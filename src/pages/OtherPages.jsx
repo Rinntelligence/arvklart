@@ -62,14 +62,14 @@ export function PricingPage({ session }) {
                 {p.features.map(f=><div key={f} style={{ fontSize:'13px', color:'#4a3c30', display:'flex', gap:'8px' }}><span style={{ color:'#7aaa7a' }}>✓</span>{f}</div>)}
                 {p.missing.map(f=><div key={f} style={{ fontSize:'13px', color:'#c0b0a0', display:'flex', gap:'8px' }}><span>—</span>{f}</div>)}
               </div>
-              <button onClick={()=>session?window.location.href='mailto:hello@heirsplit.com?subject=Upgrade to ' + p.name:navigate('/')} style={{ width:'100%', padding:'11px', background:p.name==='Free'?'#f5f0eb':p.color, color:p.name==='Free'?'#1a1410':'#fff', border:'none', borderRadius:'8px', cursor:'pointer', fontSize:'14px', fontFamily:'DM Sans, sans-serif' }}>
+              <button onClick={()=>session?window.location.href='mailto:hei@arvklart.no?subject=Oppgradering til ' + p.name:navigate('/')} style={{ width:'100%', padding:'11px', background:p.name==='Free'?'#f5f0eb':p.color, color:p.name==='Free'?'#1a1410':'#fff', border:'none', borderRadius:'8px', cursor:'pointer', fontSize:'14px', fontFamily:'DM Sans, sans-serif' }}>
                 {p.name==='Free'?'Kom i gang gratis':`Få ${p.name}`}
               </button>
             </div>
           ))}
         </div>
         <p style={{ textAlign:'center', marginTop:'32px', fontSize:'13px', color:'#a89080' }}>
-          Questions? Email us at <a href="mailto:hello@heirsplit.com" style={{ color:'#c4855a' }}>hello@heirsplit.com</a>
+          Spørsmål? Send oss en e-post på <a href="mailto:hei@arvklart.no" style={{ color:'#c4855a' }}>hei@arvklart.no</a>
         </p>
       </div>
     </div>
