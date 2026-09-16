@@ -231,11 +231,31 @@ export default function ItemDetailPage({ session, profile, onToast }) {
             <div style={{ fontSize:'14px', color:'#3A2F26', fontWeight:'500' }}>Denne gjenstanden er offisielt tildelt</div>
           </div>
         ) : showWithdrawConfirm ? (
-          <div style={{ padding:'18px', background:'#E8DFD0', border:'1px solid #C8BEA0', borderRadius:'10px', marginBottom:'24px' }}>
-            <div style={{ fontSize:'15px', color:'#3A2F26', marginBottom:'12px', fontWeight:'500' }}>Vil du angre interessen din?</div>
-            <div style={{ display:'flex', gap:'10px' }}>
-              <button onClick={() => setShowWithdrawConfirm(false)} style={{ flex:1, padding:'11px', background:'#fff', border:'1px solid #D9CFC0', borderRadius:'8px', cursor:'pointer', fontSize:'14px', fontFamily:'Karla, sans-serif', color:'#5C4530' }}>Nei, behold</button>
-              <button onClick={confirmWithdraw} style={{ flex:1, padding:'11px', background:'#8B3A3A', color:'#fff', border:'none', borderRadius:'8px', cursor:'pointer', fontSize:'14px', fontFamily:'Karla, sans-serif' }}>Ja, angre</button>
+          <div style={{ padding:'20px', background:'#F5F0E8', border:'1px solid #C8BEA0', borderRadius:'12px', marginBottom:'24px' }}>
+            <div style={{ fontSize:'15px', color:'#3A2F26', marginBottom:'4px', fontWeight:'500' }}>Vil du trekke deg?</div>
+            <div style={{ fontSize:'13px', color:'#9C8267', marginBottom:'16px' }}>Hva skal skje med gjenstanden?</div>
+            <div style={{ display:'flex', flexDirection:'column', gap:'8px', marginBottom:'14px' }}>
+              {[
+                { label:'Legg ut på Finn.no', desc:'Selg gjenstanden på nett', url:`https://www.finn.no/bap/forsale/new?title=${encodeURIComponent(item.title)}` },
+                { label:'Doner til veldighet', desc:'Gi til Fretex eller lignende', url:'https://www.fretex.no' },
+                { label:'Bestill tømming', desc:'Hent og fjern fra boet', url:`https://www.google.no/search?q=bestill+boligtømming` },
+              ].map(({ label, desc, url }) => (
+                <button key={label} onClick={() => { confirmWithdraw(); window.open(url, '_blank') }} style={{
+                  width:'100%', padding:'13px 16px', background:'#fff', border:'1px solid #D9CFC0',
+                  borderRadius:'9px', cursor:'pointer', textAlign:'left', fontFamily:'Karla, sans-serif',
+                  display:'flex', justifyContent:'space-between', alignItems:'center',
+                }}>
+                  <div>
+                    <div style={{ fontSize:'14px', color:'#3A2F26', fontWeight:'500' }}>{label}</div>
+                    <div style={{ fontSize:'12px', color:'#9C8267', marginTop:'2px' }}>{desc}</div>
+                  </div>
+                  <span style={{ color:'#9C8267', fontSize:'16px' }}>›</span>
+                </button>
+              ))}
+            </div>
+            <div style={{ display:'flex', gap:'8px' }}>
+              <button onClick={() => setShowWithdrawConfirm(false)} style={{ flex:1, padding:'10px', background:'none', border:'1px solid #D9CFC0', borderRadius:'8px', cursor:'pointer', fontSize:'13px', fontFamily:'Karla, sans-serif', color:'#5C4530' }}>Behold interessen</button>
+              <button onClick={confirmWithdraw} style={{ flex:1, padding:'10px', background:'none', border:'1px solid #C8BEA0', borderRadius:'8px', cursor:'pointer', fontSize:'13px', fontFamily:'Karla, sans-serif', color:'#8B3A3A' }}>Bare trekk meg</button>
             </div>
           </div>
         ) : myInterest ? (
