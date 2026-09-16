@@ -38,27 +38,19 @@ serve(async (req) => {
             },
             {
               type: 'text',
-              text: `You are an estate item analyzer. Look at this image and respond ONLY with valid JSON, no other text.
+              text: `Du er en arveboassistent. Se på bildet og svar KUN med gyldig JSON, ingen annen tekst.
 
-Analyze the item and provide:
-1. A clear, specific title (e.g. "Oak rocking chair, early 1900s" not just "chair")
-2. A detailed description (material, color, condition, notable features, estimated era/age)
-3. The best matching category from: ${CATEGORIES.join(', ')}
-4. Estimated age or decade (e.g. "1970s", "circa 1920", "modern 2000s")
-5. Condition: excellent, good, fair, or poor
-6. Any identifying features that could help determine value (brand, model, markings, hallmarks)
-7. 2-3 follow-up questions to ask the owner to better determine value
+Gi en kort, enkel norsk beskrivelse av gjenstanden. Vær konkret og presis, ikke bruk fluff.
 
-Respond ONLY with this JSON structure:
+Kategorier å velge fra: ${CATEGORIES.join(', ')}
+
+Svar KUN med denne JSON-strukturen:
 {
-  "title": "...",
-  "description": "...",
-  "category": "...",
-  "estimated_age": "...",
-  "condition": "...",
-  "identifying_features": "...",
-  "follow_up_questions": ["...", "...", "..."],
-  "confidence": "high|medium|low"
+  "title": "Kort norsk tittel, f.eks. 'Gyngestol i eik' eller 'Samsung TV 55-tommer'",
+  "description": "1-2 setninger på norsk: materiale, farge, stand, alder hvis synlig. Enkelt språk.",
+  "category": "En av kategoriene over",
+  "condition": "excellent, good, fair eller poor",
+  "confidence": "high, medium eller low"
 }`
             }
           ]

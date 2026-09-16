@@ -112,7 +112,7 @@ export default function AddItemPage({ session, profile, onToast }) {
     setEstimating(true)
     try {
       const cat = categories.find(c => c.id === categoryId)
-      const result = await callEdgeFunction('estimate-value', {
+      const res = await callEdgeFunction('estimate-value', {
         title,
         description,
         category: cat?.label || '',
@@ -120,7 +120,13 @@ export default function AddItemPage({ session, profile, onToast }) {
         purchase_price: purchasePrice ? parseFloat(purchasePrice) : undefined,
         purchase_year: purchaseYear ? parseInt(purchaseYear) : undefined,
       })
-      setAiEstimate(result)
+      const d = res.data || res
+      setAiEstimate({
+        low_nok: d.summary?.low_nok ?? d.low_nok,
+        high_nok: d.summary?.high_nok ?? d.high_nok,
+        likely_nok: d.summary?.likely_nok ?? d.likely_nok,
+        reasoning: d.market?.reasoning ?? d.reasoning,
+      })
     } catch (e) {
       onToast('Verdiestimering feilet', 'error')
     } finally {
