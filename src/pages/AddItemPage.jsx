@@ -84,10 +84,11 @@ export default function AddItemPage({ session, profile, onToast }) {
     setAnalyzing(true)
     try {
       const imageBase64 = await fileToBase64(imageFiles[0])
-      const result = await callEdgeFunction('analyze-item', {
+      const res = await callEdgeFunction('analyze-item', {
         imageBase64,
         mimeType: imageFiles[0].type || 'image/jpeg',
       })
+      const result = res.data || res
       if (result.title && !title) setTitle(result.title)
       if (result.description && !description) setDescription(result.description)
       if (result.condition) setCondition(result.condition)
@@ -341,7 +342,7 @@ export default function AddItemPage({ session, profile, onToast }) {
         {/* Verdiestimat-resultat */}
         {aiEstimate && (
           <div style={{ background: '#DCE3D2', border: '1px solid #B8C8A8', borderRadius: '12px', padding: '20px' }}>
-            <div style={{ fontSize: '13px', color: '#3A5A30', fontWeight: '500', marginBottom: '12px' }}>AI Verdiestimat (NOK)</div>
+            <div style={{ fontSize: '13px', color: '#3A5A30', fontWeight: '500', marginBottom: '12px' }}>Verdiestimat (NOK)</div>
             <div style={{ display: 'flex', gap: '16px', marginBottom: '12px', flexWrap: 'wrap' }}>
               <div style={{ textAlign: 'center' }}>
                 <div style={{ fontSize: '11px', color: '#9C8267', marginBottom: '2px' }}>Lavt</div>

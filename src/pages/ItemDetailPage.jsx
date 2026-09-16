@@ -20,6 +20,8 @@ export default function ItemDetailPage({ session, profile, onToast }) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [showWithdrawConfirm, setShowWithdrawConfirm] = useState(false)
   const [currentImageIndex, setCurrentImageIndex] = useState(0)
+  const [suggestedValue, setSuggestedValue] = useState('')
+  const [showSuggestInput, setShowSuggestInput] = useState(false)
   const commentsEndRef = useRef(null)
 
   const load = async () => {
@@ -68,21 +70,30 @@ export default function ItemDetailPage({ session, profile, onToast }) {
     await removeInterest(itemId, session.user.id)
     onToast('Interesse trukket tilbake')
     setShowWithdrawConfirm(false); load()
+  }
 
-  const handleEstimateVote = async (vote) => {
+  const handleEstimateVote = async (vote, suggestedValue) => {
     const voterIds = item.value_voter_ids || []
     const alreadyVoted = voterIds.includes(session.user.id)
     if (alreadyVoted) return
     const agree = (item.value_agree_count || 0) + (vote === 'agree' ? 1 : 0)
     const disagree = (item.value_disagree_count || 0) + (vote === 'disagree' ? 1 : 0)
-    await supabase.from('items').update({
+    const updateData = {
       value_agree_count: agree,
       value_disagree_count: disagree,
       value_voter_ids: [...voterIds, session.user.id],
-    }).eq('id', itemId)
+    }
+    if (vote === 'disagree' && suggestedValue) {
+      const existing = item.value_suggestions || []
+      updateData.value_suggestions = [...existing, {
+        user_id: session.user.id,
+        name: profile?.display_name || 'Ukjent',
+        value: parseFloat(suggestedValue),
+      }]
+    }
+    await supabase.from('items').update(updateData).eq('id', itemId)
     onToast(vote === 'agree' ? '👍 Stemme registrert' : '👎 Stemme registrert')
     load()
-  }
   }
 
   const handleComment = async () => {
@@ -159,30 +170,56 @@ export default function ItemDetailPage({ session, profile, onToast }) {
           const hasVoted = voterIds.includes(session.user.id)
           const totalVotes = (item.value_agree_count || 0) + (item.value_disagree_count || 0)
           const formatNOK = n => n ? new Intl.NumberFormat('nb-NO', { style:'currency', currency:'NOK', maximumFractionDigits:0 }).format(n) : '—'
+          const suggestions = item.value_suggestions || []
           return (
             <div style={{ background:'#DCE3D2', border:'1px solid #B8C8A8', borderRadius:'10px', padding:'14px', marginBottom:'12px' }}>
-              <div style={{ fontSize:'12px', color:'#3A5A30', fontWeight:'500', marginBottom:'4px' }}>AI Verdiestimat</div>
+              <div style={{ fontSize:'12px', color:'#3A5A30', fontWeight:'500', marginBottom:'4px' }}>Verdiestimat</div>
               <div style={{ fontSize:'20px', color:'#3A2F26', fontFamily:'Fraunces, serif', marginBottom:'8px' }}>
                 {formatNOK(item.estimated_value)}
               </div>
               {totalVotes > 0 && (
                 <div style={{ fontSize:'12px', color:'#5C4530', marginBottom:'8px' }}>
-                  👍 {item.value_agree_count || 0} enig · 👎 {item.value_disagree_count || 0} uenig ({totalVotes} {totalVotes === 1 ? 'stemme' : 'stemmer'})
+                  👍 {item.value_agree_count || 0} · 👎 {item.value_disagree_count || 0} ({totalVotes} {totalVotes === 1 ? 'stemme' : 'stemmer'})
+                </div>
+              )}
+              {suggestions.length > 0 && (
+                <div style={{ fontSize:'12px', color:'#5C4530', marginBottom:'8px' }}>
+                  {suggestions.map((s, i) => (
+                    <div key={i}>{s.name} foreslår {formatNOK(s.value)}</div>
+                  ))}
                 </div>
               )}
               {!hasVoted ? (
-                <div style={{ display:'flex', gap:'6px' }}>
-                  <button onClick={() => handleEstimateVote('agree')} style={{
-                    flex:1, padding:'7px', border:'1px solid #B8C8A8', borderRadius:'7px',
-                    background:'#fff', cursor:'pointer', fontSize:'13px', color:'#3A2F26', fontFamily:'Karla, sans-serif',
-                  }}>👍 Enig</button>
-                  <button onClick={() => handleEstimateVote('disagree')} style={{
-                    flex:1, padding:'7px', border:'1px solid #B8C8A8', borderRadius:'7px',
-                    background:'#fff', cursor:'pointer', fontSize:'13px', color:'#3A2F26', fontFamily:'Karla, sans-serif',
-                  }}>👎 Uenig</button>
+                <div>
+                  <div style={{ display:'flex', gap:'6px', marginBottom: showSuggestInput ? '8px' : '0' }}>
+                    <button onClick={() => { handleEstimateVote('agree'); setShowSuggestInput(false) }} style={{
+                      flex:1, padding:'8px', border:'1px solid #B8C8A8', borderRadius:'7px',
+                      background:'#5F6E52', cursor:'pointer', fontSize:'13px', color:'#fff', fontFamily:'Karla, sans-serif',
+                    }}>👍 Enig</button>
+                    <button onClick={() => setShowSuggestInput(!showSuggestInput)} style={{
+                      flex:1, padding:'8px', border:'1px solid #B8C8A8', borderRadius:'7px',
+                      background: showSuggestInput ? '#A97C3F' : '#fff', cursor:'pointer', fontSize:'13px',
+                      color: showSuggestInput ? '#fff' : '#3A2F26', fontFamily:'Karla, sans-serif',
+                    }}>👎 Uenig</button>
+                  </div>
+                  {showSuggestInput && (
+                    <div style={{ display:'flex', gap:'6px', marginTop:'8px' }}>
+                      <input
+                        type="number"
+                        value={suggestedValue}
+                        onChange={e => setSuggestedValue(e.target.value)}
+                        placeholder="Ditt estimat (NOK)"
+                        style={{ flex:1, padding:'8px 12px', border:'1px solid #B8C8A8', borderRadius:'7px', fontSize:'14px', background:'#fff', color:'#3A2F26', outline:'none', fontFamily:'Karla, sans-serif' }}
+                      />
+                      <button onClick={() => { handleEstimateVote('disagree', suggestedValue); setShowSuggestInput(false); setSuggestedValue('') }} style={{
+                        padding:'8px 14px', background:'#A97C3F', color:'#fff', border:'none', borderRadius:'7px',
+                        cursor:'pointer', fontSize:'13px', fontFamily:'Karla, sans-serif', whiteSpace:'nowrap',
+                      }}>Send inn</button>
+                    </div>
+                  )}
                 </div>
               ) : (
-                <div style={{ fontSize:'12px', color:'#5C4530' }}>Du har allerede stemt.</div>
+                <div style={{ fontSize:'12px', color:'#5C4530' }}>Du har stemt.</div>
               )}
             </div>
           )
