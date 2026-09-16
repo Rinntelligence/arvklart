@@ -68,6 +68,21 @@ export default function ItemDetailPage({ session, profile, onToast }) {
     await removeInterest(itemId, session.user.id)
     onToast('Interesse trukket tilbake')
     setShowWithdrawConfirm(false); load()
+
+  const handleEstimateVote = async (vote) => {
+    const voterIds = item.value_voter_ids || []
+    const alreadyVoted = voterIds.includes(session.user.id)
+    if (alreadyVoted) return
+    const agree = (item.value_agree_count || 0) + (vote === 'agree' ? 1 : 0)
+    const disagree = (item.value_disagree_count || 0) + (vote === 'disagree' ? 1 : 0)
+    await supabase.from('items').update({
+      value_agree_count: agree,
+      value_disagree_count: disagree,
+      value_voter_ids: [...voterIds, session.user.id],
+    }).eq('id', itemId)
+    onToast(vote === 'agree' ? '👍 Stemme registrert' : '👎 Stemme registrert')
+    load()
+  }
   }
 
   const handleComment = async () => {
@@ -139,7 +154,39 @@ export default function ItemDetailPage({ session, profile, onToast }) {
         <p style={{ color:'#9C8267', fontSize:'13px', marginBottom:'8px' }}>
           Lagt inn av {item.added_by_name || 'ukjent'} · {new Date(item.created_at).toLocaleDateString('nb-NO', { day:'numeric', month:'long', year:'numeric' })}
         </p>
-        {item.estimated_value && <p style={{ color:'#5F6E52', fontSize:'13px', marginBottom:'8px' }}>Estimert verdi: {item.estimated_value}</p>}
+        {item.estimated_value && (() => {
+          const voterIds = item.value_voter_ids || []
+          const hasVoted = voterIds.includes(session.user.id)
+          const totalVotes = (item.value_agree_count || 0) + (item.value_disagree_count || 0)
+          const formatNOK = n => n ? new Intl.NumberFormat('nb-NO', { style:'currency', currency:'NOK', maximumFractionDigits:0 }).format(n) : '—'
+          return (
+            <div style={{ background:'#DCE3D2', border:'1px solid #B8C8A8', borderRadius:'10px', padding:'14px', marginBottom:'12px' }}>
+              <div style={{ fontSize:'12px', color:'#3A5A30', fontWeight:'500', marginBottom:'4px' }}>AI Verdiestimat</div>
+              <div style={{ fontSize:'20px', color:'#3A2F26', fontFamily:'Fraunces, serif', marginBottom:'8px' }}>
+                {formatNOK(item.estimated_value)}
+              </div>
+              {totalVotes > 0 && (
+                <div style={{ fontSize:'12px', color:'#5C4530', marginBottom:'8px' }}>
+                  👍 {item.value_agree_count || 0} enig · 👎 {item.value_disagree_count || 0} uenig ({totalVotes} {totalVotes === 1 ? 'stemme' : 'stemmer'})
+                </div>
+              )}
+              {!hasVoted ? (
+                <div style={{ display:'flex', gap:'6px' }}>
+                  <button onClick={() => handleEstimateVote('agree')} style={{
+                    flex:1, padding:'7px', border:'1px solid #B8C8A8', borderRadius:'7px',
+                    background:'#fff', cursor:'pointer', fontSize:'13px', color:'#3A2F26', fontFamily:'Karla, sans-serif',
+                  }}>👍 Enig</button>
+                  <button onClick={() => handleEstimateVote('disagree')} style={{
+                    flex:1, padding:'7px', border:'1px solid #B8C8A8', borderRadius:'7px',
+                    background:'#fff', cursor:'pointer', fontSize:'13px', color:'#3A2F26', fontFamily:'Karla, sans-serif',
+                  }}>👎 Uenig</button>
+                </div>
+              ) : (
+                <div style={{ fontSize:'12px', color:'#5C4530' }}>Du har allerede stemt.</div>
+              )}
+            </div>
+          )
+        })()}
         {item.description && <p style={{ color:'#5C4530', lineHeight:'1.8', marginBottom:'24px', fontSize:'15px' }}>{item.description}</p>}
 
         {isAssigned ? (

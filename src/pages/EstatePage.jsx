@@ -161,7 +161,7 @@ export default function EstatePage({ session, profile, onToast, isDemo }) {
         {[
           { path:`/estate/${id}/guide`, label:'Veiviser', desc:'For arveprosessen', color:'#DCE3D2', border:'#B8C8A8' },
           { path:`/estate/${id}/heirs`, label:'Arvinger', desc:'Fordelingskalkulator', color:'#DCE3D2', border:'#B8C8A8' },
-          ...(contested > 0 ? [{ path:`/estate/${id}/conflicts`, label:'Konfliktløsning', desc:`${contested} ettertraktede`, color:'#E8DFD0', border:'#C8B8A0', highlight: true }] : []),
+          ...(contested > 0 ? [{ path:`/estate/${id}/conflicts`, label:'Løsningsmetoder', desc:`${contested} ettertraktede`, color:'#E8DFD0', border:'#C8B8A0', highlight: true }] : []),
         ].map(mod => (
           <button key={mod.path} onClick={() => navigate(mod.path)} style={{
             padding:'16px', background:mod.color, border:`1.5px solid ${mod.border}`,

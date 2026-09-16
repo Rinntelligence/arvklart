@@ -22,7 +22,6 @@ import { JoinPage, PricingPage, CategoriesPage } from './pages/OtherPages'
 import ConflictPage from './pages/ConflictPage'
 import TopBar from './components/TopBar'
 import Toast from './components/Toast'
-import LanguageSwitcher from './components/LanguageSwitcher'
 import FeedbackWidget from './components/FeedbackWidget'
 
 export default function App() {
@@ -52,13 +51,28 @@ export default function App() {
       .then(async ({ data }) => {
         setProfile(data)
         if (isDemo) {
-          // Demo user: always go straight to conflicts page
           const { data: membership } = await supabase
             .from('estate_members')
             .select('estate_id')
             .eq('user_id', session.user.id)
             .limit(1)
             .single()
+          if (membership?.estate_id) {
+            // Reset demo data on each login so state is fresh for next visitor
+            const estateId = membership.estate_id
+            const { data: demoItems } = await supabase
+              .from('items')
+              .select('id')
+              .eq('estate_id', estateId)
+            if (demoItems?.length) {
+              const itemIds = demoItems.map(i => i.id)
+              await supabase.from('interests').delete().in('item_id', itemIds)
+              await supabase.from('items')
+                .update({ assigned_to: null, status: 'active' })
+                .eq('estate_id', estateId)
+                .eq('status', 'assigned')
+            }
+          }
           navigate(membership?.estate_id ? `/estate/${membership.estate_id}` : '/')
         } else if (!data?.display_name) {
           navigate('/setup')
@@ -101,7 +115,6 @@ export default function App() {
           </div>
         )}
         {toast && <Toast msg={toast.msg} type={toast.type} />}
-        <LanguageSwitcher />
         {!isDemo && <FeedbackWidget session={session} />}
         <Routes>
           <Route path="/" element={<EstatesPage session={session} profile={profile} onToast={showToast} isDemo={isDemo} />} />

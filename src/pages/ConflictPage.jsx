@@ -172,7 +172,7 @@ export default function ConflictPage({ session, onToast }) {
       <button onClick={() => navigate(`/estate/${id}`)} style={{ background:'none', border:'none', color:'#9C8267', cursor:'pointer', fontSize:'13px', padding:'0 0 16px', fontFamily:'Karla, sans-serif' }}>← Tilbake til boet</button>
       <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', marginBottom:'28px', flexWrap:'wrap', gap:'12px' }}>
         <div>
-          <h1 style={{ fontFamily:'Fraunces, serif', fontSize:'26px', fontWeight:'400', color:'#3A2F26', marginBottom:'4px' }}>Konfliktløsning</h1>
+          <h1 style={{ fontFamily:'Fraunces, serif', fontSize:'26px', fontWeight:'400', color:'#3A2F26', marginBottom:'4px' }}>Løsningsmetoder</h1>
           <p style={{ color:'#9C8267', fontSize:'14px' }}>{items.length} gjenstander med overlappende interesser</p>
         </div>
         <div style={{ background:resolvedCount===items.length?'#DCE3D2':'#E8DFD0', border:`1px solid ${resolvedCount===items.length?'#B8C8A8':'#C8BEA0'}`, borderRadius:'8px', padding:'8px 16px', fontSize:'13px', color:resolvedCount===items.length?'#3A5A30':'#5C4530' }}>

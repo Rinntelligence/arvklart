@@ -43,6 +43,7 @@ export default function AddItemPage({ session, profile, onToast }) {
   const [aiEstimate, setAiEstimate] = useState(null)
   const [purchasePrice, setPurchasePrice] = useState('')
   const [purchaseYear, setPurchaseYear] = useState('')
+  const [myEstimateVote, setMyEstimateVote] = useState(null) // 'agree' | 'disagree'
   const fileRef = useRef()
 
   useEffect(() => {
@@ -143,6 +144,9 @@ export default function AddItemPage({ session, profile, onToast }) {
         estimated_value: aiEstimate?.likely_nok || null,
         purchase_price: purchasePrice ? parseFloat(purchasePrice) : null,
         purchase_year: purchaseYear ? parseInt(purchaseYear) : null,
+        value_agree_count: myEstimateVote === 'agree' ? 1 : 0,
+        value_disagree_count: myEstimateVote === 'disagree' ? 1 : 0,
+        value_voter_ids: myEstimateVote ? [session.user.id] : [],
       }).select().single()
 
       if (error) throw error
@@ -352,7 +356,34 @@ export default function AddItemPage({ session, profile, onToast }) {
                 <div style={{ fontSize: '18px', color: '#3A2F26', fontFamily: 'Fraunces, serif' }}>{formatNOK(aiEstimate.high_nok)}</div>
               </div>
             </div>
-            {aiEstimate.reasoning && <p style={{ fontSize: '12px', color: '#5C4530', lineHeight: '1.5', marginBottom: '0' }}>{aiEstimate.reasoning}</p>}
+            {aiEstimate.reasoning && <p style={{ fontSize: '12px', color: '#5C4530', lineHeight: '1.5', marginBottom: '8px' }}>{aiEstimate.reasoning}</p>}
+
+            {/* Voting */}
+            <div style={{ borderTop: '1px solid #B8C8A8', paddingTop: '12px', marginTop: '4px' }}>
+              <div style={{ fontSize: '12px', color: '#5C4530', marginBottom: '8px' }}>Er du enig i estimatet?</div>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button onClick={() => setMyEstimateVote(myEstimateVote === 'agree' ? null : 'agree')} style={{
+                  flex: 1, padding: '9px', border: `2px solid ${myEstimateVote === 'agree' ? '#5F6E52' : '#B8C8A8'}`,
+                  borderRadius: '8px', cursor: 'pointer', fontSize: '14px',
+                  background: myEstimateVote === 'agree' ? '#5F6E52' : '#fff',
+                  color: myEstimateVote === 'agree' ? '#fff' : '#5C4530',
+                  fontFamily: 'Karla, sans-serif', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
+                }}>👍 Enig</button>
+                <button onClick={() => setMyEstimateVote(myEstimateVote === 'disagree' ? null : 'disagree')} style={{
+                  flex: 1, padding: '9px', border: `2px solid ${myEstimateVote === 'disagree' ? '#A97C3F' : '#B8C8A8'}`,
+                  borderRadius: '8px', cursor: 'pointer', fontSize: '14px',
+                  background: myEstimateVote === 'disagree' ? '#A97C3F' : '#fff',
+                  color: myEstimateVote === 'disagree' ? '#fff' : '#5C4530',
+                  fontFamily: 'Karla, sans-serif', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
+                }}>👎 Uenig</button>
+              </div>
+              {myEstimateVote && (
+                <p style={{ fontSize: '11px', color: '#5C4530', marginTop: '6px', marginBottom: 0 }}>
+                  {myEstimateVote === 'agree' ? 'Stemmen din lagres — andre arvinger kan også stemme.' : 'Stemmen din lagres — andre arvinger kan også stemme.'}
+                </p>
+              )}
+            </div>
+
             <p style={{ fontSize: '11px', color: '#9C8267', marginTop: '8px', marginBottom: 0 }}>Estimater er kun veiledende — ikke profesjonell takst.</p>
           </div>
         )}
