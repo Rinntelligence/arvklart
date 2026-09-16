@@ -44,14 +44,28 @@ export default function AddItemPage({ session, profile, onToast }) {
   const [purchasePrice, setPurchasePrice] = useState('')
   const [purchaseYear, setPurchaseYear] = useState('')
   const [myEstimateVote, setMyEstimateVote] = useState(null) // 'agree' | 'disagree'
+  const [showAddCat, setShowAddCat] = useState(false)
+  const [newCatLabel, setNewCatLabel] = useState('')
+  const [newCatEmoji, setNewCatEmoji] = useState('📦')
+  const [savingCat, setSavingCat] = useState(false)
   const fileRef = useRef()
 
-  useEffect(() => {
-    getCategories(id).then(({ data }) => {
-      setCategories(data || [])
-      if (data?.length) setCategoryId(data[0].id)
-    })
-  }, [id])
+  const loadCategories = () => getCategories(id).then(({ data }) => {
+    setCategories(data || [])
+    if (data?.length && !categoryId) setCategoryId(data[0].id)
+  })
+
+  useEffect(() => { loadCategories() }, [id])
+
+  const addCategory = async () => {
+    if (!newCatLabel.trim()) return
+    setSavingCat(true)
+    const { data: newCat } = await supabase.from('categories').insert({ label: newCatLabel.trim(), emoji: newCatEmoji, estate_id: id }).select().single()
+    setSavingCat(false)
+    setNewCatLabel(''); setNewCatEmoji('📦'); setShowAddCat(false)
+    await loadCategories()
+    if (newCat) setCategoryId(newCat.id)
+  }
 
   const handleImages = (e) => {
     const MAX_IMAGE_SIZE = 10 * 1024 * 1024 // 10 MB
@@ -265,19 +279,57 @@ export default function AddItemPage({ session, profile, onToast }) {
 
         {/* Kategori */}
         <div>
-          <label style={{ display: 'block', fontSize: '13px', color: '#9C8267', marginBottom: '6px' }}>
+          <label style={{ display: 'block', fontSize: '13px', color: '#9C8267', marginBottom: '8px' }}>
             Kategori
           </label>
-          {categories.length === 0 ? (
-            <p style={{ fontSize: '13px', color: '#9C8267' }}>Ingen kategorier ennå — <button onClick={() => navigate(`/estate/${id}/categories`)} style={{ background: 'none', border: 'none', color: '#5F6E52', cursor: 'pointer', fontFamily: 'Karla, sans-serif', fontSize: '13px', padding: 0, textDecoration: 'underline' }}>legg til kategorier</button></p>
-          ) : (
-            <select value={categoryId} onChange={e => setCategoryId(e.target.value)} style={{
-              width: '100%', padding: '14px', border: '1px solid #D9CFC0',
-              borderRadius: '10px', fontSize: '16px', background: '#FBF9F5',
-              color: '#3A2F26', outline: 'none', fontFamily: 'Karla, sans-serif',
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+            {categories.map(c => (
+              <button key={c.id} onClick={() => setCategoryId(c.id)} style={{
+                padding: '8px 14px', borderRadius: '20px', cursor: 'pointer', fontSize: '13px',
+                fontFamily: 'Karla, sans-serif', border: `2px solid ${categoryId === c.id ? '#3A2F26' : '#D9CFC0'}`,
+                background: categoryId === c.id ? '#3A2F26' : '#FBF9F5',
+                color: categoryId === c.id ? '#FBF9F5' : '#5C4530',
+                transition: 'all 0.12s',
+              }}>
+                {c.label}
+              </button>
+            ))}
+            <button onClick={() => setShowAddCat(!showAddCat)} style={{
+              padding: '8px 14px', borderRadius: '20px', cursor: 'pointer', fontSize: '13px',
+              fontFamily: 'Karla, sans-serif', border: '2px dashed #D9CFC0',
+              background: 'transparent', color: '#9C8267',
             }}>
-              {categories.map(c => <option key={c.id} value={c.id}>{c.emoji} {c.label}</option>)}
-            </select>
+              + Ny kategori
+            </button>
+          </div>
+
+          {showAddCat && (
+            <div style={{ marginTop: '12px', background: '#FBF9F5', border: '1px solid #D9CFC0', borderRadius: '10px', padding: '14px' }}>
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <input
+                  value={newCatLabel}
+                  onChange={e => setNewCatLabel(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && addCategory()}
+                  placeholder="Kategorinavn…"
+                  maxLength={60}
+                  autoFocus
+                  style={{
+                    flex: 1, padding: '8px 12px', border: '1px solid #D9CFC0', borderRadius: '8px',
+                    fontSize: '14px', background: '#fff', color: '#3A2F26', outline: 'none', fontFamily: 'Karla, sans-serif',
+                  }}
+                />
+                <button onClick={addCategory} disabled={!newCatLabel.trim() || savingCat} style={{
+                  padding: '8px 14px', background: newCatLabel.trim() ? '#3A2F26' : '#D9CFC0', color: '#FBF9F5',
+                  border: 'none', borderRadius: '8px', cursor: newCatLabel.trim() ? 'pointer' : 'not-allowed',
+                  fontSize: '13px', fontFamily: 'Karla, sans-serif', whiteSpace: 'nowrap',
+                }}>
+                  {savingCat ? '…' : 'Legg til'}
+                </button>
+                <button onClick={() => { setShowAddCat(false); setNewCatLabel('') }} style={{
+                  padding: '8px', background: 'none', border: 'none', cursor: 'pointer', color: '#9C8267', fontSize: '16px',
+                }}>×</button>
+              </div>
+            </div>
           )}
         </div>
 
@@ -375,14 +427,14 @@ export default function AddItemPage({ session, profile, onToast }) {
                   background: myEstimateVote === 'agree' ? '#5F6E52' : '#fff',
                   color: myEstimateVote === 'agree' ? '#fff' : '#5C4530',
                   fontFamily: 'Karla, sans-serif', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
-                }}>👍 Enig</button>
+                }}>Enig</button>
                 <button onClick={() => setMyEstimateVote(myEstimateVote === 'disagree' ? null : 'disagree')} style={{
                   flex: 1, padding: '9px', border: `2px solid ${myEstimateVote === 'disagree' ? '#A97C3F' : '#B8C8A8'}`,
                   borderRadius: '8px', cursor: 'pointer', fontSize: '14px',
                   background: myEstimateVote === 'disagree' ? '#A97C3F' : '#fff',
                   color: myEstimateVote === 'disagree' ? '#fff' : '#5C4530',
                   fontFamily: 'Karla, sans-serif', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
-                }}>👎 Uenig</button>
+                }}>Uenig</button>
               </div>
               {myEstimateVote && (
                 <p style={{ fontSize: '11px', color: '#5C4530', marginTop: '6px', marginBottom: 0 }}>

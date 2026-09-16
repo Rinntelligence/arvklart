@@ -92,7 +92,7 @@ export default function ItemDetailPage({ session, profile, onToast }) {
       }]
     }
     await supabase.from('items').update(updateData).eq('id', itemId)
-    onToast(vote === 'agree' ? '👍 Stemme registrert' : '👎 Stemme registrert')
+    onToast('Stemme registrert')
     load()
   }
 
@@ -179,7 +179,7 @@ export default function ItemDetailPage({ session, profile, onToast }) {
               </div>
               {totalVotes > 0 && (
                 <div style={{ fontSize:'12px', color:'#5C4530', marginBottom:'8px' }}>
-                  👍 {item.value_agree_count || 0} · 👎 {item.value_disagree_count || 0} ({totalVotes} {totalVotes === 1 ? 'stemme' : 'stemmer'})
+                  Enig: {item.value_agree_count || 0} · Uenig: {item.value_disagree_count || 0} ({totalVotes} {totalVotes === 1 ? 'stemme' : 'stemmer'})
                 </div>
               )}
               {suggestions.length > 0 && (
@@ -195,12 +195,12 @@ export default function ItemDetailPage({ session, profile, onToast }) {
                     <button onClick={() => { handleEstimateVote('agree'); setShowSuggestInput(false) }} style={{
                       flex:1, padding:'8px', border:'1px solid #B8C8A8', borderRadius:'7px',
                       background:'#5F6E52', cursor:'pointer', fontSize:'13px', color:'#fff', fontFamily:'Karla, sans-serif',
-                    }}>👍 Enig</button>
+                    }}>Enig</button>
                     <button onClick={() => setShowSuggestInput(!showSuggestInput)} style={{
                       flex:1, padding:'8px', border:'1px solid #B8C8A8', borderRadius:'7px',
                       background: showSuggestInput ? '#A97C3F' : '#fff', cursor:'pointer', fontSize:'13px',
                       color: showSuggestInput ? '#fff' : '#3A2F26', fontFamily:'Karla, sans-serif',
-                    }}>👎 Uenig</button>
+                    }}>Uenig</button>
                   </div>
                   {showSuggestInput && (
                     <div style={{ display:'flex', gap:'6px', marginTop:'8px' }}>

@@ -3,9 +3,9 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY')
 
 const CATEGORIES = [
-  'Furniture', 'Art & pictures', 'Books', 'Kitchen', 
-  'Decorations', 'Electronics', 'Clothing & textiles', 
-  'Jewelry', 'Tools', 'Sports & outdoors', 'Collectibles', 'Other'
+  'Møbler', 'Kunst og bilder', 'Bøker', 'Kjøkken',
+  'Dekorasjoner', 'Elektronikk', 'Klær og tekstiler',
+  'Smykker', 'Verktøy', 'Sportsutstyr', 'Samleobjekter', 'Kjøretøy', 'Dokumenter', 'Annet'
 ]
 
 const corsHeaders = {
