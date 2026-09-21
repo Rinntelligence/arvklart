@@ -3,6 +3,9 @@ import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY
+
 export function JoinPage({ session, onToast }) {
   const { code } = useParams()
   const navigate = useNavigate()
@@ -130,6 +133,171 @@ export function CategoriesPage({ session, onToast }) {
             <button onClick={()=>remove(c.id)} style={{ background:'none', border:'none', color:'#c0a090', cursor:'pointer', fontSize:'20px' }}>×</button>
           </div>
         ))}
+      </div>
+    </div>
+  )
+}
+
+// ── PrivacyPage ───────────────────────────────────────────────────────────────
+export function PrivacyPage() {
+  const [tab, setTab] = useState('privacy')
+  const s = { fontFamily: 'Karla, sans-serif', maxWidth: '720px', margin: '0 auto', padding: '40px 20px 80px', color: '#3A2F26', lineHeight: '1.8' }
+  const h2s = { fontFamily: 'Fraunces, serif', fontSize: '20px', fontWeight: '400', marginTop: '32px', marginBottom: '8px', color: '#3A2F26' }
+  const ps = { fontSize: '15px', color: '#5C4530', marginBottom: '12px' }
+  const lis = { fontSize: '15px', color: '#5C4530', marginBottom: '6px' }
+  return (
+    <div style={s}>
+      <h1 style={{ fontFamily: 'Fraunces, serif', fontSize: '28px', fontWeight: '400', color: '#3A2F26', marginBottom: '6px' }}>Juridisk</h1>
+      <p style={{ color: '#9C8267', fontSize: '14px', marginBottom: '28px' }}>Sist oppdatert: september 2024</p>
+      <div style={{ display: 'flex', gap: '8px', marginBottom: '32px', borderBottom: '1px solid #E8DFD0', paddingBottom: '16px' }}>
+        {[['privacy', 'Personvernerklæring'], ['terms', 'Vilkår for bruk']].map(([key, label]) => (
+          <button key={key} onClick={() => setTab(key)} style={{ padding: '8px 18px', borderRadius: '20px', border: 'none', cursor: 'pointer', fontFamily: 'Karla, sans-serif', fontSize: '14px', background: tab === key ? '#3A2F26' : '#E8DFD0', color: tab === key ? '#FBF9F5' : '#5C4530' }}>{label}</button>
+        ))}
+      </div>
+
+      {tab === 'privacy' && (
+        <div>
+          <p style={ps}>Denne personvernerklæringen beskriver hvordan ArvKlart («vi», «oss», «tjenesten») behandler personopplysninger om deg som bruker.</p>
+          <p style={{ ...ps, background: '#DCE3D2', border: '1px solid #B8C8A8', borderRadius: '8px', padding: '12px 16px' }}>
+            <strong>Behandlingsansvarlig:</strong> [SELSKAPSNAVN AS], org.nr. [ORGNR] · kontakt: hei@arvklart.no
+          </p>
+          <h2 style={h2s}>Hva vi samler inn</h2>
+          <ul>
+            <li style={lis}><strong>Kontoopplysninger:</strong> navn og e-postadresse ved registrering.</li>
+            <li style={lis}><strong>Bo-innhold:</strong> bilder, beskrivelser og anslåtte verdier av gjenstander.</li>
+            <li style={lis}><strong>Interesser og kommentarer</strong> du registrerer på gjenstander.</li>
+            <li style={lis}><strong>Tekniske data:</strong> IP-adresse og innloggingstidspunkt, behandlet av infrastrukturleverandøren.</li>
+          </ul>
+          <h2 style={h2s}>Grunnlag og formål</h2>
+          <ul>
+            <li style={lis}><strong>Avtaleutførelse</strong> (GDPR art. 6 nr. 1 b): levering av tjenesten du har bedt om.</li>
+            <li style={lis}><strong>Berettiget interesse</strong> (GDPR art. 6 nr. 1 f): sikkerhet og feilsøking.</li>
+            <li style={lis}><strong>Samtykke</strong> (GDPR art. 6 nr. 1 a): AI-analyse av bilder — du gir samtykke eksplisitt ved bruk av denne funksjonen.</li>
+          </ul>
+          <h2 style={h2s}>Tredjeparter som mottar data</h2>
+          <ul>
+            <li style={lis}><strong>Supabase Inc. (USA)</strong> — database og autentisering. Databehandleravtale inngått. Data lagres i EU (Frankfurt, AWS eu-central-1).</li>
+            <li style={lis}><strong>Vercel Inc. (USA)</strong> — hosting av webapplikasjonen. Databehandleravtale inngått.</li>
+            <li style={lis}><strong>Anthropic PBC (USA)</strong> — AI-bildeanalyse, kun ved ditt eksplisitte samtykke. Anthropic bruker ikke API-data til modelltrening. Se <a href="https://www.anthropic.com/privacy" target="_blank" rel="noreferrer" style={{ color: '#5F6E52' }}>Anthropics personvernerklæring</a>.</li>
+          </ul>
+          <h2 style={h2s}>Lagringstid</h2>
+          <p style={ps}>Opplysninger lagres så lenge kontoen er aktiv. Ved kontosletting slettes personopplysninger innen 30 dager, med unntak av det vi er rettslig forpliktet til å oppbevare.</p>
+          <h2 style={h2s}>Dine rettigheter</h2>
+          <p style={ps}>Du har rett til innsyn, retting, sletting, dataportabilitet og å protestere mot behandlingen. Utøv disse via «Min konto» i appen, eller kontakt oss på hei@arvklart.no. Du kan klage til <a href="https://www.datatilsynet.no" target="_blank" rel="noreferrer" style={{ color: '#5F6E52' }}>Datatilsynet</a>.</p>
+          <h2 style={h2s}>Sikkerhet</h2>
+          <p style={ps}>All kommunikasjon er TLS-kryptert. Data er kryptert i ro. Tilgang til produksjonsdata er begrenset til autorisert personell.</p>
+          <h2 style={h2s}>Endringer</h2>
+          <p style={ps}>Vesentlige endringer varsles på e-post minst 30 dager i forkant.</p>
+          <h2 style={h2s}>Kontakt</h2>
+          <p style={ps}><a href="mailto:hei@arvklart.no" style={{ color: '#5F6E52' }}>hei@arvklart.no</a></p>
+        </div>
+      )}
+
+      {tab === 'terms' && (
+        <div>
+          <p style={ps}>Ved å opprette konto og bruke ArvKlart godtar du disse vilkårene.</p>
+          <h2 style={h2s}>Tjenestebeskrivelse</h2>
+          <p style={ps}>ArvKlart er en digital plattform for registrering og fordeling av gjenstander i dødsbo. Tjenesten er et hjelpeverktøy og erstatter ikke juridisk rådgivning, testament eller bindende arveavtaler.</p>
+          <h2 style={h2s}>Konto og ansvar</h2>
+          <ul>
+            <li style={lis}>Du er ansvarlig for å holde innloggingsdetaljene sikre.</li>
+            <li style={lis}>Du er ansvarlig for innhold du laster opp og bekrefter at du har rett til å dele det.</li>
+            <li style={lis}>Tjenesten kan ikke brukes til ulovlige formål.</li>
+          </ul>
+          <h2 style={h2s}>Tilgjengelighet og endringer</h2>
+          <p style={ps}>Vi tilstreber høy oppetid, men garanterer ikke 100 % tilgjengelighet. Vi forbeholder oss retten til å endre eller avslutte tjenesten med rimelig varsel.</p>
+          <h2 style={h2s}>Ansvarsfraskrivelse</h2>
+          <p style={ps}>Verdiestimat fra AI er veiledende og ikke profesjonell takst. Vi er ikke ansvarlige for beslutninger tatt på bakgrunn av estimater. Tjenesten leveres «som den er» uten garantier utover ufravikelig lovgivning.</p>
+          <h2 style={h2s}>Abonnement og betaling</h2>
+          <p style={ps}>Gratis-tieren er gratis uten tidsbegrensning. Betalte abonnementer faktureres forskuddsvis. Refusjon gis ikke for påbegynt periode.</p>
+          <h2 style={h2s}>Gjeldende lov</h2>
+          <p style={ps}>Norsk lov gjelder. Tvister søkes løst i minnelighet; ellers ved Oslo tingrett.</p>
+          <h2 style={h2s}>Kontakt</h2>
+          <p style={ps}><a href="mailto:hei@arvklart.no" style={{ color: '#5F6E52' }}>hei@arvklart.no</a></p>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── AccountPage ───────────────────────────────────────────────────────────────
+export function AccountPage({ session, onToast }) {
+  const navigate = useNavigate()
+  const [confirmDelete, setConfirmDelete] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [exporting, setExporting] = useState(false)
+
+  const exportData = async () => {
+    setExporting(true)
+    try {
+      const [{ data: profile }, { data: interests }, { data: comments }] = await Promise.all([
+        supabase.from('profiles').select('*').eq('user_id', session.user.id).single(),
+        supabase.from('interests').select('*, items(title)').eq('user_id', session.user.id),
+        supabase.from('comments').select('*, items(title)').eq('user_id', session.user.id),
+      ])
+      const blob = new Blob([JSON.stringify({ profile, interests, comments, exported_at: new Date().toISOString() }, null, 2)], { type: 'application/json' })
+      const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'mine-data-arvklart.json'; a.click()
+      onToast('Data lastet ned')
+    } catch { onToast('Eksport feilet', 'error') }
+    setExporting(false)
+  }
+
+  const deleteAccount = async () => {
+    setDeleting(true)
+    try {
+      const { data: { session: s } } = await supabase.auth.getSession()
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/delete-account`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${s.access_token}`, 'apikey': SUPABASE_ANON_KEY },
+      })
+      const result = await res.json()
+      if (!result.success) throw new Error(result.error || 'Ukjent feil')
+      await supabase.auth.signOut()
+      navigate('/home')
+    } catch (e) {
+      onToast('Feil ved sletting: ' + e.message, 'error')
+      setDeleting(false)
+    }
+  }
+
+  return (
+    <div style={{ maxWidth: '560px', margin: '0 auto', padding: '40px 20px', fontFamily: 'Karla, sans-serif' }}>
+      <h1 style={{ fontFamily: 'Fraunces, serif', fontSize: '26px', fontWeight: '400', color: '#3A2F26', marginBottom: '6px' }}>Min konto</h1>
+      <p style={{ color: '#9C8267', fontSize: '14px', marginBottom: '32px' }}>{session.user.email}</p>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+
+        <div style={{ background: '#fff', border: '1px solid #D9CFC0', borderRadius: '12px', padding: '24px' }}>
+          <h2 style={{ fontFamily: 'Fraunces, serif', fontSize: '17px', fontWeight: '400', color: '#3A2F26', marginBottom: '6px' }}>Last ned dine data</h2>
+          <p style={{ fontSize: '14px', color: '#5C4530', marginBottom: '16px', lineHeight: '1.6' }}>Last ned alle personopplysninger vi har om deg (profil, interesser, kommentarer) som JSON-fil.</p>
+          <button onClick={exportData} disabled={exporting} style={{ padding: '10px 20px', background: '#5F6E52', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '14px', fontFamily: 'Karla, sans-serif' }}>
+            {exporting ? 'Eksporterer…' : 'Last ned mine data'}
+          </button>
+        </div>
+
+        <div style={{ background: '#fff', border: '1px solid #D9CFC0', borderRadius: '12px', padding: '24px' }}>
+          <h2 style={{ fontFamily: 'Fraunces, serif', fontSize: '17px', fontWeight: '400', color: '#3A2F26', marginBottom: '6px' }}>Personvern og vilkår</h2>
+          <p style={{ fontSize: '14px', color: '#5C4530', marginBottom: '12px', lineHeight: '1.6' }}>Les vår personvernerklæring og vilkår for bruk av tjenesten.</p>
+          <a href="/personvern" style={{ fontSize: '14px', color: '#5F6E52' }}>Åpne personvernerklæring →</a>
+        </div>
+
+        <div style={{ background: '#fff', border: '1px solid #F0D4D4', borderRadius: '12px', padding: '24px' }}>
+          <h2 style={{ fontFamily: 'Fraunces, serif', fontSize: '17px', fontWeight: '400', color: '#8B3A3A', marginBottom: '6px' }}>Slett konto</h2>
+          <p style={{ fontSize: '14px', color: '#5C4530', marginBottom: '16px', lineHeight: '1.6' }}>Sletter kontoen og alle personopplysninger permanent. Bo og gjenstander delt med andre beholdes.</p>
+          {!confirmDelete ? (
+            <button onClick={() => setConfirmDelete(true)} style={{ padding: '10px 20px', background: 'none', border: '1px solid #8B3A3A', color: '#8B3A3A', borderRadius: '8px', cursor: 'pointer', fontSize: '14px', fontFamily: 'Karla, sans-serif' }}>Slett min konto</button>
+          ) : (
+            <div>
+              <p style={{ fontSize: '14px', color: '#8B3A3A', marginBottom: '12px', fontWeight: '500' }}>Er du helt sikker? Dette kan ikke angres.</p>
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <button onClick={() => setConfirmDelete(false)} style={{ flex: 1, padding: '10px', background: 'none', border: '1px solid #D9CFC0', borderRadius: '8px', cursor: 'pointer', fontSize: '14px', fontFamily: 'Karla, sans-serif', color: '#5C4530' }}>Avbryt</button>
+                <button onClick={deleteAccount} disabled={deleting} style={{ flex: 1, padding: '10px', background: '#8B3A3A', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '14px', fontFamily: 'Karla, sans-serif' }}>
+                  {deleting ? 'Sletter…' : 'Ja, slett permanent'}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+
       </div>
     </div>
   )

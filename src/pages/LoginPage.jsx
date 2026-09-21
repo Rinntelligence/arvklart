@@ -89,6 +89,13 @@ export default function LoginPage({ onToast }) {
               cursor:canSubmit?'pointer':'not-allowed', fontSize:'15px', fontFamily:'Karla, sans-serif',
             }}>{loading?'Please wait…':mode==='login'?'Log in':'Create account'}</button>
 
+            {mode==='signup' && (
+              <p style={{ textAlign:'center', marginTop:'12px', fontSize:'12px', color:'#9C8267', lineHeight:'1.6' }}>
+                Ved å opprette konto godtar du våre{' '}
+                <a href="/personvern" style={{ color:'#5F6E52' }}>vilkår og personvernerklæring</a>.
+              </p>
+            )}
+
             <p style={{ textAlign:'center', marginTop:'16px', fontSize:'13px', color:'#9C8267' }}>
               {mode==='login'?<>New here?{' '}<button onClick={()=>setMode('signup')} style={{ background:'none', border:'none', color:'#5F6E52', cursor:'pointer', fontSize:'13px', fontFamily:'Karla, sans-serif', textDecoration:'underline' }}>Create account</button></>
               :<>Have an account?{' '}<button onClick={()=>setMode('login')} style={{ background:'none', border:'none', color:'#5F6E52', cursor:'pointer', fontSize:'13px', fontFamily:'Karla, sans-serif', textDecoration:'underline' }}>Log in</button></>}

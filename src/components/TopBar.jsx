@@ -63,6 +63,7 @@ export default function TopBar({ profile, session, estate }) {
 
             {[
               { label: 'Min profil', action: () => { navigate('/setup'); setMenuOpen(false) } },
+              { label: 'Min konto', action: () => { navigate('/konto'); setMenuOpen(false) } },
               ...(profile?.is_founder ? [{ label: 'Founder dashboard', action: () => { navigate('/founder'); setMenuOpen(false) } }] : []),
               { label: 'Logg ut', action: () => { signOut(); setMenuOpen(false) }, danger: true },
             ].map(({ label, action, danger }) => (
