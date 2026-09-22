@@ -283,8 +283,9 @@ export default function LandingPage() {
           <ul className="foot-links">
             <li><a href="#">Om oss</a></li>
             <li><a href="#">For advokater og meklere</a></li>
-            <li><a href="#">Personvern</a></li>
-            <li><a href="#">Kontakt</a></li>
+            <li><a href="/personvern">Personvernerklæring</a></li>
+            <li><a href="/personvern#vilkar">Vilkår for bruk</a></li>
+            <li><a href="mailto:hei@arvklart.no">Kontakt</a></li>
           </ul>
         </footer>
       </div>

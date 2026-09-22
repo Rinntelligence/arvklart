@@ -140,7 +140,12 @@ export function CategoriesPage({ session, onToast }) {
 
 // ── PrivacyPage ───────────────────────────────────────────────────────────────
 export function PrivacyPage() {
-  const [tab, setTab] = useState('privacy')
+  const [tab, setTab] = useState(() => window.location.hash === '#vilkar' ? 'terms' : 'privacy')
+
+  const switchTab = (key) => {
+    setTab(key)
+    window.history.replaceState(null, '', key === 'terms' ? '#vilkar' : '#')
+  }
   const s = { fontFamily: 'Karla, sans-serif', maxWidth: '720px', margin: '0 auto', padding: '40px 20px 80px', color: '#3A2F26', lineHeight: '1.8' }
   const h2s = { fontFamily: 'Fraunces, serif', fontSize: '20px', fontWeight: '400', marginTop: '32px', marginBottom: '8px', color: '#3A2F26' }
   const ps = { fontSize: '15px', color: '#5C4530', marginBottom: '12px' }
@@ -151,7 +156,7 @@ export function PrivacyPage() {
       <p style={{ color: '#9C8267', fontSize: '14px', marginBottom: '28px' }}>Sist oppdatert: september 2024</p>
       <div style={{ display: 'flex', gap: '8px', marginBottom: '32px', borderBottom: '1px solid #E8DFD0', paddingBottom: '16px' }}>
         {[['privacy', 'Personvernerklæring'], ['terms', 'Vilkår for bruk']].map(([key, label]) => (
-          <button key={key} onClick={() => setTab(key)} style={{ padding: '8px 18px', borderRadius: '20px', border: 'none', cursor: 'pointer', fontFamily: 'Karla, sans-serif', fontSize: '14px', background: tab === key ? '#3A2F26' : '#E8DFD0', color: tab === key ? '#FBF9F5' : '#5C4530' }}>{label}</button>
+          <button key={key} onClick={() => switchTab(key)} style={{ padding: '8px 18px', borderRadius: '20px', border: 'none', cursor: 'pointer', fontFamily: 'Karla, sans-serif', fontSize: '14px', background: tab === key ? '#3A2F26' : '#E8DFD0', color: tab === key ? '#FBF9F5' : '#5C4530' }}>{label}</button>
         ))}
       </div>
 
