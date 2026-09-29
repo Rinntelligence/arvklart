@@ -28,6 +28,7 @@ export default function App() {
   const [session, setSession] = useState(undefined)
   const [profile, setProfile] = useState(null)
   const [toast, setToast] = useState(null)
+  const [demoReady, setDemoReady] = useState(false)
   const navigate = useNavigate()
 
   const showToast = (msg, type = 'success') => {
@@ -39,7 +40,7 @@ export default function App() {
     supabase.auth.getSession().then(({ data }) => setSession(data.session))
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_, s) => {
       setSession(s)
-      if (!s) setProfile(null)
+      if (!s) { setProfile(null); setDemoReady(false) }
     })
     return () => subscription.unsubscribe()
   }, [])
@@ -74,6 +75,7 @@ export default function App() {
             }
           }
           navigate(membership?.estate_id ? `/estate/${membership.estate_id}` : '/')
+          setDemoReady(true)
         } else if (!data?.display_name) {
           navigate('/setup')
         } else {
@@ -89,6 +91,9 @@ export default function App() {
   if (session === undefined) return <Splash />
 
   const isDemo = session?.user?.email === 'mona.demo@heirsplit.no'
+
+  // Hold the splash until the demo estate is reset and opened, so the estates list never flashes
+  if (isDemo && !demoReady) return <Splash />
 
   if (!session) {
     return (
