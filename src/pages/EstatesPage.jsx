@@ -1,17 +1,11 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { getMyEstates, createEstate, supabase } from '../lib/supabase'
+import { getMyEstates, createEstate, ensureDefaultCategories, supabase } from '../lib/supabase'
 import { usePlan } from '../hooks/usePlan'
 import { t } from '../lib/lang'
 import { Card, Button, Avatar } from '../components/UI'
 
 function genCode() { return Math.random().toString(36).substring(2,8).toUpperCase() }
-
-const DEFAULT_CATEGORIES = [
-  'Møbler', 'Kunst og bilder', 'Smykker', 'Bøker',
-  'Elektronikk', 'Kjøkken', 'Klær og tekstiler',
-  'Verktøy', 'Kjøretøy', 'Dokumenter', 'Annet',
-].map(label => ({ label, emoji: '' }))
 
 export default function EstatesPage({ session, profile, onToast }) {
   const [estates, setEstates] = useState([])
@@ -44,7 +38,7 @@ export default function EstatesPage({ session, profile, onToast }) {
     })
     if (error) { onToast('Feil: ' + error.message, 'error'); setCreating(false); return }
     await supabase.from('estate_members').insert({ estate_id: data.id, user_id: session.user.id, role: 'admin' })
-    await supabase.from('categories').insert(DEFAULT_CATEGORIES.map(c => ({ ...c, estate_id: data.id })))
+    await ensureDefaultCategories(data.id)
     onToast('Bo opprettet! ✓')
     setShowNew(false); setNewName(''); setNewDesc('')
     load()

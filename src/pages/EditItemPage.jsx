@@ -19,7 +19,7 @@ export default function EditItemPage({ session, profile, onToast }) {
   const fileRef = useRef()
 
   useEffect(() => {
-    Promise.all([getItem(itemId), getCategories()]).then(([{ data: it }, { data: cats }]) => {
+    Promise.all([getItem(itemId), getCategories(id)]).then(([{ data: it }, { data: cats }]) => {
       setItem(it)
       setTitle(it?.title || '')
       setCategoryId(it?.category_id || '')
