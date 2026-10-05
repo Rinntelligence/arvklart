@@ -43,7 +43,7 @@ export default function AddItemPage({ session, profile, onToast }) {
   const [aiEstimate, setAiEstimate] = useState(null)
   const [purchasePrice, setPurchasePrice] = useState('')
   const [purchaseYear, setPurchaseYear] = useState('')
-  const [myEstimateVote, setMyEstimateVote] = useState(null)
+  const [myEstimateVote, setMyEstimateVote] = useState(null) // 'agree' | 'disagree'
   const [aiConsented, setAiConsented] = useState(() => { try { return localStorage.getItem('aiConsented') === 'true' } catch { return false } })
   const [showAiConsent, setShowAiConsent] = useState(false)
   const [showAddCat, setShowAddCat] = useState(false)
@@ -52,20 +52,19 @@ export default function AddItemPage({ session, profile, onToast }) {
   const [savingCat, setSavingCat] = useState(false)
   const fileRef = useRef()
 
-  const loadCategories = async () => {
-    const { data } = await getCategories(id)
+  const loadCategories = () => getCategories(id).then(({ data }) => {
     setCategories(data || [])
     if (data?.length && !categoryId) setCategoryId(data[0].id)
-  }
+  })
 
   useEffect(() => { loadCategories() }, [id])
 
   const addCategory = async () => {
     if (!newCatLabel.trim()) return
     setSavingCat(true)
-    const { data: newCat } = await supabase.from('categories').insert({ label: newCatLabel.trim(), emoji: '', estate_id: id }).select().single()
+    const { data: newCat } = await supabase.from('categories').insert({ label: newCatLabel.trim(), emoji: newCatEmoji, estate_id: id }).select().single()
     setSavingCat(false)
-    setNewCatLabel(''); setShowAddCat(false)
+    setNewCatLabel(''); setNewCatEmoji('📦'); setShowAddCat(false)
     await loadCategories()
     if (newCat) setCategoryId(newCat.id)
   }
@@ -101,10 +100,11 @@ export default function AddItemPage({ session, profile, onToast }) {
     setAnalyzing(true)
     try {
       const imageBase64 = await fileToBase64(imageFiles[0])
-      const result = await callEdgeFunction('analyze-item', {
+      const res = await callEdgeFunction('analyze-item', {
         imageBase64,
         mimeType: imageFiles[0].type || 'image/jpeg',
       })
+      const result = res.data || res
       if (result.title && !title) setTitle(result.title)
       if (result.description && !description) setDescription(result.description)
       if (result.condition) setCondition(result.condition)
@@ -128,7 +128,7 @@ export default function AddItemPage({ session, profile, onToast }) {
     setEstimating(true)
     try {
       const cat = categories.find(c => c.id === categoryId)
-      const result = await callEdgeFunction('estimate-value', {
+      const res = await callEdgeFunction('estimate-value', {
         title,
         description,
         category: cat?.label || '',
@@ -136,7 +136,13 @@ export default function AddItemPage({ session, profile, onToast }) {
         purchase_price: purchasePrice ? parseFloat(purchasePrice) : undefined,
         purchase_year: purchaseYear ? parseInt(purchaseYear) : undefined,
       })
-      setAiEstimate(result)
+      const d = res.data || res
+      setAiEstimate({
+        low_nok: d.summary?.low_nok ?? d.low_nok,
+        high_nok: d.summary?.high_nok ?? d.high_nok,
+        likely_nok: d.summary?.likely_nok ?? d.likely_nok,
+        reasoning: d.market?.reasoning ?? d.reasoning,
+      })
     } catch (e) {
       onToast('Verdiestimering feilet', 'error')
     } finally {
@@ -287,34 +293,55 @@ export default function AddItemPage({ session, profile, onToast }) {
 
         {/* Kategori */}
         <div>
-          <label style={{ display: 'block', fontSize: '13px', color: '#9C8267', marginBottom: '6px' }}>
+          <label style={{ display: 'block', fontSize: '13px', color: '#9C8267', marginBottom: '8px' }}>
             Kategori
           </label>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
             {categories.map(c => (
               <button key={c.id} onClick={() => setCategoryId(c.id)} style={{
-                padding: '7px 14px', borderRadius: '20px', cursor: 'pointer', fontSize: '13px',
+                padding: '8px 14px', borderRadius: '20px', cursor: 'pointer', fontSize: '13px',
                 fontFamily: 'Karla, sans-serif', border: `2px solid ${categoryId === c.id ? '#3A2F26' : '#D9CFC0'}`,
                 background: categoryId === c.id ? '#3A2F26' : '#FBF9F5',
                 color: categoryId === c.id ? '#FBF9F5' : '#5C4530',
-              }}>{c.label}</button>
+                transition: 'all 0.12s',
+              }}>
+                {c.label}
+              </button>
             ))}
             <button onClick={() => setShowAddCat(!showAddCat)} style={{
-              padding: '7px 14px', borderRadius: '20px', cursor: 'pointer', fontSize: '13px',
+              padding: '8px 14px', borderRadius: '20px', cursor: 'pointer', fontSize: '13px',
               fontFamily: 'Karla, sans-serif', border: '2px dashed #D9CFC0',
               background: 'transparent', color: '#9C8267',
-            }}>+ Ny kategori</button>
+            }}>
+              + Ny kategori
+            </button>
           </div>
 
           {showAddCat && (
-            <div style={{ marginTop: '10px', background: '#FBF9F5', border: '1px solid #D9CFC0', borderRadius: '10px', padding: '12px' }}>
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <input value={newCatLabel} onChange={e => setNewCatLabel(e.target.value)} placeholder="Kategorinavn" maxLength={60}
+            <div style={{ marginTop: '12px', background: '#FBF9F5', border: '1px solid #D9CFC0', borderRadius: '10px', padding: '14px' }}>
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <input
+                  value={newCatLabel}
+                  onChange={e => setNewCatLabel(e.target.value)}
                   onKeyDown={e => e.key === 'Enter' && addCategory()}
-                  style={{ flex: 1, padding: '9px 12px', border: '1px solid #D9CFC0', borderRadius: '8px', fontSize: '14px', background: '#fff', color: '#3A2F26', outline: 'none', fontFamily: 'Karla, sans-serif' }} />
-                <button onClick={addCategory} disabled={!newCatLabel.trim() || savingCat} style={{ padding: '9px 16px', background: '#3A2F26', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontFamily: 'Karla, sans-serif' }}>
+                  placeholder="Kategorinavn…"
+                  maxLength={60}
+                  autoFocus
+                  style={{
+                    flex: 1, padding: '8px 12px', border: '1px solid #D9CFC0', borderRadius: '8px',
+                    fontSize: '14px', background: '#fff', color: '#3A2F26', outline: 'none', fontFamily: 'Karla, sans-serif',
+                  }}
+                />
+                <button onClick={addCategory} disabled={!newCatLabel.trim() || savingCat} style={{
+                  padding: '8px 14px', background: newCatLabel.trim() ? '#3A2F26' : '#D9CFC0', color: '#FBF9F5',
+                  border: 'none', borderRadius: '8px', cursor: newCatLabel.trim() ? 'pointer' : 'not-allowed',
+                  fontSize: '13px', fontFamily: 'Karla, sans-serif', whiteSpace: 'nowrap',
+                }}>
                   {savingCat ? '…' : 'Legg til'}
                 </button>
+                <button onClick={() => { setShowAddCat(false); setNewCatLabel('') }} style={{
+                  padding: '8px', background: 'none', border: 'none', cursor: 'pointer', color: '#9C8267', fontSize: '16px',
+                }}>×</button>
               </div>
             </div>
           )}
@@ -387,7 +414,7 @@ export default function AddItemPage({ session, profile, onToast }) {
         {/* Verdiestimat-resultat */}
         {aiEstimate && (
           <div style={{ background: '#DCE3D2', border: '1px solid #B8C8A8', borderRadius: '12px', padding: '20px' }}>
-            <div style={{ fontSize: '13px', color: '#3A5A30', fontWeight: '500', marginBottom: '12px' }}>AI Verdiestimat (NOK)</div>
+            <div style={{ fontSize: '13px', color: '#3A5A30', fontWeight: '500', marginBottom: '12px' }}>Verdiestimat (NOK)</div>
             <div style={{ display: 'flex', gap: '16px', marginBottom: '12px', flexWrap: 'wrap' }}>
               <div style={{ textAlign: 'center' }}>
                 <div style={{ fontSize: '11px', color: '#9C8267', marginBottom: '2px' }}>Lavt</div>
@@ -414,14 +441,14 @@ export default function AddItemPage({ session, profile, onToast }) {
                   background: myEstimateVote === 'agree' ? '#5F6E52' : '#fff',
                   color: myEstimateVote === 'agree' ? '#fff' : '#5C4530',
                   fontFamily: 'Karla, sans-serif', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
-                }}>👍 Enig</button>
+                }}>Enig</button>
                 <button onClick={() => setMyEstimateVote(myEstimateVote === 'disagree' ? null : 'disagree')} style={{
                   flex: 1, padding: '9px', border: `2px solid ${myEstimateVote === 'disagree' ? '#A97C3F' : '#B8C8A8'}`,
                   borderRadius: '8px', cursor: 'pointer', fontSize: '14px',
                   background: myEstimateVote === 'disagree' ? '#A97C3F' : '#fff',
                   color: myEstimateVote === 'disagree' ? '#fff' : '#5C4530',
                   fontFamily: 'Karla, sans-serif', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
-                }}>👎 Uenig</button>
+                }}>Uenig</button>
               </div>
               {myEstimateVote && (
                 <p style={{ fontSize: '11px', color: '#5C4530', marginTop: '6px', marginBottom: 0 }}>

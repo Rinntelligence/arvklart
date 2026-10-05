@@ -47,7 +47,7 @@ export default function LoginPage({ onToast }) {
             <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#5C4530" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginBottom:'16px' }}>
               <path d="M12 3v18M7 21h10M5 7h4M15 7h4M5 7L2.5 12a2.5 2.5 0 0 0 5 0L5 7zM19 7l-2.5 5a2.5 2.5 0 0 0 5 0L19 7z"/>
             </svg>
-            <h1 style={{ fontFamily:'Fraunces, serif', fontSize:'30px', fontWeight:'400', color:'#3A2F26', marginBottom:'10px' }}>HeirSplit</h1>
+            <h1 style={{ fontFamily:'Fraunces, serif', fontSize:'30px', fontWeight:'400', color:'#3A2F26', marginBottom:'10px' }}>Arvklart</h1>
             <p style={{ color:'#9C8267', fontSize:'15px', lineHeight:'1.6' }}>The professional platform for distributing estate items fairly</p>
           </div>
 

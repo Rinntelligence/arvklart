@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { getMyEstates, createEstate, supabase } from '../lib/supabase'
+import { getMyEstates, createEstate, ensureDefaultCategories, supabase } from '../lib/supabase'
 import { usePlan } from '../hooks/usePlan'
 import { t } from '../lib/lang'
 import { Card, Button, Avatar } from '../components/UI'
@@ -38,6 +38,7 @@ export default function EstatesPage({ session, profile, onToast }) {
     })
     if (error) { onToast('Feil: ' + error.message, 'error'); setCreating(false); return }
     await supabase.from('estate_members').insert({ estate_id: data.id, user_id: session.user.id, role: 'admin' })
+    await ensureDefaultCategories(data.id)
     onToast('Bo opprettet! ✓')
     setShowNew(false); setNewName(''); setNewDesc('')
     load()

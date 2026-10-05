@@ -20,14 +20,19 @@ import HeirsPage from './pages/HeirsPage'
 import GoodwillPage from './pages/GoodwillPage'
 import { JoinPage, PricingPage, CategoriesPage, PrivacyPage, AccountPage } from './pages/OtherPages'
 import ConflictPage from './pages/ConflictPage'
+import ContactPage from './pages/ContactPage'
 import TopBar from './components/TopBar'
 import Toast from './components/Toast'
 import FeedbackWidget from './components/FeedbackWidget'
+
+// Public pages a demo session should be allowed to stay on instead of being sent into the demo estate
+const PUBLIC_PATHS = ['/home', '/veiviser', '/kontakt', '/pricing']
 
 export default function App() {
   const [session, setSession] = useState(undefined)
   const [profile, setProfile] = useState(null)
   const [toast, setToast] = useState(null)
+  const [demoReady, setDemoReady] = useState(false)
   const navigate = useNavigate()
 
   const showToast = (msg, type = 'success') => {
@@ -39,7 +44,7 @@ export default function App() {
     supabase.auth.getSession().then(({ data }) => setSession(data.session))
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_, s) => {
       setSession(s)
-      if (!s) setProfile(null)
+      if (!s) { setProfile(null); setDemoReady(false) }
     })
     return () => subscription.unsubscribe()
   }, [])
@@ -50,7 +55,9 @@ export default function App() {
     supabase.from('profiles').select('*').eq('user_id', session.user.id).single()
       .then(async ({ data }) => {
         setProfile(data)
-        if (isDemo) {
+        if (isDemo && PUBLIC_PATHS.includes(window.location.pathname)) {
+          setDemoReady(true)
+        } else if (isDemo) {
           const { data: membership } = await supabase
             .from('estate_members')
             .select('estate_id')
@@ -74,6 +81,7 @@ export default function App() {
             }
           }
           navigate(membership?.estate_id ? `/estate/${membership.estate_id}` : '/')
+          setDemoReady(true)
         } else if (!data?.display_name) {
           navigate('/setup')
         } else {
@@ -90,6 +98,9 @@ export default function App() {
 
   const isDemo = session?.user?.email === 'mona.demo@heirsplit.no'
 
+  // Hold the splash until the demo estate is reset and opened, so the estates list never flashes
+  if (isDemo && !demoReady) return <Splash />
+
   if (!session) {
     return (
       <>
@@ -100,6 +111,8 @@ export default function App() {
           <Route path="/join/:code" element={<JoinPage onToast={showToast} />} />
           <Route path="/pricing" element={<PricingPage />} />
           <Route path="/personvern" element={<PrivacyPage />} />
+          <Route path="/kontakt" element={<ContactPage />} />
+          <Route path="/veiviser" element={<GuidePage standalone />} />
           <Route path="*" element={<Navigate to="/home" />} />
         </Routes>
       </>
@@ -120,6 +133,7 @@ export default function App() {
         <Routes>
           <Route path="/" element={<EstatesPage session={session} profile={profile} onToast={showToast} isDemo={isDemo} />} />
           <Route path="/home" element={<LandingPage onToast={showToast} />} />
+          <Route path="/kontakt" element={<ContactPage />} />
           <Route path="/setup" element={<ProfileSetupPage session={session} onSaved={(p) => {
             setProfile(p)
             const pendingCode = localStorage.getItem('pendingJoinCode')
@@ -142,6 +156,7 @@ export default function App() {
           <Route path="/pricing" element={<PricingPage session={session} />} />
           <Route path="/founder" element={<FounderPage session={session} />} />
           <Route path="/estate/:id/guide" element={<GuidePage />} />
+          <Route path="/veiviser" element={<GuidePage />} />
           <Route path="/personvern" element={<PrivacyPage />} />
           <Route path="/konto" element={<AccountPage session={session} onToast={showToast} />} />
           <Route path="*" element={<Navigate to="/" />} />
@@ -154,7 +169,7 @@ export default function App() {
 function Splash() {
   return (
     <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#FBF9F5', fontFamily: "'Fraunces', serif", color: '#9C8267', fontSize: '20px', gap: '12px' }}>
-      HeirSplit
+      Arvklart
     </div>
   )
 }

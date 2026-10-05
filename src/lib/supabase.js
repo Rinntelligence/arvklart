@@ -150,9 +150,31 @@ export const addComment = (item_id, user_id, content) =>
 export const deleteComment = (id) =>
   supabase.from('comments').delete().eq('id', id)
 
-export const getCategories = (estate_id) => {
-  const query = supabase.from('categories').select('*').order('label')
-  return estate_id ? query.eq('estate_id', estate_id) : query
+// Same set as the demo estate (supabase_demo.sql)
+export const DEFAULT_CATEGORIES = [
+  'Møbler', 'Kunst og bilder', 'Smykker og ur',
+  'Elektronikk', 'Kjøkken og porselen', 'Minner og arvestykker',
+]
+
+const seeding = {}
+
+// Inserts the default categories if the estate has none; reuses an in-flight insert
+export const ensureDefaultCategories = (estate_id) => {
+  if (!seeding[estate_id]) {
+    seeding[estate_id] = supabase.from('categories')
+      .insert(DEFAULT_CATEGORIES.map(label => ({ label, emoji: '', estate_id })))
+      .select()
+      .then(res => { delete seeding[estate_id]; return res })
+  }
+  return seeding[estate_id]
+}
+
+export const getCategories = async (estate_id) => {
+  const res = await supabase.from('categories').select('*').eq('estate_id', estate_id).order('label')
+  if (res.error || res.data.length) return res
+  const seeded = await ensureDefaultCategories(estate_id)
+  if (seeded.error) return seeded
+  return { ...seeded, data: [...seeded.data].sort((a, b) => a.label.localeCompare(b.label, 'nb')) }
 }
 
 export const submitFeedback = (user_id, estate_id, type, content, nps_score) =>

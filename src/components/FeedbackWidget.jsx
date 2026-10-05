@@ -74,7 +74,7 @@ export default function FeedbackWidget({ session }) {
                     outline: 'none', boxSizing: 'border-box', marginBottom: '14px',
                   }} />
                 <div style={{ marginBottom: '16px' }}>
-                  <div style={{ fontSize: '12px', color: '#8c7b6b', marginBottom: '6px' }}>Anbefaler du HeirSplit? (1-10)</div>
+                  <div style={{ fontSize: '12px', color: '#8c7b6b', marginBottom: '6px' }}>Anbefaler du Arvklart? (1-10)</div>
                   <div style={{ display: 'flex', gap: '3px' }}>
                     {[1,2,3,4,5,6,7,8,9,10].map(n => (
                       <button key={n} onClick={() => setNps(nps===n?null:n)} style={{

@@ -40,12 +40,26 @@ export default function LandingPage() {
         .lp header {
           position: absolute; top: 0; left: 0; right: 0; z-index: 10;
           display: flex; align-items: center; justify-content: space-between;
-          padding: 28px 56px;
+          padding: 24px 56px 40px;
+          background: linear-gradient(180deg, rgba(42,33,26,0.72) 0%, rgba(42,33,26,0.4) 60%, rgba(42,33,26,0) 100%);
         }
-        .lp .logo img { display: block; height: 28px; }
-        .lp nav ul { display: flex; gap: 38px; list-style: none; }
-        .lp nav a { font-size: 14.5px; color: var(--snow); opacity: 0.92; }
-        .lp nav a:hover { opacity: 1; text-decoration: underline; text-underline-offset: 4px; }
+        .lp .logo img { display: block; height: 28px; filter: drop-shadow(0 1px 4px rgba(0,0,0,0.45)); }
+        .lp nav ul { display: flex; gap: 6px; list-style: none; align-items: center; }
+        .lp nav a {
+          display: inline-block; padding: 8px 14px; border-radius: 999px;
+          font-size: 14.5px; font-weight: 500; color: var(--snow);
+          text-shadow: 0 1px 4px rgba(0,0,0,0.55);
+          border: 1px solid transparent;
+          transition: background 0.18s ease, border-color 0.18s ease, color 0.18s ease;
+        }
+        .lp nav a:hover, .lp nav a:focus-visible {
+          background: rgba(251,249,245,0.2); border-color: rgba(251,249,245,0.45);
+          outline: none;
+        }
+        .lp nav a.nav-login { border-color: rgba(251,249,245,0.7); margin-left: 8px; }
+        .lp nav a.nav-login:hover, .lp nav a.nav-login:focus-visible {
+          background: var(--snow); color: var(--espresso); text-shadow: none; border-color: var(--snow);
+        }
 
         .lp .hero {
           position: relative; min-height: 92vh;
@@ -150,7 +164,8 @@ export default function LandingPage() {
 
         @media (max-width: 860px) {
           .lp header { padding: 22px 24px; }
-          .lp nav ul { gap: 20px; }
+          .lp nav ul { gap: 2px; flex-wrap: wrap; justify-content: flex-end; }
+          .lp nav a { padding: 6px 10px; font-size: 13.5px; }
           .lp .hero-inner { padding: 0 24px 64px; }
           .lp .hero-inner h1 { font-size: 28px; }
           .lp .intro { padding: 76px 24px; }
@@ -174,8 +189,8 @@ export default function LandingPage() {
               <li><a href="#slik-fungerer">Slik fungerer det</a></li>
               <li><a href="#for-hvem">For hvem</a></li>
               <li><a href="#demo" onClick={(e) => { e.preventDefault(); document.getElementById('demo').scrollIntoView({ behavior: 'smooth' }) }}>Prøv demo</a></li>
-              <li><a href="/estate/guide">Veiviser</a></li>
-              <li><a href="/logg-inn">Logg inn</a></li>
+              <li><a href="/veiviser">Veiviser</a></li>
+              <li><a className="nav-login" href="/logg-inn">Logg inn</a></li>
             </ul>
           </nav>
         </header>
@@ -285,7 +300,7 @@ export default function LandingPage() {
             <li><a href="#">For advokater og meklere</a></li>
             <li><a href="/personvern">Personvernerklæring</a></li>
             <li><a href="/personvern#vilkar">Vilkår for bruk</a></li>
-            <li><a href="mailto:hei@arvklart.no">Kontakt</a></li>
+            <li><a href="/kontakt">Kontakt</a></li>
           </ul>
         </footer>
       </div>
