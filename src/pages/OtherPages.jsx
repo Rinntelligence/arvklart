@@ -68,14 +68,14 @@ export function PricingPage({ session }) {
                 {p.features.map(f=><div key={f} style={{ fontSize:'13px', color:'#4a3c30', display:'flex', gap:'8px' }}><span style={{ color:'#7aaa7a' }}>✓</span>{f}</div>)}
                 {p.missing.map(f=><div key={f} style={{ fontSize:'13px', color:'#c0b0a0', display:'flex', gap:'8px' }}><span>—</span>{f}</div>)}
               </div>
-              <button onClick={()=>session?window.location.href='mailto:hei@arvklart.no?subject=Oppgradering til ' + p.name:navigate('/')} style={{ width:'100%', padding:'11px', background:p.name==='Free'?'#f5f0eb':p.color, color:p.name==='Free'?'#1a1410':'#fff', border:'none', borderRadius:'8px', cursor:'pointer', fontSize:'14px', fontFamily:'DM Sans, sans-serif' }}>
+              <button onClick={()=>session?window.location.href='mailto:admin@arvklart.no?subject=Oppgradering til ' + p.name:navigate('/')} style={{ width:'100%', padding:'11px', background:p.name==='Free'?'#f5f0eb':p.color, color:p.name==='Free'?'#1a1410':'#fff', border:'none', borderRadius:'8px', cursor:'pointer', fontSize:'14px', fontFamily:'DM Sans, sans-serif' }}>
                 {p.name==='Free'?'Kom i gang gratis':`Få ${p.name}`}
               </button>
             </div>
           ))}
         </div>
         <p style={{ textAlign:'center', marginTop:'32px', fontSize:'13px', color:'#a89080' }}>
-          Spørsmål? Send oss en e-post på <a href="mailto:hei@arvklart.no" style={{ color:'#c4855a' }}>hei@arvklart.no</a>
+          Spørsmål? Send oss en e-post på <a href="mailto:admin@arvklart.no" style={{ color:'#c4855a' }}>admin@arvklart.no</a>
         </p>
       </div>
     </div>
@@ -167,7 +167,7 @@ export function PrivacyPage() {
         <div>
           <p style={ps}>Denne personvernerklæringen beskriver hvordan ArvKlart («vi», «oss», «tjenesten») behandler personopplysninger om deg som bruker.</p>
           <p style={{ ...ps, background: '#DCE3D2', border: '1px solid #B8C8A8', borderRadius: '8px', padding: '12px 16px' }}>
-            <strong>Behandlingsansvarlig:</strong> [SELSKAPSNAVN AS], org.nr. [ORGNR] · kontakt: hei@arvklart.no
+            <strong>Behandlingsansvarlig:</strong> [SELSKAPSNAVN AS], org.nr. [ORGNR] · kontakt: admin@arvklart.no
           </p>
           <h2 style={h2s}>Hva vi samler inn</h2>
           <ul>
@@ -191,13 +191,13 @@ export function PrivacyPage() {
           <h2 style={h2s}>Lagringstid</h2>
           <p style={ps}>Opplysninger lagres så lenge kontoen er aktiv. Ved kontosletting slettes personopplysninger innen 30 dager, med unntak av det vi er rettslig forpliktet til å oppbevare.</p>
           <h2 style={h2s}>Dine rettigheter</h2>
-          <p style={ps}>Du har rett til innsyn, retting, sletting, dataportabilitet og å protestere mot behandlingen. Utøv disse via «Min konto» i appen, eller kontakt oss på hei@arvklart.no. Du kan klage til <a href="https://www.datatilsynet.no" target="_blank" rel="noreferrer" style={{ color: '#5F6E52' }}>Datatilsynet</a>.</p>
+          <p style={ps}>Du har rett til innsyn, retting, sletting, dataportabilitet og å protestere mot behandlingen. Utøv disse via «Min konto» i appen, eller kontakt oss på admin@arvklart.no. Du kan klage til <a href="https://www.datatilsynet.no" target="_blank" rel="noreferrer" style={{ color: '#5F6E52' }}>Datatilsynet</a>.</p>
           <h2 style={h2s}>Sikkerhet</h2>
           <p style={ps}>All kommunikasjon er TLS-kryptert. Data er kryptert i ro. Tilgang til produksjonsdata er begrenset til autorisert personell.</p>
           <h2 style={h2s}>Endringer</h2>
           <p style={ps}>Vesentlige endringer varsles på e-post minst 30 dager i forkant.</p>
           <h2 style={h2s}>Kontakt</h2>
-          <p style={ps}><a href="mailto:hei@arvklart.no" style={{ color: '#5F6E52' }}>hei@arvklart.no</a></p>
+          <p style={ps}><a href="mailto:admin@arvklart.no" style={{ color: '#5F6E52' }}>admin@arvklart.no</a></p>
         </div>
       )}
 
@@ -221,7 +221,7 @@ export function PrivacyPage() {
           <h2 style={h2s}>Gjeldende lov</h2>
           <p style={ps}>Norsk lov gjelder. Tvister søkes løst i minnelighet; ellers ved Oslo tingrett.</p>
           <h2 style={h2s}>Kontakt</h2>
-          <p style={ps}><a href="mailto:hei@arvklart.no" style={{ color: '#5F6E52' }}>hei@arvklart.no</a></p>
+          <p style={ps}><a href="mailto:admin@arvklart.no" style={{ color: '#5F6E52' }}>admin@arvklart.no</a></p>
         </div>
       )}
     </div>
@@ -243,8 +243,8 @@ export function AccountPage({ session, onToast }) {
         supabase.from('interests').select('*, items(title)').eq('user_id', session.user.id),
         supabase.from('comments').select('*, items(title)').eq('user_id', session.user.id),
       ])
-      const blob = new Blob([JSON.stringify({ profile, interests, comments, exported_at: new Date().toISOString() }, null, 2)], { type: 'application/json' })
-      const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'mine-data-arvklart.json'; a.click()
+      const { buildDataExportPdf } = await import('../lib/dataExportPdf')
+      buildDataExportPdf({ email: session.user.email, profile, interests, comments }).save('mine-data-arvklart.pdf')
       onToast('Data lastet ned')
     } catch { onToast('Eksport feilet', 'error') }
     setExporting(false)
@@ -276,7 +276,7 @@ export function AccountPage({ session, onToast }) {
 
         <div style={{ background: '#fff', border: '1px solid #D9CFC0', borderRadius: '12px', padding: '24px' }}>
           <h2 style={{ fontFamily: 'Fraunces, serif', fontSize: '17px', fontWeight: '400', color: '#3A2F26', marginBottom: '6px' }}>Last ned dine data</h2>
-          <p style={{ fontSize: '14px', color: '#5C4530', marginBottom: '16px', lineHeight: '1.6' }}>Last ned alle personopplysninger vi har om deg (profil, interesser, kommentarer) som JSON-fil.</p>
+          <p style={{ fontSize: '14px', color: '#5C4530', marginBottom: '16px', lineHeight: '1.6' }}>Last ned alle personopplysninger vi har om deg (profil, interesser, kommentarer) som PDF.</p>
           <button onClick={exportData} disabled={exporting} style={{ padding: '10px 20px', background: '#5F6E52', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '14px', fontFamily: 'Karla, sans-serif' }}>
             {exporting ? 'Eksporterer…' : 'Last ned mine data'}
           </button>
