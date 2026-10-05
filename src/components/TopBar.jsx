@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { signOut } from '../lib/supabase'
 import { getLang, setLang } from '../lib/lang'
 
@@ -7,6 +7,8 @@ const tc = c => { if(!c)return'#FBF9F5'; const r=parseInt(c.slice(1,3),16),g=par
 
 export default function TopBar({ profile, session, estate }) {
   const navigate = useNavigate()
+  const { pathname } = useLocation()
+  const onLanding = pathname === '/home'
   const [menuOpen, setMenuOpen] = useState(false)
   const [logoMenuOpen, setLogoMenuOpen] = useState(false)
   const [lang, setLangState] = useState(getLang())
@@ -52,6 +54,11 @@ export default function TopBar({ profile, session, estate }) {
         .tb-item:hover, .tb-item:focus-visible { background: #F3EDE3; outline: none; }
         .tb-item.danger { color: #8B3A3A; }
         .tb-item + .tb-item { border-top: 1px solid #E8DFD0; }
+        .tb-nav { flex: 1; min-width: 0; display: flex; justify-content: flex-end; gap: 4px; margin: 0 12px; overflow-x: auto; scrollbar-width: none; }
+        .tb-nav::-webkit-scrollbar { display: none; }
+        .tb-nav a { flex-shrink: 0; padding: 7px 13px; border-radius: 999px; border: 1px solid transparent; font-size: 14px; font-weight: 500; color: #FBF9F5; text-decoration: none; white-space: nowrap; transition: background 0.15s, border-color 0.15s; }
+        .tb-nav a:hover, .tb-nav a:focus-visible { background: rgba(251,249,245,0.14); border-color: rgba(251,249,245,0.3); outline: none; }
+        @media (max-width: 860px) { .tb-nav { justify-content: flex-start; margin: 0 8px; } .tb-nav a { padding: 6px 10px; font-size: 13.5px; } }
       `}</style>
 
       {(menuOpen || logoMenuOpen) && (
@@ -77,6 +84,15 @@ export default function TopBar({ profile, session, estate }) {
           </div>
         )}
       </div>
+
+      {onLanding && (
+        <nav className="tb-nav">
+          <a href="#slik-fungerer">Slik fungerer det</a>
+          <a href="#for-hvem">For hvem</a>
+          <a href="#demo">Prøv demo</a>
+          <a href="/veiviser" onClick={(e) => { e.preventDefault(); navigate('/veiviser') }}>Veiviser</a>
+        </nav>
+      )}
 
       <div style={{ position: 'relative', zIndex: 200 }}>
         <button onClick={() => { setMenuOpen(!menuOpen); setLogoMenuOpen(false) }} style={{

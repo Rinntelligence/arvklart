@@ -4,7 +4,7 @@ import { signIn } from '../lib/supabase'
 const DEMO_EMAIL = 'mona.demo@heirsplit.no'
 const DEMO_PASSWORD = import.meta.env.VITE_DEMO_PASSWORD || ''
 
-export default function LandingPage() {
+export default function LandingPage({ loggedIn = false }) {
   const [demoLoading, setDemoLoading] = useState(false)
   const [demoError, setDemoError] = useState('')
 
@@ -36,6 +36,7 @@ export default function LandingPage() {
         .lp { position: relative; font-family: 'Karla', sans-serif; color: var(--espresso); background: var(--lin); }
         .lp .serif { font-family: 'Fraunces', serif; font-weight: 400; }
         .lp a { color: inherit; text-decoration: none; }
+        .lp.logged-in section { scroll-margin-top: 56px; }
 
         .lp header {
           position: absolute; top: 0; left: 0; right: 0; z-index: 10;
@@ -178,9 +179,9 @@ export default function LandingPage() {
         }
       `}</style>
 
-      <div className="lp">
-        {/* NAV */}
-        <header>
+      <div className={loggedIn ? 'lp logged-in' : 'lp'}>
+        {/* NAV — når innlogget ligger lenkene i TopBar i stedet */}
+        {!loggedIn && <header>
           <div className="logo">
             <img src="/ARVKLART Horizontal Negative.svg" alt="Arvklart" />
           </div>
@@ -193,7 +194,7 @@ export default function LandingPage() {
               <li><a className="nav-login" href="/logg-inn">Logg inn</a></li>
             </ul>
           </nav>
-        </header>
+        </header>}
 
         {/* HERO */}
         <section className="hero">
