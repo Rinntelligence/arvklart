@@ -44,6 +44,8 @@ export default function AddItemPage({ session, profile, onToast }) {
   const [purchasePrice, setPurchasePrice] = useState('')
   const [purchaseYear, setPurchaseYear] = useState('')
   const [myEstimateVote, setMyEstimateVote] = useState(null) // 'agree' | 'disagree'
+  const [aiConsented, setAiConsented] = useState(() => { try { return localStorage.getItem('aiConsented') === 'true' } catch { return false } })
+  const [showAiConsent, setShowAiConsent] = useState(false)
   const [showAddCat, setShowAddCat] = useState(false)
   const [newCatLabel, setNewCatLabel] = useState('')
   const [newCatEmoji, setNewCatEmoji] = useState('📦')
@@ -246,14 +248,26 @@ export default function AddItemPage({ session, profile, onToast }) {
           <input ref={fileRef} type="file" accept="image/*" capture="environment" multiple onChange={handleImages} style={{ display: 'none' }} />
 
           {/* AI-analyseknapp */}
-          {imageFiles.length > 0 && (
-            <button onClick={analyzeWithAI} disabled={analyzing} style={{
+          {imageFiles.length > 0 && !showAiConsent && (
+            <button onClick={() => aiConsented ? analyzeWithAI() : setShowAiConsent(true)} disabled={analyzing} style={{
               marginTop: '10px', padding: '9px 16px', background: analyzing ? '#D9CFC0' : '#5F6E52',
               color: '#fff', border: 'none', borderRadius: '8px', cursor: analyzing ? 'not-allowed' : 'pointer',
               fontSize: '13px', fontFamily: 'Karla, sans-serif', display: 'flex', alignItems: 'center', gap: '6px',
             }}>
               {analyzing ? 'Analyserer…' : 'Analyser med AI'}
             </button>
+          )}
+          {showAiConsent && (
+            <div style={{ marginTop: '10px', background: '#FBF9F5', border: '1px solid #D9CFC0', borderRadius: '10px', padding: '14px' }}>
+              <div style={{ fontSize: '13px', color: '#3A2F26', fontWeight: '500', marginBottom: '6px' }}>Bildet sendes til en AI-tjeneste</div>
+              <p style={{ fontSize: '12px', color: '#5C4530', lineHeight: '1.6', marginBottom: '10px' }}>
+                For å identifisere gjenstanden sendes bildet til Anthropic (USA) for analyse. Bildet brukes kun til dette og lagres ikke av dem. Les mer i vår <a href="/personvern" target="_blank" style={{ color: '#5F6E52' }}>personvernerklæring</a>.
+              </p>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button onClick={() => setShowAiConsent(false)} style={{ flex: 1, padding: '8px', background: 'none', border: '1px solid #D9CFC0', borderRadius: '7px', cursor: 'pointer', fontSize: '13px', fontFamily: 'Karla, sans-serif', color: '#5C4530' }}>Avbryt</button>
+                <button onClick={() => { try { localStorage.setItem('aiConsented', 'true') } catch {} setAiConsented(true); setShowAiConsent(false); analyzeWithAI() }} style={{ flex: 2, padding: '8px', background: '#5F6E52', color: '#fff', border: 'none', borderRadius: '7px', cursor: 'pointer', fontSize: '13px', fontFamily: 'Karla, sans-serif' }}>Godta og analyser</button>
+              </div>
+            </div>
           )}
         </div>
 

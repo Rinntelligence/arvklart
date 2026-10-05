@@ -18,7 +18,7 @@ import TasksPage from './pages/TasksPage'
 import DocumentVaultPage from './pages/DocumentVaultPage'
 import HeirsPage from './pages/HeirsPage'
 import GoodwillPage from './pages/GoodwillPage'
-import { JoinPage, PricingPage, CategoriesPage } from './pages/OtherPages'
+import { JoinPage, PricingPage, CategoriesPage, PrivacyPage, AccountPage } from './pages/OtherPages'
 import ConflictPage from './pages/ConflictPage'
 import ContactPage from './pages/ContactPage'
 import TopBar from './components/TopBar'
@@ -110,6 +110,7 @@ export default function App() {
           <Route path="/logg-inn" element={<LoginPage onToast={showToast} />} />
           <Route path="/join/:code" element={<JoinPage onToast={showToast} />} />
           <Route path="/pricing" element={<PricingPage />} />
+          <Route path="/personvern" element={<PrivacyPage />} />
           <Route path="/kontakt" element={<ContactPage />} />
           <Route path="/veiviser" element={<GuidePage standalone />} />
           <Route path="*" element={<Navigate to="/home" />} />
@@ -156,6 +157,8 @@ export default function App() {
           <Route path="/founder" element={<FounderPage session={session} />} />
           <Route path="/estate/:id/guide" element={<GuidePage />} />
           <Route path="/veiviser" element={<GuidePage />} />
+          <Route path="/personvern" element={<PrivacyPage />} />
+          <Route path="/konto" element={<AccountPage session={session} onToast={showToast} />} />
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>
       </div>
