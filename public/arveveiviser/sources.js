@@ -42,7 +42,10 @@ export const SOURCES = {
   arveloven_uskifte_gaver: law(23, 'Gaver fra uskifteboet'),
   arveloven_uskifte_nytt_forhold: law(27, 'Nytt ekteskap eller samboerskap'),
   arveloven_uskifte_skifte_senere: law(28, 'Skifte av uskifteboet senere'),
+  arveloven_uskifte_saereie: law(21, 'Hva som går inn i uskifteformuen'),
+  arveloven_uskifte_arvinger: law(26, 'Arvingene etter førstavdøde må leve når uskiftet skiftes'),
   arveloven_uskifte_deling: law(29, 'Deling av uskifteboet når gjenlevende dør'),
+  arveloven_uskifte_formue: law(31, 'Alt gjenlevende eier, hører til uskifteformuen'),
   arveloven_uskifte_samboer: law(32, 'Samboerens rett til uskifte'),
   arveloven_uskifte_samboer_deling: law(39, 'Deling av samboerens uskiftebo'),
 

@@ -7,7 +7,7 @@ import { deriveFacts } from './facts.js'
 import { evaluate } from './conditions.js'
 import { analyze, answerFlags, flagsForQuestion } from './engine.js'
 import { SOURCES } from './sources.js'
-import { TERMS } from './glossary.js'
+import { TERMS, linkTerms } from './glossary.js'
 import { GRANDPARENT_SIDES, childLines } from './heirs.js'
 import { fill, kr as krPlain, pct } from './text.js'
 import { estateRows, answerSummary, toEstatePayload } from './report.js'
@@ -25,7 +25,8 @@ function load() {
 function save() {
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)) } catch { /* privat modus o.l. */ }
 }
-const fresh = () => ({ answers: {}, current: null, view: 'intro', resultView: null, returnTo: null })
+// `acks`: varsler brukeren har bekreftet med «OK», per spørsmål (se renderFlags).
+const fresh = () => ({ answers: {}, current: null, view: 'intro', resultView: null, returnTo: null, acks: {} })
 let state = { ...fresh(), ...(load() || {}) }
 let error = null
 
@@ -34,10 +35,14 @@ let error = null
 const embedded = window.parent !== window
 const host = { ready: false, loggedIn: false, estate: null, saved: null, saving: false, message: null }
 let pdfBusy = false
-// Varslene som sist ble vist på spørsmålet. Gir et svar et nytt varsel, stopper «Neste»
-// én gang, slik at brukeren rekker å lese det før veiviseren går videre.
-let shownFlags = ''
+// Gir et svar et varsel, må brukeren trykke «OK» på det før veiviseren går videre.
+// Bekreftelsen gjelder akkurat de varslene som ble vist; kommer det et nytt, må det bekreftes på nytt.
+let needsAck = false
 const flagKey = flags => flags.map(f => f.id).join(',')
+const unacked = q => {
+  const key = flagKey(flagsForQuestion(state.answers, q.id))
+  return key && state.acks?.[q.id] !== key ? key : ''
+}
 let pdfError = null
 const toHost = msg => { if (embedded) window.parent.postMessage(msg, window.location.origin) }
 
@@ -45,8 +50,6 @@ const toHost = msg => { if (embedded) window.parent.postMessage(msg, window.loca
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
 const kr = krPlain
 const uid = () => Math.random().toString(36).slice(2, 9)
-const NUM_WORDS = ['null', 'ett', 'to', 'tre', 'fire', 'fem', 'seks', 'sju', 'åtte', 'ni', 'ti']
-const count = n => { const w = NUM_WORDS[n] || String(n); return w.charAt(0).toUpperCase() + w.slice(1) }
 
 const ICON = {
   arrow: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>',
@@ -61,9 +64,10 @@ const ICON = {
   edit: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19 9l-4-4L4 16v4z"/></svg>',
 }
 
-// Erstatter plassholdere og gjør [[fagord]] om til klikkbare forklaringer.
+// Erstatter plassholdere og gjør fagord om til klikkbare forklaringer – både ord som er
+// markert med [[fagord]], og kjente fagord som står i teksten (se linkTerms i glossary.js).
 function rich(text, facts) {
-  return esc(fill(text, facts))
+  return esc(linkTerms(fill(text, facts)))
     .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
     .replace(/\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g, (_, key, label) => {
       const t = TERMS[key]
@@ -72,9 +76,9 @@ function rich(text, facts) {
     })
 }
 function titleFor(q, facts) {
-  if (facts.survivor && q.titleSurvivor) return fill(q.titleSurvivor, facts)
-  if (facts.married && q.titleMarried) return fill(q.titleMarried, facts)
-  return fill(q.title, facts)
+  if (facts.survivor && q.titleSurvivor) return q.titleSurvivor
+  if (facts.married && q.titleMarried) return q.titleMarried
+  return q.title
 }
 // Kompakt kildelinje, brukt der mange kilder ellers ville gjort teksten tung å lese.
 function sourceLine(ids = []) {
@@ -91,6 +95,7 @@ function sourceLinks(ids = []) {
 function setAnswer(id, value) {
   state.answers = { ...state.answers, [id]: value }
   error = null
+  needsAck = false
   save()
 }
 
@@ -99,6 +104,7 @@ function go(view, current) {
   state.view = view
   if (current !== undefined) state.current = current
   error = null
+  needsAck = false
   save()
   render()
   root.scrollIntoView({ behavior: 'smooth', block: 'start' })
@@ -109,8 +115,12 @@ function nextQuestion() {
   if (q) {
     const err = validationError(q, state.answers)
     if (err) { error = err; render(); return }
-    const flags = flagKey(flagsForQuestion(state.answers, q.id))
-    if (flags && flags !== shownFlags) { render(); return }
+    if (unacked(q)) {
+      needsAck = true
+      render()
+      root.querySelector('[data-action="ack"]')?.focus()
+      return
+    }
   }
   // Ved endring fra oversikten eller resultatet: gå tilbake dit – men først til spørsmål
   // som endringen har gjort relevante og som ikke er besvart ennå.
@@ -199,6 +209,7 @@ function renderProgress(qs, idx, q) {
 function renderLearnMore(q, facts) {
   const lm = q.learnMore
   if (!lm || (!lm.text && !lm.sources?.length)) return ''
+  if (lm.showIf && !evaluate(lm.showIf, { answers: state.answers, facts })) return ''
   return `
   <details class="aw-more">
     <summary>${esc(fill(lm.title || 'Les mer', facts))}</summary>
@@ -212,18 +223,16 @@ function renderQuestion(q, facts) {
   let idx = qs.findIndex(x => x.id === q.id)
   if (idx === -1) { state.current = qs[0]?.id; return renderQuestion(qs[0], facts) }
   const isLast = idx === qs.length - 1
-  const allFlags = answerFlags(state.answers)
-  const flags = allFlags.filter(f => f.questionId === q.id)
-  shownFlags = flagKey(flags)
-  const flaggedCount = new Set(allFlags.map(f => f.questionId)).size
+  const flags = flagsForQuestion(state.answers, q.id)
+  const acked = !unacked(q)
   return `
   <div class="aw-card aw-question" data-q="${q.id}">
     ${renderProgress(qs, idx, q)}
-    <h3 class="aw-title" tabindex="-1" data-autofocus>${esc(titleFor(q, facts))}</h3>
-    <p class="aw-why"><span>Hvorfor spør vi om dette?</span> ${rich(q.why, facts)}</p>
+    <h3 class="aw-title" tabindex="-1" data-autofocus>${rich(titleFor(q, facts), facts)}</h3>
+    <p class="aw-why"><span>Hvorfor spør vi om dette?</span> ${rich(typeof q.why === 'function' ? q.why(facts) : q.why, facts)}</p>
     <div class="aw-input">${renderInput(q, facts)}</div>
     ${error ? `<p class="aw-error" role="alert">${esc(error)}</p>` : ''}
-    ${renderFlags(flags, facts)}
+    ${renderFlags(flags, facts, acked)}
     ${renderLearnMore(q, facts)}
     <div class="aw-nav">
       <button type="button" class="aw-btn ghost" data-action="prev">${ICON.back} Tilbake</button>
@@ -233,28 +242,29 @@ function renderQuestion(q, facts) {
       ${idx > 0 ? '<button type="button" class="aw-link" data-action="review">Se over og endre alle svarene</button>' : ''}
       ${!state.returnTo && qs.every(x => !validationError(x, state.answers)) ? '<button type="button" class="aw-link" data-action="result">Gå rett til resultatet</button>' : ''}
     </div>
-    ${flaggedCount ? `<p class="aw-flag-count">${ICON.warn}<span>${count(flaggedCount)} av svarene dine gjør at vi ikke kan gi en sikker fordeling. Du får en forklaring i resultatet.</span></p>` : ''}
   </div>`
 }
 
 // Varsel rett under svaret når valget gjør situasjonen for sammensatt til en sikker beregning.
-function renderFlags(flags, facts) {
-  const groups = [
-    { kind: 'blocker', level: 'critical', title: 'Med dette svaret kan vi ikke beregne fordelingen', after: 'Du kan gå videre, men resultatet viser ikke hvordan arven fordeles før dette er avklart.' },
-    { kind: 'complex', level: 'warning', title: 'Dette svaret gjør situasjonen mer sammensatt enn veiviseren kan beregne', after: 'Du kan gå videre, og vi viser fortsatt en beregning – men den kan bli feil for dere. I resultatet forklarer vi nøyaktig hvorfor.' },
-  ]
-  return groups.map(g => {
-    const list = flags.filter(f => f.kind === g.kind)
-    if (!list.length) return ''
-    return `<div class="aw-notice ${g.level} aw-flag" role="status">
-      <div class="aw-notice-icon">${ICON.warn}</div>
-      <div>
-        <h4>${g.title}</h4>
-        ${list.map(f => `<p><strong>${esc(fill(f.title, facts))}.</strong> ${rich(f.text, facts)}</p>`).join('')}
-        <p class="aw-flag-after">${g.after}</p>
-      </div>
-    </div>`
-  }).join('')
+// Brukeren skal bare gjøres oppmerksom på det: «OK» bekrefter og går videre.
+function renderFlags(flags, facts, acked) {
+  if (!flags.length) return ''
+  const blocker = flags.some(f => f.kind === 'blocker')
+  const title = blocker ? 'Med dette svaret kan vi ikke beregne fordelingen' : 'Dette svaret gjør situasjonen mer sammensatt enn veiviseren kan beregne'
+  const after = blocker
+    ? 'Du kan gå videre, men resultatet viser ikke hvordan arven fordeles før dette er avklart.'
+    : 'Du kan gå videre, og vi viser fortsatt en beregning – men den kan bli feil for dere. I resultatet forklarer vi nøyaktig hvorfor.'
+  return `<div class="aw-notice ${blocker ? 'critical' : 'warning'} aw-flag ${needsAck && !acked ? 'attention' : ''}" role="${acked ? 'note' : 'alertdialog'}" aria-label="${esc(title)}">
+    <div class="aw-notice-icon">${ICON.warn}</div>
+    <div>
+      <h4>${title}</h4>
+      ${flags.map(f => `<p><strong>${esc(fill(f.title, facts))}.</strong> ${rich(f.text, facts)}</p>`).join('')}
+      <p class="aw-flag-after">${after}</p>
+      ${acked
+        ? `<p class="aw-flag-done">${ICON.check} Du har lest dette</p>`
+        : `${needsAck ? '<p class="aw-flag-need" role="alert">Trykk «OK» for å gå videre.</p>' : ''}<button type="button" class="aw-btn primary small" data-action="ack">OK ${ICON.arrow}</button>`}
+    </div>
+  </div>`
 }
 
 // ── Inndata ──────────────────────────────────────────────────
@@ -272,6 +282,11 @@ function countInput(path, value) {
   return `<input class="aw-count" type="number" min="0" max="50" step="1" inputmode="numeric" data-path="${path}" value="${esc(value ?? '')}">`
 }
 
+function optionHint(o, facts) {
+  const hint = facts.survivor && o.hintSurvivor ? o.hintSurvivor : o.hint
+  return hint ? `<span class="aw-option-hint">${esc(fill(hint, facts))}</span>` : ''
+}
+
 function renderInput(q, facts) {
   const v = state.answers[q.id]
   const ctx = { answers: state.answers, facts }
@@ -279,22 +294,28 @@ function renderInput(q, facts) {
     case 'single':
       return `<div class="aw-options">${q.options.filter(o => evaluate(o.showIf, ctx)).map(o => `
         <button type="button" class="aw-option ${v === o.value ? 'selected' : ''}" data-action="choose" data-value="${o.value}" aria-pressed="${v === o.value}">
-          <span class="aw-radio"></span><span><span class="aw-option-label">${esc(fill(o.label, facts))}</span>${o.hint ? `<span class="aw-option-hint">${esc(fill(o.hint, facts))}</span>` : ''}</span>
+          <span class="aw-radio"></span><span><span class="aw-option-label">${esc(fill(o.label, facts))}</span>${optionHint(o, facts)}</span>
         </button>`).join('')}</div>`
     case 'multi': {
       const arr = Array.isArray(v) ? v : []
       return `<div class="aw-options">${q.options.filter(o => evaluate(o.showIf, ctx)).map(o => `
         <button type="button" class="aw-option multi ${arr.includes(o.value) ? 'selected' : ''}" data-action="toggle" data-value="${o.value}" aria-pressed="${arr.includes(o.value)}">
-          <span class="aw-checkbox">${ICON.check}</span><span><span class="aw-option-label">${esc(fill(o.label, facts))}</span>${o.hint ? `<span class="aw-option-hint">${esc(fill(o.hint, facts))}</span>` : ''}</span>
+          <span class="aw-checkbox">${ICON.check}</span><span><span class="aw-option-label">${esc(fill(o.label, facts))}</span>${optionHint(o, facts)}</span>
         </button>`).join('')}</div>`
     }
     case 'date':
       return `<input class="aw-date" type="date" data-path="${q.id}" value="${esc(v || '')}" max="${new Date().toISOString().slice(0, 10)}" min="1900-01-01">`
     case 'number':
-      return moneyInput(q.id, v, 'Beløp')
+      return moneyInput(q.id, v, 'Beløp', q.optional ? 'La stå tomt hvis du ikke vet' : '')
+    case 'percent':
+      return `<label class="aw-money">
+        <span class="aw-money-label">Andel${q.optional ? '<small>La stå tomt hvis du ikke vet – da regner vi med 50 %</small>' : ''}</span>
+        <span class="aw-money-field"><input type="text" inputmode="decimal" autocomplete="off" data-path="${q.id}" value="${esc(v ?? '')}" placeholder="50"><span>%</span></span>
+      </label>`
     case 'amounts':
       return q.fields.map(f => moneyInput(`${q.id}.${f.key}`, v?.[f.key], f.label)).join('')
     case 'children': return renderChildren(v, facts)
+    case 'otherChildren': return renderOtherChildren(v)
     case 'siblings': return renderSiblings(v)
     case 'grandparents': return renderGrandparents(v)
     case 'assets': return renderAssets(v || {}, facts)
@@ -322,12 +343,30 @@ function renderChildren(list, facts) {
         ${children.length > 1 ? `<button type="button" class="aw-remove" data-action="remove" data-path="children" data-index="${i}" aria-label="Fjern barn ${i + 1}">Fjern</button>` : ''}
       </div>
       ${facts.hasPartner ? `<div class="aw-field"><span>${esc(commonQ)}</span>${seg(`children.${i}.common`, c.common, [{ value: 'yes', label: 'Ja, felles barn' }, { value: 'no', label: 'Nei, fra et annet forhold' }])}</div>` : ''}
+      ${facts.previousUskifte ? `<div class="aw-field"><span>${esc(fill('Er dette også barnet til {first}?', facts))}</span>${seg(`children.${i}.firstCommon`, c.firstCommon, [{ value: 'yes', label: 'Ja' }, { value: 'no', label: 'Nei, fra et annet forhold' }])}</div>` : ''}
       <div class="aw-field"><span>Lever barnet?</span>${seg(`children.${i}.alive`, c.alive, [{ value: 'yes', label: 'Ja' }, { value: 'no', label: 'Nei, er død' }])}</div>
       ${c.alive === 'no' ? `<div class="aw-field"><span>Hvor mange barn etterlot barnet seg? <small>Skriv 0 hvis ingen</small></span>${countInput(`children.${i}.grandchildren`, c.grandchildren)}</div>` : ''}
       ${c.alive === 'yes' ? `<label class="aw-check"><input type="checkbox" data-path="children.${i}.minor" ${c.minor ? 'checked' : ''}> Barnet er under 18 år</label>` : ''}
     </div>`).join('')}
     <button type="button" class="aw-add" data-action="add" data-path="children">${ICON.plus} Legg til barn</button>
-    <p class="aw-hint">Venter dere barn? Legg det inn som et barn som lever.</p>
+    <p class="aw-hint">Var et barn unnfanget, men ikke født ennå? Legg det inn som et barn som lever.</p>
+  </div>`
+}
+
+// Barn den som døde først hadde med andre enn avdøde (tidligere uskifte).
+function renderOtherChildren(list) {
+  const path = 'previousSpouseChildrenList'
+  const children = Array.isArray(list) && list.length ? list : (state.answers[path] = [{ id: uid() }])
+  return `<div class="aw-rows">${children.map((c, i) => `
+    <div class="aw-row">
+      <div class="aw-row-head">
+        <input class="aw-name" type="text" maxlength="40" placeholder="Barn ${i + 1} (navn er valgfritt)" data-path="${path}.${i}.name" value="${esc(c.name || '')}">
+        ${children.length > 1 ? `<button type="button" class="aw-remove" data-action="remove" data-path="${path}" data-index="${i}" aria-label="Fjern barn ${i + 1}">Fjern</button>` : ''}
+      </div>
+      <div class="aw-field"><span>Lever barnet?</span>${seg(`${path}.${i}.alive`, c.alive, [{ value: 'yes', label: 'Ja' }, { value: 'no', label: 'Nei, er død' }])}</div>
+      ${c.alive === 'no' ? `<div class="aw-field"><span>Hvor mange barn etterlot barnet seg? <small>Skriv 0 hvis ingen</small></span>${countInput(`${path}.${i}.grandchildren`, c.grandchildren)}</div>` : ''}
+    </div>`).join('')}
+    <button type="button" class="aw-add" data-action="add" data-path="${path}">${ICON.plus} Legg til barn</button>
   </div>`
 }
 
@@ -377,16 +416,17 @@ function renderAssets(v, facts) {
   const sep = facts.married && state.answers.separateProperty === 'yes'
   const sepDeceased = sep && ['deceased', 'both'].includes(state.answers.separatePropertyWho)
   const sepSurvivor = sep && ['survivor', 'both'].includes(state.answers.separatePropertyWho)
+  const couple = fill('{couple}', facts)
   const intro = married
-    ? `<p class="aw-hint aw-hint-box">Ta med alt <strong>dere eide til sammen</strong> – både det som sto på avdøde og på gjenlevende. Ektefellers felles formue deles først i to like deler. Bare avdødes halvdel er arv.${sep ? ' Det som etter ektepakten skal holdes utenfor, fører du opp nederst.' : ''}</p>`
+    ? `<p class="aw-hint aw-hint-box">Ta med alt <strong>${couple} eide til sammen</strong> – både det som sto på avdøde og på gjenlevende. Ektefellers felles formue deles først i to like deler. Bare avdødes halvdel er arv.${sep ? ' Det som etter ektepakten skal holdes utenfor, fører du opp nederst.' : ''}</p>`
     : facts.cohabitant
       ? '<p class="aw-hint aw-hint-box">Ta bare med det <strong>avdøde eide</strong>. Eide dere noe sammen, for eksempel boligen, fører du opp avdødes andel. Det samboeren eier selv, er ikke en del av arven.</p>'
       : '<p class="aw-hint aw-hint-box">Ta med det avdøde eide og skyldte. Omtrentlige beløp holder.</p>'
   return `${intro}
-  <fieldset class="aw-group"><legend>${married ? 'Det dere eide' : 'Det avdøde eide'}</legend>
+  <fieldset class="aw-group"><legend>${married ? `Det ${couple} eide` : 'Det avdøde eide'}</legend>
     ${ASSET_FIELDS.map(f => moneyInput(`assets.${f.key}`, v[f.key], f.label, f.hint)).join('')}
   </fieldset>
-  <fieldset class="aw-group"><legend>${married ? 'Det dere skyldte' : 'Det avdøde skyldte'}</legend>
+  <fieldset class="aw-group"><legend>${married ? `Det ${couple} skyldte` : 'Det avdøde skyldte'}</legend>
     ${DEBT_FIELDS.map(f => moneyInput(`assets.${f.key}`, v[f.key], f.label, f.hint)).join('')}
   </fieldset>
   ${sepDeceased ? `<fieldset class="aw-group"><legend>Avdødes eiendeler som skal holdes utenfor (særeie)</legend>
@@ -466,7 +506,7 @@ function heirCards(people, E, facts, opts = {}) {
   return `<div class="aw-heirs">${people.map(p => `
     <div class="aw-heir ${p.isPartner ? 'partner' : ''} ${p.isTestament ? 'testament' : ''}">
       <div class="aw-heir-top">
-        <div><div class="aw-heir-name">${esc(p.label)}</div><div class="aw-heir-rel">${esc(p.relation)}${p.side ? ' · ' + esc(p.side) : ''}${p.common === 'no' ? ' · særkullsbarn' : ''}${p.fromFirst ? ' · inkl. ' + kr(p.fromFirst) + ' etter førstavdøde' : ''}${p.advance ? ' · forskudd ' + kr(p.advance) + ' trukket fra' : ''}</div></div>
+        <div><div class="aw-heir-name">${esc(p.label)}</div><div class="aw-heir-rel">${esc(p.relation)}${p.side ? ' · ' + esc(p.side) : ''}${p.common === 'no' ? ' · særkullsbarn' : ''}${p.fromFirst ? ' · inkl. ' + kr(p.fromFirst) + ' etter den som døde først' : ''}${p.advance ? ' · forskudd ' + kr(p.advance) + ' trukket fra' : ''}</div></div>
         <div class="aw-heir-amount">${kr(p.amount)}<small>${E > 0 ? pct(p.amount / E) + ' av arven' : ''}</small></div>
       </div>
       <div class="aw-heir-bar"><span style="width:${Math.max(2, (p.amount / max) * 100)}%"></span></div>
@@ -480,11 +520,11 @@ function renderSkifte(r, facts) {
   return `
   <div class="aw-block">
     <h3>Slik fordeles boet hvis dere skifter nå</h3>
-    ${s.E <= 0
+    ${s.fullE <= 0
       ? `<p class="aw-lead">Etter at gjelden${e.funeral ? ' og begravelsen' : ''} er betalt, er det ingenting igjen å arve.</p>`
       : `<p class="aw-lead">${rich(r.howMuch, facts)}</p>`}
     ${waterfall(r)}
-    ${s.E > 0 && s.people.length ? heirCards(s.people, s.fullE, facts) : ''}
+    ${s.fullE > 0 && s.people.length ? heirCards(s.people, s.fullE, facts) : ''}
     ${s.toCharity > 0 ? `<div class="aw-flow"><div class="aw-flow-row total"><span>Til frivillig arbeid for barn og unge</span><strong>${kr(s.toCharity)}</strong></div></div>` : ''}
     ${e.kind === 'married' && s.people.some(p => p.isPartner) ? `<p class="aw-hint">I tillegg beholder gjenlevende sin egen halvdel av felles formue (${kr(e.half)})${e.survivorSep ? ` og sitt særeie (${kr(e.survivorSep)})` : ''}. Det er ikke arv. Til sammen sitter gjenlevende igjen med <strong>${kr(e.half + e.survivorSep + s.partner.amount)}</strong>.</p>` : ''}
     ${r.skifteNotices.map(n => notice(n, facts)).join('')}
@@ -503,7 +543,7 @@ function renderUskifte(r, facts) {
       <div><h4>Hva skjer nå</h4><ul class="aw-list">${u.now.map(t => `<li>${rich(t, facts)}</li>`).join('')}</ul></div>
       <div><h4>Hva skjer senere</h4><ul class="aw-list">${u.later.map(t => `<li>${rich(t, facts)}</li>`).join('')}</ul></div>
     </div>
-    <h4>Dette bør du vite før du velger uskifte</h4>
+    <h4>${esc(u.consequencesTitle)}</h4>
     <ul class="aw-list">${u.consequences.map(t => `<li>${rich(t, facts)}</li>`).join('')}</ul>
     ${r.uskifteNotices.map(n => notice(n, facts)).join('')}
     ${sourceLine(u.sources)}
@@ -745,6 +785,13 @@ root.addEventListener('click', e => {
       if (!Object.keys(state.answers).length || confirm('Vil du slette svarene dine og starte på nytt?')) { state = fresh(); save(); go('intro') }
       break
     case 'next': nextQuestion(); break
+    case 'ack': {
+      state.acks = { ...(state.acks || {}), [q.id]: flagKey(flagsForQuestion(state.answers, q.id)) }
+      needsAck = false
+      save()
+      nextQuestion()
+      break
+    }
     case 'prev': prevQuestion(); break
     case 'review': go('review'); break
     case 'result': state.resultView = null; go('result'); break
@@ -767,8 +814,8 @@ root.addEventListener('click', e => {
     case 'choose':
       setAnswer(q.id, value)
       render()
-      // Gir svaret et varsel, blir brukeren stående til hen har lest det og trykker «Neste»
-      if (shownFlags) break
+      // Gir svaret et varsel, blir brukeren stående til hen har trykket «OK» på det
+      if (unacked(q)) break
       // Ett klikk holder: gå videre automatisk etter et kort øyeblikk
       setTimeout(() => { if (state.view === 'question' && state.current === q.id) nextQuestion() }, 220)
       break

@@ -26,8 +26,7 @@ describe('Årsaker til at situasjonen er sammensatt', () => {
     ['testament med skjev fordeling', ok({ testament: 'yes', testamentContent: ['uneven'] }), 'testamentUneven', 'testamentContent'],
     ['testament om noe annet', ok({ testament: 'yes', testamentContent: ['other'] }), 'testamentOther', 'testamentContent'],
     ['testament gir bort for mye', ok({ testament: 'yes', testamentContent: ['giveaway'], testamentAmount: '900000' }), 'testamentExceeds', 'testamentAmount'],
-    ['tidligere uskifte med andre arvinger', ok({ previousUskifte: 'yes', previousUskifteHeirs: 'different' }), 'previousUskifte', 'previousUskifteHeirs'],
-    ['tidligere uskifte, ukjente arvinger', ok({ previousUskifte: 'yes', previousUskifteHeirs: 'unknown' }), 'previousUskifte', 'previousUskifteHeirs'],
+    ['tidligere uskifte der den første ikke etterlot seg barn', single({ previousUskifte: 'yes', previousUskifteType: 'married', hasChildren: 'no', parents: 'none', hasSiblings: 'no', previousSpouseChildren: 'no', assets: { bank: '1000000' } }), 'previousUskifteRelatives', 'previousSpouseChildren'],
     ['gjeld større enn eiendeler', ok({ assets: { bank: '100000', otherDebt: '300000' } }), 'insolvent', 'assets'],
     ['uenige arvinger', ok({ circumstances: ['disagreement'] }), 'disagreement', 'circumstances'],
     ['arving som ikke kan nås', ok({ circumstances: ['unreachable'] }), 'unreachable', 'circumstances'],
@@ -44,8 +43,17 @@ describe('Årsaker til at situasjonen er sammensatt', () => {
     })
   }
 
-  test('tidligere uskifte med bare felles barn er ikke sammensatt', () => {
-    assert.ok(!reasonIds(run(ok({ previousUskifte: 'yes', previousUskifteHeirs: 'same' }))).includes('previousUskifte'))
+  test('tidligere uskifte med barn er ikke sammensatt – det beregnes', () => {
+    const r = run(ok({ previousUskifte: 'yes', previousUskifteType: 'married', children: [child({ firstCommon: 'yes' }), child({ firstCommon: 'yes' })], previousSpouseChildren: 'yes', previousSpouseChildrenList: [child()] }))
+    assert.deepEqual(r.complexReasons, [])
+  })
+  test('testament som gir bort for mye varsles ikke før formuen er lagt inn – og da også på formue-spørsmålet', () => {
+    const before = single({ hasChildren: 'yes', children: kids(), testament: 'yes', testamentContent: ['giveaway'], testamentAmount: '900000' })
+    delete before.assets
+    assert.deepEqual(flagsForQuestion(before, 'testamentAmount'), [])
+    const after = { ...before, assets: { bank: '1000000' } }
+    assert.ok(flagsForQuestion(after, 'testamentAmount').some(f => f.id === 'testamentExceeds'))
+    assert.ok(flagsForQuestion(after, 'assets').some(f => f.id === 'testamentExceeds'))
   })
   test('flere årsaker på samme spørsmål vises samlet', () => {
     const answers = ok({ circumstances: ['disagreement', 'unreachable'] })

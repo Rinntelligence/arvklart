@@ -67,9 +67,17 @@ export function deriveFacts(a = {}) {
   f.advancementGifts = f.hasDescendants && a.advancements === 'gift'
   f.advancementsUnknown = f.hasDescendants && a.advancements === 'unknown'
 
-  f.askPreviousUskifte = Boolean(a.maritalStatus) && a.maritalStatus !== 'married'
+  // Bare enslige og samboere kan ha sittet i uskifte: et nytt ekteskap krever at uskifteboet skiftes først.
+  f.askPreviousUskifte = ['none', 'cohabitant'].includes(a.maritalStatus)
   f.previousUskifte = f.askPreviousUskifte && a.previousUskifte === 'yes'
   f.previousUskifteUnknown = f.askPreviousUskifte && a.previousUskifte === 'unknown'
+  f.previousUskifteMarried = f.previousUskifte && a.previousUskifteType === 'married'
+  f.previousUskifteCohabitant = f.previousUskifte && a.previousUskifteType === 'cohabitant'
+  // Arvingene etter den som døde først: felles barn med avdøde, og egne barn fra andre forhold.
+  f.firstCommonLines = f.previousUskifte ? lines.filter(l => l.firstCommon === 'yes').length : 0
+  f.firstOtherLines = f.previousUskifte && a.previousSpouseChildren === 'yes' ? childLines(a.previousSpouseChildrenList || []).length : 0
+  f.firstOtherChildrenUnknown = f.previousUskifte && a.previousSpouseChildren === 'unknown'
+  f.firstHeirsRelatives = f.previousUskifte && Boolean(a.previousSpouseChildren) && f.firstCommonLines + f.firstOtherLines === 0
 
   f.debtUncertain = a.debtOverview === 'no'
   const circ = Array.isArray(a.circumstances) ? a.circumstances : []

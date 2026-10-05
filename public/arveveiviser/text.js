@@ -5,7 +5,12 @@ import { TERMS } from './glossary.js'
 // Fyller inn plassholdere som avhenger av hvem brukeren er.
 export function fill(text, facts = {}) {
   const partner = facts.married ? 'ektefellen' : facts.cohabitant ? 'samboeren' : 'ektefellen eller samboeren'
+  // Ektefellen/samboeren som døde før avdøde, når avdøde satt i uskifte etter hen.
+  const first = facts.previousUskifteCohabitant ? 'samboeren som døde først' : facts.previousUskifteMarried ? 'ektefellen som døde først' : 'ektefellen eller samboeren som døde først'
   return String(text ?? '')
+    .replaceAll('{First}', capFirst(first))
+    .replaceAll('{first}', first)
+    .replaceAll('{couple}', facts.survivor ? 'dere' : `avdøde og ${partner}`)
     .replaceAll('{partnerDu}', facts.survivor ? 'du' : partner)
     .replaceAll('{partnerDeg}', facts.survivor ? 'deg' : partner)
     .replaceAll('{partner}', partner)

@@ -56,7 +56,8 @@ export function analyze(rawAnswers = {}) {
       advancementsApplied: Boolean(calc.advancementResult),
       insolvent: e.insolvent,
       smallEstate: !e.insolvent && deceasedGross - e.funeral <= SMALL_ESTATE_LIMIT && calc.E > 0,
-      uskifteAvailable: Boolean(uskifteCalc && uskifteCalc.status !== 'notNeeded'),
+      // Er gjelden større enn eiendelene, betyr uskifte bare å overta gjelden – vi viser det ikke som et valg.
+      uskifteAvailable: Boolean(uskifteCalc && uskifteCalc.status !== 'notNeeded' && !e.insolvent),
     })
     if (e.insolvent || calc.E === 0) facts.smallEstate = false
   }
@@ -68,7 +69,10 @@ export function analyze(rawAnswers = {}) {
     E: kr(calc?.E), partnerAmount: kr(calc?.partner.amount),
     pliktPerLine: kr(calc?.compulsory.perLine), freePart: kr(calc?.freePart),
     skjevE: kr(calc?.estate.skjevdeling?.deceasedEstate), testamentWanted: kr(calc?.testament?.wanted),
-    survivorKeeps: kr(calc?.estate.survivorKeeps),
+    // Det testamentet lovlig kan gi: fridelen, pluss inntil 4 G til samboer etter fem år (§ 13)
+    testamentMax: kr((calc?.testament?.cohabitantProtected || 0) + (calc?.freePart || 0)),
+    survivorKeeps: kr(calc?.estate.survivorKeeps), firstAmount: kr(calc?.previous?.amount),
+    splitRule: facts.previousUskifteCohabitant ? 'Etter et samboerskap deles uskifteboet etter verdiene da uskiftet startet.' : 'Etter et ekteskap deles uskifteboet i to like deler.',
   }
   const fmt = t => String(t ?? '').replace(/\{(\w+)\}/g, (m, k) => (k in vars ? vars[k] : m))
   const ctx = { answers: a, facts }
@@ -76,9 +80,16 @@ export function analyze(rawAnswers = {}) {
   const hardBlocked = blockers.some(b => b.hard) || Boolean(skifte?.blocked)
   const notices = hardBlocked ? [] : NOTICES.filter(n => evaluate(n.when, ctx)).map(n => ({ ...n, title: fmt(n.title), text: fmt(n.text), more: fmt(n.more) }))
   const nextSteps = NEXT_STEPS.filter(s => evaluate(s.when, ctx)).map(s => ({ ...s, title: fmt(s.title), text: fmt(s.text) }))
-  if (hardBlocked) nextSteps.unshift({ id: 'clarify', title: 'Avklar det som mangler', text: 'Finn svaret på spørsmålene over, og kom tilbake til veiviseren. Tingretten i kommunen der avdøde bodde, gir gratis veiledning.', sources: ['domstol_kontakt'] })
+  if (hardBlocked) {
+    // Uten beregning gir bare de generelle stegene mening – ikke fordeling og skifteerklæring.
+    const general = ['findTestament', 'overview', 'proklama', 'publicSkifte']
+    nextSteps.splice(0, nextSteps.length, ...nextSteps.filter(s => general.includes(s.id)))
+    nextSteps.unshift(facts.oldLaw
+      ? { id: 'clarify', title: 'Kontakt tingretten for veiledning', text: 'Fordi dødsfallet skjedde før 2021, gjelder andre regler enn veiviseren regner med. Tingretten i kommunen der avdøde bodde, gir gratis veiledning.', sources: ['domstol_kontakt'] }
+      : { id: 'clarify', title: 'Avklar det som mangler', text: 'Finn svaret på spørsmålene over, og kom tilbake til veiviseren. Tingretten i kommunen der avdøde bodde, gir gratis veiledning.', sources: ['domstol_kontakt'] })
+  }
 
-  const uskifte = uskifteCalc && uskifteCalc.status !== 'notNeeded' && !noValues ? describeUskifte(uskifteCalc, calc, facts, a) : null
+  const uskifte = facts.uskifteAvailable && !noValues ? describeUskifte(uskifteCalc, calc, facts, a) : null
 
   const sourcesUsed = new Set(['arveloven_ikraft', 'nav_g', 'domstol_hvem_arver', 'domstol_hva_arver', 'domstol_skifteformer'])
   for (const x of [...notices, ...nextSteps, ...blockers]) for (const s of x.sources || []) sourcesUsed.add(s)
@@ -119,7 +130,7 @@ export function answerFlags(answers) {
 
 // Varsler som hører til ett bestemt spørsmål – vises med en gang brukeren svarer.
 export function flagsForQuestion(answers, questionId) {
-  return answerFlags(answers).filter(x => x.questionId === questionId)
+  return answerFlags(answers).filter(x => x.questionId === questionId || x.alsoOn?.includes(questionId))
 }
 
 // ── Blokkeringer: opplysninger vi må ha før vi kan si hvem som arver ──
@@ -167,7 +178,9 @@ function collectAssumptions(a, f) {
   if (f.separatePropertyAtDeathUnknown) list.push({ questionId: 'separatePropertyAtDeath', text: 'Vi har regnet som om **særeiet også gjelder ved dødsfall**. Sjekk ektepakten.' })
   if (f.advancementsUnknown) list.push({ questionId: 'advancements', text: 'Vi har regnet som om **ingen har fått forskudd på arv**.' })
   if (f.previousUskifteUnknown) list.push({ questionId: 'previousUskifte', text: 'Vi har regnet som om avdøde **ikke satt i uskifte** etter en tidligere ektefelle eller samboer.' })
-  if (f.previousUskifte && a.previousUskifteHeirs !== 'same') list.push({ questionId: 'previousUskifteHeirs', text: 'Vi har ikke beregnet hvordan **halvparten til arvingene etter den som døde først** skal fordeles mellom dem.' })
+  if (f.previousUskifteCohabitant && (a.previousUskifteShare === undefined || a.previousUskifteShare === '')) list.push({ questionId: 'previousUskifteShare', text: 'Vi har regnet som om {first} eide **halvparten** av det som ble holdt i uskifte.' })
+  if (f.firstOtherChildrenUnknown) list.push({ questionId: 'previousSpouseChildren', text: 'Vi har regnet som om {first} **ikke hadde barn med andre**.' })
+  if (f.previousUskifte && !num(a.previousUskifteOutside)) list.push({ questionId: 'previousUskifteOutside', text: 'Vi har regnet som om **alt avdøde eide, hørte til uskifteboet**.' })
   if (f.testamentLimitsPartner && a.testamentPartnerKnew === 'unknown') list.push({ questionId: 'testamentPartnerKnew', text: 'Vi har regnet som om {partnerDu} **ikke visste om testamentet**, slik at full arv etter loven gjelder.' })
   if (f.testamentToCohabitant && a.cohabitantFiveYears === 'unknown') list.push({ questionId: 'cohabitantFiveYears', text: 'Vi har regnet som om dere **ikke hadde bodd sammen i fem år**.' })
   if (f.testamentGiveaway && !num(a.testamentAmount)) list.push({ questionId: 'testamentAmount', text: 'Du har ikke oppgitt hvor mye testamentet gir bort, så det er ikke trukket fra.' })
@@ -192,7 +205,8 @@ function describeSituation(a, f, calc) {
     if (f.hasPartner) {
       const sep = children.filter(c => c.common === 'no').length
       const common = n - sep
-      if (sep === 0) t += n === 1 ? (you ? ', som også er ditt barn' : ', som også er barnet til gjenlevende') : (you ? ' – alle er også dine barn' : ' – alle er felles barn med gjenlevende')
+      const all = n === 2 ? 'begge' : 'alle'
+      if (sep === 0) t += n === 1 ? (you ? ', som også er ditt barn' : ', som også er barnet til gjenlevende') : (you ? ` – ${all} er også dine barn` : ` – ${all} er felles barn med gjenlevende`)
       else if (common === 0) t += n === 1 ? ' fra et annet forhold (særkullsbarn)' : ' fra andre forhold (særkullsbarn)'
       else t += ` – ${count(common)} felles og ${count(sep)} fra et annet forhold (særkullsbarn)`
     }
@@ -201,7 +215,8 @@ function describeSituation(a, f, calc) {
     for (const c of dead) {
       const k = Number(c.grandchildren) || 0
       const name = c.name?.trim() || 'Ett av barna'
-      s.push(k > 0 ? `${cap(name)} er død, og ${k === 1 ? 'barnet hans eller hennes' : `de ${count(k)} barna hans eller hennes`} arver i stedet.` : `${cap(name)} er død uten å etterlate seg barn.`)
+      const dead = c.name?.trim() ? 'død' : 'dødt' // «Kari er død», men «Ett av barna er dødt»
+      s.push(k > 0 ? `${cap(name)} er ${dead}, og ${k === 1 ? 'barnet hans eller hennes' : `de ${count(k)} barna hans eller hennes`} arver i stedet.` : `${cap(name)} er ${dead} uten å etterlate seg barn.`)
     }
   } else if (hasChildren === 'no') {
     s.push('Avdøde hadde ikke barn.')
@@ -209,6 +224,8 @@ function describeSituation(a, f, calc) {
     if (p) s.push(p)
     if (a.hasSiblings === 'yes' && a.siblings?.length) s.push(`Avdøde hadde ${count(a.siblings.length)} søsken.`)
   }
+
+  if (f.previousUskifte) s.push('Avdøde satt i uskifte etter {first}. Uskifteboet skal derfor deles mellom arvingene etter dem begge.')
 
   if (a.testament === 'no') s.push('Det finnes ikke testament.')
   else if (a.testament === 'yes') s.push('Det finnes et testament.')
@@ -221,11 +238,14 @@ function describeSituation(a, f, calc) {
 
   if (calc && calc.estate.assets + calc.estate.debts > 0) {
     const e = calc.estate
-    if (e.kind === 'married') s.push(`Etter gjeld eide dere ${kr(e.commonNet)} sammen. Avdødes halvdel er ${kr(e.half)}${e.deceasedSep ? `, i tillegg til særeie på ${kr(e.deceasedSep)}` : ''}.`)
-    if (calc.E > 0) s.push(`Etter gjeld${e.funeral ? ' og begravelse' : ''} er det **${kr(calc.fullE)}** som skal fordeles etter avdøde.`)
+    if (e.kind === 'married' && e.commonNet < 0) s.push(`Gjelden er ${kr(-e.commonNet)} større enn det ${you ? 'dere' : 'avdøde og ektefellen'} eide sammen.`)
+    else if (e.kind === 'married') s.push(`Etter gjeld eide ${you ? 'dere' : 'avdøde og ektefellen'} ${kr(e.commonNet)} sammen. Avdødes halvdel er ${kr(e.half)}${e.deceasedSep ? `, i tillegg til særeie på ${kr(e.deceasedSep)}` : ''}.`)
+    if (calc.fullE > 0) s.push(calc.previous
+      ? `Etter gjeld${e.funeral ? ' og begravelse' : ''} er det **${kr(calc.fullE)}** som skal fordeles – mellom arvingene etter avdøde og arvingene etter {first}.`
+      : `Etter gjeld${e.funeral ? ' og begravelse' : ''} er det **${kr(calc.fullE)}** som skal fordeles etter avdøde.`)
     else s.push('Etter at gjelden er betalt, er det ingenting igjen å arve.')
   }
-  if (calc && f.uskifteAvailable) s.push(`I denne situasjonen er det særlig spørsmålet om **skifte eller uskifte** som er viktig.`)
+  if (calc && f.uskifteAvailable && !calc.estate.insolvent) s.push(`I denne situasjonen er det særlig spørsmålet om **skifte eller uskifte** som er viktig.`)
   return s
 }
 
@@ -239,6 +259,7 @@ function describeWho(a, f, calc) {
   const parts = []
   const partner = people.find(p => p.isPartner)
   if (partner) parts.push(f.survivor ? 'du' : f.married ? 'gjenlevende ektefelle' : 'gjenlevende samboer')
+  if (people.some(p => p.id === 'testament-cohabitant')) parts.push(f.survivor ? 'du (etter testamentet)' : 'samboeren (etter testamentet)')
   const children = people.filter(p => p.relation === 'Barn')
   const grand = people.filter(p => p.relation === 'Barnebarn')
   if (children.length) {
@@ -247,41 +268,65 @@ function describeWho(a, f, calc) {
     else parts.push(children.length === 1 ? 'barnet til avdøde' : `de ${count(children.length)} barna til avdøde`)
   }
   if (grand.length) parts.push(grand.length === 1 ? 'ett barnebarn' : `${count(grand.length)} barnebarn`)
-  const rel = people.filter(p => !p.isPartner && !p.isTestament && !p.isOther && !['Barn', 'Barnebarn'].includes(p.relation))
+  const ORDER = ['Forelder', 'Søsken', 'Halvsøsken', 'Nevø/niese', 'Besteforelder', 'Tante/onkel', 'Tante/onkel (halv)', 'Søskenbarn']
+  const rel = people.filter(p => ORDER.includes(p.relation))
   const groups = {}
-  for (const p of rel) groups[p.relation] = (groups[p.relation] || 0) + 1
-  const names = { Forelder: ['forelderen', 'foreldrene'], Søsken: ['ett søsken', 'søsken'], Halvsøsken: ['ett halvsøsken', 'halvsøsken'], 'Nevø/niese': ['en nevø eller niese', 'nevøer og nieser'], Besteforelder: ['en besteforelder', 'besteforeldre'], 'Tante/onkel': ['en tante eller onkel', 'tanter og onkler'], 'Tante/onkel (halv)': ['en tante eller onkel', 'tanter og onkler'], Søskenbarn: ['et søskenbarn', 'søskenbarn'] }
+  for (const r of ORDER) { const n = rel.filter(p => p.relation === r).length; if (n) groups[r] = n }
+  const names = { Søsken: ['ett søsken', 'søsken'], Halvsøsken: ['ett halvsøsken', 'halvsøsken'], 'Nevø/niese': ['en nevø eller niese', 'nevøer og nieser'], Besteforelder: ['en besteforelder', 'besteforeldre'], 'Tante/onkel': ['en tante eller onkel', 'tanter og onkler'], 'Tante/onkel (halv)': ['en tante eller onkel', 'tanter og onkler'], Søskenbarn: ['et søskenbarn', 'søskenbarn'] }
   for (const [r, n] of Object.entries(groups)) {
-    const [one, many] = names[r] || [r, r]
-    parts.push(n === 1 ? one : (r === 'Forelder' ? many : `${count(n)} ${many}`))
+    if (r === 'Forelder') { parts.push(n === 2 ? 'foreldrene' : rel.find(p => p.relation === r).label === 'Mor' ? 'moren' : 'faren'); continue }
+    if (r === 'Besteforelder' && n === 1) { parts.push(rel.find(p => p.relation === r).label.toLowerCase()); continue }
+    const [one, many] = names[r]
+    parts.push(n === 1 ? one : `${count(n)} ${many}`)
   }
-  if (people.some(p => p.isTestament)) parts.push('mottakerne i testamentet')
-  if (people.some(p => p.isOther)) parts.push('arvingene etter den som døde først')
+  if (people.some(p => p.id === 'testament')) parts.push('mottakerne i testamentet')
+  // Arvingene etter den som døde først, når avdøde satt i uskifte
+  const firstChildren = people.filter(p => p.relation === 'Barn av den som døde først').length
+  const firstGrand = people.filter(p => p.relation === 'Barnebarn av den som døde først').length
+  if (firstChildren) parts.push(`${firstChildren === 1 ? 'ett barn' : `${count(firstChildren)} barn`} av {first}`)
+  if (firstGrand) parts.push(`${firstGrand === 1 ? 'ett barnebarn' : `${count(firstGrand)} barnebarn`} av {first}`)
+  if (people.some(p => p.id === 'firstDeceased')) parts.push('slekten til {first}')
   if (!parts.length) {
     if (calc.toCharity > 0) return 'Det finnes ingen arvinger etter loven. Uten testament går arven til frivillig arbeid for barn og unge.'
     return 'Etter svarene dine finnes det ingen som arver.'
   }
-  if (partner && calc.partnerTakesAll) return `${f.survivor ? 'Du' : cap(parts[0])} arver alt, fordi boet er mindre enn minstearven.`
+  if (partner && calc.partnerTakesAll) {
+    const why = calc.partner.basis === 'all'
+      ? 'fordi avdøde ikke etterlot seg barn, foreldre, søsken, nevøer eller nieser'
+      : calc.partner.basis === 'cohabitant4G' ? 'fordi boet er mindre enn samboerens arv på fire ganger grunnbeløpet' : 'fordi boet er mindre enn minstearven'
+    return `${f.survivor ? 'Du' : cap(parts[0])} arver alt, ${why}.`
+  }
   if (parts.length === 1 && parts[0] === 'du') return 'Du er eneste arving.'
-  const plural = parts.length > 1 || /barna|barn$|foreldrene|søsken|besteforeldre|tanter|søskenbarn|nevøer|barnebarn|mottakerne|arvingene/.test(parts[0])
+  const plural = parts.length > 1 || /barna|barn$|barn av|foreldrene|søsken|besteforeldre|tanter|søskenbarn|nevøer|barnebarn|mottakerne|slekten/.test(parts[0])
   return `${cap(listJoin(parts))} ${plural ? 'er arvingene' : 'er eneste arving'}.`
 }
 
 // ── Tekst: hvor mye? ──
 function describeHowMuch(calc, f, short = false) {
-  if (calc.E <= 0) return 'Det er ingenting igjen å arve etter at gjelden er betalt.'
+  if (calc.fullE <= 0) return 'Det er ingenting igjen å arve etter at gjelden er betalt.'
   const people = calc.people
   const partner = people.find(p => p.isPartner)
   const rest = people.filter(p => !p.isPartner && !p.isTestament && !p.isOther)
   const sameAmount = rest.length > 1 && rest.every(p => Math.abs(p.amount - rest[0].amount) <= 1)
+  const others = partner ? 'de andre arvingene' : 'arvingene'
   const bits = []
   if (partner) bits.push(`${f.survivor ? 'du' : f.married ? 'ektefellen' : 'samboeren'} får ${kr(partner.amount)}`)
+  const viaTestament = people.find(p => p.id === 'testament-cohabitant')
+  if (viaTestament) bits.push(`${f.survivor ? 'du' : 'samboeren'} får ${kr(viaTestament.amount)} etter testamentet`)
   if (rest.length === 1) bits.push(`${rest[0].relation === 'Barn' ? 'barnet' : rest[0].label} får ${kr(rest[0].amount)}`)
-  else if (sameAmount) bits.push(`${rest.every(p => p.relation === 'Barn') ? 'hvert av barna' : 'hver av de andre arvingene'} får ${kr(rest[0].amount)}`)
-  else if (rest.length) bits.push('de andre arvingene får ulike beløp – se fordelingen under')
+  else if (sameAmount) bits.push(`${rest.every(p => p.relation === 'Barn') ? 'hvert av barna' : `hver av ${others}`} får ${kr(rest[0].amount)}`)
+  else if (rest.length) bits.push(`${others} får ulike beløp – se fordelingen under`)
+  const recipients = people.find(p => p.id === 'testament')
+  if (recipients) bits.push(`mottakerne i testamentet får ${kr(recipients.amount)} til sammen`)
+  // Satt avdøde i uskifte: si først hvordan boet deles mellom de to sidene.
+  if (calc.previous?.amount > 0) {
+    const split = `${kr(calc.previous.amount)} går til arvingene etter {first}, og ${kr(calc.fullE - calc.previous.amount)} er arv etter avdøde.`
+    const p = partner ? ` Av dette får ${f.survivor ? 'du' : f.married ? 'ektefellen' : 'samboeren'} ${kr(partner.amount)}.` : ''
+    return `${short ? '' : 'Basert på opplysningene du har lagt inn: '}${split}${p} Se fordelingen under for hva hver enkelt får.`
+  }
+  if (!bits.length && calc.toCharity > 0) return `Hele arven (${kr(calc.toCharity)}) går til frivillig arbeid for barn og unge.`
   if (!bits.length) return 'Se fordelingen under.'
-  let text = short ? cap(listJoin(bits)) + '.' : `Basert på opplysningene du har lagt inn, er fordelingen slik: ${listJoin(bits)}.`
-  return text
+  return short ? cap(listJoin(bits)) + '.' : `Basert på opplysningene du har lagt inn, er fordelingen slik: ${listJoin(bits)}.`
 }
 
 // ── Uskifte: tekst og tall ──
@@ -302,9 +347,14 @@ function describeUskifte(u, calc, f, a) {
   if (u.status === 'free') lead = calc.order === 1
     ? `${Pc} kan sitte i uskifte uten å spørre barna om lov, fordi alle er felles barn.`
     : `${Pc} kan sitte i uskifte uten samtykke fra avdødes foreldre eller søsken.`
-  if (u.status === 'consent') lead = `Alle særkullsbarna samtykker, så ${P} kan sitte i uskifte med hele boet.`
-  if (u.status === 'partial') lead = `Fordi ikke alle særkullsbarna samtykker, må de få arven sin nå. ${Pc} kan sitte i uskifte med resten. Vi har regnet som om ingen av særkullsbarna samtykker.`
-  if (u.status === 'unknown') lead = `${Pc} kan bare sitte i uskifte med særkullsbarnas del hvis de samtykker. Gjør de ikke det, får de arven sin nå, og ${P} kan sitte i uskifte med resten.`
+  const one = calc.people.filter(p => p.common === 'no').length === 1
+  if (u.status === 'consent') lead = one ? `Særkullsbarnet samtykker, så ${P} kan sitte i uskifte med hele boet.` : `Alle særkullsbarna samtykker, så ${P} kan sitte i uskifte med hele boet.`
+  if (u.status === 'partial') lead = one
+    ? `Fordi særkullsbarnet ikke samtykker, må hen få arven sin nå. ${Pc} kan sitte i uskifte med resten.`
+    : `Fordi ikke alle særkullsbarna samtykker, må de få arven sin nå. ${Pc} kan sitte i uskifte med resten. Vi har regnet som om ingen av særkullsbarna samtykker.`
+  if (u.status === 'unknown') lead = one
+    ? `${Pc} kan bare sitte i uskifte med særkullsbarnets del hvis hen samtykker. Gjør hen ikke det, får hen arven sin nå, og ${P} kan sitte i uskifte med resten.`
+    : `${Pc} kan bare sitte i uskifte med særkullsbarnas del hvis de samtykker. Gjør de ikke det, får de arven sin nå, og ${P} kan sitte i uskifte med resten.`
 
   if (u.kind === 'married') {
     rows.push({ label: `Uskifteboet – det ${P} overtar`, amount: u.uskifteValue, kind: 'total' })
@@ -321,13 +371,13 @@ function describeUskifte(u, calc, f, a) {
     later.push(`${Pc} kan når som helst velge å skifte. Da får ${P} arven ${sin} etter reglene, og ${heirsWord} får sin del.`)
     later.push(`Gifter ${P} ${seg} igjen, må uskifteboet skiftes først. Får ${P} ny samboer i minst to år, eller barn med en ny samboer, kan arvingene kreve skifte.`)
   } else {
-    rows.push({ label: 'Bolig, fritidsbolig, bil og innbo etter boliglån – det du kan overta i uskifte', amount: u.uskifteValue, kind: 'total' })
+    rows.push({ label: `Bolig, fritidsbolig, bil og innbo etter boliglån – det ${P} kan overta i uskifte`, amount: u.uskifteValue, kind: 'total' })
     if (u.restNow > 0) rows.push({ label: 'Resten skiftes nå mellom arvingene', amount: u.restNow })
     lead = `Som samboer med felles barn kan ${P} sitte i uskifte med felles bolig og innbo, bil og fritidsbolig. Annen formue, for eksempel bankinnskudd og aksjer, må gjøres opp nå. ` + lead
     now.push(`${Pc} beholder bolig, innbo, bil og fritidsbolig udelt.`)
     now.push('Barna får ikke sin del av disse eiendelene nå.')
     now.push(`${Pc} blir personlig ansvarlig for avdødes gjeld.`)
-    later.push(`Når ${P} dør, deles uskifteboet etter verdiforholdet mellom dere da uskiftet startet – ikke nødvendigvis likt.`)
+    later.push(`Når ${P} dør, deles uskifteboet etter verdiforholdet mellom ${you ? 'dere' : 'samboerne'} da uskiftet startet – ikke nødvendigvis likt.`)
     later.push(`${Pc} kan når som helst velge å skifte. Da kan ${P} kreve arven på fire ganger grunnbeløpet.`)
     later.push(`Gifter ${P} ${seg}, eller får ${P} ny samboer i minst to år eller barn med en ny samboer, kan arvingene kreve skifte.`)
   }
@@ -348,6 +398,7 @@ function describeUskifte(u, calc, f, a) {
   return {
     status: u.status, kind: u.kind,
     headline: you ? 'Hvis du velger uskifte' : `Hvis ${P} velger uskifte`,
+    consequencesTitle: you ? 'Dette bør du vite før du velger uskifte' : `Dette bør dere vite før ${P} velger uskifte`,
     lead, rows, now, later, consequences, compare,
     choiceIntro: `${you ? 'Du' : cap(P)} kan som hovedregel velge mellom å skifte med ${heirsWord} nå, eller å sitte i [[uskifte]].`,
     sources: u.kind === 'married'
@@ -367,7 +418,14 @@ function describeMethod(calc, f, G, a) {
     m.push({ text: `Avdødes eiendeler (${kr(e.assets)}) minus gjeld (${kr(e.debts)}) er dødsboet.`, sources: [] })
   }
   if (e.funeral) m.push({ text: `Begravelsen (${kr(e.funeral)}) er trukket fra før arven fordeles.`, sources: [] })
-  if (calc.previous) m.push({ text: `Fordi avdøde satt i uskifte, går halvparten (${kr(calc.previous.amount)}) til arvingene etter den som døde først.`, sources: ['arveloven_uskifte_deling'] })
+  if (calc.previous) {
+    const p = calc.previous
+    const share = p.ratio === 0.5 ? 'halvparten' : `${Math.round(p.ratio * 100)} prosent`
+    const outside = p.outside ? ` Først er ${kr(p.outside)} som ikke hørte til uskifteboet, holdt utenfor – det er bare arv etter avdøde.` : ''
+    const lines = p.commonLines.length + p.otherLines.length
+    const split = lines ? ` Den delen er fordelt likt mellom ${lines === 1 ? 'barnet' : `de ${count(lines)} barna`} til {first}${p.otherLines.length ? ', også barn hen hadde med andre' : ''}.` : ''
+    m.push({ text: `Fordi avdøde satt i uskifte etter {first}, går ${share} av uskifteboet (${kr(p.amount)}) til arvingene etter {first}.${outside}${split}`, sources: ['arveloven_uskifte_deling', ...(f.previousUskifteCohabitant ? ['arveloven_uskifte_samboer_deling'] : []), 'arveloven_uskifte_arvinger'] })
+  }
   const basisText = {
     quarter: 'Ektefellen arver en fjerdedel fordi avdøde hadde barn.',
     min4G: `Ektefellen arver minstearven på fire ganger G (${kr(4 * G.value)}), fordi det er mer enn en fjerdedel.`,
@@ -378,10 +436,12 @@ function describeMethod(calc, f, G, a) {
   }[calc.partner.basis]
   if (basisText && calc.partner.amount > 0) m.push({ text: `${basisText}${calc.partner.limitedByTestament ? ' Testamentet har redusert arven til minstearven.' : ''} Det blir ${kr(calc.partner.amount)}.`, sources: [f.married ? (calc.order === 1 ? 'arveloven_ektefelle' : 'arveloven_ektefelle_uten_barn') : 'arveloven_samboer_arv'] })
   if (calc.testament) m.push({ text: `Testamentet kan bestemme fritt over ${kr(calc.freePart)}. Vi har trukket fra ${kr(calc.testament.applied)} til mottakerne i testamentet.`, sources: ['arveloven_pliktdel', 'arveloven_testament_samboer'] })
+  // «Resten» bare når noen har fått sin del først (ektefelle, samboer eller testament)
+  const what = calc.partner.amount > 0 || calc.testament ? 'Resten' : calc.previous ? 'Arven etter avdøde' : 'Arven'
   const orderText = {
-    1: 'Resten er delt likt mellom barna. Er et barn dødt, deler barnets barn den delen.',
-    2: 'Resten er delt mellom foreldrene, halvparten hver. En død forelders del går til avdødes søsken på den siden.',
-    3: 'Resten er delt halvt mellom farssiden og morssiden – besteforeldre, eller tanter, onkler og søskenbarn i deres sted.',
+    1: `${what} er delt likt mellom barna til avdøde. Er et barn dødt, deler barnets barn den delen.`,
+    2: `${what} er delt mellom foreldrene, halvparten hver. En død forelders del går til avdødes søsken på den siden.`,
+    3: `${what} er delt halvt mellom farssiden og morssiden – besteforeldre, eller tanter, onkler og søskenbarn i deres sted.`,
   }[calc.order]
   if (orderText && calc.people.some(p => !p.isPartner && !p.isTestament && !p.isOther)) m.push({ text: orderText, sources: [{ 1: 'arveloven_livsarvinger', 2: 'arveloven_andre_arvegang', 3: 'arveloven_tredje_arvegang' }[calc.order]] })
   if (calc.advancementResult) m.push({ text: 'Forskudd på arv er lagt til det barna deler, og trukket fra hos den som mottok det.', sources: ['arveloven_avkorting'] })
@@ -408,8 +468,8 @@ function complexReasons(a, f, calc) {
   })
   if (f.commonNegative || calc?.estate.commonNegative) r.push({
     id: 'commonNegative', questionId: 'assets',
-    title: 'Gjelden er større enn det dere eide sammen',
-    text: 'Da kan felles formue ikke bare deles i to. Hvem som må dekke gjelden, avhenger av hvem av dere som sto som låntaker – noe veiviseren ikke spør om.',
+    title: 'Gjelden er større enn felles formue',
+    text: 'Da kan felles formue ikke bare deles i to. Hvem som må dekke gjelden, avhenger av hvem av ektefellene som sto som låntaker – noe veiviseren ikke spør om.',
   })
   if (f.testamentUneven) r.push({
     id: 'testamentUneven', questionId: 'testamentContent',
@@ -426,22 +486,21 @@ function complexReasons(a, f, calc) {
     title: 'Testamentet inneholder noe vi ikke kjenner',
     text: 'Du har svart «Noe annet, eller jeg er usikker». Vi kan ikke ta hensyn til innhold vi ikke vet hva er, så fordelingen bygger bare på loven.',
   })
-  if (calc?.testament?.exceeds) r.push({
-    id: 'testamentExceeds', questionId: f.testamentGiveaway ? 'testamentAmount' : 'testamentCohabitantAmount',
+  // Om testamentet gir bort for mye, vet vi først når formuen er lagt inn – derfor varsles det også der.
+  if (calc?.testament?.exceeds && a.assets !== undefined && calc.E > 0) r.push({
+    id: 'testamentExceeds', questionId: f.testamentGiveaway ? 'testamentAmount' : 'testamentCohabitantAmount', alsoOn: ['assets'],
     title: 'Testamentet gir bort mer enn loven tillater',
     text: 'Vi har redusert gavene til det testamentet lovlig kan bestemme over. Hvordan reduksjonen fordeles mellom mottakerne, og om arvingene krever den, kan vi ikke avgjøre.',
   })
-  if (f.previousUskifte && a.previousUskifteHeirs !== 'same') r.push({
-    id: 'previousUskifte', questionId: 'previousUskifteHeirs',
-    title: a.previousUskifteHeirs === 'unknown'
-      ? 'Du vet ikke hvem som arver etter den første ektefellen'
-      : 'Det finnes andre arvinger etter den første ektefellen',
-    text: 'Halvparten av uskifteboet skal til arvingene etter den som døde først. Veiviseren spør ikke hvem de er, så vi kan ikke si hvor mye hver av dem får.',
+  if (f.firstHeirsRelatives) r.push({
+    id: 'previousUskifteRelatives', questionId: 'previousSpouseChildren',
+    title: 'Vi kan ikke fordele delen som går til slekten til {first}',
+    text: '{First} etterlot seg ingen barn eller barnebarn, så delen av uskifteboet som hører til hen, går til foreldrene, søsknene eller andre slektninger av hen. Veiviseren spør ikke om dem, så vi viser bare hvor mye de skal dele til sammen.',
   })
   if (calc?.estate.insolvent) r.push({
     id: 'insolvent', questionId: 'assets',
     title: 'Gjelden er større enn det avdøde eide',
-    text: 'Da er det ingen arv å fordele. Hvilke krav som skal dekkes først, og om dere bør overta boet i det hele tatt, må avklares med tingretten.',
+    text: 'Da er det ingen arv å fordele. Hvilke krav som skal dekkes først, og om arvingene bør overta boet i det hele tatt, må avklares med tingretten.',
   })
   if (f.disagreement) r.push({
     id: 'disagreement', questionId: 'circumstances',

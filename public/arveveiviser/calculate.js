@@ -138,9 +138,12 @@ export function calculateSkifte(a, f, G) {
   const rel = determineRelatives(a, { stopAtSecond: f.married })
   if (rel.unknown.length) return { estate, blocked: true, missing: rel.unknown }
 
-  // Satt avdøde i uskifte, går halvparten av boet til arvingene etter den som døde først (§ 29).
+  // Satt avdøde i uskifte, deles uskifteboet mellom arvingene etter begge (§ 29): likt etter
+  // ektefeller, etter verdiforholdet da uskiftet startet etter samboere (§ 39). Det som ikke
+  // hørte til uskifteboet (§§ 21 og 31), er bare arv etter avdøde.
   const fullE = Math.max(0, estate.deceasedEstate)
-  const firstDeceasedShare = f.previousUskifte ? fullE / 2 : 0
+  const previous = f.previousUskifte ? previousUskifteSplit(a, f, fullE) : null
+  let firstDeceasedShare = previous ? previous.exact : 0
   const E = fullE - firstDeceasedShare
   const partner = partnerInheritance(E, rel.order, f, G)
   const partnerLimited = f.testamentLimitsPartner && a.testamentPartnerKnew === 'yes'
@@ -172,7 +175,10 @@ export function calculateSkifte(a, f, G) {
   }
 
   // Ingen arvinger etter loven: arven går til frivillig virksomhet for barn og unge (§ 76).
-  const toCharity = rel.order === 0 && partnerAmount === 0 ? pool : 0
+  // Satt avdøde i uskifte, går den i stedet til arvingene etter den som døde først (§ 29 siste ledd).
+  const noHeirs = rel.order === 0 && partnerAmount === 0
+  const toCharity = noHeirs && !previous ? pool : 0
+  if (noHeirs && previous) { firstDeceasedShare += pool; pool = 0 }
 
   const people = []
   if (partnerAmount > 0 || (f.partnerInherits && E === 0)) {
@@ -185,11 +191,25 @@ export function calculateSkifte(a, f, G) {
     people.push({ id: 'testament', label: 'Mottakere i testamentet', relation: 'Etter testament', exact: testament.other, isTestament: true })
   }
 
-  // Satt avdøde i uskifte, går halvparten til arvingene etter den som døde først (§ 29).
-  // Er det de samme (felles) barna, får de også den halvparten.
-  const sameChildren = f.previousUskifte && a.previousUskifteHeirs === 'same' && rel.order === 1
-  if (f.previousUskifte && !sameChildren) {
-    people.unshift({ id: 'firstDeceased', label: 'Arvingene etter den som døde først', relation: 'Halvparten av uskifteboet', exact: firstDeceasedShare, isOther: true })
+  // Delen til arvingene etter den som døde først, fordelt likt per barn (stamme) hen etterlot seg.
+  // Felles barn med avdøde får den i tillegg til arven etter avdøde. Uten barn går delen til
+  // slekten til den som døde først, som veiviseren ikke spør om – da vises den samlet.
+  const fromFirstByLine = {}
+  if (previous) {
+    const firstLines = [...previous.commonLines, ...previous.otherLines]
+    const perLine = firstLines.length ? firstDeceasedShare / firstLines.length : 0
+    for (const l of previous.commonLines) fromFirstByLine[l.id] = perLine
+    for (const l of previous.otherLines) {
+      if (l.alive === 'yes') {
+        people.push({ id: `first-${l.id}`, label: l.label, relation: 'Barn av den som døde først', exact: perLine, isOther: true, isFirstHeir: true })
+      } else {
+        const n = Number(l.grandchildren)
+        for (let k = 0; k < n; k++) people.push({ id: `first-${l.id}-${k}`, label: n > 1 ? `Barnebarn ${k + 1} (via ${l.label})` : `Barnebarn (via ${l.label})`, relation: 'Barnebarn av den som døde først', exact: perLine / n, isOther: true, isFirstHeir: true })
+      }
+    }
+    if (!firstLines.length && firstDeceasedShare > 0) {
+      people.unshift({ id: 'firstDeceased', label: 'Slekten til den som døde først', relation: 'Foreldre, søsken eller andre slektninger', exact: firstDeceasedShare, isOther: true, isFirstHeir: true })
+    }
   }
 
   let advancementResult = null
@@ -203,7 +223,7 @@ export function calculateSkifte(a, f, G) {
       const lineTotal = inLine.reduce((s, h) => s + h.share, 0)
       for (const h of inLine) {
         const w = h.share / lineTotal
-        const fromFirst = sameChildren ? (firstDeceasedShare / lines.length) * w : 0
+        const fromFirst = (fromFirstByLine[line.id] || 0) * w
         people.push({
           id: h.id, label: h.label, relation: h.relation, lineId: line.id,
           exact: perLine[line.id] * w + fromFirst, fromFirst: round(fromFirst),
@@ -217,7 +237,7 @@ export function calculateSkifte(a, f, G) {
     for (const h of rel.heirs) people.push({ id: h.id, label: h.label, relation: h.relation, side: h.side, exact: pool * h.share })
   }
   roundAll(people)
-  const previous = f.previousUskifte ? { amount: round(firstDeceasedShare), sameChildren } : null
+  if (previous) Object.assign(previous, { amount: round(firstDeceasedShare), relatives: !previous.commonLines.length && !previous.otherLines.length })
 
   return {
     estate, blocked: false, order: rel.order, notes: rel.notes, previous,
@@ -227,6 +247,19 @@ export function calculateSkifte(a, f, G) {
     advancementResult, people,
     total: people.reduce((s, p) => s + p.amount, 0) + round(toCharity),
   }
+}
+
+// Hvor mye av avdødes bo som hører til den som døde først, og hvem hens arvinger er.
+function previousUskifteSplit(a, f, fullE) {
+  const outside = Math.min(num(a.previousUskifteOutside), fullE)
+  const pctRaw = Number(String(a.previousUskifteShare ?? '').replace(',', '.'))
+  const ratio = f.previousUskifteCohabitant && a.previousUskifteShare !== '' && a.previousUskifteShare !== undefined && Number.isFinite(pctRaw)
+    ? Math.min(100, Math.max(0, pctRaw)) / 100
+    : 0.5
+  const hasChildren = a.cohabitantChildren === 'yes' ? 'yes' : a.hasChildren
+  const commonLines = hasChildren === 'yes' ? childLines(a.children).filter(l => l.firstCommon === 'yes') : []
+  const otherLines = a.previousSpouseChildren === 'yes' ? childLines(a.previousSpouseChildrenList || []) : []
+  return { exact: (fullE - outside) * ratio, ratio, outside: round(outside), uskifteValue: round(fullE - outside), commonLines, otherLines }
 }
 
 // ── 6. Uskifte ────────────────────────────────────────────────

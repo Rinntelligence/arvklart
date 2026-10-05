@@ -29,9 +29,10 @@ const isYesNo = v => v === 'yes' || v === 'no'
 const isCount = v => v !== '' && v !== undefined && v !== null && Number.isInteger(Number(v)) && Number(v) >= 0 && Number(v) <= 50
 const isAmount = v => v === '' || v === undefined || v === null || (Number.isFinite(Number(String(v).replace(/\s/g, '').replace(',', '.'))) && Number(String(v).replace(/\s/g, '').replace(',', '.')) >= 0)
 
-export function validateChild(c, needsCommon) {
+export function validateChild(c, needsCommon, needsFirstCommon = false) {
   if (!c || !isYesNo(c.alive)) return false
   if (needsCommon && !isYesNo(c.common)) return false
+  if (needsFirstCommon && !isYesNo(c.firstCommon)) return false
   if (c.alive === 'no' && !isCount(c.grandchildren)) return false
   return true
 }
@@ -53,12 +54,22 @@ export function validationError(q, answers) {
       return null
     }
     case 'number':
+      if (q.optional && (v === undefined || v === '')) return null
       return v !== undefined && v !== '' && isAmount(v) ? null : 'Skriv inn et beløp (bruk 0 hvis du ikke vet).'
+    case 'percent': {
+      if (q.optional && (v === undefined || v === '')) return null
+      const n = Number(String(v ?? '').replace(',', '.'))
+      return v !== undefined && v !== '' && Number.isFinite(n) && n >= 0 && n <= 100 ? null : 'Skriv inn et tall mellom 0 og 100.'
+    }
     case 'children': {
       if (!Array.isArray(v) || !v.length) return 'Legg inn minst ett barn.'
-      if (!v.every(c => validateChild(c, facts.hasPartner))) return 'Svar på spørsmålene for hvert barn.'
+      if (!v.every(c => validateChild(c, facts.hasPartner, facts.previousUskifte))) return 'Svar på spørsmålene for hvert barn.'
       if (answers.cohabitantChildren === 'yes' && !v.some(c => c.common === 'yes')) return 'Du har svart at dere hadde barn sammen. Marker minst ett barn som felles barn.'
       return null
+    }
+    case 'otherChildren': {
+      if (!Array.isArray(v) || !v.length) return 'Legg inn minst ett barn.'
+      return v.every(c => validateChild(c, false)) ? null : 'Svar på spørsmålene for hvert barn.'
     }
     case 'siblings': {
       if (!Array.isArray(v) || !v.length) return 'Legg inn minst ett søsken.'

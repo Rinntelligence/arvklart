@@ -2,6 +2,8 @@
 // med G = 136 549 kr (gjelder fra 1. mai 2026).
 import { test, describe } from 'node:test'
 import assert from 'node:assert/strict'
+import { validationError } from '../../public/arveveiviser/flow.js'
+import { QUESTION_BY_ID } from '../../public/arveveiviser/questions.js'
 import { G, child, sibling, married, single, base, run, amountOf, byRelation, sumPeople } from './helpers.js'
 
 const sixMillion = { home: '5000000', bank: '1000000', mortgage: '1000000' }
@@ -333,18 +335,70 @@ describe('16–17: Gjeld og uenighet', () => {
   })
 })
 
-describe('18: Avdøde satt i uskifte', () => {
-  test('samme felles barn får begge halvdelene', () => {
-    const r = run(single({ previousUskifte: 'yes', previousUskifteHeirs: 'same', hasChildren: 'yes', children: [child(), child()], assets: { bank: '2000000' } }))
+describe('18: Avdøde satt i uskifte etter en tidligere ektefelle eller samboer', () => {
+  const widow = (o = {}) => single({ previousUskifte: 'yes', previousUskifteType: 'married', hasChildren: 'yes', previousSpouseChildren: 'no', assets: { bank: '2000000' }, ...o })
+
+  test('felles barn får begge halvdelene', () => {
+    const r = run(widow({ children: [child({ firstCommon: 'yes' }), child({ firstCommon: 'yes' })] }))
+    assert.equal(r.blocked, false)
     assert.equal(r.skifte.previous.amount, 1000000)
-    for (const p of byRelation(r, 'Barn')) assert.equal(p.amount, 1000000)
+    for (const p of byRelation(r, 'Barn')) { assert.equal(p.amount, 1000000); assert.equal(p.fromFirst, 500000) }
+    assert.equal(sumPeople(r), 2000000)
+    assert.deepEqual(r.complexReasons, [])
+  })
+  test('særkullsbarn av den som døde først arver bare fra hens halvdel', () => {
+    const own = child({ name: 'Felles', firstCommon: 'yes' })
+    const r = run(widow({ children: [own], previousSpouseChildren: 'yes', previousSpouseChildrenList: [child({ name: 'Første sitt' })] }))
+    const firstChild = r.skifte.people.find(p => p.relation === 'Barn av den som døde først')
+    assert.equal(firstChild.amount, 500000)
+    assert.equal(amountOf(r, `child-${own.id}`), 1500000)
     assert.equal(sumPeople(r), 2000000)
   })
-  test('andre arvinger etter førstavdøde – halvparten vises separat', () => {
-    const r = run(single({ previousUskifte: 'yes', previousUskifteHeirs: 'different', hasChildren: 'yes', children: [child(), child()], assets: { bank: '2000000' } }))
+  test('avdødes egne særkullsbarn arver bare fra avdødes halvdel', () => {
+    const common = child({ firstCommon: 'yes' })
+    const own = child({ firstCommon: 'no' })
+    const r = run(widow({ children: [common, own] }))
+    assert.equal(amountOf(r, `child-${common.id}`), 1500000)
+    assert.equal(amountOf(r, `child-${own.id}`), 500000)
+  })
+  test('et dødt barn av den som døde først: barnebarna arver i stedet', () => {
+    const r = run(widow({ children: [child({ firstCommon: 'yes' })], previousSpouseChildren: 'yes', previousSpouseChildrenList: [child({ alive: 'no', grandchildren: 2 })] }))
+    const gc = r.skifte.people.filter(p => p.relation === 'Barnebarn av den som døde først')
+    assert.equal(gc.length, 2)
+    for (const p of gc) assert.equal(p.amount, 250000)
+  })
+  test('samboer: delingen følger verdiforholdet da uskiftet startet', () => {
+    const r = run(widow({ previousUskifteType: 'cohabitant', previousUskifteShare: '60', children: [child({ firstCommon: 'yes' })] }))
+    assert.equal(r.skifte.previous.amount, 1200000)
+    assert.ok(!r.assumptions.some(a => a.questionId === 'previousUskifteShare'))
+    const blank = run(widow({ previousUskifteType: 'cohabitant', children: [child({ firstCommon: 'yes' })] }))
+    assert.equal(blank.skifte.previous.amount, 1000000)
+    assert.ok(blank.assumptions.some(a => a.questionId === 'previousUskifteShare'))
+  })
+  test('verdier som ikke hørte til uskifteboet, går bare til avdødes arvinger', () => {
+    const own = child({ firstCommon: 'no' })
+    const r = run(widow({ children: [own], previousSpouseChildren: 'yes', previousSpouseChildrenList: [child()], previousUskifteOutside: '400000' }))
+    assert.equal(r.skifte.previous.amount, 800000)
+    assert.equal(amountOf(r, `child-${own.id}`), 1200000)
+  })
+  test('den første etterlot seg ingen barn: delen vises samlet for slekten hens', () => {
+    const r = run(widow({ children: [child({ firstCommon: 'no' })] }))
     assert.equal(amountOf(r, 'firstDeceased'), 1000000)
-    for (const p of byRelation(r, 'Barn')) assert.equal(p.amount, 500000)
-    assert.ok(r.assumptions.some(a => a.questionId === 'previousUskifteHeirs'))
+    assert.ok(r.complexReasons.some(x => x.id === 'previousUskifteRelatives'))
+  })
+  test('ingen arvinger etter avdøde: alt går til arvingene etter den som døde først', () => {
+    const r = run(widow({ hasChildren: 'no', parents: 'none', hasSiblings: 'no', hasGrandparentLine: 'no', previousSpouseChildren: 'yes', previousSpouseChildrenList: [child()] }))
+    assert.equal(r.skifte.toCharity, 0)
+    assert.equal(r.skifte.people.find(p => p.relation === 'Barn av den som døde først').amount, 2000000)
+  })
+  test('barna må svare på om de også er barn av den som døde først', () => {
+    const a = widow({ children: [child()] })
+    assert.ok(validationError(QUESTION_BY_ID.children, a))
+  })
+  test('metoden og situasjonen forklarer delingen', () => {
+    const r = run(widow({ children: [child({ firstCommon: 'yes' })] }))
+    assert.ok(r.method.some(m => /satt i uskifte etter \{first\}/.test(m.text)))
+    assert.ok(r.situation.some(t => /uskifte/.test(t)))
   })
 })
 

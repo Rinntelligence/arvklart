@@ -9,6 +9,7 @@ import { visibleQuestions } from './flow.js'
 import { SECTIONS } from './questions.js'
 import { GRANDPARENT_SIDES } from './heirs.js'
 import { SOURCES } from './sources.js'
+import { TERMS, termsIn } from './glossary.js'
 import { fill, plain, kr, pct } from './text.js'
 
 // ── Linjene fra eiendeler til det som skal arves ──
@@ -27,6 +28,13 @@ export function estateRows(skifte) {
     rows.push({ label: '− Gjeld', amount: -e.debts })
   }
   if (e.funeral) rows.push({ label: '− Begravelse', amount: -e.funeral })
+  // Satt avdøde i uskifte, deles boet mellom arvingene etter begge.
+  if (skifte.previous) {
+    rows.push({ label: '= Dette skal fordeles', amount: skifte.fullE, kind: 'total' })
+    rows.push({ label: 'Herav til arvingene etter den som døde først', amount: skifte.previous.amount })
+    rows.push({ label: 'Herav arv etter avdøde', amount: skifte.fullE - skifte.previous.amount })
+    return rows
+  }
   rows.push({ label: '= Dette skal arves', amount: skifte.E, kind: 'total' })
   return rows
 }
@@ -41,13 +49,19 @@ export function answerText(q, answers, facts) {
     case 'multi': return (v || []).map(x => fill(q.options.find(o => o.value === x)?.label || x, facts)).join(', ')
     case 'date': return new Date(v).toLocaleDateString('nb-NO', { day: 'numeric', month: 'long', year: 'numeric' })
     case 'number': return kr(n(v))
+    case 'percent': return `${String(v).replace('.', ',')} %`
     case 'children': return v.map((c, i) => {
       const name = c.name?.trim() || `Barn ${i + 1}`
       const bits = []
       if (facts.hasPartner) bits.push(c.common === 'yes' ? 'felles barn' : 'fra et annet forhold')
+      if (facts.previousUskifte) bits.push(c.firstCommon === 'yes' ? 'også barn av den som døde først' : 'ikke barn av den som døde først')
       if (c.alive === 'no') bits.push(`død, ${Number(c.grandchildren) || 0} barn`)
       else if (c.minor) bits.push('under 18 år')
       return `${name}${bits.length ? ` (${bits.join(', ')})` : ''}`
+    }).join('; ')
+    case 'otherChildren': return v.map((c, i) => {
+      const name = c.name?.trim() || `Barn ${i + 1}`
+      return c.alive === 'no' ? `${name} (død, ${Number(c.grandchildren) || 0} barn)` : name
     }).join('; ')
     case 'siblings': return v.map((s, i) => {
       const name = s.name?.trim() || `Søsken ${i + 1}`
@@ -76,7 +90,7 @@ export function answerText(q, answers, facts) {
 export function answerSummary(answers, facts) {
   return visibleQuestions(answers).map(q => {
     const title = facts.survivor && q.titleSurvivor ? q.titleSurvivor : facts.married && q.titleMarried ? q.titleMarried : q.title
-    return { id: q.id, section: SECTIONS.find(s => s.id === q.section)?.label || '', question: fill(title, facts), answer: answerText(q, answers, facts) }
+    return { id: q.id, section: SECTIONS.find(s => s.id === q.section)?.label || '', question: plain(title, facts), answer: answerText(q, answers, facts) }
   })
 }
 
@@ -121,7 +135,7 @@ export function buildReport(answers, { date = new Date() } = {}) {
       { type: 'p', text: P(r.howMuch) },
       { type: 'table', columns: ['', 'Beløp'], align: ['left', 'right'], rows: estateRows(s).map(x => ({ cells: [x.label, kr(Math.abs(x.amount))], strong: x.kind === 'total' || x.kind === 'sum' })) },
     ]
-    if (s.people.length && s.E > 0) {
+    if (s.people.length && s.fullE > 0) {
       blocks.push({
         type: 'table', columns: ['Arving', 'Forhold', 'Beløp', 'Andel'], align: ['left', 'left', 'right', 'right'],
         rows: [
@@ -147,7 +161,7 @@ export function buildReport(answers, { date = new Date() } = {}) {
         { type: 'table', columns: ['', 'Beløp'], align: ['left', 'right'], rows: u.rows.map(x => ({ cells: [x.label, kr(x.amount)], strong: x.kind === 'total' })) },
         { type: 'subheading', text: 'Hva skjer nå' }, { type: 'list', items: u.now.map(P) },
         { type: 'subheading', text: 'Hva skjer senere' }, { type: 'list', items: u.later.map(P) },
-        { type: 'subheading', text: 'Dette bør du vite før du velger uskifte' }, { type: 'list', items: u.consequences.map(P) },
+        { type: 'subheading', text: P(u.consequencesTitle) }, { type: 'list', items: u.consequences.map(P) },
         ...r.uskifteNotices.map(n => ({ type: 'note', level: n.level, title: P(n.title), text: P(n.text) })),
       ],
     })
@@ -167,6 +181,13 @@ export function buildReport(answers, { date = new Date() } = {}) {
     heading: 'Dine svar',
     blocks: [{ type: 'table', columns: ['Spørsmål', 'Svar'], align: ['left', 'left'], widths: [0.55, 0.45], rows: answerSummary(r.answers, f).map(a => ({ cells: [a.question, a.answer] })) }],
   })
+
+  // Ordliste over fagordene som er brukt i rapporten – i PDF-en kan de ikke klikkes på.
+  const raw = JSON.stringify([r.who, r.howMuch, r.firstStep, r.situation, r.blockers, r.notices, r.skifteNotices, r.uskifteNotices, r.nextSteps, r.method, r.complexReasons, r.uskifte, r.assumptions].map(x => x ?? ''))
+  const used = termsIn(fill(raw, f))
+  if (used.length) {
+    sections.push({ heading: 'Ordforklaringer', blocks: [{ type: 'list', items: used.map(k => `${TERMS[k].term.charAt(0).toUpperCase() + TERMS[k].term.slice(1)}: ${TERMS[k].def}`) }] })
+  }
 
   sections.push({
     heading: 'Kilder',
@@ -191,7 +212,7 @@ const RELATIONSHIP = {
 const TASK_CATEGORY = {
   findTestament: 'Uke 1', overview: 'Uke 1', proklama: 'Uke 1',
   decideUskifte: 'Måned 1', consent: 'Måned 1', uskifteNotice: 'Måned 1', soleHeir: 'Måned 1',
-  smallEstate: 'Måned 1', publicSkifte: 'Måned 1', privateSkifte: 'Måned 1', clarify: 'Umiddelbart',
+  smallEstate: 'Måned 1', noHeirs: 'Måned 1', publicSkifte: 'Måned 1', privateSkifte: 'Måned 1', clarify: 'Umiddelbart',
   divide: 'Fordeling', register: 'Fordeling',
 }
 export const WIZARD_TAG = 'Fra arveveiviseren'

@@ -20,7 +20,7 @@ describe('PDF-rapporten', () => {
   const headings = report.sections.map(s => s.heading)
 
   test('har alle hoveddelene i riktig rekkefølge', () => {
-    assert.deepEqual(headings, ['Kort fortalt', 'Din situasjon', 'Hvis dere skifter nå', 'Hvis du velger uskifte', 'Hva betyr dette for dere?', 'Dette bør dere gjøre nå', 'Slik har vi kommet frem til dette', 'Dine svar', 'Kilder'])
+    assert.deepEqual(headings, ['Kort fortalt', 'Din situasjon', 'Hvis dere skifter nå', 'Hvis du velger uskifte', 'Hva betyr dette for dere?', 'Dette bør dere gjøre nå', 'Slik har vi kommet frem til dette', 'Dine svar', 'Ordforklaringer', 'Kilder'])
   })
   test('fordelingstabellen viser hver arving, beløp, andel og sum', () => {
     const table = report.sections[2].blocks.find(b => b.type === 'table' && b.columns[0] === 'Arving')

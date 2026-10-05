@@ -9,6 +9,10 @@
 //   {skjevE}              avdødes bo med skjevdeling
 //   {testamentWanted}     beløp testamentet gir bort
 //   {survivorKeeps}       gjenlevendes egen del av felles formue
+//   {testamentMax}        det testamentet lovlig kan gi bort
+//   {firstAmount}         delen av uskifteboet som går til arvingene etter den som døde først
+//   {splitRule}           hvordan uskifteboet deles (ekteskap eller samboerskap)
+// Fylles inn av text.js: {partner} {partnerDu} {partnerDeg} {couple} {first} {First}
 //
 // level: 'info' (forklaring), 'warning' (bør undersøkes), 'critical' (juridisk risiko)
 // area:  'meaning' (Hva betyr dette), 'skifte', 'uskifte'
@@ -70,7 +74,7 @@ export const NOTICES = [
     id: 'cohabitant4G', area: 'meaning', level: 'info',
     when: { all: [{ fact: 'cohabitantWithChildren' }, { not: { fact: 'partnerTakesAll' } }] },
     title: 'Samboeren arver fire ganger grunnbeløpet',
-    text: 'Fordi dere har eller har hatt barn sammen, arver samboeren {g4} (fire ganger grunnbeløpet). Resten går til avdødes barn, som deler likt.',
+    text: 'Fordi {couple} har eller har hatt barn sammen, arver {partnerDu} {g4} (fire ganger grunnbeløpet). Resten går til avdødes barn, som deler likt.',
     more: 'Avdøde kunne bare begrense samboerens arv i et testament hvis samboeren fikk vite om testamentet mens avdøde levde.',
     sources: ['arveloven_samboer_arv', 'domstol_hva_arver'],
   },
@@ -101,7 +105,8 @@ export const NOTICES = [
   // ── Barn og slekt ──
   {
     id: 'childrenEqual', area: 'meaning', level: 'info',
-    when: { all: [{ fact: 'order', eq: 1 }, { fact: 'lineCount', gt: 1 }, { not: { fact: 'partnerTakesAll' } }] },
+    // Ved tidligere uskifte arver felles barn også etter den som døde først – forklares i previousUskifte.
+    when: { all: [{ fact: 'order', eq: 1 }, { fact: 'lineCount', gt: 1 }, { not: { fact: 'partnerTakesAll' } }, { not: { fact: 'previousUskifte' } }] },
     title: 'Barna arver likt',
     text: 'Alle barna til avdøde arver like mye – uansett om de er felles barn, særkullsbarn eller adoptivbarn.',
     sources: ['arveloven_livsarvinger'],
@@ -164,7 +169,7 @@ export const NOTICES = [
     id: 'testamentExceeds', area: 'meaning', level: 'critical',
     when: { fact: 'testamentExceeds' },
     title: 'Testamentet gir bort mer enn loven tillater',
-    text: 'Testamentet gir bort omtrent {testamentWanted}, men kan bare bestemme over {freePart}. I beregningen har vi redusert gavene til det som er lov. Mottakerne i testamentet bør få vite dette.',
+    text: 'Testamentet gir bort omtrent {testamentWanted}, men kan bare bestemme over {testamentMax}. I beregningen har vi redusert gavene til det som er lov. Mottakerne i testamentet bør få vite dette.',
     sources: ['arveloven_pliktdel', 'arveloven_ektefelle'],
   },
   {
@@ -192,7 +197,7 @@ export const NOTICES = [
     id: 'testamentCohabitant', area: 'meaning', level: 'info',
     when: { fact: 'testamentToCohabitant' },
     title: 'Testament til samboeren',
-    text: 'En samboer uten felles barn arver bare det testamentet gir. Har dere bodd sammen de siste fem årene, kan inntil {g4} gis selv om det går ut over barnas pliktdelsarv. Ellers kan samboeren bare få det testamentet fritt kan bestemme over.',
+    text: 'En samboer uten felles barn arver bare det testamentet gir. Har {couple} bodd sammen de siste fem årene, kan inntil {g4} gis selv om det går ut over barnas pliktdelsarv. Ellers kan samboeren bare få det testamentet fritt kan bestemme over.',
     sources: ['arveloven_testament_samboer', 'arveloven_pliktdel'],
   },
   {
@@ -274,10 +279,10 @@ export const NOTICES = [
   {
     id: 'previousUskifte', area: 'meaning', level: 'warning',
     when: { fact: 'previousUskifte' },
-    title: 'Uskifteboet deles i to',
-    text: 'Fordi avdøde satt i uskifte, går halvparten av boet til arvingene etter den som døde først. Bare den andre halvparten er arv etter avdøde.',
-    more: 'Arvingene etter den første ektefellen må være i live nå for å arve. Gjaldt uskiftet en samboer, deles boet etter verdiene da uskiftet startet – ikke nødvendigvis i to like deler.',
-    sources: ['arveloven_uskifte_deling', 'arveloven_uskifte_samboer_deling'],
+    title: 'Uskifteboet deles mellom arvingene etter begge',
+    text: 'Fordi avdøde satt i uskifte, går {firstAmount} til arvingene etter {first}. Bare resten er arv etter avdøde. Felles barn arver fra begge deler, mens barn som bare en av dem hadde, arver fra sin forelders del.',
+    more: 'Arvingene etter {first}, må være i live nå for å arve – er et barn dødt, arver barnets barn i stedet. {splitRule} Har {first} skrevet testament, kan det endre fordelingen av hens del.',
+    sources: ['arveloven_uskifte_deling', 'arveloven_uskifte_samboer_deling', 'arveloven_uskifte_arvinger'],
   },
 
   // ── Barn under 18 ──
@@ -379,8 +384,8 @@ export const NOTICES = [
   {
     id: 'uskifteCohabitantRest', area: 'uskifte', level: 'warning',
     when: { all: [{ fact: 'cohabitantWithChildren' }, { fact: 'uskifteAvailable' }] },
-    title: 'Det er uklart om du også kan få 4 G nå',
-    text: 'Loven sier ikke klart om en samboer som sitter i uskifte, i tillegg kan kreve arven på {g4} av eiendelene som ikke er med i uskifte. Spør tingretten før du bestemmer deg.',
+    title: 'Det er uklart om {partnerDu} også kan få 4 G nå',
+    text: 'Loven sier ikke klart om en samboer som sitter i uskifte, i tillegg kan kreve arven på {g4} av eiendelene som ikke er med i uskifte. Spør tingretten før dere bestemmer dere.',
     sources: ['arveloven_uskifte_samboer', 'arveloven_uskifte_samboer_deling'],
   },
 ]
@@ -426,14 +431,14 @@ export const NEXT_STEPS = [
   {
     id: 'uskifteNotice',
     when: { fact: 'uskifteAvailable' },
-    title: 'Hvis du velger uskifte: meld fra til tingretten innen 60 dager',
-    text: 'Send skjemaet «Melding om uskiftet bo» til tingretten der avdøde bodde. Da får du en [[uskifteattest]] som viser at du kan disponere boet.',
+    title: 'Hvis {partnerDu} velger uskifte: meld fra til tingretten innen 60 dager',
+    text: 'Send skjemaet «Melding om uskiftet bo» til tingretten der avdøde bodde. Tingretten utsteder da en [[uskifteattest]], som viser at {partnerDu} kan disponere boet.',
     sources: ['arveloven_uskifte_frist', 'skjema_uskifte_ektefelle', 'skjema_uskifte_samboer'],
   },
   {
     id: 'soleHeir',
     when: { fact: 'partnerTakesAll' },
-    title: 'Send erklæring om at du er eneste arving',
+    title: 'Send erklæring om at {partnerDu} er eneste arving',
     text: 'Når ektefelle eller samboer arver alt, finnes det egne skjemaer for dette. Tingretten utsteder deretter skifteattest.',
     sources: ['skjema_enearving_ektefelle', 'skjema_enearving_samboer'],
   },
@@ -443,6 +448,13 @@ export const NEXT_STEPS = [
     title: 'Vurder oppgjør som bo av liten verdi',
     text: 'Er det lite igjen etter begravelsen, kan den som ordnet begravelsen søke tingretten om å ta hånd om eiendelene på en enkel måte.',
     sources: ['skjema_liten_verdi', 'arveloven_liten_verdi'],
+  },
+  {
+    id: 'noHeirs',
+    when: { fact: 'toCharity' },
+    title: 'Kontakt tingretten om oppgjøret',
+    text: 'Når det ikke finnes arvinger, kan ingen overta boet ved privat skifte. Tingretten veileder om hvordan boet skal gjøres opp, og om hvordan personer som sto avdøde nær, kan søke om å få arven.',
+    sources: ['arveloven_staten', 'domstol_skifteformer'],
   },
   {
     id: 'publicSkifte',
@@ -460,14 +472,14 @@ export const NEXT_STEPS = [
   },
   {
     id: 'divide',
-    when: { all: [{ not: { fact: 'insolvent' } }, { not: { fact: 'partnerTakesAll' } }] },
+    when: { all: [{ not: { fact: 'insolvent' } }, { not: { fact: 'partnerTakesAll' } }, { not: { fact: 'toCharity' } }] },
     title: 'Fordel eiendelene og gjør opp boet',
     text: 'Med skifteattesten kan dere betale gjeld, selge eller overta eiendeler og fordele resten. Skriv ned hvem som får hva i et skifteoppgjør som alle arvingene signerer. Arvklart kan hjelpe dere med å fordele eiendelene rettferdig.',
     sources: ['domstol_privat_skifte'],
   },
   {
     id: 'register',
-    when: { not: { fact: 'insolvent' } },
+    when: { all: [{ not: { fact: 'insolvent' } }, { not: { fact: 'toCharity' } }] },
     title: 'Overfør eierskap og avslutt',
     text: 'Bolig og fritidsbolig må tinglyses på ny eier hos Kartverket, og kjøretøy omregistreres hos Statens vegvesen. Husk også avdødes skattemelding for dødsåret.',
     sources: [],
