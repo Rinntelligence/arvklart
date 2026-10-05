@@ -3,6 +3,8 @@ import { useEffect, useLayoutEffect, useState, useRef } from 'react'
 const tc = c => { if(!c)return'#FBF9F5'; const r=parseInt(c.slice(1,3),16),g=parseInt(c.slice(3,5),16),b=parseInt(c.slice(5,7),16); return(0.299*r+0.587*g+0.114*b)/255>0.55?'#3A2F26':'#FBF9F5' }
 import { useParams, useNavigate } from 'react-router-dom'
 import { getEstate, getItems, getCategories, supabase } from '../lib/supabase'
+import { buildRemainingSteps, getUndecided } from '../lib/estateProgress'
+import { loadStatusExtras } from '../lib/decisions'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
 
 const PALETTE = ['#5F6E52','#8B9A7D','#A97C3F','#7A8B6E','#9C8267','#6E8B87']
@@ -19,6 +21,7 @@ export default function EstatePage({ session, profile, onToast, isDemo }) {
   const [filterStatus, setFilterStatus] = useState('all')
   const [loading, setLoading] = useState(true)
   const [confirmItem, setConfirmItem] = useState(null)
+  const [statusExtras, setStatusExtras] = useState(null)
   const scrollPos = useRef(0)
 
   useEffect(() => {
@@ -51,6 +54,7 @@ export default function EstatePage({ session, profile, onToast, isDemo }) {
     setCategories(cats || [])
     setMyRole(mem?.role || 'member')
     setLoading(false)
+    setStatusExtras(await loadStatusExtras(id, its || []))
   }
 
   useEffect(() => {
@@ -58,6 +62,7 @@ export default function EstatePage({ session, profile, onToast, isDemo }) {
     const channel = supabase.channel(`estate-${id}`)
       .on('postgres_changes', { event:'*', schema:'public', table:'items', filter:`estate_id=eq.${id}` }, load)
       .on('postgres_changes', { event:'*', schema:'public', table:'interests' }, load)
+      .on('postgres_changes', { event:'*', schema:'public', table:'item_passes' }, load)
       .subscribe()
     return () => supabase.removeChannel(channel)
   }, [id])
@@ -83,6 +88,8 @@ export default function EstatePage({ session, profile, onToast, isDemo }) {
   const contested = items.filter(i => i.interests?.length > 1).length
   const unwanted = items.filter(i => i.interests?.length === 0).length
   const assigned = items.filter(i => i.status === 'assigned').length
+  const undecidedCount = statusExtras ? getUndecided(items, statusExtras.members, statusExtras.passes).length : 0
+  const remainingSteps = statusExtras ? buildRemainingSteps({ estateId: id, userId: session.user.id, items, ...statusExtras }).length : null
 
   const handleDelete = (item, e) => {
     e.stopPropagation()
@@ -161,9 +168,12 @@ export default function EstatePage({ session, profile, onToast, isDemo }) {
         {[
           { path:`/estate/${id}/guide`, label:'Veiviser', desc:'For arveprosessen', color:'#DCE3D2', border:'#B8C8A8' },
           { path:`/estate/${id}/heirs`, label:'Arvinger', desc:'Fordelingskalkulator', color:'#DCE3D2', border:'#B8C8A8' },
-          contested > 0
+          undecidedCount > 0
+            ? { path:`/estate/${id}/conflicts`, label:'Løsningsmetoder', desc:`Venter på ${undecidedCount} ${undecidedCount === 1 ? 'arving' : 'arvinger'}`, color:'#E8DFD0', border:'#C8B8A0' }
+            : contested > 0
             ? { path:`/estate/${id}/conflicts`, label:'Løsningsmetoder', desc:`${contested} ettertraktede`, color:'#E8DFD0', border:'#C8B8A0', highlight: true }
             : { path:`/estate/${id}/conflicts`, label:'Løsningsmetoder', desc:'Ingen ettertraktede ennå', color:'#E8DFD0', border:'#C8B8A0' },
+          { path:`/estate/${id}/status`, label:'Hva gjenstår', desc: remainingSteps === null ? 'Oversikt over boet' : remainingSteps === 0 ? 'Alt er klart' : `${remainingSteps} steg gjenstår`, color:'#fff', border:'#D9CFC0' },
         ].map(mod => (
           <button key={mod.path} onClick={() => navigate(mod.path)} style={{
             padding:'16px', background:mod.color, border:`1.5px solid ${mod.border}`,

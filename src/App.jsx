@@ -21,6 +21,7 @@ import HeirsPage from './pages/HeirsPage'
 import GoodwillPage from './pages/GoodwillPage'
 import { JoinPage, PricingPage, CategoriesPage, PrivacyPage, AccountPage } from './pages/OtherPages'
 import ConflictPage from './pages/ConflictPage'
+import StatusPage from './pages/StatusPage'
 import ContactPage from './pages/ContactPage'
 import { getPendingSave } from './lib/wizardEstate'
 import TopBar from './components/TopBar'
@@ -164,6 +165,7 @@ export default function App() {
           <Route path="/estate/:id/goodwill" element={<GoodwillPage session={session} profile={profile} onToast={showToast} />} />
           <Route path="/estate/:id/heirs" element={<HeirsPage session={session} profile={profile} onToast={showToast} />} />
           <Route path="/estate/:id/conflicts" element={<ConflictPage session={session} onToast={showToast} />} />
+          <Route path="/estate/:id/status" element={<StatusPage session={session} />} />
           <Route path="/join/:code" element={<JoinPage session={session} onToast={showToast} />} />
           <Route path="/pricing" element={<PricingPage session={session} />} />
           <Route path="/founder" element={<FounderPage session={session} />} />

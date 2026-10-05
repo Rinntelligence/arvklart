@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase, getItems, getEstateMembers } from '../lib/supabase'
+import { getPasses } from '../lib/decisions'
+import { getUndecided } from '../lib/estateProgress'
 
 const PALETTE = ['#5F6E52','#8B9A7D','#A97C3F','#7A8B6E','#9C8267','#6E8B87']
 
@@ -37,6 +39,7 @@ export default function ConflictPage({ session, onToast }) {
   const [draftStarted, setDraftStarted] = useState(false)
   const [loading, setLoading] = useState(true)
   const [applying, setApplying] = useState(false)
+  const [undecided, setUndecided] = useState([])
 
   const load = async () => {
     const [{ data: its }, { data: mems }] = await Promise.all([
@@ -47,6 +50,8 @@ export default function ConflictPage({ session, onToast }) {
     setItems(contested)
     const ms = mems || []
     setMembers(ms)
+    const passes = await getPasses((its || []).map(i => i.id))
+    setUndecided(getUndecided(its || [], ms, passes))
     setSnakeOrderIds(ms.map(m => m.user_id))
     setLoading(false)
   }
@@ -157,6 +162,48 @@ export default function ConflictPage({ session, onToast }) {
   }))
 
   if (loading) return <div style={{ padding:'80px', textAlign:'center', color:'#9C8267', fontFamily:'Karla, sans-serif' }}>Laster…</div>
+
+  if (undecided.length) {
+    const meMissing = undecided.some(u => u.member.user_id === session.user.id)
+    return (
+      <div style={{ maxWidth:'560px', margin:'0 auto', padding:'28px 16px 60px', fontFamily:'Karla, sans-serif' }}>
+        <button onClick={() => navigate(`/estate/${id}`)} style={{ background:'none', border:'none', color:'#9C8267', cursor:'pointer', fontSize:'13px', padding:'0 0 16px', fontFamily:'Karla, sans-serif' }}>← Tilbake til boet</button>
+        <h1 style={{ fontFamily:'Fraunces, serif', fontSize:'26px', fontWeight:'400', color:'#3A2F26', marginBottom:'8px' }}>Løsningsmetoder</h1>
+        <p style={{ color:'#5C4530', fontSize:'14px', lineHeight:1.6, marginBottom:'24px' }}>
+          Løsningsmetodene kan brukes når alle arvingene har tatt stilling til hver gjenstand — enten vist interesse eller sagt at de ikke skal ha den.
+        </p>
+        <div style={{ display:'flex', flexDirection:'column', gap:'10px', marginBottom:'24px' }}>
+          {undecided.map(({ member, items: missing }) => {
+            const isMe = member.user_id === session.user.id
+            const name = isMe ? 'Du' : (member.profiles?.display_name || 'En arving')
+            return (
+              <div key={member.user_id} style={{ background:'#fff', border:'1px solid #D9CFC0', borderRadius:'12px', padding:'14px 16px' }}>
+                <div style={{ display:'flex', alignItems:'center', gap:'10px', marginBottom:'6px' }}>
+                  <Avatar name={member.profiles?.display_name} color={memberColor(member.user_id)} size={28} />
+                  <div style={{ fontSize:'14px', color:'#3A2F26' }}>
+                    <strong style={{ fontWeight:'500' }}>{name}</strong> mangler å vise interesse eller si nei takk til {missing.length} {missing.length === 1 ? 'gjenstand' : 'gjenstander'}
+                  </div>
+                </div>
+                <div style={{ fontSize:'12px', color:'#9C8267', lineHeight:1.5, paddingLeft:'38px' }}>
+                  {missing.slice(0, 5).map(i => i.title).join(', ')}{missing.length > 5 ? ` og ${missing.length - 5} til` : ''}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+        <div style={{ display:'flex', gap:'10px', flexWrap:'wrap' }}>
+          {meMissing && (
+            <button onClick={() => navigate(`/estate/${id}/swipe`)} style={{ flex:'1 1 200px', padding:'12px', background:'#3A2F26', color:'#FBF9F5', border:'none', borderRadius:'8px', cursor:'pointer', fontSize:'14px', fontFamily:'Karla, sans-serif' }}>
+              Ta stilling til dine gjenstander
+            </button>
+          )}
+          <button onClick={() => navigate(`/estate/${id}/status`)} style={{ flex:'1 1 200px', padding:'12px', background:'none', border:'1px solid #D9CFC0', borderRadius:'8px', cursor:'pointer', color:'#5C4530', fontSize:'14px', fontFamily:'Karla, sans-serif' }}>
+            Se hva som gjenstår
+          </button>
+        </div>
+      </div>
+    )
+  }
 
   if (!items.length) return (
     <div style={{ maxWidth:'560px', margin:'0 auto', padding:'60px 16px', textAlign:'center', fontFamily:'Karla, sans-serif' }}>

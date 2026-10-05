@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { getItems, addInterest, removeInterest, supabase } from '../lib/supabase'
+import { getItems, supabase } from '../lib/supabase'
+import { getPasses, addPass, addInterestClearingPass } from '../lib/decisions'
 
 export default function SwipePage({ session, profile, onToast }) {
   const { id } = useParams()
@@ -16,9 +17,13 @@ export default function SwipePage({ session, profile, onToast }) {
   const cardRef = useRef(null)
 
   useEffect(() => {
-    getItems(id).then(({ data }) => {
-      const unswipedItems = (data || []).filter(item =>
-        !item.interests?.some(x => x.user_id === session.user.id)
+    getItems(id).then(async ({ data }) => {
+      const all = data || []
+      const myPasses = (await getPasses(all.map(i => i.id))).filter(p => p.user_id === session.user.id)
+      const unswipedItems = all.filter(item =>
+        item.status !== 'assigned' &&
+        !item.interests?.some(x => x.user_id === session.user.id) &&
+        !myPasses.some(p => p.item_id === item.id)
       )
       setItems(unswipedItems)
       setLoading(false)
@@ -33,13 +38,15 @@ export default function SwipePage({ session, profile, onToast }) {
 
     setTimeout(async () => {
       if (type === 'like') {
-        await addInterest(currentItem.id, session.user.id, '')
+        await addInterestClearingPass(currentItem.id, session.user.id, '')
         onToast('Interesse registrert!')
       } else if (type === 'trash') {
         await supabase.from('items').update({ marked_for_disposal: true }).eq('id', currentItem.id)
+        await addPass(currentItem.id, session.user.id)
         onToast('Merket for kast')
       } else {
-        onToast('Hoppet over')
+        await addPass(currentItem.id, session.user.id)
+        onToast('Ikke interessert')
       }
 
       setOffset({ x: 0, y: 0 })

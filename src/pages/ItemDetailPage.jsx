@@ -1,6 +1,8 @@
 import { useEffect, useState, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { getItem, addInterest, removeInterest, deleteItem, getComments, addComment, deleteComment, assignItem, getEstateMembers, supabase } from '../lib/supabase'
+import { getItem, removeInterest, deleteItem, getComments, addComment, deleteComment, assignItem, getEstateMembers, supabase } from '../lib/supabase'
+
+import { getPasses, addPass, removePass, addInterestClearingPass } from '../lib/decisions'
 
 const tc = c => { if(!c)return'#FBF9F5'; const r=parseInt(c.slice(1,3),16),g=parseInt(c.slice(3,5),16),b=parseInt(c.slice(5,7),16); return(0.299*r+0.587*g+0.114*b)/255>0.55?'#3A2F26':'#FBF9F5' }
 
@@ -19,19 +21,22 @@ export default function ItemDetailPage({ session, profile, onToast }) {
   const [showAssign, setShowAssign] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [showWithdrawConfirm, setShowWithdrawConfirm] = useState(false)
+  const [passes, setPasses] = useState([])
   const [currentImageIndex, setCurrentImageIndex] = useState(0)
   const [suggestedValue, setSuggestedValue] = useState('')
   const [showSuggestInput, setShowSuggestInput] = useState(false)
   const commentsEndRef = useRef(null)
 
   const load = async () => {
-    const [{ data: it }, { data: cms }, { data: mems }, { data: mem }] = await Promise.all([
+    const [{ data: it }, { data: cms }, { data: mems }, { data: mem }, ps] = await Promise.all([
       getItem(itemId),
       getComments(itemId),
       getEstateMembers(id),
       supabase.from('estate_members').select('role').eq('estate_id', id).eq('user_id', session.user.id).single(),
+      getPasses([itemId]),
     ])
     setItem(it)
+    setPasses(ps)
     setComments(cms || [])
     setMembers(mems || [])
     setMyRole(mem?.role || 'member')
@@ -43,6 +48,7 @@ export default function ItemDetailPage({ session, profile, onToast }) {
     const channel = supabase.channel(`item-detail-${itemId}`)
       .on('postgres_changes', { event:'*', schema:'public', table:'comments', filter:`item_id=eq.${itemId}` }, load)
       .on('postgres_changes', { event:'*', schema:'public', table:'interests', filter:`item_id=eq.${itemId}` }, load)
+      .on('postgres_changes', { event:'*', schema:'public', table:'item_passes', filter:`item_id=eq.${itemId}` }, load)
       .subscribe()
     return () => supabase.removeChannel(channel)
   }, [itemId])
@@ -54,6 +60,7 @@ export default function ItemDetailPage({ session, profile, onToast }) {
 
   const cat = item.categories || { emoji:'', label:'Annet' }
   const myInterest = item.interests?.find(x => x.user_id === session.user.id)
+  const myPass = passes.some(p => p.user_id === session.user.id)
   const isAssigned = item.status === 'assigned'
   const canDelete = myRole === 'admin' || item.added_by === session.user.id
   const allImages = [item.image_url, ...(item.extra_images || [])].filter(Boolean)
@@ -61,7 +68,7 @@ export default function ItemDetailPage({ session, profile, onToast }) {
   const handleInterest = async () => {
     if (myInterest) { setShowWithdrawConfirm(true); return }
     if (!showReason) { setShowReason(true); return }
-    await addInterest(itemId, session.user.id, reason)
+    await addInterestClearingPass(itemId, session.user.id, reason)
     onToast('Interesse registrert')
     setShowReason(false); setReason(''); load()
   }
@@ -70,6 +77,18 @@ export default function ItemDetailPage({ session, profile, onToast }) {
     await removeInterest(itemId, session.user.id)
     onToast('Interesse trukket tilbake')
     setShowWithdrawConfirm(false); load()
+  }
+
+  const handlePass = async () => {
+    await addPass(itemId, session.user.id)
+    onToast('Registrert at du ikke skal ha denne')
+    load()
+  }
+
+  const undoPass = async () => {
+    await removePass(itemId, session.user.id)
+    onToast('Angret')
+    load()
   }
 
   const handleEstimateVote = async (vote, suggestedValue) => {
@@ -254,10 +273,19 @@ export default function ItemDetailPage({ session, profile, onToast }) {
               <button onClick={handleInterest} style={{ flex:2, padding:'11px', background:'#3A2F26', color:'#FBF9F5', border:'none', borderRadius:'8px', cursor:'pointer', fontSize:'14px', fontFamily:'Karla, sans-serif' }}>Registrer interesse</button>
             </div>
           </div>
-        ) : (
-          <button onClick={handleInterest} style={{ width:'100%', padding:'14px', background:'#3A2F26', color:'#FBF9F5', border:'none', borderRadius:'10px', cursor:'pointer', fontSize:'15px', fontFamily:'Karla, sans-serif', marginBottom:'24px' }}>
-            Registrer interesse
+        ) : myPass ? (
+          <button onClick={undoPass} style={{ width:'100%', padding:'14px', background:'#FBF9F5', color:'#5C4530', border:'1px solid #D9CFC0', borderRadius:'10px', cursor:'pointer', fontSize:'15px', fontFamily:'Karla, sans-serif', marginBottom:'24px' }}>
+            Du skal ikke ha denne — klikk for å angre
           </button>
+        ) : (
+          <div style={{ display:'flex', gap:'10px', marginBottom:'24px' }}>
+            <button onClick={handleInterest} style={{ flex:2, padding:'14px', background:'#3A2F26', color:'#FBF9F5', border:'none', borderRadius:'10px', cursor:'pointer', fontSize:'15px', fontFamily:'Karla, sans-serif' }}>
+              Registrer interesse
+            </button>
+            <button onClick={handlePass} style={{ flex:1, padding:'14px', background:'#fff', color:'#5C4530', border:'1px solid #D9CFC0', borderRadius:'10px', cursor:'pointer', fontSize:'15px', fontFamily:'Karla, sans-serif' }}>
+              Ikke interessert
+            </button>
+          </div>
         )}
 
         <div style={{ borderTop:'1px solid #E8DFD0', paddingTop:'20px', marginBottom:'16px' }}>
