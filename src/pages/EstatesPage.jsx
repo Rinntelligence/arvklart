@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { getMyEstates, createEstate, ensureDefaultCategories, supabase } from '../lib/supabase'
 import { usePlan } from '../hooks/usePlan'
 import { t } from '../lib/lang'
+import { joinEstateByCode } from '../lib/joinEstate'
 import { Card, Button, Avatar } from '../components/UI'
 
 function genCode() { return Math.random().toString(36).substring(2,8).toUpperCase() }
@@ -47,10 +48,8 @@ export default function EstatesPage({ session, profile, onToast }) {
 
   const joinByCode = async () => {
     if (!joinCode.trim()) return
-    const code = joinCode.trim().toUpperCase()
-    const { data: estate } = await supabase.from('estates').select('id, name').eq('invite_code', code).single()
-    if (!estate) { onToast('Ugyldig invitasjonskode', 'error'); return }
-    await supabase.from('estate_members').upsert({ estate_id: estate.id, user_id: session.user.id, role: 'member' }, { onConflict: 'estate_id,user_id' })
+    const { estate, error } = await joinEstateByCode(joinCode, session.user.email)
+    if (error) { onToast(error, 'error'); return }
     onToast(`Ble med i "${estate.name}" ✓`)
     load(); setJoinCode('')
   }

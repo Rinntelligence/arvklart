@@ -1,13 +1,15 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { supabase } from '../lib/supabase'
+import { supabase, getEstateMembers } from '../lib/supabase'
 import { WIZARD_TAG } from '../lib/wizardEstate'
 
 const RELATIONSHIPS = ['Barn', 'Ektefelle / Partner', 'Søsken', 'Forelder', 'Barnebarn', 'Bobestyrer', 'Advokat', 'Rådgiver', 'Annen']
 const AVATAR_COLORS = ['#DCE3D2','#E8DFD0','#C9AE8E','#A8B598','#8B9A7D','#D9CFC0','#5F6E52','#9C8267']
+const normEmail = e => (e || '').trim().toLowerCase()
+const isEmail = e => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)
 const tc = c => { if(!c)return'#FBF9F5'; const r=parseInt(c.slice(1,3),16),g=parseInt(c.slice(3,5),16),b=parseInt(c.slice(5,7),16); return(0.299*r+0.587*g+0.114*b)/255>0.55?'#3A2F26':'#FBF9F5' }
 
-export default function HeirsPage({ session, profile }) {
+export default function HeirsPage({ session, profile, onToast }) {
   const { id } = useParams()
   const navigate = useNavigate()
   const [heirs, setHeirs] = useState([])
@@ -18,15 +20,22 @@ export default function HeirsPage({ session, profile }) {
   const [myRole, setMyRole] = useState('member')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [inviteCode, setInviteCode] = useState('')
+  const [memberEmails, setMemberEmails] = useState([])
+  const [copied, setCopied] = useState('')
+  const [emailEdit, setEmailEdit] = useState(null)
 
   const load = async () => {
-    const [{ data: hs }, { data: mem }, { data: es }] = await Promise.all([
+    const [{ data: hs }, { data: mem }, { data: es }, { data: members }] = await Promise.all([
       supabase.from('heirs').select('*').eq('estate_id', id).order('created_at'),
       supabase.from('estate_members').select('role').eq('estate_id', id).eq('user_id', session.user.id).single(),
-      supabase.from('estates').select('total_value, split_mode').eq('id', id).single(),
+      supabase.from('estates').select('total_value, split_mode, invite_code').eq('id', id).single(),
+      getEstateMembers(id),
     ])
     setHeirs(hs || [])
     setMyRole(mem?.role || 'member')
+    setInviteCode(es?.invite_code || '')
+    setMemberEmails((members || []).map(m => normEmail(m.profiles?.email)).filter(Boolean))
     if (es?.total_value) setTotalValue(es.total_value.toString())
     if (es?.split_mode) setSplitMode(es.split_mode)
     setLoading(false)
@@ -48,11 +57,31 @@ export default function HeirsPage({ session, profile }) {
 
   const addHeir = async () => {
     if (!newHeir.name.trim()) return
-    await supabase.from('heirs').insert({ ...newHeir, estate_id: id, percentage: parseFloat(newHeir.percentage) || 0 })
+    const email = normEmail(newHeir.email)
+    if (email && !isEmail(email)) { onToast?.('Ugyldig e-postadresse', 'error'); return }
+    const { error } = await supabase.from('heirs').insert({ ...newHeir, email: email || null, estate_id: id, percentage: parseFloat(newHeir.percentage) || 0 })
+    if (error) { onToast?.('Kunne ikke legge til arving: ' + error.message, 'error'); return }
+    onToast?.(email ? `${newHeir.name.trim()} er lagt til. Send invitasjonskoden ${inviteCode} til ${email}` : `${newHeir.name.trim()} er lagt til`)
     setNewHeir({ name: '', email: '', relationship: 'Barn', notes: '', percentage: '' })
     setShowAdd(false)
     load()
   }
+
+  const saveEmail = async () => {
+    const email = normEmail(emailEdit.value)
+    if (email && !isEmail(email)) { onToast?.('Ugyldig e-postadresse', 'error'); return }
+    const { error } = await supabase.from('heirs').update({ email: email || null }).eq('id', emailEdit.id)
+    if (error) { onToast?.('Kunne ikke lagre e-post: ' + error.message, 'error'); return }
+    setEmailEdit(null)
+    load()
+  }
+
+  const copy = (what, text) => {
+    navigator.clipboard?.writeText(text)
+    setCopied(what)
+    setTimeout(() => setCopied(''), 2000)
+  }
+  const inviteUrl = inviteCode ? `${window.location.origin}/join/${inviteCode}` : ''
 
   const removeHeir = async (heirId) => {
     await supabase.from('heirs').delete().eq('id', heirId)
@@ -104,6 +133,25 @@ export default function HeirsPage({ session, profile }) {
           <button onClick={() => navigate(`/estate/${id}/guide`)} style={{ padding:'9px 16px', background:'#3A2F26', color:'#FBF9F5', border:'none', borderRadius:'8px', cursor:'pointer', fontSize:'14px', fontFamily:'Karla, sans-serif', whiteSpace:'nowrap' }}>
             Endre svarene i veiviseren
           </button>
+        </div>
+      )}
+
+      {/* Invitasjon */}
+      {inviteCode && (
+        <div style={{ background:'#fff', border:'1px solid #D9CFC0', borderRadius:'12px', padding:'24px', marginBottom:'20px' }}>
+          <h2 style={{ fontFamily:'Fraunces, serif', fontSize:'18px', fontWeight:'400', color:'#3A2F26', marginBottom:'6px' }}>Inviter arvinger</h2>
+          <p style={{ fontSize:'13px', color:'#9C8267', lineHeight:'1.6', marginBottom:'16px' }}>
+            For å bli med i boet må arvingen være lagt til nedenfor med e-posten de logger inn med, og skrive inn invitasjonskoden.
+          </p>
+          <div style={{ display:'flex', alignItems:'center', gap:'10px', flexWrap:'wrap' }}>
+            <span style={{ fontFamily:'Fraunces, serif', fontSize:'26px', letterSpacing:'4px', color:'#3A2F26', background:'#E8DFD0', padding:'8px 16px', borderRadius:'8px' }}>{inviteCode}</span>
+            <button onClick={() => copy('code', inviteCode)} style={{ padding:'9px 16px', background: copied==='code'?'#5F6E52':'#3A2F26', color:'#FBF9F5', border:'none', borderRadius:'8px', cursor:'pointer', fontSize:'14px', fontFamily:'Karla, sans-serif' }}>
+              {copied === 'code' ? 'Kopiert ✓' : 'Kopier kode'}
+            </button>
+            <button onClick={() => copy('link', inviteUrl)} style={{ padding:'9px 16px', background:'none', color:'#5C4530', border:'1px solid #D9CFC0', borderRadius:'8px', cursor:'pointer', fontSize:'14px', fontFamily:'Karla, sans-serif' }}>
+              {copied === 'link' ? 'Kopiert ✓' : 'Kopier lenke'}
+            </button>
+          </div>
         </div>
       )}
 
@@ -162,7 +210,7 @@ export default function HeirsPage({ session, profile }) {
                   style={{ width:'100%', padding:'10px 12px', border:'1px solid #D9CFC0', borderRadius:'8px', fontSize:'14px', background:'#FBF9F5', color:'#3A2F26', outline:'none', fontFamily:'Karla, sans-serif', boxSizing:'border-box' }} />
               </div>
               <div style={{ flex:1, minWidth:'160px' }}>
-                <label style={{ display:'block', fontSize:'12px', color:'#9C8267', marginBottom:'5px' }}>E-post (for å invitere)</label>
+                <label style={{ display:'block', fontSize:'12px', color:'#9C8267', marginBottom:'5px' }}>E-post (den arvingen logger inn med)</label>
                 <input type="email" value={newHeir.email} onChange={e => setNewHeir(p => ({ ...p, email: e.target.value }))} placeholder="kari@epost.no" maxLength={254}
                   style={{ width:'100%', padding:'10px 12px', border:'1px solid #D9CFC0', borderRadius:'8px', fontSize:'14px', background:'#FBF9F5', color:'#3A2F26', outline:'none', fontFamily:'Karla, sans-serif', boxSizing:'border-box' }} />
               </div>
@@ -233,7 +281,29 @@ export default function HeirsPage({ session, profile }) {
                       {heir.relationship}
                     </span>
                   </div>
-                  {heir.email && <div style={{ fontSize:'12px', color:'#9C8267', marginBottom:'4px' }}>{heir.email}</div>}
+                  {emailEdit?.id === heir.id ? (
+                    <div style={{ display:'flex', gap:'6px', flexWrap:'wrap', margin:'4px 0 6px' }}>
+                      <input type="email" autoFocus value={emailEdit.value} onChange={e => setEmailEdit(p => ({ ...p, value: e.target.value }))} onKeyDown={e => e.key === 'Enter' && saveEmail()} placeholder="kari@epost.no" maxLength={254}
+                        style={{ flex:'1 1 180px', padding:'6px 10px', border:'1px solid #D9CFC0', borderRadius:'6px', fontSize:'13px', background:'#FBF9F5', color:'#3A2F26', outline:'none', fontFamily:'Karla, sans-serif' }} />
+                      <button onClick={saveEmail} style={{ padding:'6px 12px', background:'#3A2F26', color:'#FBF9F5', border:'none', borderRadius:'6px', cursor:'pointer', fontSize:'12px', fontFamily:'Karla, sans-serif' }}>Lagre</button>
+                      <button onClick={() => setEmailEdit(null)} style={{ padding:'6px 10px', background:'none', color:'#9C8267', border:'1px solid #D9CFC0', borderRadius:'6px', cursor:'pointer', fontSize:'12px', fontFamily:'Karla, sans-serif' }}>Avbryt</button>
+                    </div>
+                  ) : (
+                    <div style={{ display:'flex', alignItems:'center', gap:'8px', flexWrap:'wrap', marginBottom:'4px' }}>
+                      {heir.email && <span style={{ fontSize:'12px', color:'#9C8267' }}>{heir.email}</span>}
+                      {(() => {
+                        const st = !heir.email ? { label:'Ingen e-post – kan ikke bli med', bg:'#E8DFD0', fg:'#5C4530' }
+                          : memberEmails.includes(normEmail(heir.email)) ? { label:'Har blitt med', bg:'#DCE3D2', fg:'#3A5A30' }
+                          : { label:'Venter på at arvingen blir med', bg:'#FBF9F5', fg:'#9C8267' }
+                        return <span style={{ fontSize:'11px', background:st.bg, color:st.fg, border:'1px solid #D9CFC0', padding:'1px 8px', borderRadius:'20px' }}>{st.label}</span>
+                      })()}
+                      {!memberEmails.includes(normEmail(heir.email)) && (
+                        <button onClick={() => setEmailEdit({ id: heir.id, value: heir.email || '' })} style={{ fontSize:'12px', color:'#9C8267', background:'none', border:'none', padding:0, cursor:'pointer', textDecoration:'underline', fontFamily:'Karla, sans-serif' }}>
+                          {heir.email ? 'Endre e-post' : 'Legg til e-post'}
+                        </button>
+                      )}
+                    </div>
+                  )}
                   {heir.notes && <div style={{ fontSize:'13px', color:'#5C4530', fontStyle:'italic' }}>{heir.notes}</div>}
                 </div>
 

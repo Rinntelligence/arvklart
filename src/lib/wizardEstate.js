@@ -88,11 +88,14 @@ export async function saveWizardToEstate(estateId, userId, { answers, payload })
   const { error: answersError } = await supabase.from('estates').update({ wizard_answers: answers, wizard_updated_at: savedAt }).eq('id', estateId)
   store.set(localAnswersKey(estateId), { answers, savedAt })
 
-  // Arvinger: erstatt de som kom fra veiviseren sist.
+  // Arvinger: erstatt de som kom fra veiviseren sist, men behold e-post som er lagt inn
+  // på dem (trengs for at arvingen skal kunne bli med i boet).
+  const { data: prevHeirs } = await supabase.from('heirs').select('name, email').eq('estate_id', estateId).like('notes', `${WIZARD_TAG}%`)
+  const emailByName = new Map((prevHeirs || []).filter(h => h.email).map(h => [h.name, h.email]))
   const { error: delHeirs } = await supabase.from('heirs').delete().eq('estate_id', estateId).like('notes', `${WIZARD_TAG}%`)
   if (delHeirs) return { error: delHeirs }
   if (p.heirs.length) {
-    const { error } = await supabase.from('heirs').insert(p.heirs.map(h => ({ ...h, estate_id: estateId })))
+    const { error } = await supabase.from('heirs').insert(p.heirs.map(h => ({ ...h, email: emailByName.get(h.name) || null, estate_id: estateId })))
     if (error) return { error }
   }
 

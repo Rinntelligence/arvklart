@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { joinEstateByCode } from '../lib/joinEstate'
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY
@@ -10,13 +11,13 @@ export function JoinPage({ session, onToast }) {
   const { code } = useParams()
   const navigate = useNavigate()
   const [status, setStatus] = useState('joining')
+  const [errorMsg, setErrorMsg] = useState('')
 
   useEffect(() => {
     if (!session) { localStorage.setItem('pendingJoinCode', code); navigate('/'); return }
     const join = async () => {
-      const { data: estate } = await supabase.from('estates').select('id, name').eq('invite_code', code).single()
-      if (!estate) { setStatus('invalid'); return }
-      await supabase.from('estate_members').upsert({ estate_id: estate.id, user_id: session.user.id, role: 'admin' }, { onConflict: 'estate_id,user_id' })
+      const { estate, reason, error } = await joinEstateByCode(code, session.user.email)
+      if (error) { setStatus(reason === 'invalid' ? 'invalid' : 'denied'); setErrorMsg(error); return }
       onToast(`Ble med i "${estate.name}" ✓`)
       navigate(`/estate/${estate.id}`)
     }
@@ -26,7 +27,9 @@ export function JoinPage({ session, onToast }) {
   return (
     <div style={{ minHeight:'100vh', display:'flex', alignItems:'center', justifyContent:'center', background:'#f8f5f0', fontFamily:'DM Sans, sans-serif' }}>
       <div style={{ textAlign:'center', padding:'40px' }}>
-        {status === 'invalid'
+        {status === 'denied'
+          ? <><h2 style={{ fontFamily:"'Fraunces', serif", fontSize:'22px', fontWeight:'400', color:'#3A2F26' }}>Du er ikke lagt til i dette boet</h2><p style={{ color:'#9C8267', marginTop:'8px', maxWidth:'420px', lineHeight:'1.5' }}>{errorMsg}</p><button onClick={() => navigate('/')} style={{ marginTop:'20px', padding:'10px 20px', background:'#3A2F26', color:'#FBF9F5', border:'none', borderRadius:'8px', cursor:'pointer', fontSize:'14px', fontFamily:'Karla, sans-serif' }}>Til mine bo</button></>
+          : status === 'invalid'
           ? <><div style={{ fontSize:'48px', marginBottom:'16px' }}>❌</div><h2 style={{ fontFamily:'Playfair Display, serif', fontSize:'22px', fontWeight:'400', color:'#1a1410' }}>Ugyldig invitasjonslenke</h2><p style={{ color:'#8c7b6b', marginTop:'8px' }}>Denne lenken kan ha utløpt eller blitt fornyet.</p></>
           : <><div style={{ fontSize:'48px', marginBottom:'16px' }}>⏳</div><h2 style={{ fontFamily:'Playfair Display, serif', fontSize:'22px', fontWeight:'400', color:'#1a1410' }}>Blir med i boet…</h2></>}
       </div>
