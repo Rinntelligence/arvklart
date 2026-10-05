@@ -28,9 +28,11 @@ const clean = t => String(t ?? '')
   .replace(/[→]/g, '->')
   .replace(/[^\x00-\xFF–—‘’“”•€…\n]/g, '')
 
+// Arvklart-paletten: espresso, kastanje og kaffe latte til tekst, salviegrønn aksent, beige flater
 const COLOR = {
-  ink: [33, 43, 38], muted: [92, 107, 99], faint: [138, 150, 143],
-  primary: [30, 61, 58], primarySoft: [230, 237, 234], accent: [169, 124, 63], accentSoft: [243, 227, 200], border: [226, 224, 212],
+  ink: [58, 47, 38], muted: [122, 97, 70], faint: [156, 130, 103],
+  primary: [95, 110, 82], primaryStrong: [63, 74, 55], primarySoft: [241, 243, 236],
+  accent: [201, 174, 142], accentSoft: [247, 243, 236], border: [232, 223, 208], espresso: [58, 47, 38],
 }
 
 export async function downloadPdf(answers) {
@@ -62,7 +64,7 @@ export async function downloadPdf(answers) {
     // Hold overskriften sammen med starten av innholdet
     ensure(32)
     y += 3
-    setFont(14, 'bold', COLOR.primary)
+    setFont(14, 'bold', COLOR.primaryStrong)
     doc.text(clean(text), M, y + 5)
     y += 8
     doc.setDrawColor(...COLOR.border); doc.setLineWidth(0.3); doc.line(M, y, W - M, y)
@@ -158,7 +160,7 @@ export async function downloadPdf(answers) {
   }
 
   // ── Forside-topp ──
-  doc.setFillColor(...COLOR.primary); doc.roundedRect(M, y, 9, 9, 2, 2, 'F')
+  doc.setFillColor(...COLOR.espresso); doc.roundedRect(M, y, 9, 9, 2, 2, 'F')
   setFont(11, 'bold', COLOR.ink); doc.text('Arvklart', M + 12, y + 6.2)
   y += 16
   setFont(20, 'bold', COLOR.ink); doc.text(clean(report.title), M, y + 6); y += 11
