@@ -106,6 +106,7 @@ export default function App() {
           <Route path="/join/:code" element={<JoinPage onToast={showToast} />} />
           <Route path="/pricing" element={<PricingPage />} />
           <Route path="/kontakt" element={<ContactPage />} />
+          <Route path="/veiviser" element={<GuidePage standalone />} />
           <Route path="*" element={<Navigate to="/home" />} />
         </Routes>
       </>
@@ -149,6 +150,7 @@ export default function App() {
           <Route path="/pricing" element={<PricingPage session={session} />} />
           <Route path="/founder" element={<FounderPage session={session} />} />
           <Route path="/estate/:id/guide" element={<GuidePage />} />
+          <Route path="/veiviser" element={<GuidePage />} />
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>
       </div>

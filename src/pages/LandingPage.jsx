@@ -189,7 +189,7 @@ export default function LandingPage() {
               <li><a href="#slik-fungerer">Slik fungerer det</a></li>
               <li><a href="#for-hvem">For hvem</a></li>
               <li><a href="#demo" onClick={(e) => { e.preventDefault(); document.getElementById('demo').scrollIntoView({ behavior: 'smooth' }) }}>Prøv demo</a></li>
-              <li><a href="/estate/guide">Veiviser</a></li>
+              <li><a href="/veiviser">Veiviser</a></li>
               <li><a className="nav-login" href="/logg-inn">Logg inn</a></li>
             </ul>
           </nav>
