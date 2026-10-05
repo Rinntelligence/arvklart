@@ -61,3 +61,6 @@ drop policy if exists "Owners can add themselves to their estate" on estate_memb
 create policy "Owners can add themselves to their estate" on estate_members for insert with check (
   user_id = auth.uid() and public.is_estate_owner(estate_id)
 );
+
+-- Be API-et (PostgREST) laste inn den nye funksjonen med en gang.
+notify pgrst, 'reload schema';
