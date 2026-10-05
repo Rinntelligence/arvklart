@@ -43,12 +43,12 @@ export default function TasksPage({ session, profile }) {
 
   const load = async () => {
     const [{ data: ts }, { data: mems }, { data: mem }] = await Promise.all([
-      supabase.from('tasks').select('*, assigned_to_profile:profiles!tasks_assigned_to_fkey(display_name, avatar_color)')
-        .eq('estate_id', id).order('priority').order('created_at'),
+      // tasks.assigned_to peker ikke på profiles, så profilen hentes fra medlemslisten i stedet for en join
+      supabase.from('tasks').select('*').eq('estate_id', id).order('priority').order('created_at'),
       supabase.from('estate_members').select('user_id, profiles(display_name, avatar_color)').eq('estate_id', id),
       supabase.from('estate_members').select('role').eq('estate_id', id).eq('user_id', session.user.id).single(),
     ])
-    setTasks(ts || [])
+    setTasks((ts || []).map(t => ({ ...t, assigned_to_profile: mems?.find(m => m.user_id === t.assigned_to)?.profiles || null })))
     setMembers(mems || [])
     setMyRole(mem?.role || 'member')
     setLoading(false)
