@@ -12,7 +12,7 @@ export default function TopBar({ profile, session, estate }) {
   const [lang, setLangState] = useState(getLang())
 
   const brandColor = estate?.branding_color || '#3A2F26'
-  const brandName = estate?.name ? `HeirSplit · ${estate.name}` : 'HeirSplit'
+  const brandName = estate?.name ? `Arvklart · ${estate.name}` : 'Arvklart'
 
   const toggleLang = () => {
     const next = lang === 'en' ? 'no' : 'en'

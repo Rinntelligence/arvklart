@@ -156,7 +156,7 @@ export default function App() {
 function Splash() {
   return (
     <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#FBF9F5', fontFamily: "'Fraunces', serif", color: '#9C8267', fontSize: '20px', gap: '12px' }}>
-      HeirSplit
+      Arvklart
     </div>
   )
 }
