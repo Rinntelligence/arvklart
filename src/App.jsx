@@ -25,6 +25,9 @@ import TopBar from './components/TopBar'
 import Toast from './components/Toast'
 import FeedbackWidget from './components/FeedbackWidget'
 
+// Public pages a demo session should be allowed to stay on instead of being sent into the demo estate
+const PUBLIC_PATHS = ['/home', '/veiviser', '/kontakt', '/pricing']
+
 export default function App() {
   const [session, setSession] = useState(undefined)
   const [profile, setProfile] = useState(null)
@@ -52,7 +55,9 @@ export default function App() {
     supabase.from('profiles').select('*').eq('user_id', session.user.id).single()
       .then(async ({ data }) => {
         setProfile(data)
-        if (isDemo) {
+        if (isDemo && PUBLIC_PATHS.includes(window.location.pathname)) {
+          setDemoReady(true)
+        } else if (isDemo) {
           const { data: membership } = await supabase
             .from('estate_members')
             .select('estate_id')
