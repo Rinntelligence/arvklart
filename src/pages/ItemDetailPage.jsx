@@ -99,8 +99,10 @@ export default function ItemDetailPage({ session, profile, onToast }) {
   const handleComment = async () => {
     if (!commentText.trim()) return
     setSubmittingComment(true)
-    await addComment(itemId, session.user.id, commentText.trim())
-    setCommentText(''); setSubmittingComment(false); load()
+    const { error } = await addComment(itemId, session.user.id, commentText.trim())
+    setSubmittingComment(false)
+    if (error) { onToast('Kunne ikke lagre kommentaren. Prøv igjen.', 'error'); return }
+    setCommentText(''); load()
   }
 
   const handleAssign = async (userId) => {

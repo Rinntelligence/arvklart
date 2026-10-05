@@ -139,13 +139,13 @@ export const removeInterest = (item_id, user_id) =>
 
 export const getComments = (item_id) =>
   supabase.from('comments')
-    .select('*, profiles(display_name, avatar_color)')
+    .select('*, profiles!comments_user_id_fkey(display_name, avatar_color)')
     .eq('item_id', item_id)
     .order('created_at', { ascending: true })
 
 export const addComment = (item_id, user_id, content) =>
   supabase.from('comments').insert({ item_id, user_id, content })
-    .select('*, profiles(display_name, avatar_color)').single()
+    .select('*, profiles!comments_user_id_fkey(display_name, avatar_color)').single()
 
 export const deleteComment = (id) =>
   supabase.from('comments').delete().eq('id', id)
