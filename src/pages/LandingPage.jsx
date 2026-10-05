@@ -33,7 +33,7 @@ export default function LandingPage() {
           --text2:#7A6C5D;
         }
         .lp * { box-sizing: border-box; margin: 0; padding: 0; }
-        .lp { font-family: 'Karla', sans-serif; color: var(--espresso); background: var(--lin); }
+        .lp { position: relative; font-family: 'Karla', sans-serif; color: var(--espresso); background: var(--lin); }
         .lp .serif { font-family: 'Fraunces', serif; font-weight: 400; }
         .lp a { color: inherit; text-decoration: none; }
 
