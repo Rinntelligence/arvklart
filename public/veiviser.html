@@ -635,7 +635,7 @@
       <h2>Klar for å fordele eiendelene?</h2>
       <p>Når boet er kartlagt og verdsatt, gjør Arvklart selve fordelingen ryddig, sporbar og rettferdig for alle arvinger.</p>
       <button class="cta-btn" id="ctaBtn" type="button">
-        Tilbake til boet
+        <span id="ctaLabel">Tilbake til boet</span>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
       </button>
     </div>
@@ -928,8 +928,12 @@
     resourcesWrap.appendChild(catEl);
   });
 
+  // The embedding page (GuidePage) decides the button text and handles navigation
+  const ctaParams = new URLSearchParams(window.location.search);
+  if(ctaParams.get('back') === 'home') document.getElementById('ctaLabel').textContent = 'Tilbake til hjemmesiden';
   document.getElementById('ctaBtn').addEventListener('click', () => {
-    window.parent.history.back();
+    if(window.parent !== window) window.parent.postMessage({ type: 'veiviser-back' }, window.location.origin);
+    else window.history.back();
   });
 })();
 </script>
