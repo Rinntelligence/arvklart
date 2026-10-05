@@ -5,7 +5,7 @@ import { QUESTION_BY_ID, SECTIONS, ASSET_FIELDS, DEBT_FIELDS } from './questions
 import { visibleQuestions, validationError } from './flow.js'
 import { deriveFacts } from './facts.js'
 import { evaluate } from './conditions.js'
-import { analyze } from './engine.js'
+import { analyze, answerFlags, flagsForQuestion } from './engine.js'
 import { SOURCES } from './sources.js'
 import { TERMS } from './glossary.js'
 import { GRANDPARENT_SIDES, childLines } from './heirs.js'
@@ -34,6 +34,10 @@ let error = null
 const embedded = window.parent !== window
 const host = { ready: false, loggedIn: false, estate: null, saved: null, saving: false, message: null }
 let pdfBusy = false
+// Varslene som sist ble vist på spørsmålet. Gir et svar et nytt varsel, stopper «Neste»
+// én gang, slik at brukeren rekker å lese det før veiviseren går videre.
+let shownFlags = ''
+const flagKey = flags => flags.map(f => f.id).join(',')
 let pdfError = null
 const toHost = msg => { if (embedded) window.parent.postMessage(msg, window.location.origin) }
 
@@ -41,6 +45,8 @@ const toHost = msg => { if (embedded) window.parent.postMessage(msg, window.loca
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
 const kr = krPlain
 const uid = () => Math.random().toString(36).slice(2, 9)
+const NUM_WORDS = ['null', 'ett', 'to', 'tre', 'fire', 'fem', 'seks', 'sju', 'åtte', 'ni', 'ti']
+const count = n => { const w = NUM_WORDS[n] || String(n); return w.charAt(0).toUpperCase() + w.slice(1) }
 
 const ICON = {
   arrow: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>',
@@ -103,6 +109,8 @@ function nextQuestion() {
   if (q) {
     const err = validationError(q, state.answers)
     if (err) { error = err; render(); return }
+    const flags = flagKey(flagsForQuestion(state.answers, q.id))
+    if (flags && flags !== shownFlags) { render(); return }
   }
   // Ved endring fra oversikten eller resultatet: gå tilbake dit – men først til spørsmål
   // som endringen har gjort relevante og som ikke er besvart ennå.
@@ -204,6 +212,10 @@ function renderQuestion(q, facts) {
   let idx = qs.findIndex(x => x.id === q.id)
   if (idx === -1) { state.current = qs[0]?.id; return renderQuestion(qs[0], facts) }
   const isLast = idx === qs.length - 1
+  const allFlags = answerFlags(state.answers)
+  const flags = allFlags.filter(f => f.questionId === q.id)
+  shownFlags = flagKey(flags)
+  const flaggedCount = new Set(allFlags.map(f => f.questionId)).size
   return `
   <div class="aw-card aw-question" data-q="${q.id}">
     ${renderProgress(qs, idx, q)}
@@ -211,6 +223,7 @@ function renderQuestion(q, facts) {
     <p class="aw-why"><span>Hvorfor spør vi om dette?</span> ${rich(q.why, facts)}</p>
     <div class="aw-input">${renderInput(q, facts)}</div>
     ${error ? `<p class="aw-error" role="alert">${esc(error)}</p>` : ''}
+    ${renderFlags(flags, facts)}
     ${renderLearnMore(q, facts)}
     <div class="aw-nav">
       <button type="button" class="aw-btn ghost" data-action="prev">${ICON.back} Tilbake</button>
@@ -220,7 +233,28 @@ function renderQuestion(q, facts) {
       ${idx > 0 ? '<button type="button" class="aw-link" data-action="review">Se over og endre alle svarene</button>' : ''}
       ${!state.returnTo && qs.every(x => !validationError(x, state.answers)) ? '<button type="button" class="aw-link" data-action="result">Gå rett til resultatet</button>' : ''}
     </div>
+    ${flaggedCount ? `<p class="aw-flag-count">${ICON.warn}<span>${count(flaggedCount)} av svarene dine gjør at vi ikke kan gi en sikker fordeling. Du får en forklaring i resultatet.</span></p>` : ''}
   </div>`
+}
+
+// Varsel rett under svaret når valget gjør situasjonen for sammensatt til en sikker beregning.
+function renderFlags(flags, facts) {
+  const groups = [
+    { kind: 'blocker', level: 'critical', title: 'Med dette svaret kan vi ikke beregne fordelingen', after: 'Du kan gå videre, men resultatet viser ikke hvordan arven fordeles før dette er avklart.' },
+    { kind: 'complex', level: 'warning', title: 'Dette svaret gjør situasjonen mer sammensatt enn veiviseren kan beregne', after: 'Du kan gå videre, og vi viser fortsatt en beregning – men den kan bli feil for dere. I resultatet forklarer vi nøyaktig hvorfor.' },
+  ]
+  return groups.map(g => {
+    const list = flags.filter(f => f.kind === g.kind)
+    if (!list.length) return ''
+    return `<div class="aw-notice ${g.level} aw-flag" role="status">
+      <div class="aw-notice-icon">${ICON.warn}</div>
+      <div>
+        <h4>${g.title}</h4>
+        ${list.map(f => `<p><strong>${esc(fill(f.title, facts))}.</strong> ${rich(f.text, facts)}</p>`).join('')}
+        <p class="aw-flag-after">${g.after}</p>
+      </div>
+    </div>`
+  }).join('')
 }
 
 // ── Inndata ──────────────────────────────────────────────────
@@ -384,6 +418,13 @@ function renderReview(facts) {
     groups[groups.length - 1].rows.push(r)
   }
   const missing = visibleQuestions(state.answers).find(q => validationError(q, state.answers))
+  const flags = answerFlags(state.answers)
+  const flagTag = id => {
+    const own = flags.filter(f => f.questionId === id)
+    if (!own.length) return ''
+    const label = own.some(f => f.kind === 'blocker') ? 'Hindrer beregningen' : 'Gjør fordelingen usikker'
+    return `<span class="aw-flag-tag" title="${esc(own.map(f => f.title).join(' · '))}">${ICON.warn}${label}</span>`
+  }
   return `
   <div class="aw-card">
     <span class="eyebrow">Dine svar</span>
@@ -392,7 +433,7 @@ function renderReview(facts) {
     ${groups.map(g => `
       <h4 class="aw-review-section">${esc(g.section)}</h4>
       <dl class="aw-review">${g.rows.map(r => `
-        <div><dt>${esc(r.question)}</dt><dd>${r.answer === 'Ikke besvart' ? '<em>Ikke besvart</em>' : esc(r.answer)}</dd>
+        <div><dt>${esc(r.question)}</dt><dd>${r.answer === 'Ikke besvart' ? '<em>Ikke besvart</em>' : esc(r.answer)}${flagTag(r.id)}</dd>
         <button type="button" class="aw-link" data-action="edit" data-q="${r.id}" aria-label="Endre: ${esc(r.question)}">${ICON.edit} Endre</button></div>`).join('')}
       </dl>`).join('')}
     <div class="aw-nav">
@@ -560,6 +601,27 @@ function renderResult() {
       </div></div>`).join('')}
     </div>` : ''
 
+  // Hvorfor situasjonen er for sammensatt: ett punkt per svar, med lenke tilbake til spørsmålet.
+  const complexity = r.complexReasons.length ? `
+    <div class="aw-block">
+      <div class="aw-notice warning aw-complex">
+        <div class="aw-notice-icon">${ICON.warn}</div>
+        <div>
+          <h4>Situasjonen deres kan være mer sammensatt enn veiviseren kan beregne</h4>
+          <p>${blocked
+            ? 'Når det som mangler er avklart, vil disse svarene i tillegg gjøre beregningen usikker:'
+            : 'Fordelingen vi viser, bygger på lovens hovedregler. Disse svarene gjør at den kan bli feil for dere:'}</p>
+          <ol class="aw-reasons">${r.complexReasons.map(x => `<li>
+            <strong>${esc(fill(x.title, facts))}</strong>
+            <p>${rich(x.text, facts)}</p>
+            <button type="button" class="aw-link inline" data-action="edit" data-q="${x.questionId}">${ICON.edit} Se svaret ditt</button>
+          </li>`).join('')}</ol>
+          <p>${rich('Vurder å kontakte [[tingretten]] (gratis veiledning) eller en advokat før dere bestemmer dere.', facts)}</p>
+          ${sourceLinks(['domstol_kontakt'])}
+        </div>
+      </div>
+    </div>` : ''
+
   const summary = `
     <div class="aw-summary">
       <div class="aw-summary-item"><span class="aw-num">1</span><div><h4>Hvem arver?</h4><p>${rich(r.who, facts)}</p></div></div>
@@ -620,12 +682,12 @@ function renderResult() {
     ${head}
     ${summary}
     ${blockers}
+    ${complexity}
     ${situation}
     ${distribution}
     ${meaning}
     ${steps}
     ${method}
-    ${r.complex ? `<div class="aw-notice warning"><div class="aw-notice-icon">${ICON.warn}</div><div><h4>Situasjonen deres kan være mer sammensatt enn veiviseren kan beregne</h4><p>${rich('Vurder å kontakte [[tingretten]] (gratis veiledning) eller en advokat før dere bestemmer dere.', facts)}</p>${sourceLinks(['domstol_kontakt'])}</div></div>` : ''}
     ${renderSaveCard(r)}
     <div class="aw-nav aw-result-nav">
       <button type="button" class="aw-btn ghost" data-action="review">${ICON.edit} Endre svar</button>
@@ -705,6 +767,8 @@ root.addEventListener('click', e => {
     case 'choose':
       setAnswer(q.id, value)
       render()
+      // Gir svaret et varsel, blir brukeren stående til hen har lest det og trykker «Neste»
+      if (shownFlags) break
       // Ett klikk holder: gå videre automatisk etter et kort øyeblikk
       setTimeout(() => { if (state.view === 'question' && state.current === q.id) nextQuestion() }, 220)
       break

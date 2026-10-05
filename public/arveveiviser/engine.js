@@ -83,6 +83,7 @@ export function analyze(rawAnswers = {}) {
   const sourcesUsed = new Set(['arveloven_ikraft', 'nav_g', 'domstol_hvem_arver', 'domstol_hva_arver', 'domstol_skifteformer'])
   for (const x of [...notices, ...nextSteps, ...blockers]) for (const s of x.sources || []) sourcesUsed.add(s)
   for (const s of uskifte?.sources || []) sourcesUsed.add(s)
+  const complexList = complexReasons(a, facts, calc)
 
   return {
     answers: a, facts, G, blockers, blocked: blockers.length > 0,
@@ -100,8 +101,25 @@ export function analyze(rawAnswers = {}) {
     nextSteps,
     method: calc ? describeMethod(calc, facts, G, a) : [],
     sourcesUsed: [...sourcesUsed],
-    complex: isComplex(a, facts, calc),
+    complex: complexList.length > 0 || facts.oldLaw,
+    complexReasons: complexList,
   }
+}
+
+// Svar som gjør fordelingen usikker eller umulig å beregne, ett varsel per årsak.
+// Ubesvarte spørsmål og blokkeringer for manglende opplysninger (barn, beløp) gir ingen
+// varsler, siden de bare betyr at brukeren ikke har fylt ut ennå.
+export function answerFlags(answers) {
+  const r = analyze(answers)
+  const blockers = r.blockers
+    .filter(b => b.questionId && r.answers[b.questionId] !== undefined && !['children', 'noValues'].includes(b.id))
+    .map(b => ({ ...b, kind: 'blocker' }))
+  return [...blockers, ...r.complexReasons.map(x => ({ ...x, kind: 'complex' }))]
+}
+
+// Varsler som hører til ett bestemt spørsmål – vises med en gang brukeren svarer.
+export function flagsForQuestion(answers, questionId) {
+  return answerFlags(answers).filter(x => x.questionId === questionId)
 }
 
 // ── Blokkeringer: opplysninger vi må ha før vi kan si hvem som arver ──
@@ -371,12 +389,71 @@ function describeMethod(calc, f, G, a) {
   return m
 }
 
-function isComplex(a, f, calc) {
-  return Boolean(
-    f.testamentOther || f.testamentUneven || f.testamentUskifte || f.livedAbroad || f.disagreement ||
-    f.unreachableHeir || (f.previousUskifte && a.previousUskifteHeirs !== 'same') || f.skjevdeling ||
-    f.commonNegative || calc?.estate.commonNegative || calc?.testament?.exceeds || calc?.estate.insolvent || f.oldLaw,
-  )
+// ── Sammensatte situasjoner ──
+// Svar som gjør at fordelingen vi viser, kan bli feil – fordi det finnes forhold veiviseren
+// ikke kan regne på. Hver årsak peker på spørsmålet som utløste den, slik at UI-et kan varsle
+// brukeren når svaret gis, og forklare nøyaktig hvorfor i resultatet.
+// (Dødsfall før 2021 er ikke med her: det stopper hele beregningen og forklares som blokkering.)
+function complexReasons(a, f, calc) {
+  const r = []
+  if (f.livedAbroad) r.push({
+    id: 'livedAbroad', questionId: 'residence',
+    title: a.residence === 'unknown' ? 'Du vet ikke om avdøde bodde fast i Norge' : 'Avdøde bodde ikke fast i Norge',
+    text: 'Det er som hovedregel landet der avdøde bodde sist, som bestemmer hvilken arvelov som gjelder. Veiviseren regner bare etter norsk lov, så fordelingen kan bli en helt annen hvis et annet lands regler gjelder.',
+  })
+  if (f.skjevdeling) r.push({
+    id: 'skjevdeling', questionId: 'skjevdeling',
+    title: 'Det kan kreves skjevdeling',
+    text: 'Om verdier fra før ekteskapet, arv og gaver kan holdes utenfor delingen, avhenger av om de kan dokumenteres og fortsatt finnes – og av om noen krever det. Det kan vi ikke vurdere, så dødsboet kan bli større eller mindre enn vi viser.',
+  })
+  if (f.commonNegative || calc?.estate.commonNegative) r.push({
+    id: 'commonNegative', questionId: 'assets',
+    title: 'Gjelden er større enn det dere eide sammen',
+    text: 'Da kan felles formue ikke bare deles i to. Hvem som må dekke gjelden, avhenger av hvem av dere som sto som låntaker – noe veiviseren ikke spør om.',
+  })
+  if (f.testamentUneven) r.push({
+    id: 'testamentUneven', questionId: 'testamentContent',
+    title: 'Testamentet gir noen arvinger mer enn andre, eller bestemte gjenstander',
+    text: 'Vi vet ikke hvem som skal få hva, eller hva gjenstandene er verdt. Fordelingen vi viser, er derfor lovens hovedregel – ikke det testamentet faktisk bestemmer.',
+  })
+  if (f.testamentUskifte) r.push({
+    id: 'testamentUskifte', questionId: 'testamentContent',
+    title: 'Testamentet sier noe om uskifte',
+    text: 'Et testament kan begrense retten til uskifte. Hva det betyr for dere, avhenger av ordlyden, som veiviseren ikke kan lese.',
+  })
+  if (f.testamentOther) r.push({
+    id: 'testamentOther', questionId: 'testamentContent',
+    title: 'Testamentet inneholder noe vi ikke kjenner',
+    text: 'Du har svart «Noe annet, eller jeg er usikker». Vi kan ikke ta hensyn til innhold vi ikke vet hva er, så fordelingen bygger bare på loven.',
+  })
+  if (calc?.testament?.exceeds) r.push({
+    id: 'testamentExceeds', questionId: f.testamentGiveaway ? 'testamentAmount' : 'testamentCohabitantAmount',
+    title: 'Testamentet gir bort mer enn loven tillater',
+    text: 'Vi har redusert gavene til det testamentet lovlig kan bestemme over. Hvordan reduksjonen fordeles mellom mottakerne, og om arvingene krever den, kan vi ikke avgjøre.',
+  })
+  if (f.previousUskifte && a.previousUskifteHeirs !== 'same') r.push({
+    id: 'previousUskifte', questionId: 'previousUskifteHeirs',
+    title: a.previousUskifteHeirs === 'unknown'
+      ? 'Du vet ikke hvem som arver etter den første ektefellen'
+      : 'Det finnes andre arvinger etter den første ektefellen',
+    text: 'Halvparten av uskifteboet skal til arvingene etter den som døde først. Veiviseren spør ikke hvem de er, så vi kan ikke si hvor mye hver av dem får.',
+  })
+  if (calc?.estate.insolvent) r.push({
+    id: 'insolvent', questionId: 'assets',
+    title: 'Gjelden er større enn det avdøde eide',
+    text: 'Da er det ingen arv å fordele. Hvilke krav som skal dekkes først, og om dere bør overta boet i det hele tatt, må avklares med tingretten.',
+  })
+  if (f.disagreement) r.push({
+    id: 'disagreement', questionId: 'circumstances',
+    title: 'Arvingene er uenige',
+    text: 'Beregningen forutsetter at dere blir enige om et privat skifte. Ved uenighet kan hver arving kreve offentlig skifte, og da blir det bostyreren som avgjør oppgjøret – med kostnader som trekkes fra arven.',
+  })
+  if (f.unreachableHeir) r.push({
+    id: 'unreachable', questionId: 'circumstances',
+    title: 'En arving er ukjent eller vanskelig å nå',
+    text: 'Alle arvingene må være med på et privat skifte. Vi vet ikke om det finnes flere arvinger enn de du har lagt inn, eller om boet må skiftes offentlig.',
+  })
+  return r
 }
 
 // Eksportert for bruk i UI og tester

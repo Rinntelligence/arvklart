@@ -670,6 +670,17 @@
   .aw-notice.critical{ border: 1.5px solid var(--accent); background: var(--accent-soft); }
   .aw-notice.critical .aw-notice-icon svg{ stroke: var(--accent-strong); }
   .aw-notice.critical p{ color: var(--ink); }
+  .aw-notice p + p{ margin-top: 6px; }
+  .aw-flag{ margin-top: 16px; }
+  .aw-flag .aw-flag-after{ color: var(--ink-muted); font-size: .84rem; }
+  .aw-flag-count{ display:flex; gap: 8px; align-items:flex-start; margin: 14px 0 0 !important; font-size: .82rem; color: var(--ink-muted); }
+  .aw-flag-count svg{ width: 16px; height: 16px; flex-shrink: 0; margin-top: 1px; stroke: var(--accent-strong); }
+  .aw-flag-tag{ display:inline-flex; align-items:center; gap: 4px; margin-left: 8px; padding: 1px 8px; border-radius: 999px; background: var(--accent-soft); color: var(--accent-strong); font-size: .74rem; font-weight: 600; white-space: nowrap; vertical-align: middle; }
+  .aw-flag-tag svg{ width: 12px; height: 12px; stroke: currentColor; }
+  .aw-reasons{ margin: 10px 0 12px; padding-left: 20px; font-size: .9rem; }
+  .aw-reasons li{ margin-bottom: 12px; }
+  .aw-reasons li strong{ display:block; margin-bottom: 2px; }
+  .aw-reasons .aw-link.inline{ margin: 2px 0 0; }
 
   .aw-timeline{ list-style:none; counter-reset: step; padding: 0; margin: 12px 0 0; }
   .aw-timeline li{ counter-increment: step; position: relative; padding: 0 0 18px 44px; }

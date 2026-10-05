@@ -100,6 +100,17 @@ export function buildReport(answers, { date = new Date() } = {}) {
     sections.push({ heading: 'Dette må avklares først', blocks: r.blockers.map(b => ({ type: 'note', level: 'critical', title: b.title, text: P(b.text) })) })
   }
 
+  if (r.complexReasons.length) {
+    sections.push({
+      heading: 'Derfor kan fordelingen bli annerledes',
+      blocks: [
+        { type: 'p', text: 'Situasjonen deres kan være mer sammensatt enn veiviseren kan beregne. Disse svarene gjør at fordelingen kan bli feil for dere:' },
+        ...r.complexReasons.map(x => ({ type: 'note', level: 'warning', title: P(x.title), text: P(x.text) })),
+        { type: 'p', text: 'Vurder å kontakte tingretten (gratis veiledning) eller en advokat før dere bestemmer dere.' },
+      ],
+    })
+  }
+
   const situation = { heading: 'Din situasjon', blocks: r.situation.map(t => ({ type: 'p', text: P(t) })) }
   if (r.assumptions.length) situation.blocks.push({ type: 'note', level: 'warning', title: 'Dette har vi lagt til grunn', text: r.assumptions.map(a => '• ' + P(a.text)).join('\n') })
   sections.push(situation)
