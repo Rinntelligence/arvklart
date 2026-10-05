@@ -20,6 +20,7 @@ import HeirsPage from './pages/HeirsPage'
 import GoodwillPage from './pages/GoodwillPage'
 import { JoinPage, PricingPage, CategoriesPage } from './pages/OtherPages'
 import ConflictPage from './pages/ConflictPage'
+import ContactPage from './pages/ContactPage'
 import TopBar from './components/TopBar'
 import Toast from './components/Toast'
 import FeedbackWidget from './components/FeedbackWidget'
@@ -104,6 +105,7 @@ export default function App() {
           <Route path="/logg-inn" element={<LoginPage onToast={showToast} />} />
           <Route path="/join/:code" element={<JoinPage onToast={showToast} />} />
           <Route path="/pricing" element={<PricingPage />} />
+          <Route path="/kontakt" element={<ContactPage />} />
           <Route path="*" element={<Navigate to="/home" />} />
         </Routes>
       </>
@@ -124,6 +126,7 @@ export default function App() {
         <Routes>
           <Route path="/" element={<EstatesPage session={session} profile={profile} onToast={showToast} isDemo={isDemo} />} />
           <Route path="/home" element={<LandingPage onToast={showToast} />} />
+          <Route path="/kontakt" element={<ContactPage />} />
           <Route path="/setup" element={<ProfileSetupPage session={session} onSaved={(p) => {
             setProfile(p)
             const pendingCode = localStorage.getItem('pendingJoinCode')

@@ -299,7 +299,7 @@ export default function LandingPage() {
             <li><a href="#">Om oss</a></li>
             <li><a href="#">For advokater og meklere</a></li>
             <li><a href="#">Personvern</a></li>
-            <li><a href="#">Kontakt</a></li>
+            <li><a href="/kontakt">Kontakt</a></li>
           </ul>
         </footer>
       </div>
