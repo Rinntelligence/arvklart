@@ -3,6 +3,7 @@ import { Routes, Route, Navigate, useNavigate } from 'react-router-dom'
 import { supabase } from './lib/supabase'
 import { PlanProvider } from './hooks/usePlan'
 import LoginPage from './pages/LoginPage'
+import ResetPasswordPage from './pages/ResetPasswordPage'
 import LandingPage from './pages/LandingPage'
 import ProfileSetupPage from './pages/ProfileSetupPage'
 import EstatesPage from './pages/EstatesPage'
@@ -28,6 +29,7 @@ import FeedbackWidget from './components/FeedbackWidget'
 
 // Public pages a demo session should be allowed to stay on instead of being sent into the demo estate
 const PUBLIC_PATHS = ['/home', '/veiviser', '/kontakt', '/pricing']
+const RESET_PATH = '/nytt-passord'
 
 export default function App() {
   const [session, setSession] = useState(undefined)
@@ -43,9 +45,11 @@ export default function App() {
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => setSession(data.session))
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_, s) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, s) => {
       setSession(s)
       if (!s) { setProfile(null); setDemoReady(false) }
+      // Fallback in case the reset link landed somewhere other than /nytt-passord
+      if (event === 'PASSWORD_RECOVERY') navigate(RESET_PATH)
     })
     return () => subscription.unsubscribe()
   }, [])
@@ -56,6 +60,8 @@ export default function App() {
     supabase.from('profiles').select('*').eq('user_id', session.user.id).single()
       .then(async ({ data }) => {
         setProfile(data)
+        // Let the user finish choosing a new password before any redirects
+        if (!isDemo && window.location.pathname === RESET_PATH) return
         if (isDemo && PUBLIC_PATHS.includes(window.location.pathname)) {
           setDemoReady(true)
         } else if (isDemo) {
@@ -112,6 +118,7 @@ export default function App() {
         <Routes>
           <Route path="/home" element={<LandingPage onToast={showToast} />} />
           <Route path="/logg-inn" element={<LoginPage onToast={showToast} />} />
+          <Route path={RESET_PATH} element={<ResetPasswordPage session={null} onToast={showToast} />} />
           <Route path="/join/:code" element={<JoinPage onToast={showToast} />} />
           <Route path="/pricing" element={<PricingPage />} />
           <Route path="/personvern" element={<PrivacyPage />} />
@@ -163,6 +170,7 @@ export default function App() {
           <Route path="/estate/:id/guide" element={<GuidePage session={session} onToast={showToast} />} />
           <Route path="/veiviser" element={<GuidePage session={session} onToast={showToast} />} />
           <Route path="/personvern" element={<PrivacyPage />} />
+          <Route path={RESET_PATH} element={<ResetPasswordPage session={session} onToast={showToast} />} />
           <Route path="/konto" element={<AccountPage session={session} onToast={showToast} />} />
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>
