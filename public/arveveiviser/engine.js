@@ -272,6 +272,8 @@ function describeUskifte(u, calc, f, a) {
   const P = you ? 'du' : (f.married ? 'ektefellen' : 'samboeren')
   const Pc = cap(P)
   const heirsWord = calc.order === 1 ? 'barna' : 'de andre arvingene'
+  const sin = you ? 'din' : 'sin'
+  const seg = you ? 'deg' : 'seg'
   const rows = []
   const now = []
   const later = []
@@ -293,13 +295,13 @@ function describeUskifte(u, calc, f, a) {
       rows.push({ label: `Uten samtykke: særeiet gjøres opp nå – ${P} arver omtrent`, amount: u.separateNow.partner })
       rows.push({ label: `– og ${heirsWord} får omtrent`, amount: u.separateNow.others })
     }
-    now.push(`${Pc} overtar hele felles formue – også den halvdelen som ellers ville vært avdødes – og kan bruke den som sin egen.`)
+    now.push(`${Pc} overtar hele felles formue – også den halvdelen som ellers ville vært avdødes – og kan bruke den som ${sin} egen.`)
     now.push(calc.order === 1 ? 'Felles barn får ikke arven sin nå.' : 'Avdødes foreldre eller søsken får ikke arven sin nå.')
     now.push(`${Pc} blir personlig ansvarlig for all gjelden til avdøde.`)
     now.push(`${Pc} får en [[uskifteattest]] fra tingretten.`)
     later.push(`Når ${P} dør, deles uskifteboet i to like deler: halvparten til arvingene etter avdøde og halvparten til arvingene etter ${you ? 'deg' : P}.`)
-    later.push(`${Pc} kan når som helst velge å skifte. Da får ${P} arven sin etter reglene, og ${heirsWord} får sin del.`)
-    later.push(`Gifter ${P} seg igjen, må uskifteboet skiftes først. Får ${P} ny samboer i minst to år, eller barn med en ny samboer, kan arvingene kreve skifte.`)
+    later.push(`${Pc} kan når som helst velge å skifte. Da får ${P} arven ${sin} etter reglene, og ${heirsWord} får sin del.`)
+    later.push(`Gifter ${P} ${seg} igjen, må uskifteboet skiftes først. Får ${P} ny samboer i minst to år, eller barn med en ny samboer, kan arvingene kreve skifte.`)
   } else {
     rows.push({ label: 'Bolig, fritidsbolig, bil og innbo etter boliglån – det du kan overta i uskifte', amount: u.uskifteValue, kind: 'total' })
     if (u.restNow > 0) rows.push({ label: 'Resten skiftes nå mellom arvingene', amount: u.restNow })
@@ -309,7 +311,7 @@ function describeUskifte(u, calc, f, a) {
     now.push(`${Pc} blir personlig ansvarlig for avdødes gjeld.`)
     later.push(`Når ${P} dør, deles uskifteboet etter verdiforholdet mellom dere da uskiftet startet – ikke nødvendigvis likt.`)
     later.push(`${Pc} kan når som helst velge å skifte. Da kan ${P} kreve arven på fire ganger grunnbeløpet.`)
-    later.push(`Gifter ${P} seg, eller får ${P} ny samboer i minst to år eller barn med en ny samboer, kan arvingene kreve skifte.`)
+    later.push(`Gifter ${P} ${seg}, eller får ${P} ny samboer i minst to år eller barn med en ny samboer, kan arvingene kreve skifte.`)
   }
   for (const p of u.paidNow) rows.push({ label: `${p.label} får nå`, amount: p.amount })
   if (u.ifRefuse.length) for (const p of u.ifRefuse) rows.push({ label: `Hvis ${p.label} ikke samtykker, får hen nå`, amount: p.amount })

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { WIZARD_TAG } from '../lib/wizardEstate'
 
 const RELATIONSHIPS = ['Barn', 'Ektefelle / Partner', 'Søsken', 'Forelder', 'Barnebarn', 'Bobestyrer', 'Advokat', 'Rådgiver', 'Annen']
 const AVATAR_COLORS = ['#DCE3D2','#E8DFD0','#C9AE8E','#A8B598','#8B9A7D','#D9CFC0','#5F6E52','#9C8267']
@@ -94,6 +95,17 @@ export default function HeirsPage({ session, profile }) {
           + Legg til arving
         </button>
       </div>
+
+      {heirs.some(h => h.notes?.startsWith(WIZARD_TAG)) && (
+        <div style={{ background:'#DCE3D2', border:'1px solid #B8C8A8', borderRadius:'12px', padding:'16px 20px', marginBottom:'20px', display:'flex', justifyContent:'space-between', alignItems:'center', gap:'12px', flexWrap:'wrap' }}>
+          <p style={{ margin:0, fontSize:'14px', color:'#3A5A30', lineHeight:'1.5', flex:'1 1 260px' }}>
+            Arvingene og prosentene er beregnet i arveveiviseren etter arveloven. Endrer du svarene der og lagrer på nytt, oppdateres de automatisk.
+          </p>
+          <button onClick={() => navigate(`/estate/${id}/guide`)} style={{ padding:'9px 16px', background:'#3A2F26', color:'#FBF9F5', border:'none', borderRadius:'8px', cursor:'pointer', fontSize:'14px', fontFamily:'Karla, sans-serif', whiteSpace:'nowrap' }}>
+            Endre svarene i veiviseren
+          </button>
+        </div>
+      )}
 
       {/* Fordelingskalkulator */}
       <div style={{ background:'#fff', border:'1px solid #D9CFC0', borderRadius:'12px', padding:'24px', marginBottom:'20px' }}>

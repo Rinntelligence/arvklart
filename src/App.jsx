@@ -21,6 +21,7 @@ import GoodwillPage from './pages/GoodwillPage'
 import { JoinPage, PricingPage, CategoriesPage, PrivacyPage, AccountPage } from './pages/OtherPages'
 import ConflictPage from './pages/ConflictPage'
 import ContactPage from './pages/ContactPage'
+import { getPendingSave } from './lib/wizardEstate'
 import TopBar from './components/TopBar'
 import Toast from './components/Toast'
 import FeedbackWidget from './components/FeedbackWidget'
@@ -89,6 +90,9 @@ export default function App() {
           if (pendingCode) {
             localStorage.removeItem('pendingJoinCode')
             navigate(`/join/${pendingCode}`)
+          } else if (getPendingSave() && window.location.pathname !== '/veiviser') {
+            // Fullfør lagring fra arveveiviseren som ble startet før innlogging
+            navigate('/veiviser')
           }
         }
       })
@@ -112,7 +116,7 @@ export default function App() {
           <Route path="/pricing" element={<PricingPage />} />
           <Route path="/personvern" element={<PrivacyPage />} />
           <Route path="/kontakt" element={<ContactPage />} />
-          <Route path="/veiviser" element={<GuidePage standalone />} />
+          <Route path="/veiviser" element={<GuidePage standalone onToast={showToast} />} />
           <Route path="*" element={<Navigate to="/home" />} />
         </Routes>
       </>
@@ -138,6 +142,7 @@ export default function App() {
             setProfile(p)
             const pendingCode = localStorage.getItem('pendingJoinCode')
             if (pendingCode) { localStorage.removeItem('pendingJoinCode'); navigate(`/join/${pendingCode}`) }
+            else if (getPendingSave()) navigate('/veiviser')
             else navigate('/')
           }} onToast={showToast} />} />
           <Route path="/estate/:id" element={<EstatePage session={session} profile={profile} onToast={showToast} isDemo={isDemo} />} />
@@ -155,8 +160,8 @@ export default function App() {
           <Route path="/join/:code" element={<JoinPage session={session} onToast={showToast} />} />
           <Route path="/pricing" element={<PricingPage session={session} />} />
           <Route path="/founder" element={<FounderPage session={session} />} />
-          <Route path="/estate/:id/guide" element={<GuidePage />} />
-          <Route path="/veiviser" element={<GuidePage />} />
+          <Route path="/estate/:id/guide" element={<GuidePage session={session} onToast={showToast} />} />
+          <Route path="/veiviser" element={<GuidePage session={session} onToast={showToast} />} />
           <Route path="/personvern" element={<PrivacyPage />} />
           <Route path="/konto" element={<AccountPage session={session} onToast={showToast} />} />
           <Route path="*" element={<Navigate to="/" />} />

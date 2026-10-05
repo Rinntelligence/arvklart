@@ -9,6 +9,8 @@ import { analyze } from './engine.js'
 import { SOURCES } from './sources.js'
 import { TERMS } from './glossary.js'
 import { GRANDPARENT_SIDES, childLines } from './heirs.js'
+import { fill, kr as krPlain, pct } from './text.js'
+import { estateRows, answerSummary, toEstatePayload } from './report.js'
 
 const STORAGE_KEY = 'arvklart-arveveiviser-v1'
 const root = document.getElementById('arvWizard')
@@ -23,17 +25,21 @@ function load() {
 function save() {
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)) } catch { /* privat modus o.l. */ }
 }
-const fresh = () => ({ answers: {}, current: null, view: 'intro', resultView: null })
+const fresh = () => ({ answers: {}, current: null, view: 'intro', resultView: null, returnTo: null })
 let state = { ...fresh(), ...(load() || {}) }
 let error = null
 
+// Kontakt med Arvklart-appen rundt veiviseren (iframe i GuidePage). Appen tar seg av
+// innlogging og lagring i boet; veiviseren sender bare svarene og ferdig beregnede data.
+const embedded = window.parent !== window
+const host = { ready: false, loggedIn: false, estate: null, saved: null, saving: false, message: null }
+let pdfBusy = false
+let pdfError = null
+const toHost = msg => { if (embedded) window.parent.postMessage(msg, window.location.origin) }
+
 // ── Hjelpere ─────────────────────────────────────────────────
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
-const kr = n => new Intl.NumberFormat('nb-NO', { maximumFractionDigits: 0 }).format(Math.round(n || 0)) + ' kr'
-const pct = x => {
-  const v = (x || 0) * 100
-  return (Math.abs(v - Math.round(v)) < 0.05 ? Math.round(v) : v.toFixed(1).replace('.', ',')) + ' %'
-}
+const kr = krPlain
 const uid = () => Math.random().toString(36).slice(2, 9)
 
 const ICON = {
@@ -44,17 +50,12 @@ const ICON = {
   warn: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 2 20h20L12 3z"/><path d="M12 10v4.5M12 17.5h.01"/></svg>',
   ext: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17L17 7M8 7h9v9"/></svg>',
   plus: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
+  download: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>',
+  save: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21V9l8-6 8 6v12"/><path d="M9 21v-7h6v7"/></svg>',
   edit: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19 9l-4-4L4 16v4z"/></svg>',
 }
 
-// Erstatter plassholdere og [[fagord]] i tekst fra datamodellen.
-function fill(text, facts) {
-  const partner = facts.married ? 'ektefellen' : facts.cohabitant ? 'samboeren' : 'ektefellen eller samboeren'
-  return String(text ?? '')
-    .replaceAll('{partnerDu}', facts.survivor ? 'du' : partner)
-    .replaceAll('{partnerDeg}', facts.survivor ? 'deg' : partner)
-    .replaceAll('{partner}', partner)
-}
+// Erstatter plassholdere og gjør [[fagord]] om til klikkbare forklaringer.
 function rich(text, facts) {
   return esc(fill(text, facts))
     .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
@@ -103,11 +104,24 @@ function nextQuestion() {
     const err = validationError(q, state.answers)
     if (err) { error = err; render(); return }
   }
+  // Ved endring fra oversikten eller resultatet: gå tilbake dit – men først til spørsmål
+  // som endringen har gjort relevante og som ikke er besvart ennå.
+  if (state.returnTo) {
+    const open = visibleQuestions(state.answers).find(x => validationError(x, state.answers))
+    if (open && open.id !== state.current) return go('question', open.id)
+    const to = state.returnTo
+    state.returnTo = null
+    return go(to)
+  }
   const idx = qs.findIndex(x => x.id === state.current)
   const next = qs[idx + 1]
-  if (state.returnToReview) { state.returnToReview = false; return go('review') }
   if (next) go('question', next.id)
   else go('result')
+}
+// Hopp til et spørsmål for å endre det, og kom tilbake dit brukeren var.
+function editQuestion(id) {
+  state.returnTo = state.view === 'review' || state.view === 'result' ? state.view : state.returnTo
+  go('question', id)
 }
 function prevQuestion() {
   const qs = visibleQuestions(state.answers)
@@ -153,6 +167,8 @@ function renderIntro() {
 function renderProgress(qs, idx, q) {
   const activeSections = SECTIONS.filter(s => qs.some(x => x.section === s.id))
   const pctDone = Math.round((idx / qs.length) * 100)
+  const openIdx = qs.findIndex(x => validationError(x, state.answers))
+  const firstOpen = openIdx === -1 ? qs.length : openIdx
   return `
   <div class="aw-progress" aria-label="Fremdrift">
     <div class="aw-progress-top">
@@ -163,7 +179,11 @@ function renderProgress(qs, idx, q) {
     <ol class="aw-steps">${activeSections.map(s => {
       const sIdx = SECTIONS.findIndex(x => x.id === s.id)
       const curIdx = SECTIONS.findIndex(x => x.id === q.section)
-      return `<li class="${s.id === q.section ? 'current' : sIdx < curIdx ? 'done' : ''}">${esc(s.label)}</li>`
+      const first = qs.findIndex(x => x.section === s.id)
+      // Brukeren kan hoppe til alle deler som er nådd – også fremover når alt før er besvart.
+      const reachable = first <= firstOpen && s.id !== q.section
+      const cls = s.id === q.section ? 'current' : sIdx < curIdx ? 'done' : ''
+      return `<li class="${cls}">${reachable ? `<button type="button" data-action="edit" data-q="${qs[first].id}" data-keep="1">${esc(s.label)}</button>` : esc(s.label)}</li>`
     }).join('')}</ol>
   </div>`
 }
@@ -194,9 +214,12 @@ function renderQuestion(q, facts) {
     ${renderLearnMore(q, facts)}
     <div class="aw-nav">
       <button type="button" class="aw-btn ghost" data-action="prev">${ICON.back} Tilbake</button>
-      <button type="button" class="aw-btn primary" data-action="next">${state.returnToReview ? 'Lagre' : isLast ? 'Se resultatet' : 'Neste'} ${ICON.arrow}</button>
+      <button type="button" class="aw-btn primary" data-action="next">${state.returnTo ? 'Lagre endringen' : isLast ? 'Se resultatet' : 'Neste'} ${ICON.arrow}</button>
     </div>
-    ${idx > 0 ? '<button type="button" class="aw-link" data-action="review">Se over og endre svarene dine</button>' : ''}
+    <div class="aw-quicklinks">
+      ${idx > 0 ? '<button type="button" class="aw-link" data-action="review">Se over og endre alle svarene</button>' : ''}
+      ${!state.returnTo && qs.every(x => !validationError(x, state.answers)) ? '<button type="button" class="aw-link" data-action="result">Gå rett til resultatet</button>' : ''}
+    </div>
   </div>`
 }
 
@@ -353,35 +376,30 @@ function liveTotal(v, facts) {
 }
 
 // ── Oversikt over svar ──────────────────────────────────────
-function answerText(q, facts) {
-  const v = state.answers[q.id]
-  if (v === undefined || v === '' || v === null) return '<em>Ikke besvart</em>'
-  switch (q.type) {
-    case 'single': return esc(fill(q.options.find(o => o.value === v)?.label || v, facts))
-    case 'multi': return esc((v || []).map(x => fill(q.options.find(o => o.value === x)?.label || x, facts)).join(', '))
-    case 'date': return esc(new Date(v).toLocaleDateString('nb-NO', { day: 'numeric', month: 'long', year: 'numeric' }))
-    case 'number': return kr(Number(String(v).replace(/\s/g, '')))
-    case 'children': return esc(`${v.length} ${v.length === 1 ? 'barn' : 'barn'}` + (facts.hasPartner ? ` (${v.filter(c => c.common === 'no').length} fra et annet forhold)` : ''))
-    case 'siblings': return esc(`${v.length} søsken`)
-    case 'grandparents': return esc(GRANDPARENT_SIDES.flatMap(sd => [[sd.gp1, v?.[sd.key]?.gp1], [sd.gp2, v?.[sd.key]?.gp2]]).filter(([, alive]) => alive === 'yes').map(([l]) => l).join(', ') || 'Ingen besteforeldre lever')
-    case 'assets': return 'Lagt inn'
-    default: return 'Lagt inn'
-  }
-}
 function renderReview(facts) {
-  const qs = visibleQuestions(state.answers)
+  const rows = answerSummary(state.answers, facts)
+  const groups = []
+  for (const r of rows) {
+    if (!groups.length || groups[groups.length - 1].section !== r.section) groups.push({ section: r.section, rows: [] })
+    groups[groups.length - 1].rows.push(r)
+  }
+  const missing = visibleQuestions(state.answers).find(q => validationError(q, state.answers))
   return `
   <div class="aw-card">
     <span class="eyebrow">Dine svar</span>
     <h3 class="aw-title" tabindex="-1" data-autofocus>Se over og endre svarene dine</h3>
-    <p class="aw-why">Trykk på «Endre» for å rette et svar. Resultatet oppdateres automatisk.</p>
-    <dl class="aw-review">${qs.map(q => `
-      <div><dt>${esc(titleFor(q, facts))}</dt><dd>${answerText(q, facts)}</dd>
-      <button type="button" class="aw-link" data-action="edit" data-q="${q.id}">${ICON.edit} Endre</button></div>`).join('')}
-    </dl>
+    <p class="aw-why">Trykk på «Endre» ved et svar for å rette det. Du kommer tilbake hit etterpå, og resultatet oppdateres automatisk.</p>
+    ${groups.map(g => `
+      <h4 class="aw-review-section">${esc(g.section)}</h4>
+      <dl class="aw-review">${g.rows.map(r => `
+        <div><dt>${esc(r.question)}</dt><dd>${r.answer === 'Ikke besvart' ? '<em>Ikke besvart</em>' : esc(r.answer)}</dd>
+        <button type="button" class="aw-link" data-action="edit" data-q="${r.id}" aria-label="Endre: ${esc(r.question)}">${ICON.edit} Endre</button></div>`).join('')}
+      </dl>`).join('')}
     <div class="aw-nav">
       <button type="button" class="aw-btn ghost" data-action="restart">Start på nytt</button>
-      <button type="button" class="aw-btn primary" data-action="result">Se resultatet ${ICON.arrow}</button>
+      ${missing
+        ? `<button type="button" class="aw-btn primary" data-action="edit" data-q="${missing.id}">Svar på det som mangler ${ICON.arrow}</button>`
+        : `<button type="button" class="aw-btn primary" data-action="result">Se resultatet ${ICON.arrow}</button>`}
     </div>
   </div>`
 }
@@ -399,22 +417,7 @@ function notice(n, facts) {
 }
 
 function waterfall(r) {
-  const e = r.skifte.estate
-  const rows = []
-  if (e.kind === 'married') {
-    rows.push(['Det dere eide', e.assets + Math.max(0, e.extraCommon)])
-    rows.push(['− Gjeld', -e.debts])
-    rows.push(['= Felles formue etter gjeld', e.commonNet, 'sum'])
-    rows.push([`Gjenlevendes egen halvdel – ikke arv`, -e.half, 'keep'])
-    rows.push(['= Avdødes halvdel', e.half, 'sum'])
-    if (e.deceasedSep) rows.push(['+ Avdødes særeie', e.deceasedSep])
-  } else {
-    rows.push(['Det avdøde eide', e.assets])
-    rows.push(['− Gjeld', -e.debts])
-  }
-  if (e.funeral) rows.push(['− Begravelse', -e.funeral])
-  rows.push(['= Dette skal arves', r.skifte.E, 'total'])
-  return `<div class="aw-flow">${rows.map(([label, val, cls]) => `<div class="aw-flow-row ${cls || ''}"><span>${esc(label)}</span><strong>${kr(Math.abs(val))}</strong></div>`).join('')}</div>`
+  return `<div class="aw-flow">${estateRows(r.skifte).map(x => `<div class="aw-flow-row ${x.kind || ''}"><span>${esc(x.label)}</span><strong>${kr(Math.abs(x.amount))}</strong></div>`).join('')}</div>`
 }
 
 function heirCards(people, E, facts, opts = {}) {
@@ -490,6 +493,48 @@ function renderCompare(r, facts) {
   </div>`
 }
 
+function isDirty() {
+  return Boolean(host.saved) && JSON.stringify(host.saved.answers) !== JSON.stringify(state.answers)
+}
+function renderSaveCard(r) {
+  const date = d => new Date(d).toLocaleDateString('nb-NO', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+  const what = r.skifte
+    ? 'arvingene med beregnet fordeling, boets verdi og stegene dere bør gjøre'
+    : 'stegene dere bør gjøre'
+  let body
+  if (!embedded) {
+    body = `<p>Opprett en gratis bruker i Arvklart, så tar vi vare på svarene og legger ${what} inn i et eget bo. Du kan når som helst komme tilbake og endre svarene.</p>
+      <a class="aw-btn primary" href="/veiviser" target="_top">${ICON.save} Opprett bruker og lagre</a>`
+  } else if (!host.loggedIn) {
+    body = `<p>Opprett en gratis bruker, så legger vi ${what} inn i et eget bo i Arvklart. Svarene tas vare på, og du kan når som helst gå tilbake og endre dem.</p>
+      <div class="aw-actions">
+        <button type="button" class="aw-btn primary" data-action="saveToEstate">${ICON.save} Opprett bruker og lagre</button>
+        <button type="button" class="aw-link" data-action="saveToEstate" data-login="1">Har du allerede bruker? Logg inn</button>
+      </div>`
+  } else if (host.estate && host.estate.role !== 'admin') {
+    body = `<p>Bare administratorer av boet <strong>${esc(host.estate.name)}</strong> kan lagre resultatet der. Du kan likevel laste ned PDF-en og dele den.</p>`
+  } else if (host.estate) {
+    const status = host.saving ? 'Lagrer …'
+      : isDirty() ? 'Du har endret svarene etter at de sist ble lagret i boet.'
+        : host.saved ? `Sist lagret ${date(host.saved.savedAt)}.` : ''
+    body = `<p>Lagre resultatet i boet <strong>${esc(host.estate.name)}</strong>. Vi legger inn ${what}. Lagrer du på nytt etter å ha endret svarene, blir det som kom fra veiviseren oppdatert.</p>
+      ${status ? `<p class="aw-save-status ${isDirty() ? 'dirty' : ''}">${esc(status)}</p>` : ''}
+      <div class="aw-actions">
+        <button type="button" class="aw-btn primary" data-action="saveToEstate" ${host.saving ? 'disabled' : ''}>${ICON.save} ${host.saved ? 'Oppdater boet' : 'Lagre i boet'}</button>
+        ${host.saved ? `<button type="button" class="aw-link" data-action="open" data-path="/estate/${esc(host.estate.id)}/heirs">Se arvinger</button>
+        <button type="button" class="aw-link" data-action="open" data-path="/estate/${esc(host.estate.id)}/tasks">Se oppgaver</button>` : ''}
+      </div>`
+  } else {
+    body = `<p>Lagre resultatet i et av boene dine, eller opprett et nytt. Vi legger inn ${what}.</p>
+      <button type="button" class="aw-btn primary" data-action="saveToEstate" ${host.saving ? 'disabled' : ''}>${ICON.save} ${host.saving ? 'Lagrer …' : 'Lagre i et bo'}</button>`
+  }
+  return `<div class="aw-block aw-save" id="awSave">
+    <h3>Ta vare på resultatet</h3>
+    ${host.message ? `<p class="aw-save-msg ${host.message.type}" role="status">${esc(host.message.text)}</p>` : ''}
+    ${body}
+  </div>`
+}
+
 function renderResult() {
   const r = analyze(state.answers)
   const facts = r.facts
@@ -498,7 +543,13 @@ function renderResult() {
   const head = `
     <span class="eyebrow">Resultat</span>
     <h3 class="aw-title" tabindex="-1" data-autofocus>${blocked ? 'Vi trenger litt mer informasjon' : 'Slik blir arveoppgjøret – basert på svarene dine'}</h3>
-    <p class="aw-disclaimer">Dette er en veiledende beregning etter gjeldende regler, basert på opplysningene du har gitt. Det kan finnes forhold vi ikke har tatt hensyn til.</p>`
+    <p class="aw-disclaimer">Dette er en veiledende beregning etter gjeldende regler, basert på opplysningene du har gitt. Det kan finnes forhold vi ikke har tatt hensyn til.</p>
+    <div class="aw-toolbar">
+      <button type="button" class="aw-btn ghost small-ghost" data-action="review">${ICON.edit} Endre svar</button>
+      <button type="button" class="aw-btn ghost small-ghost" data-action="pdf" ${pdfBusy ? 'disabled' : ''}>${ICON.download} ${pdfBusy ? 'Lager PDF …' : 'Last ned PDF'}</button>
+      <button type="button" class="aw-btn ghost small-ghost" data-action="gotoSave">${ICON.save} ${host.estate ? 'Lagre i boet' : 'Lagre i Arvklart'}</button>
+    </div>
+    ${pdfError ? `<p class="aw-error" role="alert">${esc(pdfError)}</p>` : ''}`
 
   const blockers = blocked ? `
     <div class="aw-block">
@@ -574,10 +625,11 @@ function renderResult() {
     ${meaning}
     ${steps}
     ${method}
-    ${r.complex ? `<div class="aw-notice warning"><div class="aw-notice-icon">${ICON.warn}</div><div><h4>Situasjonen deres kan være mer sammensatt enn veiviseren kan beregne</h4><p>Vurder å kontakte [[tingretten]] (gratis veiledning) eller en advokat før dere bestemmer dere.</p>${sourceLinks(['domstol_kontakt'])}</div></div>` : ''}
+    ${r.complex ? `<div class="aw-notice warning"><div class="aw-notice-icon">${ICON.warn}</div><div><h4>Situasjonen deres kan være mer sammensatt enn veiviseren kan beregne</h4><p>${rich('Vurder å kontakte [[tingretten]] (gratis veiledning) eller en advokat før dere bestemmer dere.', facts)}</p>${sourceLinks(['domstol_kontakt'])}</div></div>` : ''}
+    ${renderSaveCard(r)}
     <div class="aw-nav aw-result-nav">
       <button type="button" class="aw-btn ghost" data-action="review">${ICON.edit} Endre svar</button>
-      <button type="button" class="aw-btn ghost" data-action="print">Skriv ut</button>
+      <button type="button" class="aw-btn ghost" data-action="pdf" ${pdfBusy ? 'disabled' : ''}>${ICON.download} Last ned PDF</button>
       <button type="button" class="aw-btn ghost" data-action="restart">Start på nytt</button>
     </div>
   </div>`
@@ -634,8 +686,21 @@ root.addEventListener('click', e => {
     case 'prev': prevQuestion(); break
     case 'review': go('review'); break
     case 'result': state.resultView = null; go('result'); break
-    case 'edit': state.returnToReview = state.view === 'review'; go('question', btn.dataset.q); break
-    case 'print': window.print(); break
+    case 'edit': if (btn.dataset.keep) go('question', btn.dataset.q); else editQuestion(btn.dataset.q); break
+    case 'pdf': {
+      pdfBusy = true; pdfError = null; render()
+      import('./pdf.js')
+        .then(m => m.downloadPdf(state.answers))
+        .catch(() => { pdfError = 'Vi klarte ikke å lage PDF-en. Sjekk nettforbindelsen og prøv igjen.' })
+        .finally(() => { pdfBusy = false; render() })
+      break
+    }
+    case 'gotoSave': document.getElementById('awSave')?.scrollIntoView({ behavior: 'smooth', block: 'center' }); break
+    case 'saveToEstate':
+      host.saving = true; host.message = null; render()
+      toHost({ type: 'veiviser-save', login: Boolean(btn.dataset.login), answers: state.answers, payload: toEstatePayload(state.answers) })
+      break
+    case 'open': toHost({ type: 'veiviser-navigate', path }); break
     case 'resultView': state.resultView = value; save(); render(); break
     case 'choose':
       setAnswer(q.id, value)
@@ -685,5 +750,37 @@ document.addEventListener('click', e => {
     root.querySelectorAll('.aw-term').forEach(t => t.setAttribute('aria-expanded', 'false'))
   }
 })
+
+// Meldinger fra Arvklart-appen
+window.addEventListener('message', e => {
+  if (e.origin !== window.location.origin || e.source !== window.parent) return
+  const m = e.data || {}
+  if (m.type === 'veiviser-context') {
+    Object.assign(host, { ready: true, loggedIn: Boolean(m.loggedIn), estate: m.estate || null, saved: m.saved || null })
+    // Åpnet fra et bo med lagrede svar: bruk dem, med mindre vi allerede jobber med svarene til dette boet.
+    if (m.saved?.answers && state.estateId !== m.estate?.id) {
+      state = { ...fresh(), answers: m.saved.answers, view: 'result', estateId: m.estate.id }
+      save()
+    }
+    render()
+  }
+  if (m.type === 'veiviser-saved') {
+    host.saving = false
+    if (m.ok) {
+      host.estate = m.estate
+      host.saved = { answers: JSON.parse(JSON.stringify(state.answers)), savedAt: m.savedAt || new Date().toISOString() }
+      host.loggedIn = true
+      state.estateId = m.estate.id
+      save()
+      host.message = { type: 'ok', text: m.text || 'Lagret! Arvingene og stegene er lagt inn i boet.' }
+    } else if (m.cancelled) {
+      host.message = null
+    } else {
+      host.message = { type: 'error', text: m.error || 'Noe gikk galt under lagringen. Prøv igjen.' }
+    }
+    render()
+  }
+})
+toHost({ type: 'veiviser-ready' })
 
 render()
