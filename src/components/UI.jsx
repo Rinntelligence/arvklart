@@ -1,3 +1,4 @@
+import { L } from '../lib/lang'
 export function Toast({ msg, type = 'success' }) {
   return (
     <div style={{
@@ -86,8 +87,8 @@ export function UpgradeGate({ feature, children, fallback }) {
   return fallback || (
     <div style={{ padding:'24px', background:'#fef3e8', border:'1px solid #e8c4a0', borderRadius:'10px', textAlign:'center' }}>
       <div style={{ fontSize:'24px', marginBottom:'8px' }}>🔒</div>
-      <div style={{ fontSize:'14px', color:'#6b5c4c', marginBottom:'12px' }}>This feature requires a paid plan</div>
-      <a href="/pricing" style={{ fontSize:'13px', color:'#c4855a', textDecoration:'underline' }}>View plans →</a>
+      <div style={{ fontSize:'14px', color:'#6b5c4c', marginBottom:'12px' }}>{L('Denne funksjonen krever betalt plan', 'This feature requires a paid plan')}</div>
+      <a href="/pricing" style={{ fontSize:'13px', color:'#c4855a', textDecoration:'underline' }}>{L('Se planer →', 'View plans →')}</a>
     </div>
   )
 }

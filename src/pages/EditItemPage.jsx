@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { getItem, getCategories, uploadImage, supabase } from '../lib/supabase'
+import { L } from '../lib/lang'
 
 export default function EditItemPage({ session, profile, onToast }) {
   const { id, itemId } = useParams()
@@ -63,7 +64,7 @@ export default function EditItemPage({ session, profile, onToast }) {
   }
 
   const save = async () => {
-    if (!title.trim()) { onToast('Legg til navn', 'error'); return }
+    if (!title.trim()) { onToast(L('Legg til navn', 'Add a name'), 'error'); return }
     setSaving(true)
     try {
       const uploadedUrls = []
@@ -89,27 +90,27 @@ export default function EditItemPage({ session, profile, onToast }) {
       }).eq('id', itemId)
 
       if (error) throw error
-      onToast('Gjenstand oppdatert')
+      onToast(L('Gjenstand oppdatert', 'Item updated'))
       navigate(`/estate/${id}/item/${itemId}`)
     } catch (e) {
-      onToast('Feil: ' + e.message, 'error')
+      onToast(L('Feil: ', 'Error: ') + e.message, 'error')
     } finally {
       setSaving(false)
     }
   }
 
-  if (!item) return <div style={{ padding:'80px', textAlign:'center', color:'#9C8267', fontFamily:'Karla, sans-serif' }}>Laster…</div>
+  if (!item) return <div style={{ padding:'80px', textAlign:'center', color:'#9C8267', fontFamily:'Karla, sans-serif' }}>{L('Laster…', 'Loading…')}</div>
 
   const totalImages = existingImages.length + newFiles.length
 
   return (
     <div style={{ maxWidth:'560px', margin:'0 auto', padding:'20px 16px 100px', fontFamily:'Karla, sans-serif' }}>
       <button onClick={() => navigate(`/estate/${id}/item/${itemId}`)} style={{ background:'none', border:'none', color:'#9C8267', cursor:'pointer', fontSize:'14px', padding:'0 0 16px', fontFamily:'Karla, sans-serif' }}>
-        ← Tilbake
+        {L('← Tilbake', '← Back')}
       </button>
 
       <h1 style={{ fontFamily:'Fraunces, serif', fontSize:'24px', fontWeight:'400', color:'#3A2F26', marginBottom:'24px' }}>
-        Rediger gjenstand
+        {L('Rediger gjenstand', 'Edit item')}
       </h1>
 
       <div style={{ display:'flex', flexDirection:'column', gap:'20px' }}>
@@ -117,7 +118,7 @@ export default function EditItemPage({ session, profile, onToast }) {
         {/* Images */}
         <div>
           <label style={{ display:'block', fontSize:'13px', color:'#9C8267', marginBottom:'8px' }}>
-            Bilder ({totalImages}/5)
+            {L('Bilder', 'Photos')} ({totalImages}/5)
           </label>
           <div style={{ display:'flex', gap:'8px', flexWrap:'wrap' }}>
             {existingImages.map((url, i) => (
@@ -129,7 +130,7 @@ export default function EditItemPage({ session, profile, onToast }) {
                   borderRadius:'50%', width:'20px', height:'20px',
                   cursor:'pointer', fontSize:'12px', lineHeight:'1',
                 }}>×</button>
-                {i === 0 && <span style={{ position:'absolute', bottom:'2px', left:'2px', background:'#3A2F26', color:'#fff', fontSize:'9px', padding:'1px 4px', borderRadius:'4px' }}>Hoved</span>}
+                {i === 0 && <span style={{ position:'absolute', bottom:'2px', left:'2px', background:'#3A2F26', color:'#fff', fontSize:'9px', padding:'1px 4px', borderRadius:'4px' }}>{L('Hoved', 'Main')}</span>}
               </div>
             ))}
 
@@ -142,7 +143,7 @@ export default function EditItemPage({ session, profile, onToast }) {
                   borderRadius:'50%', width:'20px', height:'20px',
                   cursor:'pointer', fontSize:'12px', lineHeight:'1',
                 }}>×</button>
-                <span style={{ position:'absolute', bottom:'2px', left:'2px', background:'#8B9A7D', color:'#fff', fontSize:'9px', padding:'1px 4px', borderRadius:'4px' }}>Ny</span>
+                <span style={{ position:'absolute', bottom:'2px', left:'2px', background:'#8B9A7D', color:'#fff', fontSize:'9px', padding:'1px 4px', borderRadius:'4px' }}>{L('Ny', 'New')}</span>
               </div>
             ))}
 
@@ -154,7 +155,7 @@ export default function EditItemPage({ session, profile, onToast }) {
                 justifyContent:'center', cursor:'pointer', gap:'4px',
               }}>
                 <span style={{ fontSize:'24px', color:'#9C8267', fontWeight:'300' }}>+</span>
-                <span style={{ fontSize:'10px', color:'#9C8267' }}>Legg til</span>
+                <span style={{ fontSize:'10px', color:'#9C8267' }}>{L('Legg til', 'Add')}</span>
               </div>
             )}
           </div>
@@ -163,25 +164,25 @@ export default function EditItemPage({ session, profile, onToast }) {
 
         {/* Title */}
         <div>
-          <label style={{ display:'block', fontSize:'13px', color:'#9C8267', marginBottom:'6px' }}>Navn *</label>
+          <label style={{ display:'block', fontSize:'13px', color:'#9C8267', marginBottom:'6px' }}>{L('Navn *', 'Name *')}</label>
           <input value={title} onChange={e => setTitle(e.target.value)} maxLength={200}
             style={{ width:'100%', padding:'14px', border:'1px solid #D9CFC0', borderRadius:'10px', fontSize:'16px', background:'#FBF9F5', color:'#3A2F26', outline:'none', fontFamily:'Karla, sans-serif', boxSizing:'border-box' }} />
         </div>
 
         {/* Category */}
         <div>
-          <label style={{ display:'block', fontSize:'13px', color:'#9C8267', marginBottom:'6px' }}>Kategori</label>
+          <label style={{ display:'block', fontSize:'13px', color:'#9C8267', marginBottom:'6px' }}>{L('Kategori', 'Category')}</label>
           <select value={categoryId} onChange={e => setCategoryId(e.target.value)} style={{ width:'100%', padding:'14px', border:'1px solid #D9CFC0', borderRadius:'10px', fontSize:'16px', background:'#FBF9F5', color:'#3A2F26', outline:'none', fontFamily:'Karla, sans-serif' }}>
-            <option value="">— Velg kategori —</option>
+            <option value="">{L('— Velg kategori —', '— Choose category —')}</option>
             {categories.map(c => <option key={c.id} value={c.id}>{c.emoji} {c.label}</option>)}
           </select>
         </div>
 
         {/* Condition */}
         <div>
-          <label style={{ display:'block', fontSize:'13px', color:'#9C8267', marginBottom:'8px' }}>Tilstand</label>
+          <label style={{ display:'block', fontSize:'13px', color:'#9C8267', marginBottom:'8px' }}>{L('Tilstand', 'Condition')}</label>
           <div style={{ display:'flex', gap:'8px' }}>
-            {[['excellent','Utmerket'],['good','God'],['fair','Middels'],['poor','Dårlig']].map(([val, label]) => (
+            {[['excellent',L('Utmerket','Excellent')],['good',L('God','Good')],['fair',L('Middels','Fair')],['poor',L('Dårlig','Poor')]].map(([val, label]) => (
               <button key={val} onClick={() => setCondition(val)} style={{
                 flex:1, padding:'10px 4px',
                 border:`2px solid ${condition===val?'#3A2F26':'#D9CFC0'}`,
@@ -196,17 +197,17 @@ export default function EditItemPage({ session, profile, onToast }) {
 
         {/* Description */}
         <div>
-          <label style={{ display:'block', fontSize:'13px', color:'#9C8267', marginBottom:'6px' }}>Beskrivelse</label>
+          <label style={{ display:'block', fontSize:'13px', color:'#9C8267', marginBottom:'6px' }}>{L('Beskrivelse', 'Description')}</label>
           <textarea value={description} onChange={e => setDescription(e.target.value)} rows={3} maxLength={2000}
-            placeholder="Materiale, farge, historikk…"
+            placeholder={L('Materiale, farge, historikk…', 'Material, colour, history…')}
             style={{ width:'100%', padding:'14px', border:'1px solid #D9CFC0', borderRadius:'10px', fontSize:'15px', fontFamily:'Karla, sans-serif', background:'#FBF9F5', color:'#3A2F26', resize:'none', outline:'none', boxSizing:'border-box' }} />
         </div>
 
         {/* Estimated value */}
         <div>
-          <label style={{ display:'block', fontSize:'13px', color:'#9C8267', marginBottom:'6px' }}>Estimert verdi (valgfri)</label>
+          <label style={{ display:'block', fontSize:'13px', color:'#9C8267', marginBottom:'6px' }}>{L('Estimert verdi (valgfri)', 'Estimated value (optional)')}</label>
           <input value={estimatedValue} onChange={e => setEstimatedValue(e.target.value)} maxLength={100}
-            placeholder="f.eks. 1000-2000 kr"
+            placeholder={L('f.eks. 1000-2000 kr', 'e.g. 1000-2000 NOK')}
             style={{ width:'100%', padding:'14px', border:'1px solid #D9CFC0', borderRadius:'10px', fontSize:'15px', background:'#FBF9F5', color:'#3A2F26', outline:'none', fontFamily:'Karla, sans-serif', boxSizing:'border-box' }} />
         </div>
       </div>
@@ -219,7 +220,7 @@ export default function EditItemPage({ session, profile, onToast }) {
           color:'#FBF9F5', border:'none', borderRadius:'10px',
           cursor: title.trim() ? 'pointer' : 'not-allowed',
           fontSize:'16px', fontFamily:'Karla, sans-serif', fontWeight:'500',
-        }}>{saving ? 'Lagrer…' : 'Lagre endringer'}</button>
+        }}>{saving ? L('Lagrer…', 'Saving…') : L('Lagre endringer', 'Save changes')}</button>
       </div>
     </div>
   )

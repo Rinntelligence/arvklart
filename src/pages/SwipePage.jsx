@@ -2,6 +2,7 @@ import { useEffect, useState, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { getItems, supabase } from '../lib/supabase'
 import { getPasses, addPass, addInterestClearingPass } from '../lib/decisions'
+import { L } from '../lib/lang'
 
 export default function SwipePage({ session, profile, onToast }) {
   const { id } = useParams()
@@ -39,14 +40,14 @@ export default function SwipePage({ session, profile, onToast }) {
     setTimeout(async () => {
       if (type === 'like') {
         await addInterestClearingPass(currentItem.id, session.user.id, '')
-        onToast('Interesse registrert!')
+        onToast(L('Interesse registrert!', 'Interest registered!'))
       } else if (type === 'trash') {
         await supabase.from('items').update({ marked_for_disposal: true }).eq('id', currentItem.id)
         await addPass(currentItem.id, session.user.id)
-        onToast('Merket for kast')
+        onToast(L('Merket for kast', 'Marked for disposal'))
       } else {
         await addPass(currentItem.id, session.user.id)
-        onToast('Ikke interessert')
+        onToast(L('Ikke interessert', 'Not interested'))
       }
 
       setOffset({ x: 0, y: 0 })
@@ -123,18 +124,18 @@ export default function SwipePage({ session, profile, onToast }) {
 
   if (loading) return (
     <div style={{ minHeight:'100vh', display:'flex', alignItems:'center', justifyContent:'center', fontFamily:'Karla, sans-serif', color:'#9C8267' }}>
-      Laster…
+      {L('Laster…', 'Loading…')}
     </div>
   )
 
   if (done || items.length === 0) return (
     <div style={{ minHeight:'100vh', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', fontFamily:'Karla, sans-serif', padding:'20px', textAlign:'center', background:'#FBF9F5' }}>
       <h2 style={{ fontFamily:'Fraunces, serif', fontSize:'24px', fontWeight:'400', color:'#3A2F26', marginBottom:'12px' }}>
-        {items.length === 0 ? 'Ingen gjenstander igjen!' : 'Du har sett alle gjenstander!'}
+        {items.length === 0 ? L('Ingen gjenstander igjen!', 'No items left!') : L('Du har sett alle gjenstander!', 'You have seen all the items!')}
       </h2>
-      <p style={{ color:'#9C8267', marginBottom:'32px' }}>Gå tilbake for å se dine interesser</p>
+      <p style={{ color:'#9C8267', marginBottom:'32px' }}>{L('Gå tilbake for å se dine interesser', 'Go back to see your interests')}</p>
       <button onClick={() => navigate(`/estate/${id}`)} style={{ padding:'14px 32px', background:'#3A2F26', color:'#FBF9F5', border:'none', borderRadius:'10px', cursor:'pointer', fontSize:'16px', fontFamily:'Karla, sans-serif' }}>
-        ← Tilbake til oversikt
+        {L('← Tilbake til oversikt', '← Back to overview')}
       </button>
     </div>
   )
@@ -146,7 +147,7 @@ export default function SwipePage({ session, profile, onToast }) {
       {/* Header */}
       <div style={{ padding:'16px 20px', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
         <button onClick={() => navigate(`/estate/${id}`)} style={{ background:'none', border:'none', color:'#9C8267', cursor:'pointer', fontSize:'14px', fontFamily:'Karla, sans-serif' }}>
-          ← Tilbake
+          {L('← Tilbake', '← Back')}
         </button>
         <div style={{ fontSize:'13px', color:'#9C8267' }}>
           {index + 1} / {items.length}
@@ -165,7 +166,7 @@ export default function SwipePage({ session, profile, onToast }) {
         {/* Action indicators */}
         {action === 'like' && (
           <div style={{ position:'absolute', top:'30px', left:'30px', background:'#5F6E52', color:'#fff', padding:'8px 20px', borderRadius:'8px', fontSize:'18px', fontWeight:'700', transform:'rotate(-15deg)', zIndex:10, border:'3px solid #4A5A3E' }}>
-            VIL HA
+            {L('VIL HA', 'WANT')}
           </div>
         )}
         {action === 'pass' && (
@@ -175,7 +176,7 @@ export default function SwipePage({ session, profile, onToast }) {
         )}
         {action === 'trash' && (
           <div style={{ position:'absolute', top:'30px', left:'50%', transform:'translateX(-50%)', background:'#9C6B30', color:'#fff', padding:'8px 20px', borderRadius:'8px', fontSize:'18px', fontWeight:'700', zIndex:10, border:'3px solid #7A5020' }}>
-            KAST
+            {L('KAST', 'DISCARD')}
           </div>
         )}
 
@@ -204,7 +205,7 @@ export default function SwipePage({ session, profile, onToast }) {
             <h2 style={{ fontFamily:'Fraunces, serif', fontSize:'20px', fontWeight:'400', color:'#3A2F26', marginBottom:'6px' }}>{currentItem.title}</h2>
             <div style={{ display:'flex', gap:'8px', alignItems:'center', marginBottom:'8px' }}>
               <span style={{ fontSize:'12px', color:'#9C8267', background:'#E8DFD0', padding:'3px 10px', borderRadius:'20px' }}>
-                {currentItem.categories?.emoji} {currentItem.categories?.label || 'Annet'}
+                {currentItem.categories?.emoji} {currentItem.categories?.label || L('Annet', 'Other')}
               </span>
               {currentItem.estimated_value && (
                 <span style={{ fontSize:'12px', color:'#5F6E52' }}>{currentItem.estimated_value}</span>
@@ -215,7 +216,10 @@ export default function SwipePage({ session, profile, onToast }) {
             )}
             {currentItem.interests?.length > 0 && (
               <p style={{ fontSize:'12px', color:'#5F6E52', marginTop:'8px' }}>
-                {currentItem.interests.length} {currentItem.interests.length === 1 ? 'person' : 'personer'} er interessert
+                {L(
+                  `${currentItem.interests.length} ${currentItem.interests.length === 1 ? 'person' : 'personer'} er interessert`,
+                  `${currentItem.interests.length} ${currentItem.interests.length === 1 ? 'person is' : 'people are'} interested`,
+                )}
               </p>
             )}
           </div>
@@ -236,19 +240,19 @@ export default function SwipePage({ session, profile, onToast }) {
           background:'#fff', cursor:'pointer',
           boxShadow:'0 4px 16px rgba(0,0,0,0.08)', display:'flex', alignItems:'center', justifyContent:'center',
           fontSize:'11px', fontWeight:'600', color:'#9C6B30', fontFamily:'Karla, sans-serif',
-        }}>Kast</button>
+        }}>{L('Kast', 'Discard')}</button>
 
         <button onClick={() => handleAction('like')} style={{
           width:'64px', height:'64px', borderRadius:'50%', border:'2px solid #B8C8A8',
           background:'#fff', cursor:'pointer',
           boxShadow:'0 4px 16px rgba(0,0,0,0.1)', display:'flex', alignItems:'center', justifyContent:'center',
           fontSize:'13px', fontWeight:'600', color:'#5F6E52', fontFamily:'Karla, sans-serif',
-        }}>Vil ha</button>
+        }}>{L('Vil ha', 'Want')}</button>
       </div>
 
       {/* Hint */}
       <div style={{ textAlign:'center', paddingBottom:'16px', fontSize:'12px', color:'#D9CFC0' }}>
-        Sveip ← pass · ↑ kast · → vil ha
+        {L('Sveip ← pass · ↑ kast · → vil ha', 'Swipe ← pass · ↑ discard · → want')}
       </div>
     </div>
   )

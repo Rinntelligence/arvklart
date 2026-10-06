@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { getEstate, getItems } from '../lib/supabase'
 import { buildRemainingSteps } from '../lib/estateProgress'
 import { loadStatusExtras } from '../lib/decisions'
+import { L } from '../lib/lang'
 
 export default function StatusPage({ session }) {
   const { id } = useParams()
@@ -24,20 +25,20 @@ export default function StatusPage({ session }) {
     })()
   }, [id])
 
-  if (loading) return <div style={{ padding:'80px', textAlign:'center', color:'#9C8267', fontFamily:'Karla, sans-serif' }}>Laster…</div>
+  if (loading) return <div style={{ padding:'80px', textAlign:'center', color:'#9C8267', fontFamily:'Karla, sans-serif' }}>{L('Laster…', 'Loading…')}</div>
 
   const assigned = items.filter(i => i.status === 'assigned').length
   const pct = items.length ? Math.round((assigned / items.length) * 100) : 0
 
   return (
     <div style={{ maxWidth:'560px', margin:'0 auto', padding:'28px 16px 60px', fontFamily:'Karla, sans-serif' }}>
-      <button onClick={() => navigate(`/estate/${id}`)} style={{ background:'none', border:'none', color:'#9C8267', cursor:'pointer', fontSize:'13px', padding:'0 0 16px', fontFamily:'Karla, sans-serif' }}>← Tilbake til boet</button>
-      <h1 style={{ fontFamily:'Fraunces, serif', fontSize:'26px', fontWeight:'400', color:'#3A2F26', marginBottom:'4px' }}>Hva gjenstår</h1>
+      <button onClick={() => navigate(`/estate/${id}`)} style={{ background:'none', border:'none', color:'#9C8267', cursor:'pointer', fontSize:'13px', padding:'0 0 16px', fontFamily:'Karla, sans-serif' }}>{L('← Tilbake til boet', '← Back to the estate')}</button>
+      <h1 style={{ fontFamily:'Fraunces, serif', fontSize:'26px', fontWeight:'400', color:'#3A2F26', marginBottom:'4px' }}>{L('Hva gjenstår', 'What remains')}</h1>
       {estate?.name && <p style={{ color:'#9C8267', fontSize:'14px', marginBottom:'20px' }}>{estate.name}</p>}
 
       <div style={{ marginBottom:'28px' }}>
         <div style={{ display:'flex', justifyContent:'space-between', fontSize:'13px', color:'#5C4530', marginBottom:'6px' }}>
-          <span>{assigned} av {items.length} gjenstander tildelt</span>
+          <span>{L(`${assigned} av ${items.length} gjenstander tildelt`, `${assigned} of ${items.length} items assigned`)}</span>
           <span>{pct} %</span>
         </div>
         <div style={{ height:'6px', background:'#E8DFD0', borderRadius:'3px', overflow:'hidden' }}>
@@ -47,8 +48,8 @@ export default function StatusPage({ session }) {
 
       {steps.length === 0 ? (
         <div style={{ background:'#DCE3D2', border:'1px solid #B8C8A8', borderRadius:'12px', padding:'24px', textAlign:'center' }}>
-          <div style={{ fontFamily:'Fraunces, serif', fontSize:'18px', color:'#3A2F26', marginBottom:'4px' }}>Alt er klart</div>
-          <div style={{ fontSize:'13px', color:'#5C4530' }}>Det er ingenting som gjenstår i boet.</div>
+          <div style={{ fontFamily:'Fraunces, serif', fontSize:'18px', color:'#3A2F26', marginBottom:'4px' }}>{L('Alt er klart', 'All done')}</div>
+          <div style={{ fontSize:'13px', color:'#5C4530' }}>{L('Det er ingenting som gjenstår i boet.', 'Nothing remains in the estate.')}</div>
         </div>
       ) : (
         <ol style={{ listStyle:'none', padding:0, margin:0, display:'flex', flexDirection:'column', gap:'10px' }}>
@@ -61,7 +62,7 @@ export default function StatusPage({ session }) {
               </div>
               {step.path && (
                 <button onClick={() => navigate(step.path)} style={{ flexShrink:0, padding:'6px 12px', background:'none', border:'1px solid #D9CFC0', borderRadius:'8px', cursor:'pointer', color:'#5C4530', fontSize:'12px', fontFamily:'Karla, sans-serif', whiteSpace:'nowrap' }}>
-                  {step.pathLabel || 'Åpne'} →
+                  {step.pathLabel || L('Åpne', 'Open')} →
                 </button>
               )}
             </li>

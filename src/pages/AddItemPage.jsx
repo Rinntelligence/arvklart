@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { getCategories, uploadImage, supabase } from '../lib/supabase'
+import { L, locale } from '../lib/lang'
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY
@@ -72,7 +73,7 @@ export default function AddItemPage({ session, profile, onToast }) {
   const handleImages = (e) => {
     const MAX_IMAGE_SIZE = 10 * 1024 * 1024 // 10 MB
     const files = Array.from(e.target.files).filter(f => {
-      if (f.size > MAX_IMAGE_SIZE) { onToast(`"${f.name}" er for stor (maks 10 MB)`, 'error'); return false }
+      if (f.size > MAX_IMAGE_SIZE) { onToast(L(`"${f.name}" er for stor (maks 10 MB)`, `"${f.name}" is too large (max 10 MB)`), 'error'); return false }
       return true
     }).slice(0, 5)
     if (!files.length) return
@@ -115,16 +116,16 @@ export default function AddItemPage({ session, profile, onToast }) {
         )
         if (match) setCategoryId(match.id)
       }
-      onToast('AI identifiserte gjenstanden ✓')
+      onToast(L('AI identifiserte gjenstanden ✓', 'AI identified the item ✓'))
     } catch (e) {
-      onToast('AI-analyse feilet — fyll inn manuelt', 'error')
+      onToast(L('AI-analyse feilet — fyll inn manuelt', 'AI analysis failed — fill in manually'), 'error')
     } finally {
       setAnalyzing(false)
     }
   }
 
   const getValueEstimate = async () => {
-    if (!title.trim()) { onToast('Legg til navn på gjenstanden først', 'error'); return }
+    if (!title.trim()) { onToast(L('Legg til navn på gjenstanden først', 'Add the item name first'), 'error'); return }
     setEstimating(true)
     try {
       const cat = categories.find(c => c.id === categoryId)
@@ -144,14 +145,14 @@ export default function AddItemPage({ session, profile, onToast }) {
         reasoning: d.market?.reasoning ?? d.reasoning,
       })
     } catch (e) {
-      onToast('Verdiestimering feilet', 'error')
+      onToast(L('Verdiestimering feilet', 'Value estimate failed'), 'error')
     } finally {
       setEstimating(false)
     }
   }
 
   const save = async () => {
-    if (!title.trim()) { onToast('Legg til navn på gjenstanden', 'error'); return }
+    if (!title.trim()) { onToast(L('Legg til navn på gjenstanden', 'Add the item name'), 'error'); return }
     setSaving(true)
     try {
       const { data: newItem, error } = await supabase.from('items').insert({
@@ -190,28 +191,28 @@ export default function AddItemPage({ session, profile, onToast }) {
         }
       }
 
-      onToast('Gjenstand lagt til! ✓')
+      onToast(L('Gjenstand lagt til! ✓', 'Item added! ✓'))
       navigate(`/estate/${id}`)
     } catch (e) {
-      onToast('Feil: ' + e.message, 'error')
+      onToast(L('Feil: ', 'Error: ') + e.message, 'error')
     } finally {
       setSaving(false)
     }
   }
 
-  const formatNOK = (n) => n ? new Intl.NumberFormat('nb-NO', { style: 'currency', currency: 'NOK', maximumFractionDigits: 0 }).format(n) : '—'
+  const formatNOK = (n) => n ? new Intl.NumberFormat(locale(), { style: 'currency', currency: 'NOK', maximumFractionDigits: 0 }).format(n) : '—'
 
   return (
     <div style={{ maxWidth: '560px', margin: '0 auto', padding: '20px 16px 100px', fontFamily: 'Karla, sans-serif' }}>
       <button onClick={() => navigate(`/estate/${id}`)} style={{ background: 'none', border: 'none', color: '#9C8267', cursor: 'pointer', fontSize: '14px', padding: '0 0 16px', fontFamily: 'Karla, sans-serif' }}>
-        ← Tilbake
+        {L('← Tilbake', '← Back')}
       </button>
 
       <h1 style={{ fontFamily: 'Fraunces, serif', fontSize: '24px', fontWeight: '400', color: '#3A2F26', marginBottom: '6px' }}>
-        Legg til gjenstand
+        {L('Legg til gjenstand', 'Add item')}
       </h1>
       <p style={{ color: '#9C8267', fontSize: '14px', marginBottom: '24px' }}>
-        Fyll inn navn og ta gjerne bilde — AI kan identifisere og verdsette automatisk
+        {L('Fyll inn navn og ta gjerne bilde — AI kan identifisere og verdsette automatisk', 'Enter a name and add a photo if you can — AI can identify and value it automatically')}
       </p>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
@@ -219,7 +220,7 @@ export default function AddItemPage({ session, profile, onToast }) {
         {/* Bilder */}
         <div>
           <label style={{ display: 'block', fontSize: '13px', color: '#9C8267', marginBottom: '8px' }}>
-            Bilder (valgfri, maks 5)
+            {L('Bilder (valgfri, maks 5)', 'Photos (optional, max 5)')}
           </label>
           <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
             {imagePreviews.map((src, i) => (
@@ -241,7 +242,7 @@ export default function AddItemPage({ session, profile, onToast }) {
                 justifyContent: 'center', cursor: 'pointer', gap: '4px',
               }}>
                 <span style={{ fontSize: '20px', color: '#9C8267' }}>+</span>
-                <span style={{ fontSize: '10px', color: '#9C8267' }}>Legg til</span>
+                <span style={{ fontSize: '10px', color: '#9C8267' }}>{L('Legg til', 'Add')}</span>
               </div>
             )}
           </div>
@@ -254,18 +255,18 @@ export default function AddItemPage({ session, profile, onToast }) {
               color: '#fff', border: 'none', borderRadius: '8px', cursor: analyzing ? 'not-allowed' : 'pointer',
               fontSize: '13px', fontFamily: 'Karla, sans-serif', display: 'flex', alignItems: 'center', gap: '6px',
             }}>
-              {analyzing ? 'Analyserer…' : 'Analyser med AI'}
+              {analyzing ? L('Analyserer…', 'Analysing…') : L('Analyser med AI', 'Analyse with AI')}
             </button>
           )}
           {showAiConsent && (
             <div style={{ marginTop: '10px', background: '#FBF9F5', border: '1px solid #D9CFC0', borderRadius: '10px', padding: '14px' }}>
-              <div style={{ fontSize: '13px', color: '#3A2F26', fontWeight: '500', marginBottom: '6px' }}>Bildet sendes til en AI-tjeneste</div>
+              <div style={{ fontSize: '13px', color: '#3A2F26', fontWeight: '500', marginBottom: '6px' }}>{L('Bildet sendes til en AI-tjeneste', 'The photo is sent to an AI service')}</div>
               <p style={{ fontSize: '12px', color: '#5C4530', lineHeight: '1.6', marginBottom: '10px' }}>
-                For å identifisere gjenstanden sendes bildet til Anthropic (USA) for analyse. Bildet brukes kun til dette og lagres ikke av dem. Les mer i vår <a href="/personvern" target="_blank" style={{ color: '#5F6E52' }}>personvernerklæring</a>.
+                {L('For å identifisere gjenstanden sendes bildet til Anthropic (USA) for analyse. Bildet brukes kun til dette og lagres ikke av dem. Les mer i vår', 'To identify the item, the photo is sent to Anthropic (USA) for analysis. The photo is used only for this and is not stored by them. Read more in our')} <a href="/personvern" target="_blank" style={{ color: '#5F6E52' }}>{L('personvernerklæring', 'privacy policy')}</a>.
               </p>
               <div style={{ display: 'flex', gap: '8px' }}>
-                <button onClick={() => setShowAiConsent(false)} style={{ flex: 1, padding: '8px', background: 'none', border: '1px solid #D9CFC0', borderRadius: '7px', cursor: 'pointer', fontSize: '13px', fontFamily: 'Karla, sans-serif', color: '#5C4530' }}>Avbryt</button>
-                <button onClick={() => { try { localStorage.setItem('aiConsented', 'true') } catch {} setAiConsented(true); setShowAiConsent(false); analyzeWithAI() }} style={{ flex: 2, padding: '8px', background: '#5F6E52', color: '#fff', border: 'none', borderRadius: '7px', cursor: 'pointer', fontSize: '13px', fontFamily: 'Karla, sans-serif' }}>Godta og analyser</button>
+                <button onClick={() => setShowAiConsent(false)} style={{ flex: 1, padding: '8px', background: 'none', border: '1px solid #D9CFC0', borderRadius: '7px', cursor: 'pointer', fontSize: '13px', fontFamily: 'Karla, sans-serif', color: '#5C4530' }}>{L('Avbryt', 'Cancel')}</button>
+                <button onClick={() => { try { localStorage.setItem('aiConsented', 'true') } catch {} setAiConsented(true); setShowAiConsent(false); analyzeWithAI() }} style={{ flex: 2, padding: '8px', background: '#5F6E52', color: '#fff', border: 'none', borderRadius: '7px', cursor: 'pointer', fontSize: '13px', fontFamily: 'Karla, sans-serif' }}>{L('Godta og analyser', 'Accept and analyse')}</button>
               </div>
             </div>
           )}
@@ -274,12 +275,12 @@ export default function AddItemPage({ session, profile, onToast }) {
         {/* Navn */}
         <div>
           <label style={{ display: 'block', fontSize: '13px', color: '#9C8267', marginBottom: '6px' }}>
-            Navn på gjenstand *
+            {L('Navn på gjenstand *', 'Item name *')}
           </label>
           <input
             value={title}
             onChange={e => setTitle(e.target.value)}
-            placeholder="f.eks. Bestemors gyngestol"
+            placeholder={L('f.eks. Bestemors gyngestol', 'e.g. Grandmother\'s rocking chair')}
             autoFocus
             maxLength={200}
             style={{
@@ -294,7 +295,7 @@ export default function AddItemPage({ session, profile, onToast }) {
         {/* Kategori */}
         <div>
           <label style={{ display: 'block', fontSize: '13px', color: '#9C8267', marginBottom: '8px' }}>
-            Kategori
+            {L('Kategori', 'Category')}
           </label>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
             {categories.map(c => (
@@ -313,7 +314,7 @@ export default function AddItemPage({ session, profile, onToast }) {
               fontFamily: 'Karla, sans-serif', border: '2px dashed #D9CFC0',
               background: 'transparent', color: '#9C8267',
             }}>
-              + Ny kategori
+              {L('+ Ny kategori', '+ New category')}
             </button>
           </div>
 
@@ -324,7 +325,7 @@ export default function AddItemPage({ session, profile, onToast }) {
                   value={newCatLabel}
                   onChange={e => setNewCatLabel(e.target.value)}
                   onKeyDown={e => e.key === 'Enter' && addCategory()}
-                  placeholder="Kategorinavn…"
+                  placeholder={L('Kategorinavn…', 'Category name…')}
                   maxLength={60}
                   autoFocus
                   style={{
@@ -337,7 +338,7 @@ export default function AddItemPage({ session, profile, onToast }) {
                   border: 'none', borderRadius: '8px', cursor: newCatLabel.trim() ? 'pointer' : 'not-allowed',
                   fontSize: '13px', fontFamily: 'Karla, sans-serif', whiteSpace: 'nowrap',
                 }}>
-                  {savingCat ? '…' : 'Legg til'}
+                  {savingCat ? '…' : L('Legg til', 'Add')}
                 </button>
                 <button onClick={() => { setShowAddCat(false); setNewCatLabel('') }} style={{
                   padding: '8px', background: 'none', border: 'none', cursor: 'pointer', color: '#9C8267', fontSize: '16px',
@@ -350,10 +351,10 @@ export default function AddItemPage({ session, profile, onToast }) {
         {/* Tilstand */}
         <div>
           <label style={{ display: 'block', fontSize: '13px', color: '#9C8267', marginBottom: '8px' }}>
-            Tilstand
+            {L('Tilstand', 'Condition')}
           </label>
           <div style={{ display: 'flex', gap: '8px' }}>
-            {[['excellent','Utmerket'],['good','God'],['fair','Middels'],['poor','Dårlig']].map(([val, label]) => (
+            {[['excellent',L('Utmerket','Excellent')],['good',L('God','Good')],['fair',L('Middels','Fair')],['poor',L('Dårlig','Poor')]].map(([val, label]) => (
               <button key={val} onClick={() => setCondition(val)} style={{
                 flex: 1, padding: '10px 4px',
                 border: `2px solid ${condition === val ? '#3A2F26' : '#D9CFC0'}`,
@@ -369,12 +370,12 @@ export default function AddItemPage({ session, profile, onToast }) {
         {/* Beskrivelse */}
         <div>
           <label style={{ display: 'block', fontSize: '13px', color: '#9C8267', marginBottom: '6px' }}>
-            Beskrivelse (valgfri)
+            {L('Beskrivelse (valgfri)', 'Description (optional)')}
           </label>
           <textarea
             value={description}
             onChange={e => setDescription(e.target.value)}
-            placeholder="Materiale, farge, historikk, minner…"
+            placeholder={L('Materiale, farge, historikk, minner…', 'Material, colour, history, memories…')}
             rows={3}
             maxLength={2000}
             style={{
@@ -389,13 +390,13 @@ export default function AddItemPage({ session, profile, onToast }) {
         {/* Kjøpspris og -år for verdiestimat */}
         <div style={{ display: 'flex', gap: '10px' }}>
           <div style={{ flex: 1 }}>
-            <label style={{ display: 'block', fontSize: '13px', color: '#9C8267', marginBottom: '6px' }}>Kjøpspris (NOK, valgfri)</label>
-            <input type="number" value={purchasePrice} onChange={e => setPurchasePrice(e.target.value)} placeholder="f.eks. 5000"
+            <label style={{ display: 'block', fontSize: '13px', color: '#9C8267', marginBottom: '6px' }}>{L('Kjøpspris (NOK, valgfri)', 'Purchase price (NOK, optional)')}</label>
+            <input type="number" value={purchasePrice} onChange={e => setPurchasePrice(e.target.value)} placeholder={L('f.eks. 5000', 'e.g. 5000')}
               style={{ width: '100%', padding: '12px 14px', border: '1px solid #D9CFC0', borderRadius: '10px', fontSize: '15px', background: '#FBF9F5', color: '#3A2F26', outline: 'none', fontFamily: 'Karla, sans-serif', boxSizing: 'border-box' }} />
           </div>
           <div style={{ flex: 1 }}>
-            <label style={{ display: 'block', fontSize: '13px', color: '#9C8267', marginBottom: '6px' }}>Kjøpsår (valgfri)</label>
-            <input type="number" value={purchaseYear} onChange={e => setPurchaseYear(e.target.value)} placeholder="f.eks. 2010"
+            <label style={{ display: 'block', fontSize: '13px', color: '#9C8267', marginBottom: '6px' }}>{L('Kjøpsår (valgfri)', 'Year of purchase (optional)')}</label>
+            <input type="number" value={purchaseYear} onChange={e => setPurchaseYear(e.target.value)} placeholder={L('f.eks. 2010', 'e.g. 2010')}
               style={{ width: '100%', padding: '12px 14px', border: '1px solid #D9CFC0', borderRadius: '10px', fontSize: '15px', background: '#FBF9F5', color: '#3A2F26', outline: 'none', fontFamily: 'Karla, sans-serif', boxSizing: 'border-box' }} />
           </div>
         </div>
@@ -407,25 +408,25 @@ export default function AddItemPage({ session, profile, onToast }) {
             color: '#fff', border: 'none', borderRadius: '8px', cursor: estimating ? 'not-allowed' : 'pointer',
             fontSize: '14px', fontFamily: 'Karla, sans-serif',
           }}>
-            {estimating ? 'Estimerer…' : 'Få verdiestimat'}
+            {estimating ? L('Estimerer…', 'Estimating…') : L('Få verdiestimat', 'Get value estimate')}
           </button>
         )}
 
         {/* Verdiestimat-resultat */}
         {aiEstimate && (
           <div style={{ background: '#DCE3D2', border: '1px solid #B8C8A8', borderRadius: '12px', padding: '20px' }}>
-            <div style={{ fontSize: '13px', color: '#3A5A30', fontWeight: '500', marginBottom: '12px' }}>Verdiestimat (NOK)</div>
+            <div style={{ fontSize: '13px', color: '#3A5A30', fontWeight: '500', marginBottom: '12px' }}>{L('Verdiestimat (NOK)', 'Value estimate (NOK)')}</div>
             <div style={{ display: 'flex', gap: '16px', marginBottom: '12px', flexWrap: 'wrap' }}>
               <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: '11px', color: '#9C8267', marginBottom: '2px' }}>Lavt</div>
+                <div style={{ fontSize: '11px', color: '#9C8267', marginBottom: '2px' }}>{L('Lavt', 'Low')}</div>
                 <div style={{ fontSize: '18px', color: '#3A2F26', fontFamily: 'Fraunces, serif' }}>{formatNOK(aiEstimate.low_nok)}</div>
               </div>
               <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: '11px', color: '#9C8267', marginBottom: '2px' }}>Mest sannsynlig</div>
+                <div style={{ fontSize: '11px', color: '#9C8267', marginBottom: '2px' }}>{L('Mest sannsynlig', 'Most likely')}</div>
                 <div style={{ fontSize: '22px', color: '#3A5A30', fontFamily: 'Fraunces, serif', fontWeight: '500' }}>{formatNOK(aiEstimate.likely_nok)}</div>
               </div>
               <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: '11px', color: '#9C8267', marginBottom: '2px' }}>Høyt</div>
+                <div style={{ fontSize: '11px', color: '#9C8267', marginBottom: '2px' }}>{L('Høyt', 'High')}</div>
                 <div style={{ fontSize: '18px', color: '#3A2F26', fontFamily: 'Fraunces, serif' }}>{formatNOK(aiEstimate.high_nok)}</div>
               </div>
             </div>
@@ -433,7 +434,7 @@ export default function AddItemPage({ session, profile, onToast }) {
 
             {/* Voting */}
             <div style={{ borderTop: '1px solid #B8C8A8', paddingTop: '12px', marginTop: '4px' }}>
-              <div style={{ fontSize: '12px', color: '#5C4530', marginBottom: '8px' }}>Er du enig i estimatet?</div>
+              <div style={{ fontSize: '12px', color: '#5C4530', marginBottom: '8px' }}>{L('Er du enig i estimatet?', 'Do you agree with the estimate?')}</div>
               <div style={{ display: 'flex', gap: '8px' }}>
                 <button onClick={() => setMyEstimateVote(myEstimateVote === 'agree' ? null : 'agree')} style={{
                   flex: 1, padding: '9px', border: `2px solid ${myEstimateVote === 'agree' ? '#5F6E52' : '#B8C8A8'}`,
@@ -441,23 +442,23 @@ export default function AddItemPage({ session, profile, onToast }) {
                   background: myEstimateVote === 'agree' ? '#5F6E52' : '#fff',
                   color: myEstimateVote === 'agree' ? '#fff' : '#5C4530',
                   fontFamily: 'Karla, sans-serif', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
-                }}>Enig</button>
+                }}>{L('Enig', 'Agree')}</button>
                 <button onClick={() => setMyEstimateVote(myEstimateVote === 'disagree' ? null : 'disagree')} style={{
                   flex: 1, padding: '9px', border: `2px solid ${myEstimateVote === 'disagree' ? '#A97C3F' : '#B8C8A8'}`,
                   borderRadius: '8px', cursor: 'pointer', fontSize: '14px',
                   background: myEstimateVote === 'disagree' ? '#A97C3F' : '#fff',
                   color: myEstimateVote === 'disagree' ? '#fff' : '#5C4530',
                   fontFamily: 'Karla, sans-serif', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
-                }}>Uenig</button>
+                }}>{L('Uenig', 'Disagree')}</button>
               </div>
               {myEstimateVote && (
                 <p style={{ fontSize: '11px', color: '#5C4530', marginTop: '6px', marginBottom: 0 }}>
-                  {myEstimateVote === 'agree' ? 'Stemmen din lagres — andre arvinger kan også stemme.' : 'Stemmen din lagres — andre arvinger kan også stemme.'}
+                  {L('Stemmen din lagres — andre arvinger kan også stemme.', 'Your vote is saved — other heirs can vote too.')}
                 </p>
               )}
             </div>
 
-            <p style={{ fontSize: '11px', color: '#9C8267', marginTop: '8px', marginBottom: 0 }}>Estimater er kun veiledende — ikke profesjonell takst.</p>
+            <p style={{ fontSize: '11px', color: '#9C8267', marginTop: '8px', marginBottom: 0 }}>{L('Estimater er kun veiledende — ikke profesjonell takst.', 'Estimates are for guidance only — not a professional appraisal.')}</p>
           </div>
         )}
 
@@ -483,7 +484,7 @@ export default function AddItemPage({ session, profile, onToast }) {
             fontSize: '16px', fontFamily: 'Karla, sans-serif', fontWeight: '500',
           }}
         >
-          {saving ? 'Lagrer…' : '✓ Lagre gjenstand'}
+          {saving ? L('Lagrer…', 'Saving…') : L('✓ Lagre gjenstand', '✓ Save item')}
         </button>
       </div>
     </div>

@@ -27,6 +27,7 @@ import { getPendingSave } from './lib/wizardEstate'
 import TopBar from './components/TopBar'
 import Toast from './components/Toast'
 import FeedbackWidget from './components/FeedbackWidget'
+import { L } from './lib/lang'
 
 // Public pages a demo session should be allowed to stay on instead of being sent into the demo estate
 const PUBLIC_PATHS = ['/home', '/veiviser', '/kontakt', '/pricing', '/personvern']
@@ -141,7 +142,7 @@ export default function App() {
         <TopBar profile={profile} session={session} onToast={showToast} />
         {isDemo && (
           <div style={{ background: '#DCE3D2', borderBottom: '1px solid #B8C8A8', padding: '8px 20px', textAlign: 'center', fontSize: '13px', color: '#3A5A30', fontFamily: 'Karla, sans-serif' }}>
-            Du ser på en <strong>demo</strong> — Mona sitt bo. Redigering er ikke tilgjengelig.
+            {L('Du ser på en', 'You are viewing a')} <strong>demo</strong> — {L('Mona sitt bo. Redigering er ikke tilgjengelig.', "Mona's estate. Editing is not available.")}
           </div>
         )}
         {toast && <Toast msg={toast.msg} type={toast.type} />}

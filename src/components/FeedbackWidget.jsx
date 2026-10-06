@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { supabase } from '../lib/supabase'
+import { L } from '../lib/lang'
 
 export default function FeedbackWidget({ session }) {
   const [open, setOpen] = useState(false)
@@ -45,16 +46,16 @@ export default function FeedbackWidget({ session }) {
             {sent ? (
               <div style={{ textAlign: 'center', padding: '20px 0' }}>
                 <div style={{ fontSize: '36px', marginBottom: '10px' }}>🙏</div>
-                <div style={{ fontSize: '16px', color: '#1a1410' }}>Takk!</div>
+                <div style={{ fontSize: '16px', color: '#1a1410' }}>{L('Takk!', 'Thank you!')}</div>
               </div>
             ) : (
               <>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px' }}>
-                  <h3 style={{ fontFamily: 'Playfair Display, serif', fontSize: '18px', fontWeight: '400', color: '#1a1410' }}>Tilbakemelding</h3>
+                  <h3 style={{ fontFamily: 'Playfair Display, serif', fontSize: '18px', fontWeight: '400', color: '#1a1410' }}>{L('Tilbakemelding', 'Feedback')}</h3>
                   <button onClick={() => setOpen(false)} style={{ background: 'none', border: 'none', fontSize: '24px', color: '#a89080', cursor: 'pointer' }}>×</button>
                 </div>
                 <div style={{ display: 'flex', gap: '6px', marginBottom: '14px' }}>
-                  {[['bug','🐛 Feil'],['idea','💡 Idé'],['general','💬 Generelt']].map(([id,label]) => (
+                  {[['bug',L('🐛 Feil','🐛 Bug')],['idea',L('💡 Idé','💡 Idea')],['general',L('💬 Generelt','💬 General')]].map(([id,label]) => (
                     <button key={id} onClick={() => setType(id)} style={{
                       flex: 1, padding: '8px 4px',
                       border: `2px solid ${type===id?'#1a1410':'#e0d8d0'}`,
@@ -66,7 +67,7 @@ export default function FeedbackWidget({ session }) {
                   ))}
                 </div>
                 <textarea value={content} onChange={e => setContent(e.target.value)}
-                  placeholder={type==='bug'?'Hva gikk galt?':type==='idea'?'Hvilken funksjon mangler?':'Fortell oss hva du synes…'}
+                  placeholder={type==='bug'?L('Hva gikk galt?','What went wrong?'):type==='idea'?L('Hvilken funksjon mangler?','What feature is missing?'):L('Fortell oss hva du synes…','Tell us what you think…')}
                   rows={4} maxLength={2000} style={{
                     width: '100%', padding: '12px', border: '1px solid #e0d8d0',
                     borderRadius: '8px', fontSize: '15px', fontFamily: 'DM Sans, sans-serif',
@@ -74,7 +75,7 @@ export default function FeedbackWidget({ session }) {
                     outline: 'none', boxSizing: 'border-box', marginBottom: '14px',
                   }} />
                 <div style={{ marginBottom: '16px' }}>
-                  <div style={{ fontSize: '12px', color: '#8c7b6b', marginBottom: '6px' }}>Anbefaler du Arvklart? (1-10)</div>
+                  <div style={{ fontSize: '12px', color: '#8c7b6b', marginBottom: '6px' }}>{L('Anbefaler du Arvklart? (1-10)', 'Would you recommend Arvklart? (1-10)')}</div>
                   <div style={{ display: 'flex', gap: '3px' }}>
                     {[1,2,3,4,5,6,7,8,9,10].map(n => (
                       <button key={n} onClick={() => setNps(nps===n?null:n)} style={{
@@ -94,7 +95,7 @@ export default function FeedbackWidget({ session }) {
                   color: '#f5f0eb', border: 'none', borderRadius: '10px',
                   cursor: (content.trim()||nps!==null)?'pointer':'not-allowed',
                   fontSize: '15px', fontFamily: 'DM Sans, sans-serif',
-                }}>{sending?'Sender…':'Send tilbakemelding'}</button>
+                }}>{sending?L('Sender…','Sending…'):L('Send tilbakemelding','Send feedback')}</button>
               </>
             )}
           </div>
