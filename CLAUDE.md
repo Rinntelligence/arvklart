@@ -75,7 +75,8 @@ Hent verdiene fra Supabase Dashboard → Project Settings → API.
 - Tilgang styres av tabellen `founders` (kun SQL Editor/service_role kan skrive) og krever tofaktor (TOTP, `aal2`)
 - `profiles.is_founder` er bare et visningsflagg som speiler `founders`, og `plan` kan ikke endres fra klienten
 - Data hentes kun via `founder_dashboard()` og `founder_set_plan()`; handlinger logges i `founder_audit_log`
-- Legg til founder: `insert into founders (user_id) select id from auth.users where email = '...';`
+- Legg til/fjern founders: fanen «Founders» i dashboardet (`founder_add_founder()` / `founder_remove_founder()`, man kan ikke fjerne seg selv)
+- Første founder legges inn i SQL Editor: `insert into founders (user_id) select id from auth.users where email = '...';`
 - Se `supabase/migrations/20261006_founder_security.sql`
 
 ## GDPR og personvern

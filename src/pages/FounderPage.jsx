@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { getFounderDashboard, setUserPlan } from '../lib/founder'
+import FounderManagement from '../components/FounderManagement'
 
 const tc = c => { if(!c)return'#FBF9F5'; const r=parseInt(c.slice(1,3),16),g=parseInt(c.slice(3,5),16),b=parseInt(c.slice(5,7),16); return(0.299*r+0.587*g+0.114*b)/255>0.55?'#3A2F26':'#FBF9F5' }
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LineChart, Line, CartesianGrid } from 'recharts'
@@ -86,7 +87,7 @@ export default function FounderPage({ session, onToast }) {
 
       {/* Tabs */}
       <div style={{ display:'flex', gap:'4px', borderBottom:'1px solid #D9CFC0', marginBottom:'24px' }}>
-        {[['overview','Oversikt'],['users','Brukere'],['feedback','Tilbakemelding'],['estates','Boer']].map(([t,l])=>(
+        {[['overview','Oversikt'],['users','Brukere'],['feedback','Tilbakemelding'],['estates','Boer'],['founders','Founders']].map(([t,l])=>(
           <button key={t} onClick={()=>setTab(t)} style={{
             padding:'10px 18px', border:'none', background:'none', cursor:'pointer',
             fontSize:'14px', fontFamily:'Karla, sans-serif',
@@ -209,6 +210,8 @@ export default function FounderPage({ session, onToast }) {
           ))}
         </div>
       )}
+
+      {tab==='founders' && <FounderManagement session={session} onToast={onToast} />}
 
       {tab==='estates' && (
         <div style={{ background:'#fff', border:'1px solid #D9CFC0', borderRadius:'12px', overflow:'hidden' }}>

@@ -36,3 +36,9 @@ export const getFounderDashboard = () => supabase.rpc('founder_dashboard')
 
 export const setUserPlan = (userId, plan) =>
   supabase.rpc('founder_set_plan', { p_user_id: userId, p_plan: plan })
+
+export const listFounders = () => supabase.rpc('founder_list_founders')
+
+export const addFounder = (email) => supabase.rpc('founder_add_founder', { p_email: email.trim() })
+
+export const removeFounder = (userId) => supabase.rpc('founder_remove_founder', { p_user_id: userId })

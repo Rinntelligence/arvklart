@@ -10,10 +10,14 @@
 --    altså når brukeren har bekreftet en kode fra autentiseringsappen i denne sesjonen.
 -- 3. Founder-data hentes via security definer-funksjoner (founder_dashboard, founder_set_plan)
 --    i stedet for brede select-policies. Hver founder-handling logges i founder_audit_log.
+--    Founders kan legge til og fjerne andre founders fra dashboardet (fanen «Founders»).
 -- 4. Før kunne alle innloggede lese alle profiler (e-post, plan). Nå ser man bare sin egen profil
 --    og profilene til medlemmer i bo man selv er med i.
 --
--- ETTER KJØRING: legg inn founders (se nederst), og hver founder setter opp tofaktor på /founder.
+-- Filen kan trygt kjøres på nytt (alt er idempotent).
+--
+-- ETTER KJØRING: legg inn den første founderen (se nederst) og sett opp tofaktor på /founder.
+-- Flere founders legges deretter til fra dashboardet.
 
 -- ============================================================
 -- 1. FOUNDER-ROLLE
@@ -242,11 +246,101 @@ revoke all on function public.founder_set_plan(uuid, text) from public, anon;
 grant execute on function public.founder_dashboard() to authenticated;
 grant execute on function public.founder_set_plan(uuid, text) to authenticated;
 
+-- ============================================================
+-- 6. ADMINISTRASJON AV FOUNDERS (fra dashboardet)
+-- ============================================================
+
+-- Hvem som la til founderen, for sporbarhet.
+alter table public.founders add column if not exists added_by uuid references auth.users(id) on delete set null;
+
+-- Liste over founders med navn, e-post og om tofaktor er satt opp.
+create or replace function public.founder_list_founders()
+returns table (user_id uuid, email text, display_name text, created_at timestamptz, added_by_email text, has_mfa boolean)
+language plpgsql
+security definer
+stable
+set search_path = public
+as $$
+begin
+  if not public.is_founder() then
+    raise exception 'not_authorized';
+  end if;
+
+  return query
+    select f.user_id, u.email::text, p.display_name, f.created_at, ab.email::text,
+           exists (select 1 from auth.mfa_factors m where m.user_id = f.user_id and m.status = 'verified')
+    from founders f
+    join auth.users u on u.id = f.user_id
+    left join profiles p on p.user_id = f.user_id
+    left join auth.users ab on ab.id = f.added_by
+    order by f.created_at;
+end;
+$$;
+
+-- Personen må ha registrert seg i appen først. Ny founder må sette opp tofaktor før dataene vises.
+create or replace function public.founder_add_founder(p_email text)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_user_id uuid;
+begin
+  if not public.is_founder() then
+    raise exception 'not_authorized';
+  end if;
+
+  select id into v_user_id from auth.users where lower(email) = lower(trim(p_email));
+  if not found then
+    raise exception 'user_not_found';
+  end if;
+  if exists (select 1 from founders where user_id = v_user_id) then
+    raise exception 'already_founder';
+  end if;
+
+  insert into founders (user_id, added_by) values (v_user_id, auth.uid());
+  insert into founder_audit_log (founder_id, action, target_user_id)
+    values (auth.uid(), 'add_founder', v_user_id);
+end;
+$$;
+
+-- Man kan ikke fjerne seg selv. Det sikrer også at det alltid finnes minst én founder.
+create or replace function public.founder_remove_founder(p_user_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if not public.is_founder() then
+    raise exception 'not_authorized';
+  end if;
+  if p_user_id = auth.uid() then
+    raise exception 'cannot_remove_self';
+  end if;
+
+  delete from founders where user_id = p_user_id;
+  if not found then
+    raise exception 'not_found';
+  end if;
+  insert into founder_audit_log (founder_id, action, target_user_id)
+    values (auth.uid(), 'remove_founder', p_user_id);
+end;
+$$;
+
+revoke all on function public.founder_list_founders() from public, anon;
+revoke all on function public.founder_add_founder(text) from public, anon;
+revoke all on function public.founder_remove_founder(uuid) from public, anon;
+grant execute on function public.founder_list_founders() to authenticated;
+grant execute on function public.founder_add_founder(text) to authenticated;
+grant execute on function public.founder_remove_founder(uuid) to authenticated;
+
 -- Be API-et (PostgREST) laste inn de nye funksjonene med en gang.
 notify pgrst, 'reload schema';
 
 -- ============================================================
--- LEGG INN FOUNDERS (kjøres manuelt, én gang per founder)
+-- LEGG INN FØRSTE FOUNDER (kjøres manuelt; resten legges til fra dashboardet)
 -- ============================================================
 -- insert into public.founders (user_id)
 --   select id from auth.users where email in ('founder1@eksempel.no', 'founder2@eksempel.no')
