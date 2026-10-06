@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="no">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ArvKlart – Sidemeny og liste</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400&family=Karla:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{--espresso:#3A2F26;--snow:#FBF9F5;--sand:#E8DFD0;--border:#D9CFC0;--latte:#9C8267;--walnut:#5C4530;--darksage:#5F6E52;--sage:#8B9A7D;--mist:#DCE3D2}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--snow);color:var(--espresso);font-family:Karla,sans-serif;font-size:15px}
+  button,input,select{font-family:inherit;font-size:14px}
+  button{cursor:pointer}
+  .app{display:grid;grid-template-columns:220px 1fr;min-height:100vh}
+  aside{background:var(--espresso);color:var(--sand);padding:20px 12px}
+  .logo{font-family:'Fraunces',serif;font-size:19px;color:var(--snow);padding:0 10px 20px}
+  .estate{padding:0 10px 16px;margin-bottom:12px;border-bottom:1px solid rgba(232,223,208,.15);font-size:13px}
+  .estate b{display:block;color:var(--snow);font-size:15px;font-weight:500;margin-top:2px}
+  aside a{display:flex;justify-content:space-between;padding:9px 10px;border-radius:6px;color:var(--sand);text-decoration:none;font-size:14px}
+  aside a:hover{background:rgba(251,249,245,.06)}
+  aside a.on{background:var(--snow);color:var(--espresso)}
+  aside a span{font-size:12px;background:var(--darksage);color:#fff;border-radius:10px;padding:1px 7px}
+  main{padding:24px 28px 56px;min-width:0}
+  .head{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:20px}
+  h1{font-family:'Fraunces',serif;font-weight:400;font-size:24px}
+  .btn{padding:9px 16px;border-radius:8px;border:1px solid var(--border);background:#fff;color:var(--walnut)}
+  .btn.primary{background:var(--espresso);border-color:var(--espresso);color:var(--snow)}
+
+  .numbers{display:grid;grid-template-columns:repeat(5,1fr);background:#fff;border:1px solid var(--border);border-radius:10px;margin-bottom:20px}
+  .numbers div{padding:14px 16px;cursor:pointer}
+  .numbers div+div{border-left:1px solid var(--border)}
+  .numbers div:hover{background:var(--snow)}
+  .numbers div.on{background:var(--mist)}
+  .numbers small{display:block;font-size:12px;color:var(--latte);margin-bottom:4px}
+  .numbers b{font-size:22px;font-weight:500}
+  .numbers .attn b{color:var(--darksage)}
+
+  .panel{background:#fff;border:1px solid var(--border);border-radius:10px;overflow:hidden}
+  .tools{display:flex;gap:8px;padding:12px;border-bottom:1px solid var(--border);flex-wrap:wrap}
+  .tools input{flex:1;min-width:180px;padding:8px 12px;border:1px solid var(--border);border-radius:8px;background:var(--snow);color:var(--espresso);outline:none}
+  .tools select{padding:8px 10px;border:1px solid var(--border);border-radius:8px;background:#fff;color:var(--espresso)}
+  table{width:100%;border-collapse:collapse}
+  th{text-align:left;font-size:12px;font-weight:500;color:var(--latte);padding:10px 14px;background:var(--snow);border-bottom:1px solid var(--border)}
+  td{padding:10px 14px;border-bottom:1px solid #EFE8DC;font-size:14px;vertical-align:middle}
+  tr:last-child td{border-bottom:none}
+  tbody tr{cursor:pointer}
+  tbody tr:hover td{background:#FDFCF9}
+  .item{display:flex;align-items:center;gap:12px}
+  .thumb{width:40px;height:40px;border-radius:6px;background:var(--sand);flex-shrink:0}
+  .item small{display:block;color:var(--latte);font-size:12px}
+  .st{font-size:12px;padding:3px 9px;border-radius:10px;white-space:nowrap}
+  .st.many{background:var(--darksage);color:#fff}
+  .st.one{background:var(--mist);color:var(--darksage)}
+  .st.none{background:var(--sand);color:var(--walnut)}
+  .st.done{border:1px solid var(--sage);color:var(--darksage)}
+  .want{padding:5px 10px;border-radius:6px;border:1px solid var(--border);background:#fff;color:var(--walnut);font-size:13px}
+  .want.on{background:var(--espresso);border-color:var(--espresso);color:var(--snow)}
+  .foot{padding:10px 14px;font-size:13px;color:var(--latte);border-top:1px solid var(--border)}
+  @media(max-width:820px){
+    .app{grid-template-columns:1fr}
+    aside{display:flex;gap:4px;overflow-x:auto;padding:10px 16px;align-items:center}
+    .logo{padding:0 12px 0 0}.estate{display:none}aside a{white-space:nowrap}
+    main{padding:20px 16px 48px}
+    .numbers{grid-template-columns:repeat(3,1fr)}.numbers div:nth-child(4){border-left:none}
+    .numbers div:nth-child(n+4){border-top:1px solid var(--border)}
+    .hide{display:none}
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside>
+    <div class="logo">ArvKlart</div>
+    <div class="estate">Bo<b>Ingrid Hansen</b></div>
+    <a class="on" href="#">Oversikt</a>
+    <a href="#">Sveip</a>
+    <a href="#">Løsningsmetoder <span>5</span></a>
+    <a href="#">Arvinger</a>
+    <a href="#">Veiviser</a>
+    <a href="#">Hva gjenstår <span>4</span></a>
+    <a href="#">Dokumenter</a>
+    <a href="#">Administrer</a>
+  </aside>
+
+  <main>
+    <div class="head"><h1>Oversikt</h1><button class="btn primary">+ Legg til gjenstand</button></div>
+
+    <div class="numbers" id="nums">
+      <div class="on"><small>Alle</small><b>48</b></div>
+      <div><small>Mine interesser</small><b>9</b></div>
+      <div class="attn"><small>Flere vil ha</small><b>5</b></div>
+      <div><small>Ingen vil ha</small><b>11</b></div>
+      <div><small>Tildelt</small><b>20</b></div>
+    </div>
+
+    <div class="panel">
+      <div class="tools">
+        <input placeholder="Søk etter gjenstand">
+        <select><option>Alle kategorier</option><option>Møbler</option><option>Kjøkken</option><option>Kunst</option></select>
+        <select><option>Sorter: Nyeste</option><option>Verdi</option><option>Navn</option></select>
+      </div>
+      <table>
+        <thead><tr><th>Gjenstand</th><th class="hide">Hvem vil ha</th><th>Status</th><th class="hide"></th></tr></thead>
+        <tbody>
+          <tr><td><div class="item"><div class="thumb"></div><div>Spisebord i eik<small>Møbler · ca. 12 000 kr</small></div></div></td><td class="hide">Kari, Erik, deg</td><td><span class="st many">3 vil ha</span></td><td class="hide"><button class="want on">Ønsker</button></td></tr>
+          <tr><td><div class="item"><div class="thumb"></div><div>Sølvtøy, 12 personer<small>Kjøkken · ca. 8 000 kr</small></div></div></td><td class="hide">Deg</td><td><span class="st one">1 vil ha</span></td><td class="hide"><button class="want on">Ønsker</button></td></tr>
+          <tr><td><div class="item"><div class="thumb"></div><div>Maleri, fjordmotiv<small>Kunst · ca. 25 000 kr</small></div></div></td><td class="hide">Erik</td><td><span class="st done">Tildelt Erik</span></td><td class="hide"></td></tr>
+          <tr><td><div class="item"><div class="thumb"></div><div>Piano<small>Møbler · ca. 15 000 kr</small></div></div></td><td class="hide" style="color:var(--latte)">–</td><td><span class="st none">Ingen</span></td><td class="hide"><button class="want">Ønsker</button></td></tr>
+          <tr><td><div class="item"><div class="thumb"></div><div>Ørelappstol<small>Møbler · ca. 3 500 kr</small></div></div></td><td class="hide">Kari, Erik</td><td><span class="st many">2 vil ha</span></td><td class="hide"><button class="want">Ønsker</button></td></tr>
+          <tr><td><div class="item"><div class="thumb"></div><div>Porsgrund-servise<small>Kjøkken · ca. 2 000 kr</small></div></div></td><td class="hide">Deg</td><td><span class="st one">1 vil ha</span></td><td class="hide"><button class="want on">Ønsker</button></td></tr>
+          <tr><td><div class="item"><div class="thumb"></div><div>Gulvur<small>Møbler · ca. 18 000 kr</small></div></div></td><td class="hide" style="color:var(--latte)">–</td><td><span class="st none">Ingen</span></td><td class="hide"><button class="want">Ønsker</button></td></tr>
+        </tbody>
+      </table>
+      <div class="foot">Viser 7 av 48</div>
+    </div>
+  </main>
+</div>
+<script>
+  // Klikk på tall filtrerer (kun visuelt her)
+  document.querySelectorAll('#nums div').forEach(d => d.onclick = () => {
+    document.querySelectorAll('#nums div').forEach(x => x.classList.remove('on')); d.classList.add('on')
+  })
+  // Ønsker-knapp av/på
+  document.querySelectorAll('.want').forEach(b => b.onclick = e => { e.stopPropagation(); b.classList.toggle('on') })
+</script>
+</body>
+</html>

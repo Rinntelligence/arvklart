@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="no">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ArvKlart – Bildegalleri</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400&family=Karla:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{--espresso:#3A2F26;--snow:#FBF9F5;--sand:#E8DFD0;--border:#D9CFC0;--latte:#9C8267;--walnut:#5C4530;--darksage:#5F6E52;--sage:#8B9A7D;--mist:#DCE3D2}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--snow);color:var(--espresso);font-family:Karla,sans-serif;font-size:15px}
+  button,select{font-family:inherit;font-size:14px}
+  button{cursor:pointer}
+  .topbar{background:#fff;border-bottom:1px solid var(--border);position:sticky;top:0;z-index:5}
+  .topbar div{max-width:1100px;margin:0 auto;padding:12px 16px;display:flex;align-items:center;gap:16px}
+  .logo{font-family:'Fraunces',serif;font-size:19px}
+  .crumb{font-size:14px;color:var(--latte)}
+  .crumb b{color:var(--espresso);font-weight:500}
+  .sp{flex:1}
+  .btn{padding:8px 14px;border-radius:8px;border:1px solid var(--border);background:#fff;color:var(--walnut)}
+  .btn.primary{background:var(--espresso);border-color:var(--espresso);color:var(--snow)}
+  .wrap{max-width:1100px;margin:0 auto;padding:24px 16px 64px}
+
+  .summary{display:flex;gap:12px;flex-wrap:wrap;align-items:stretch;margin-bottom:20px}
+  .sum{flex:1;min-width:150px;background:#fff;border:1px solid var(--border);border-radius:10px;padding:14px 16px}
+  .sum small{font-size:12px;color:var(--latte)}
+  .sum b{display:block;font-size:22px;font-weight:500;margin-top:2px}
+  .sum.go{background:var(--espresso);border-color:var(--espresso);color:var(--snow);cursor:pointer}
+  .sum.go small{color:var(--sand)}
+  .sum.go b{font-size:16px;margin-top:6px}
+
+  .filters{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:16px}
+  .seg{display:flex;border:1px solid var(--border);border-radius:8px;overflow:hidden;background:#fff}
+  .seg button{border:none;background:none;padding:8px 12px;color:var(--walnut)}
+  .seg button+button{border-left:1px solid var(--border)}
+  .seg button.on{background:var(--espresso);color:var(--snow)}
+  select{padding:8px 10px;border:1px solid var(--border);border-radius:8px;background:#fff;color:var(--espresso)}
+  .count{margin-left:auto;font-size:13px;color:var(--latte)}
+
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:16px}
+  .item{cursor:pointer}
+  .img{aspect-ratio:1;border-radius:8px;background:var(--sand);position:relative}
+  .item:nth-child(3n+2) .img{background:#E3D8C7}
+  .item:nth-child(3n) .img{background:#EDE6DA}
+  .badge{position:absolute;left:8px;top:8px;font-size:12px;padding:3px 9px;border-radius:10px;background:#fff;color:var(--walnut)}
+  .badge.many{background:var(--darksage);color:#fff}
+  .badge.done{background:var(--sage);color:#fff}
+  .want{position:absolute;right:8px;bottom:8px;padding:6px 12px;border-radius:6px;border:none;background:#fff;color:var(--espresso);font-size:13px}
+  .want.on{background:var(--espresso);color:var(--snow)}
+  .meta{padding:8px 2px 0;display:flex;justify-content:space-between;gap:8px}
+  .meta b{font-weight:500;font-size:14px}
+  .meta span{font-size:13px;color:var(--latte);white-space:nowrap}
+  .who{font-size:12px;color:var(--latte);padding:2px}
+  @media(max-width:640px){.crumb,.topbar .btn:not(.primary){display:none}.grid{grid-template-columns:1fr 1fr;gap:12px}.count{display:none}}
+</style>
+</head>
+<body>
+<header class="topbar"><div>
+  <span class="logo">ArvKlart</span>
+  <span class="crumb">Mine bo / <b>Ingrid Hansen</b></span>
+  <span class="sp"></span>
+  <button class="btn">Arvinger</button>
+  <button class="btn">Veiviser</button>
+  <button class="btn primary">+ Legg til</button>
+</div></header>
+
+<main class="wrap">
+  <section class="summary">
+    <div class="sum"><small>Gjenstander</small><b>48</b></div>
+    <div class="sum"><small>Tildelt</small><b>20</b></div>
+    <div class="sum"><small>Må avklares</small><b style="color:var(--darksage)">5</b></div>
+    <div class="sum"><small>Venter på deg</small><b>14</b></div>
+    <div class="sum go"><small>Neste steg</small><b>Gå gjennom 14 →</b></div>
+  </section>
+
+  <div class="filters">
+    <div class="seg" id="seg">
+      <button class="on">Alle</button><button>Mine</button><button>Flere vil ha</button><button>Ingen vil ha</button><button>Tildelt</button>
+    </div>
+    <select><option>Alle kategorier</option><option>Møbler</option><option>Kjøkken</option><option>Kunst</option></select>
+    <span class="count">Viser 48</span>
+  </div>
+
+  <section class="grid">
+    <div class="item"><div class="img"><span class="badge many">3 vil ha</span><button class="want on">Ønsker</button></div><div class="meta"><b>Spisebord i eik</b><span>12 000 kr</span></div><div class="who">Kari, Erik og deg</div></div>
+    <div class="item"><div class="img"><button class="want on">Ønsker</button></div><div class="meta"><b>Sølvtøy, 12 personer</b><span>8 000 kr</span></div><div class="who">Bare deg</div></div>
+    <div class="item"><div class="img"><span class="badge done">Tildelt</span></div><div class="meta"><b>Maleri, fjordmotiv</b><span>25 000 kr</span></div><div class="who">Erik</div></div>
+    <div class="item"><div class="img"><button class="want">Ønsker</button></div><div class="meta"><b>Piano</b><span>15 000 kr</span></div><div class="who">Ingen ennå</div></div>
+    <div class="item"><div class="img"><span class="badge many">2 vil ha</span><button class="want">Ønsker</button></div><div class="meta"><b>Ørelappstol</b><span>3 500 kr</span></div><div class="who">Kari og Erik</div></div>
+    <div class="item"><div class="img"><button class="want on">Ønsker</button></div><div class="meta"><b>Porsgrund-servise</b><span>2 000 kr</span></div><div class="who">Bare deg</div></div>
+    <div class="item"><div class="img"><button class="want">Ønsker</button></div><div class="meta"><b>Gulvur</b><span>18 000 kr</span></div><div class="who">Ingen ennå</div></div>
+    <div class="item"><div class="img"><span class="badge done">Tildelt</span></div><div class="meta"><b>Bokhylle med bøker</b><span>4 000 kr</span></div><div class="who">Kari</div></div>
+  </section>
+</main>
+<script>
+  // Segmentfilter (kun visuelt)
+  document.querySelectorAll('#seg button').forEach(b => b.onclick = () => {
+    document.querySelectorAll('#seg button').forEach(x => x.classList.remove('on')); b.classList.add('on')
+  })
+  // Ønsker-knapp av/på
+  document.querySelectorAll('.want').forEach(b => b.onclick = e => { e.stopPropagation(); b.classList.toggle('on') })
+</script>
+</body>
+</html>

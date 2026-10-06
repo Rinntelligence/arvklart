@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="no">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ArvKlart – Steg for steg</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400&family=Karla:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{--espresso:#3A2F26;--snow:#FBF9F5;--sand:#E8DFD0;--border:#D9CFC0;--latte:#9C8267;--walnut:#5C4530;--darksage:#5F6E52;--sage:#8B9A7D;--mist:#DCE3D2}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--snow);color:var(--espresso);font-family:Karla,sans-serif;font-size:15px}
+  button{font-family:inherit;font-size:14px;cursor:pointer}
+  .topbar{background:var(--espresso);color:var(--snow)}
+  .topbar div{max-width:1000px;margin:0 auto;padding:14px 16px;display:flex;justify-content:space-between;font-size:14px}
+  .logo{font-family:'Fraunces',serif;font-size:19px}
+  .wrap{max-width:1000px;margin:0 auto;padding:24px 16px 64px}
+  .back{font-size:13px;color:var(--latte)}
+  h1{font-family:'Fraunces',serif;font-weight:400;font-size:26px;margin:6px 0 20px}
+  .btn{padding:9px 16px;border-radius:8px;border:1px solid var(--border);background:#fff;color:var(--walnut)}
+  .btn.primary{background:var(--espresso);border-color:var(--espresso);color:var(--snow)}
+
+  /* Stegliste */
+  .steps{display:grid;grid-template-columns:repeat(5,1fr);background:#fff;border:1px solid var(--border);border-radius:10px;overflow:hidden}
+  .step{padding:14px 16px;border-top:3px solid var(--sand)}
+  .step+.step{border-left:1px solid var(--border)}
+  .step small{font-size:12px;color:var(--latte)}
+  .step b{display:block;font-weight:500;font-size:14px;margin:2px 0}
+  .step p{font-size:12px;color:var(--latte)}
+  .step.done{border-top-color:var(--darksage)}
+  .step.done small{color:var(--darksage)}
+  .step.now{border-top-color:var(--latte);background:var(--snow)}
+  .step.now small{color:var(--walnut);font-weight:600}
+
+  .next{margin:16px 0 32px;padding:18px 20px;background:#fff;border:1px solid var(--border);border-left:4px solid var(--darksage);border-radius:10px;display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap}
+  .next small{font-size:12px;color:var(--darksage);font-weight:600}
+  .next b{display:block;font-size:16px;font-weight:500;margin:2px 0}
+  .next p{font-size:14px;color:var(--latte)}
+
+  .cols{display:grid;grid-template-columns:1fr 280px;gap:24px}
+  h2{font-family:'Fraunces',serif;font-weight:400;font-size:19px;margin-bottom:12px}
+  .h2row{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;gap:12px;flex-wrap:wrap}
+  .h2row h2{margin:0}
+  select{padding:7px 10px;border:1px solid var(--border);border-radius:8px;background:#fff;color:var(--espresso);font-family:inherit}
+  .list{background:#fff;border:1px solid var(--border);border-radius:10px}
+  .row{display:grid;grid-template-columns:52px 1fr auto;gap:14px;align-items:center;padding:10px 14px;cursor:pointer}
+  .row+.row{border-top:1px solid #EFE8DC}
+  .row:hover{background:#FDFCF9}
+  .thumb{width:52px;height:52px;border-radius:6px;background:var(--sand)}
+  .row b{font-weight:500;font-size:14px}
+  .row p{font-size:12px;color:var(--latte)}
+  .row .r{font-size:13px;text-align:right}
+  .r.many{color:var(--darksage);font-weight:600}
+  .r.none{color:var(--latte)}
+  .more{display:block;padding:12px 14px;border-top:1px solid #EFE8DC;font-size:14px;color:var(--walnut);text-decoration:none}
+
+  .box{background:#fff;border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:16px}
+  .box h2{font-size:16px}
+  .heir{display:flex;justify-content:space-between;font-size:14px;padding:7px 0}
+  .heir+.heir{border-top:1px solid #EFE8DC}
+  .heir span:last-child{color:var(--latte);font-size:13px}
+  .heir .ok{color:var(--darksage)!important}
+  .log div{font-size:13px;padding:7px 0;color:var(--walnut)}
+  .log div+div{border-top:1px solid #EFE8DC}
+  .log small{display:block;color:var(--latte);font-size:12px}
+  @media(max-width:760px){
+    .steps{grid-template-columns:1fr}.step+.step{border-left:none;border-top-width:1px}
+    .step{border-top:none;border-left:4px solid var(--sand)!important}
+    .step.done{border-left-color:var(--darksage)!important}.step.now{border-left-color:var(--latte)!important}
+    .step+.step{border-top:1px solid var(--border)}
+    .cols{grid-template-columns:1fr}
+  }
+</style>
+</head>
+<body>
+<header class="topbar"><div><span class="logo">ArvKlart</span><span>Mona Hansen</span></div></header>
+
+<main class="wrap">
+  <span class="back">← Alle bo</span>
+  <h1>Ingrid Hansen</h1>
+
+  <section class="steps">
+    <div class="step done"><small>Ferdig</small><b>1. Opprett bo</b><p>4 arvinger med</p></div>
+    <div class="step done"><small>Ferdig</small><b>2. Registrer</b><p>48 gjenstander</p></div>
+    <div class="step now"><small>Pågår</small><b>3. Meld interesse</b><p>2 av 4 er ferdige</p></div>
+    <div class="step"><small>Neste</small><b>4. Avklar</b><p>5 gjenstander</p></div>
+    <div class="step"><small>Til slutt</small><b>5. Fordel og lukk</b><p>Skifteoppgjør</p></div>
+  </section>
+
+  <section class="next">
+    <div><small>Det du kan gjøre nå</small><b>14 gjenstander venter på svar fra deg</b><p>Tar omtrent 5 minutter.</p></div>
+    <button class="btn primary">Gå gjennom</button>
+  </section>
+
+  <div class="cols">
+    <section>
+      <div class="h2row">
+        <h2>Gjenstander</h2>
+        <select><option>Alle (48)</option><option>Mine (9)</option><option>Flere vil ha (5)</option><option>Ingen vil ha (11)</option><option>Tildelt (20)</option></select>
+      </div>
+      <div class="list">
+        <div class="row"><div class="thumb"></div><div><b>Spisebord i eik</b><p>Møbler · ca. 12 000 kr</p></div><div class="r many">3 vil ha</div></div>
+        <div class="row"><div class="thumb"></div><div><b>Sølvtøy, 12 personer</b><p>Kjøkken · ca. 8 000 kr</p></div><div class="r">Bare deg</div></div>
+        <div class="row"><div class="thumb"></div><div><b>Maleri, fjordmotiv</b><p>Kunst · ca. 25 000 kr</p></div><div class="r" style="color:var(--darksage)">Tildelt Erik</div></div>
+        <div class="row"><div class="thumb"></div><div><b>Piano</b><p>Møbler · ca. 15 000 kr</p></div><div class="r none">Ingen ennå</div></div>
+        <div class="row"><div class="thumb"></div><div><b>Ørelappstol</b><p>Møbler · ca. 3 500 kr</p></div><div class="r many">2 vil ha</div></div>
+        <a class="more" href="#">Vis alle 48 →</a>
+      </div>
+      <div style="margin-top:12px"><button class="btn">+ Legg til gjenstand</button></div>
+    </section>
+
+    <aside>
+      <div class="box">
+        <h2>Arvinger</h2>
+        <div class="heir"><span>Mona (deg)</span><span class="ok">Ferdig</span></div>
+        <div class="heir"><span>Kari</span><span class="ok">Ferdig</span></div>
+        <div class="heir"><span>Erik</span><span>30 av 48</span></div>
+        <div class="heir"><span>Jonas</span><span>10 av 48</span></div>
+      </div>
+      <div class="box log">
+        <h2>Siste endringer</h2>
+        <div>Kari vil ha Ørelappstol<small>I dag 14:20</small></div>
+        <div>Erik fikk Maleri, fjordmotiv<small>I går</small></div>
+        <div>Du la til 6 gjenstander<small>3. okt.</small></div>
+      </div>
+    </aside>
+  </div>
+</main>
+</body>
+</html>
