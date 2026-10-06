@@ -29,7 +29,9 @@ import Toast from './components/Toast'
 import FeedbackWidget from './components/FeedbackWidget'
 
 // Public pages a demo session should be allowed to stay on instead of being sent into the demo estate
-const PUBLIC_PATHS = ['/home', '/veiviser', '/kontakt', '/pricing']
+const PUBLIC_PATHS = ['/home', '/veiviser', '/kontakt', '/pricing', '/personvern']
+// Pages that must never be hijacked by post-login redirects (e.g. legal text opened in a new tab)
+const NO_REDIRECT_PATHS = ['/personvern']
 const RESET_PATH = '/nytt-passord'
 
 export default function App() {
@@ -63,6 +65,8 @@ export default function App() {
         setProfile(data)
         // Let the user finish choosing a new password before any redirects
         if (!isDemo && window.location.pathname === RESET_PATH) return
+        // Let the user read the privacy policy and terms without being sent elsewhere
+        if (!isDemo && NO_REDIRECT_PATHS.includes(window.location.pathname)) return
         if (isDemo && PUBLIC_PATHS.includes(window.location.pathname)) {
           setDemoReady(true)
         } else if (isDemo) {
