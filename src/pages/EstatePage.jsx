@@ -1,9 +1,8 @@
 import { useEffect, useLayoutEffect, useState, useRef } from 'react'
 
-const tc = c => { if(!c)return'#FBF9F5'; const r=parseInt(c.slice(1,3),16),g=parseInt(c.slice(3,5),16),b=parseInt(c.slice(5,7),16); return(0.299*r+0.587*g+0.114*b)/255>0.55?'#3A2F26':'#FBF9F5' }
 import { useParams, useNavigate } from 'react-router-dom'
 import { getEstate, getItems, getCategories, supabase } from '../lib/supabase'
-import { buildRemainingSteps, getUndecided } from '../lib/estateProgress'
+import { buildRemainingSteps, getUndecided, getStatusBreakdown } from '../lib/estateProgress'
 import { loadStatusExtras } from '../lib/decisions'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
 
@@ -118,88 +117,140 @@ export default function EstatePage({ session, profile, onToast, isDemo }) {
     { name: 'Ingen vil ha', value: unwanted },
   ].filter(d => d.value > 0)
 
+  const breakdown = getStatusBreakdown(items)
+  const myUndecided = statusExtras
+    ? getUndecided(items, statusExtras.members, statusExtras.passes).find(u => u.member.user_id === session.user.id)?.items.length || 0
+    : 0
+  const memberCount = statusExtras?.members.length
+
+  const statusTabs = [
+    { key:'all', label:'Alle', count:items.length },
+    { key:'mine', label:'Mine', count:myCount },
+    { key:'contested', label:'Ettertraktede', count:contested },
+    { key:'wanted', label:'Noen vil ha', count:items.filter(i => i.interests?.length > 0).length },
+    { key:'unwanted', label:'Ingen vil ha', count:unwanted },
+    { key:'assigned', label:'Tildelt', count:assigned },
+  ]
+
+  const statusBar = [
+    { label:'Tildelt', value:breakdown.assigned, color:'#5F6E52' },
+    { label:'Ettertraktet', value:breakdown.contested, color:'#9C8267' },
+    { label:'Én vil ha', value:breakdown.single, color:'#8B9A7D' },
+    { label:'Ingen vil ha', value:breakdown.none, color:'#E8DFD0' },
+  ]
+
+  const btn = { padding:'9px 16px', background:'#fff', border:'1px solid #D9CFC0', borderRadius:'8px', cursor:'pointer', color:'#5C4530', fontSize:'14px', fontFamily:'Karla, sans-serif' }
+  const btnPrimary = { ...btn, background:'#3A2F26', border:'1px solid #3A2F26', color:'#FBF9F5' }
+  const sectionLabel = { fontSize:'13px', fontWeight:'500', marginBottom:'10px', textTransform:'uppercase', letterSpacing:'0.5px' }
+  const openItem = item => { sessionStorage.setItem('estate_scroll_' + id, window.scrollY); navigate(`/estate/${id}/item/${item.id}`) }
+
   return (
-    <div style={{ maxWidth:'920px', margin:'0 auto', padding:'28px 16px', fontFamily:'Karla, sans-serif' }}>
+    <div style={{ maxWidth:'960px', margin:'0 auto', padding:'24px 16px 64px', fontFamily:'Karla, sans-serif' }}>
       {/* Header */}
-      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:'28px', flexWrap:'wrap', gap:'12px' }}>
+      <button onClick={() => navigate('/')} style={{ background:'none', border:'none', color:'#9C8267', cursor:'pointer', fontSize:'13px', padding:'0 0 8px', fontFamily:'Karla, sans-serif' }}>← Alle bo</button>
+      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-end', marginBottom:'20px', flexWrap:'wrap', gap:'12px' }}>
         <div>
-          <button onClick={() => navigate('/')} style={{ background:'none', border:'none', color:'#9C8267', cursor:'pointer', fontSize:'13px', padding:'0 0 8px', fontFamily:'Karla, sans-serif' }}>← Alle estates</button>
-          <h1 style={{ fontFamily:'Fraunces, serif', fontSize:'26px', fontWeight:'400', color:'#3A2F26', marginBottom:'4px' }}>{estate.name}</h1>
+          <h1 style={{ fontFamily:'Fraunces, serif', fontSize:'26px', fontWeight:'400', color:'#3A2F26', marginBottom:'2px' }}>{estate.name}</h1>
           {estate.description && <p style={{ color:'#9C8267', fontSize:'14px' }}>{estate.description}</p>}
+          <p style={{ color:'#9C8267', fontSize:'14px' }}>
+            {memberCount ? `${memberCount} ${memberCount === 1 ? 'medlem' : 'medlemmer'} · ` : ''}{items.length} {items.length === 1 ? 'gjenstand' : 'gjenstander'}
+          </p>
         </div>
         <div style={{ display:'flex', gap:'8px', flexWrap:'wrap' }}>
-          {myRole === 'admin' && (
-            <button onClick={() => navigate(`/estate/${id}/admin`)} style={{ padding:'9px 16px', background:'none', border:'1px solid #D9CFC0', borderRadius:'8px', cursor:'pointer', color:'#5C4530', fontSize:'14px', fontFamily:'Karla, sans-serif' }}>
-              Administrer
-            </button>
-          )}
-          <button onClick={() => navigate(`/estate/${id}/swipe`)} style={{ padding:'9px 16px', background:'none', border:'1px solid #D9CFC0', borderRadius:'8px', cursor:'pointer', color:'#5C4530', fontSize:'14px', fontFamily:'Karla, sans-serif' }}>
-            Sveip
-          </button>
-          {!isDemo && <button onClick={() => navigate(`/estate/${id}/add`)} style={{ padding:'9px 20px', background:'#3A2F26', color:'#FBF9F5', border:'none', borderRadius:'8px', cursor:'pointer', fontSize:'14px', fontFamily:'Karla, sans-serif' }}>
-            + Legg til
-          </button>}
+          {myRole === 'admin' && <button onClick={() => navigate(`/estate/${id}/admin`)} style={btn}>Administrer</button>}
+          <button onClick={() => navigate(`/estate/${id}/swipe`)} style={btn}>Sveip</button>
+          {!isDemo && <button onClick={() => navigate(`/estate/${id}/add`)} style={btnPrimary}>+ Legg til</button>}
         </div>
       </div>
 
-      {/* Stats */}
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(130px,1fr))', gap:'10px', marginBottom:'28px' }}>
-        {[
-          { v:items.length, l:'Gjenstander' },
-          { v:myCount, l:'Mine interesser', clickStatus:'mine' },
-          { v:contested, l:'Ettertraktede', warn:contested>0, clickStatus:'contested' },
-          { v:items.filter(i => i.interests?.length > 0).length, l:'Noen vil ha', clickStatus:'wanted' },
-          { v:unwanted, l:'Ingen vil ha', clickStatus:'unwanted' },
-          { v:assigned, l:'Tildelt', clickStatus:'assigned' },
-        ].map(s => (
-          <div key={s.l} onClick={s.clickStatus ? () => setFilterStatus(filterStatus===s.clickStatus?'all':s.clickStatus) : undefined} style={{
-            background: filterStatus===s.clickStatus?'#DCE3D2':'#fff',
-            border:`1px solid ${s.warn&&s.v>0?'#C8BEA0':'#D9CFC0'}`, borderRadius:'10px', padding:'14px',
-            cursor: s.clickStatus?'pointer':'default',
-          }}>
-            <div style={{ fontSize:'13px', fontWeight:'500', color:'#3A2F26', fontFamily:'Karla, sans-serif', marginBottom:'6px', lineHeight:'1.2' }}>{s.l}</div>
-            <div style={{ fontSize:'18px', color:s.warn&&s.v>0?'#5F6E52':'#9C8267', fontFamily:'Fraunces, serif' }}>{s.v}</div>
+      {/* Status for boet */}
+      {items.length > 0 && (
+        <div style={{ background:'#fff', border:'1px solid #D9CFC0', borderRadius:'10px', padding:'20px', marginBottom:'16px' }}>
+          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'baseline', marginBottom:'10px', gap:'12px', flexWrap:'wrap' }}>
+            <span style={{ fontSize:'15px', fontWeight:'600', color:'#3A2F26' }}>Status for boet</span>
+            <span style={{ fontSize:'14px', color:'#9C8267' }}>{assigned} av {items.length} fordelt</span>
           </div>
-        ))}
-      </div>
+          <div style={{ display:'flex', height:'10px', borderRadius:'5px', overflow:'hidden', background:'#E8DFD0' }}>
+            {statusBar.map(s => s.value > 0 && <span key={s.label} style={{ width:`${s.value / items.length * 100}%`, background:s.color }} />)}
+          </div>
+          <div style={{ display:'flex', flexWrap:'wrap', gap:'6px 20px', marginTop:'12px', fontSize:'13px', color:'#5C4530' }}>
+            {statusBar.map(s => (
+              <span key={s.label} style={{ display:'flex', alignItems:'center', gap:'6px' }}>
+                <i style={{ width:'10px', height:'10px', borderRadius:'2px', background:s.color, border: s.color === '#E8DFD0' ? '1px solid #D9CFC0' : 'none' }} />
+                {s.label} {s.value}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
 
-      {/* Modules */}
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(160px,1fr))', gap:'10px', marginBottom:'28px' }}>
+      {/* Neste steg for brukeren */}
+      {myUndecided > 0 ? (
+        <div style={{ background:'#DCE3D2', borderRadius:'10px', padding:'16px 20px', marginBottom:'28px', display:'flex', justifyContent:'space-between', alignItems:'center', gap:'16px', flexWrap:'wrap' }}>
+          <div>
+            <div style={{ fontSize:'15px', fontWeight:'600', color:'#3A2F26', marginBottom:'2px' }}>
+              Du har {myUndecided} {myUndecided === 1 ? 'gjenstand' : 'gjenstander'} du ikke har tatt stilling til
+            </div>
+            <div style={{ fontSize:'14px', color:'#5C4530' }}>Si ja eller nei takk til hver av dem, så kan fordelingen starte.</div>
+          </div>
+          <button onClick={() => navigate(`/estate/${id}/swipe`)} style={{ ...btnPrimary, background:'#5F6E52', border:'1px solid #5F6E52' }}>Gå gjennom nå</button>
+        </div>
+      ) : remainingSteps > 0 ? (
+        <div style={{ background:'#DCE3D2', borderRadius:'10px', padding:'16px 20px', marginBottom:'28px', display:'flex', justifyContent:'space-between', alignItems:'center', gap:'16px', flexWrap:'wrap' }}>
+          <div>
+            <div style={{ fontSize:'15px', fontWeight:'600', color:'#3A2F26', marginBottom:'2px' }}>Du har tatt stilling til alle gjenstandene</div>
+            <div style={{ fontSize:'14px', color:'#5C4530' }}>{remainingSteps} steg gjenstår før boet er ferdig.</div>
+          </div>
+          <button onClick={() => navigate(`/estate/${id}/status`)} style={{ ...btnPrimary, background:'#5F6E52', border:'1px solid #5F6E52' }}>Se hva som gjenstår</button>
+        </div>
+      ) : <div style={{ marginBottom:'12px' }} />}
+
+      {/* Snarveier */}
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(160px,1fr))', gap:'8px', marginBottom:'32px' }}>
         {[
-          { path:`/estate/${id}/guide`, label:'Veiviser', desc:'For arveprosessen', color:'#DCE3D2', border:'#B8C8A8' },
-          { path:`/estate/${id}/heirs`, label:'Arvinger', desc:'Fordelingskalkulator', color:'#DCE3D2', border:'#B8C8A8' },
+          { path:`/estate/${id}/guide`, label:'Veiviser', desc:'For arveprosessen' },
+          { path:`/estate/${id}/heirs`, label:'Arvinger', desc:'Fordelingskalkulator' },
           undecidedCount > 0
-            ? { path:`/estate/${id}/conflicts`, label:'Løsningsmetoder', desc:`Venter på ${undecidedCount} ${undecidedCount === 1 ? 'arving' : 'arvinger'}`, color:'#E8DFD0', border:'#C8B8A0' }
+            ? { path:`/estate/${id}/conflicts`, label:'Løsningsmetoder', desc:`Venter på ${undecidedCount} ${undecidedCount === 1 ? 'arving' : 'arvinger'}` }
             : contested > 0
-            ? { path:`/estate/${id}/conflicts`, label:'Løsningsmetoder', desc:`${contested} ettertraktede`, color:'#E8DFD0', border:'#C8B8A0', highlight: true }
-            : { path:`/estate/${id}/conflicts`, label:'Løsningsmetoder', desc:'Ingen ettertraktede ennå', color:'#E8DFD0', border:'#C8B8A0' },
-          { path:`/estate/${id}/status`, label:'Hva gjenstår', desc: remainingSteps === null ? 'Oversikt over boet' : remainingSteps === 0 ? 'Alt er klart' : `${remainingSteps} steg gjenstår`, color:'#fff', border:'#D9CFC0' },
+            ? { path:`/estate/${id}/conflicts`, label:'Løsningsmetoder', desc:`${contested} ettertraktede`, highlight: true }
+            : { path:`/estate/${id}/conflicts`, label:'Løsningsmetoder', desc:'Ingen ettertraktede ennå' },
+          { path:`/estate/${id}/status`, label:'Hva gjenstår', desc: remainingSteps === null ? 'Oversikt over boet' : remainingSteps === 0 ? 'Alt er klart' : `${remainingSteps} steg gjenstår` },
         ].map(mod => (
           <button key={mod.path} onClick={() => navigate(mod.path)} style={{
-            padding:'16px', background:mod.color, border:`1.5px solid ${mod.border}`,
-            borderRadius:'10px', cursor:'pointer', textAlign:'left', fontFamily:'Karla, sans-serif',
-            boxShadow: mod.highlight ? '0 0 0 2px #5F6E5240' : 'none',
+            padding:'12px 14px', background:'#fff', border:`1px solid ${mod.highlight ? '#8B9A7D' : '#D9CFC0'}`,
+            borderRadius:'8px', cursor:'pointer', textAlign:'left', fontFamily:'Karla, sans-serif',
           }}>
-            <div style={{ fontSize:'13px', fontWeight:'500', color:'#3A2F26', marginBottom:'2px' }}>{mod.label}</div>
-            <div style={{ fontSize:'11px', color: mod.highlight ? '#5F6E52' : '#9C8267', fontWeight: mod.highlight ? '500' : '400' }}>{mod.desc}</div>
+            <div style={{ fontSize:'14px', color:'#3A2F26', marginBottom:'2px' }}>{mod.label}</div>
+            <div style={{ fontSize:'12px', color: mod.highlight ? '#5F6E52' : '#9C8267', fontWeight: mod.highlight ? '600' : '400' }}>{mod.desc}</div>
           </button>
         ))}
       </div>
 
-      {/* Tabs */}
-      <div style={{ display:'flex', gap:'4px', borderBottom:'1px solid #D9CFC0', marginBottom:'24px' }}>
-        {[['items','Gjenstander'],['analytics','Analyse']].map(([t,l]) => (
-          <button key={t} onClick={() => setTab(t)} style={{
-            padding:'10px 18px', border:'none', background:'none', cursor:'pointer',
-            fontSize:'14px', fontFamily:'Karla, sans-serif',
-            color:tab===t?'#3A2F26':'#9C8267',
-            borderBottom:tab===t?'2px solid #3A2F26':'2px solid transparent', marginBottom:'-1px',
-          }}>{l}</button>
-        ))}
+      {/* Faner: statusfilter + analyse */}
+      <div style={{ display:'flex', gap:'2px', borderBottom:'1px solid #D9CFC0', marginBottom:'16px', overflowX:'auto' }}>
+        {[...statusTabs, { key:'analytics', label:'Analyse' }].map(t => {
+          const active = t.key === 'analytics' ? tab === 'analytics' : tab === 'items' && filterStatus === t.key
+          return (
+            <button key={t.key} onClick={() => {
+              if (t.key === 'analytics') { setTab('analytics'); return }
+              setTab('items'); setFilterStatus(t.key)
+            }} style={{
+              padding:'10px 12px', border:'none', background:'none', cursor:'pointer', whiteSpace:'nowrap',
+              fontSize:'14px', fontFamily:'Karla, sans-serif',
+              color: active ? '#3A2F26' : '#9C8267',
+              borderBottom: active ? '2px solid #3A2F26' : '2px solid transparent', marginBottom:'-1px',
+              marginLeft: t.key === 'analytics' ? 'auto' : 0,
+            }}>
+              {t.label}
+              {t.count !== undefined && <span style={{ fontSize:'12px', background:'#E8DFD0', color:'#5C4530', borderRadius:'10px', padding:'1px 7px', marginLeft:'6px' }}>{t.count}</span>}
+            </button>
+          )
+        })}
       </div>
 
       {tab === 'analytics' ? (
-        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'20px' }}>
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(280px, 1fr))', gap:'20px' }}>
           <div style={{ background:'#fff', border:'1px solid #D9CFC0', borderRadius:'12px', padding:'24px' }}>
             <h3 style={{ fontFamily:'Fraunces, serif', fontSize:'16px', fontWeight:'400', color:'#3A2F26', marginBottom:'20px' }}>Gjenstander per kategori</h3>
             <ResponsiveContainer width="100%" height={200}>
@@ -225,56 +276,43 @@ export default function EstatePage({ session, profile, onToast, isDemo }) {
         </div>
       ) : (
         <>
-          <div style={{ display:'flex', gap:'8px', marginBottom:'20px', flexWrap:'wrap' }}>
-            <select value={filterCat} onChange={e => setFilterCat(e.target.value)}
-              style={{ flex:1, minWidth:'140px', padding:'9px 12px', border:'1px solid #D9CFC0', borderRadius:'8px', fontSize:'14px', background:'#fff', color:'#3A2F26', outline:'none', fontFamily:'Karla, sans-serif' }}>
-              <option value="all">Alle kategorier</option>
-              {categories.map(c => <option key={c.id} value={c.id}>{c.emoji} {c.label}</option>)}
-            </select>
-            <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
-              style={{ flex:1, minWidth:'140px', padding:'9px 12px', border:'1px solid #D9CFC0', borderRadius:'8px', fontSize:'14px', background:'#fff', color:'#3A2F26', outline:'none', fontFamily:'Karla, sans-serif' }}>
-              <option value="all">Alle gjenstander</option>
-              <option value="mine">Mine interesser</option>
-              <option value="contested">Ettertraktede</option>
-              <option value="wanted">Noen vil ha</option>
-              <option value="unwanted">Ingen vil ha</option>
-              <option value="assigned">Tildelt</option>
-            </select>
-          </div>
+          {categories.length > 0 && (
+            <div style={{ marginBottom:'20px' }}>
+              <select value={filterCat} onChange={e => setFilterCat(e.target.value)}
+                style={{ minWidth:'200px', padding:'9px 12px', border:'1px solid #D9CFC0', borderRadius:'8px', fontSize:'14px', background:'#fff', color:'#3A2F26', outline:'none', fontFamily:'Karla, sans-serif' }}>
+                <option value="all">Alle kategorier</option>
+                {categories.map(c => <option key={c.id} value={c.id}>{c.emoji} {c.label}</option>)}
+              </select>
+            </div>
+          )}
 
           {filterStatus === 'all' && myItems.length > 0 && (
             <div style={{ marginBottom:'24px' }}>
-              <div style={{ fontSize:'13px', color:'#5F6E52', fontWeight:'500', marginBottom:'10px', textTransform:'uppercase', letterSpacing:'0.5px' }}>
-                Mine interesser ({myItems.length})
-              </div>
+              <div style={{ ...sectionLabel, color:'#5F6E52' }}>Mine interesser ({myItems.length})</div>
               <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(200px, 1fr))', gap:'12px', marginBottom:'20px' }}>
                 {myItems.filter(i => filterCat === 'all' || i.category_id === filterCat).map(item => (
-                  <ItemCard key={item.id} item={item} userId={session.user.id} myRole={myRole}
-                    onClick={() => { sessionStorage.setItem('estate_scroll_' + id, window.scrollY); navigate(`/estate/${id}/item/${item.id}`) }}
-                    onDelete={e => handleDelete(item, e)} />
+                  <ItemCard key={item.id} item={item} userId={session.user.id} myRole={myRole} isDemo={isDemo}
+                    onClick={() => openItem(item)} onDelete={e => handleDelete(item, e)} />
                 ))}
               </div>
               {otherItems.filter(i => filterCat === 'all' || i.category_id === filterCat).length > 0 && (
-                <div style={{ fontSize:'13px', color:'#9C8267', fontWeight:'500', marginBottom:'10px', textTransform:'uppercase', letterSpacing:'0.5px' }}>
-                  Andre gjenstander
-                </div>
+                <div style={{ ...sectionLabel, color:'#9C8267' }}>Andre gjenstander</div>
               )}
             </div>
           )}
 
           {filtered.length === 0 ? (
             <div style={{ textAlign:'center', padding:'80px 20px', color:'#9C8267' }}>
-              <p style={{ marginBottom:'20px' }}>Ingen gjenstander ennå.</p>
-              {!isDemo && <button onClick={() => navigate(`/estate/${id}/add`)} style={{ padding:'11px 24px', background:'#3A2F26', color:'#FBF9F5', border:'none', borderRadius:'8px', cursor:'pointer', fontSize:'14px', fontFamily:'Karla, sans-serif' }}>
+              <p style={{ marginBottom:'20px' }}>{items.length === 0 ? 'Ingen gjenstander ennå.' : 'Ingen gjenstander i dette utvalget.'}</p>
+              {!isDemo && items.length === 0 && <button onClick={() => navigate(`/estate/${id}/add`)} style={{ ...btnPrimary, padding:'11px 24px' }}>
                 Legg til første gjenstand
               </button>}
             </div>
           ) : (
             <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(200px, 1fr))', gap:'12px' }}>
               {(filterStatus === 'all' ? otherItems : filtered).filter(i => filterCat === 'all' || i.category_id === filterCat).map(item => (
-                <ItemCard key={item.id} item={item} userId={session.user.id} myRole={myRole}
-                  onClick={() => { sessionStorage.setItem('estate_scroll_' + id, window.scrollY); navigate(`/estate/${id}/item/${item.id}`) }}
-                  onDelete={e => handleDelete(item, e)} />
+                <ItemCard key={item.id} item={item} userId={session.user.id} myRole={myRole} isDemo={isDemo}
+                  onClick={() => openItem(item)} onDelete={e => handleDelete(item, e)} />
               ))}
             </div>
           )}
@@ -298,17 +336,26 @@ export default function EstatePage({ session, profile, onToast, isDemo }) {
   )
 }
 
-function ItemCard({ item, userId, onClick, onDelete, myRole }) {
+// Navn på de som ønsker gjenstanden, med «deg» for innlogget bruker
+const interestNames = (interests, userId) => {
+  const names = interests.map(x => x.user_id === userId ? 'deg' : (x.profiles?.display_name || 'Ukjent'))
+  const sorted = [...names.filter(n => n !== 'deg'), ...names.filter(n => n === 'deg')]
+  if (sorted.length <= 3) return sorted.length > 1 ? `${sorted.slice(0, -1).join(', ')} og ${sorted.at(-1)}` : sorted[0] || ''
+  return `${sorted.slice(0, 2).join(', ')} og ${sorted.length - 2} til`
+}
+
+function ItemCard({ item, userId, onClick, onDelete, myRole, isDemo }) {
   const cat = item.categories || { emoji:'📦', label:'Annet' }
   const myInterest = item.interests?.some(x => x.user_id === userId)
   const count = item.interests?.length || 0
   const isAssigned = item.status === 'assigned'
-  const canDelete = myRole === 'admin' || item.added_by === userId
+  const canDelete = !isDemo && (myRole === 'admin' || item.added_by === userId)
+  const names = interestNames(item.interests || [], userId)
 
   return (
     <div onClick={onClick} style={{
       background:'#fff', borderRadius:'10px', overflow:'hidden', cursor:'pointer',
-      border: isAssigned ? '1.5px solid #8B9A7D' : myInterest ? '2px solid #3A2F26' : '1px solid #D9CFC0',
+      border: myInterest ? '2px solid #3A2F26' : isAssigned ? '1.5px solid #8B9A7D' : '1px solid #D9CFC0',
       transition:'transform 0.15s, box-shadow 0.15s', position:'relative',
     }}
     onMouseEnter={e => { e.currentTarget.style.transform='translateY(-2px)'; e.currentTarget.style.boxShadow='0 8px 28px rgba(0,0,0,0.09)' }}
@@ -316,38 +363,26 @@ function ItemCard({ item, userId, onClick, onDelete, myRole }) {
 
       {canDelete && (
         <button onClick={onDelete} style={{
-          position:'absolute', top:'6px', left:'6px', zIndex:10,
+          position:'absolute', top:'8px', left:'8px', zIndex:10,
           background:'#8B3A3A', color:'#fff', border:'none',
           borderRadius:'6px', padding:'3px 8px', cursor:'pointer',
           fontSize:'11px', fontFamily:'Karla, sans-serif',
         }}>Slett</button>
       )}
 
-      <div style={{ height:'130px', background:'#E8DFD0', display:'flex', alignItems:'center', justifyContent:'center', overflow:'hidden', position:'relative' }}>
+      <div style={{ height:'130px', background:'#E8DFD0', overflow:'hidden', position:'relative' }}>
         {item.image_url
           ? <img src={item.image_url} alt={item.title} style={{ width:'100%', height:'100%', objectFit:'contain' }} />
-          : <span style={{ fontSize:'44px' }}>{cat.emoji}</span>}
-        {count > 1 && !isAssigned && <span style={{ position:'absolute', top:'6px', right:'6px', background:'#5F6E52', color:'#fff', fontSize:'10px', padding:'2px 6px', borderRadius:'20px' }}>{count}</span>}
-        {isAssigned && <span style={{ position:'absolute', top:'6px', right:'6px', background:'#8B9A7D', color:'#fff', fontSize:'10px', padding:'2px 6px', borderRadius:'20px' }}>Tildelt</span>}
+          : <span style={{ position:'absolute', left:'10px', bottom:'8px', fontSize:'11px', color:'#9C8267' }}>{cat.emoji} {cat.label}</span>}
+        {count > 1 && !isAssigned && <span style={{ position:'absolute', top:'8px', right:'8px', background:'#5F6E52', color:'#fff', fontSize:'11px', padding:'2px 8px', borderRadius:'10px' }}>{count} vil ha</span>}
+        {isAssigned && <span style={{ position:'absolute', top:'8px', right:'8px', background:'#8B9A7D', color:'#fff', fontSize:'11px', padding:'2px 8px', borderRadius:'10px' }}>Tildelt</span>}
       </div>
 
-      <div style={{ padding:'12px' }}>
-        <div style={{ fontSize:'14px', color:'#3A2F26', marginBottom:'4px', lineHeight:'1.3' }}>{item.title}</div>
-        {item.estimated_value && <div style={{ fontSize:'11px', color:'#9C8267', marginBottom:'6px' }}>{item.estimated_value}</div>}
-        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-          <div style={{ display:'flex', gap:'2px' }}>
-            {(item.interests||[]).slice(0,4).map(x => (
-              <div key={x.id} title={x.profiles?.display_name} style={{
-                width:'20px', height:'20px', borderRadius:'50%',
-                background:x.profiles?.avatar_color||'#DCE3D2',
-                border:tc(x.profiles?.avatar_color||'#DCE3D2')==='#3A2F26'?'1px solid #D9CFC0':'none',
-                display:'flex', alignItems:'center', justifyContent:'center',
-                fontSize:'9px', color:tc(x.profiles?.avatar_color||'#DCE3D2'), fontWeight:'600',
-              }}>{(x.profiles?.display_name||'?')[0].toUpperCase()}</div>
-            ))}
-            {count === 0 && <span style={{ fontSize:'11px', color:'#C0B0A0', fontStyle:'italic' }}>Ingen ennå</span>}
-          </div>
-          {myInterest && <span style={{ fontSize:'10px', color:'#3A2F26', background:'#E8DFD0', padding:'2px 6px', borderRadius:'20px' }}>Meg</span>}
+      <div style={{ padding:'10px 12px 12px' }}>
+        <div style={{ fontSize:'14px', fontWeight:'500', color:'#3A2F26', marginBottom:'2px', lineHeight:'1.3' }}>{item.title}</div>
+        {item.estimated_value && <div style={{ fontSize:'12px', color:'#9C8267' }}>{item.estimated_value}</div>}
+        <div style={{ marginTop:'8px', fontSize:'12px', color: count ? '#5C4530' : '#9C8267', fontStyle: count ? 'normal' : 'italic' }}>
+          {count === 0 ? 'Ingen ennå' : names === 'deg' ? 'Bare deg' : names.charAt(0).toUpperCase() + names.slice(1)}
         </div>
       </div>
     </div>
