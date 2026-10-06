@@ -1,7 +1,7 @@
 // Hvem som mangler å ta stilling, og hva som gjenstår i boet.
 import { test, describe } from 'node:test'
 import assert from 'node:assert/strict'
-import { getUndecided, buildRemainingSteps } from '../../src/lib/estateProgress.js'
+import { getUndecided, buildRemainingSteps, getStatusBreakdown } from '../../src/lib/estateProgress.js'
 
 const kari = { user_id: 'k', profiles: { display_name: 'Kari', email: 'kari@x.no' } }
 const ola = { user_id: 'o', profiles: { display_name: 'Ola', email: 'ola@x.no' } }
@@ -61,5 +61,18 @@ describe('buildRemainingSteps', () => {
     assert.equal(steps[0].key, 'join')
     assert.equal(steps[0].detail, 'Per, Lise')
     assert.equal(steps[1].title, '1 oppgave i sjekklisten er ikke fullført')
+  })
+})
+
+describe('getStatusBreakdown', () => {
+  test('hver gjenstand havner i nøyaktig én gruppe', () => {
+    const items = [
+      { id: 'a', interests: want('k', 'o'), status: 'assigned' },
+      { id: 'b', interests: want('k', 'o') },
+      { id: 'c', interests: want('k') },
+      { id: 'd', interests: [] },
+      { id: 'e' },
+    ]
+    assert.deepEqual(getStatusBreakdown(items), { assigned: 1, contested: 1, single: 1, none: 2 })
   })
 })

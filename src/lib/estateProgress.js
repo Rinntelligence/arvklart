@@ -71,3 +71,14 @@ export const buildRemainingSteps = ({ estateId, userId, items, members, passes, 
 
   return steps
 }
+
+// Fordeling av gjenstandene i fire grupper som ikke overlapper, til statuslinjen på bo-siden.
+export const getStatusBreakdown = items => {
+  const open = items.filter(i => i.status !== 'assigned')
+  return {
+    assigned: items.length - open.length,
+    contested: open.filter(i => (i.interests?.length || 0) > 1).length,
+    single: open.filter(i => i.interests?.length === 1).length,
+    none: open.filter(i => !i.interests?.length).length,
+  }
+}
