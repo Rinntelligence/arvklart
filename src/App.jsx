@@ -14,6 +14,7 @@ import SwipePage from './pages/SwipePage'
 import EditItemPage from './pages/EditItemPage'
 import AdminPage from './pages/AdminPage'
 import FounderPage from './pages/FounderPage'
+import FounderGate from './components/FounderGate'
 import GuidePage from './pages/GuidePage'
 import TasksPage from './pages/TasksPage'
 import DocumentVaultPage from './pages/DocumentVaultPage'
@@ -173,7 +174,7 @@ export default function App() {
           <Route path="/estate/:id/status" element={<StatusPage session={session} />} />
           <Route path="/join/:code" element={<JoinPage session={session} onToast={showToast} />} />
           <Route path="/pricing" element={<PricingPage session={session} />} />
-          <Route path="/founder" element={<FounderPage session={session} />} />
+          <Route path="/founder" element={<FounderGate><FounderPage session={session} onToast={showToast} /></FounderGate>} />
           <Route path="/estate/:id/guide" element={<GuidePage session={session} onToast={showToast} />} />
           <Route path="/veiviser" element={<GuidePage session={session} onToast={showToast} />} />
           <Route path="/personvern" element={<PrivacyPage />} />
