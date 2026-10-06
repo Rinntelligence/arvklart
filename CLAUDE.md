@@ -71,6 +71,13 @@ Hent verdiene fra Supabase Dashboard → Project Settings → API.
 | `/konto` | AccountPage | Dataeksport og kontosletting |
 | `/logg-inn` | LoginPage | Innlogging/registrering |
 
+## Founder-dashboard (`/founder`)
+- Tilgang styres av tabellen `founders` (kun SQL Editor/service_role kan skrive) og krever tofaktor (TOTP, `aal2`)
+- `profiles.is_founder` er bare et visningsflagg som speiler `founders`, og `plan` kan ikke endres fra klienten
+- Data hentes kun via `founder_dashboard()` og `founder_set_plan()`; handlinger logges i `founder_audit_log`
+- Legg til founder: `insert into founders (user_id) select id from auth.users where email = '...';`
+- Se `supabase/migrations/20261006_founder_security.sql`
+
 ## GDPR og personvern
 - Samtykkedialog for AI-bildeanalyse er i `AddItemPage.jsx` (localStorage-nøkkel: `ai_consent`)
 - Slett-konto-funksjon er i `supabase/functions/delete-account/index.ts`
