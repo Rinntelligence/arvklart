@@ -37,3 +37,7 @@ lerna-debug.log*
 # OS
 .DS_Store
 Thumbs.db
+
+# Supabase CLI (lokal kobling til prosjektet)
+supabase/.temp/
+supabase/.branches/

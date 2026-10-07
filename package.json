@@ -1,5 +1,5 @@
 {
-  "name": "heirsplit",
+  "name": "arvklart",
   "version": "1.0.0",
   "private": true,
   "type": "module",
@@ -7,10 +7,10 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "test": "node --test test/**/*.test.js"
+    "test": "node --test test/**/*.test.js",
+    "test:db": "bash test/db/run.sh"
   },
   "dependencies": {
-    "@stripe/stripe-js": "^3.0.0",
     "@supabase/supabase-js": "^2.39.0",
     "jspdf": "^4.2.1",
     "react": "^18.2.0",

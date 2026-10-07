@@ -1,18 +1,17 @@
 -- ============================================================
--- HEIRSPLIT — Demo Estate Seed
--- "Fam. Hansen sitt bo" — med 3 demo-arvinger og konflikter
+-- Demo-boet «Fam. Hansen sitt bo» — 3 demo-arvinger og konflikter
 --
--- STEG 1 (gjør dette FØR du kjører dette scriptet):
---   Gå til Supabase Dashboard → Authentication → Users → Add user
---   Opprett disse tre brukerne manuelt:
---     kari.demo@heirsplit.no  /  Demo1234!
---     lars.demo@heirsplit.no  /  Demo1234!
---     mona.demo@heirsplit.no  /  Demo1234!
---   (Huk av "Auto Confirm User" for alle tre)
+-- STEG 1 (før scriptet kjøres):
+--   Supabase Dashboard → Authentication → Users → Add user. Opprett med «Auto Confirm User»:
+--     kari.demo@heirsplit.no, lars.demo@heirsplit.no, mona.demo@heirsplit.no
+--   Bruk sterke, tilfeldige passord. Passordet til mona settes også som hemmeligheten
+--   DEMO_PASSWORD for edge-funksjonen demo-login (se supabase/README.md). Kari og Lars
+--   trenger ingen kjent innlogging.
 --
--- STEG 2: Kjør dette scriptet i SQL Editor
+-- STEG 2: Kjør dette scriptet i SQL Editor, etter supabase/legacy/* og supabase/migrations/*.
 --
--- REKKEFØLGE: Kjør supabase_setup.sql → v2 → v3 → v4 → v5 → DETTE
+-- Demokontoene er skrivebeskyttet i databasen (is_demo_user()); demoen nullstilles av
+-- reset_demo_estate() hver gang noen åpner den.
 -- ============================================================
 
 DO $$
@@ -283,15 +282,7 @@ BEGIN
 END $$;
 
 -- ============================================================
--- Ferdig! ✓
---
--- Demo-boet "Fam. Hansen sitt bo":
---   12 gjenstander, 5 konflikter (🔥), 4 med én interessert, 2 ingen vil ha
---
--- Logg inn med:
---   kari.demo@heirsplit.no  /  Demo1234!
---   lars.demo@heirsplit.no  /  Demo1234!
---   mona.demo@heirsplit.no  /  Demo1234!
---
--- Åpne "Fam. Hansen sitt bo" og klikk 🔥 Konfliktløsning
+-- Ferdig! Demo-boet «Fam. Hansen sitt bo»:
+--   12 gjenstander, 5 konflikter, 4 med én interessert, 2 ingen vil ha
+-- Åpne demoen fra forsiden («Test ut demo»).
 -- ============================================================
