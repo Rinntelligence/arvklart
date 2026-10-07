@@ -1,11 +1,8 @@
-import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
+// Anslår markedsverdi i NOK for en gjenstand (verdifall + AI-estimat).
+// Krever innlogget bruker, slik at funksjonen ikke kan brukes som gratis AI-proxy.
+import { getUser, isDemoEmail, json, preflight } from '../_shared/http.ts'
 
 const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY')
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
 
 // Depreciation rates per category
 const DEPRECIATION_RATES: Record<string, number> = {
@@ -19,6 +16,22 @@ const VALUE_FLOORS: Record<string, number> = {
   'Jewelry': 0.40, 'Collectibles': 0.50, 'Other': 0.10,
 }
 
+// Kategoriene i appen er norske og kan navngis fritt per bo; finn nærmeste tabellnøkkel.
+const CATEGORY_KEYWORDS: [RegExp, string][] = [
+  [/elektronikk|tv|data|telefon/i, 'Electronics'],
+  [/møbl|stol|bord|sofa/i, 'Furniture'],
+  [/kunst|maleri|bilde/i, 'Art & pictures'],
+  [/smykk|\bur\b|klokke|gull|sølv/i, 'Jewelry'],
+  [/bok|bøker/i, 'Books'],
+  [/kjøkken|porselen|servise|glass/i, 'Kitchen'],
+  [/klær|tekstil|tøy/i, 'Clothing & textiles'],
+  [/samle|antikk|minne|arvestykke/i, 'Collectibles'],
+  [/verktøy/i, 'Tools'],
+  [/sport|friluft/i, 'Sports & outdoors'],
+  [/dekor|pynt/i, 'Decorations'],
+]
+const categoryKey = (label = '') => CATEGORY_KEYWORDS.find(([re]) => re.test(label))?.[1] || 'Other'
+
 // Free price sources by category
 const PRICE_SOURCES: Record<string, string[]> = {
   'Electronics': ['finn.no', 'prisjakt.no', 'ebay.com'],
@@ -30,18 +43,25 @@ const PRICE_SOURCES: Record<string, string[]> = {
   'Other': ['finn.no', 'ebay.com'],
 }
 
-serve(async (req) => {
-  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
+Deno.serve(async (req) => {
+  const pre = preflight(req)
+  if (pre) return pre
 
   try {
+    const user = await getUser(req)
+    if (!user) return json({ success: false, error: 'Du må være logget inn' }, 401)
+    if (isDemoEmail(user.email)) return json({ success: false, error: 'Ikke tilgjengelig i demoen' }, 403)
+
     const { title, description, category, condition, purchase_price, purchase_year, ai_identified_model } = await req.json()
+    if (typeof title !== 'string' || !title.trim()) return json({ success: false, error: 'Mangler navn på gjenstanden' }, 400)
+    const key = categoryKey(category)
 
     // 1. Depreciation calc if we have purchase data
     let depreciationEstimate = null
     if (purchase_price && purchase_year) {
       const yearsOld = new Date().getFullYear() - parseInt(purchase_year)
-      const rate = DEPRECIATION_RATES[category] || 0.12
-      const floor = VALUE_FLOORS[category] || 0.10
+      const rate = DEPRECIATION_RATES[key] ?? 0.12
+      const floor = VALUE_FLOORS[key] ?? 0.10
       const depreciated = purchase_price * Math.pow(1 - rate, yearsOld)
       depreciationEstimate = {
         value: Math.max(depreciated, purchase_price * floor),
@@ -96,7 +116,8 @@ Respond ONLY with this JSON (no other text):
     })
 
     const data = await response.json()
-    const text = data.content[0].text
+    if (!response.ok) throw new Error(data?.error?.message || `Anthropic svarte ${response.status}`)
+    const text = data.content?.find((c: { type: string }) => c.type === 'text')?.text || ''
     const jsonMatch = text.match(/\{[\s\S]*\}/)
     if (!jsonMatch) throw new Error('No JSON in response')
     const aiEstimate = JSON.parse(jsonMatch[0])
@@ -108,9 +129,9 @@ Respond ONLY with this JSON (no other text):
       `https://www.ebay.com/sch/i.html?_nkw=${searchTerm}&LH_Sold=1&LH_Complete=1`,
     ]
 
-    const sources = PRICE_SOURCES[category] || PRICE_SOURCES['Other']
+    const sources = PRICE_SOURCES[key] || PRICE_SOURCES['Other']
 
-    return new Response(JSON.stringify({
+    return json({
       success: true,
       data: {
         depreciation: depreciationEstimate,
@@ -122,11 +143,9 @@ Respond ONLY with this JSON (no other text):
           likely_nok: aiEstimate.likely_nok,
         }
       }
-    }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
-
-  } catch (error) {
-    return new Response(JSON.stringify({ success: false, error: error.message }), {
-      status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     })
+  } catch (error) {
+    console.error('estimate-value:', error)
+    return json({ success: false, error: error instanceof Error ? error.message : String(error) }, 500)
   }
 })

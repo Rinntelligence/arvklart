@@ -1,47 +1,79 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+// Sletter kontoen til den innloggede brukeren og personopplysningene om hen (GDPR art. 17).
+//
+// • Bo der brukeren er eneste medlem slettes helt, med filer.
+// • I bo som deles med andre beholdes boet. Var brukeren eneste admin, blir det medlemmet som har
+//   vært lengst med admin (og eier), slik at boet ikke blir stående uten noen som kan administrere det.
+// • Navnet fjernes fra gjenstander brukeren la inn og fra verdiforslag.
+import { adminClient, getUser, isDemoEmail, json, preflight } from '../_shared/http.ts'
+import { removeEstateFiles } from '../_shared/estateFiles.ts'
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+const must = <T>(res: { data: T; error: unknown }) => {
+  if (res.error) throw res.error
+  return res.data
 }
 
 Deno.serve(async (req) => {
-  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
+  const pre = preflight(req)
+  if (pre) return pre
 
   try {
-    const authHeader = req.headers.get('Authorization')
-    if (!authHeader) return new Response(JSON.stringify({ error: 'Missing authorization' }), { status: 401, headers: corsHeaders })
-
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!
-    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-    const anonKey = Deno.env.get('SUPABASE_ANON_KEY')!
-
-    // Verify the JWT by using anon client
-    const userClient = createClient(supabaseUrl, anonKey, {
-      global: { headers: { Authorization: authHeader } },
-    })
-    const { data: { user }, error: authError } = await userClient.auth.getUser()
-    if (authError || !user) return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: corsHeaders })
+    const user = await getUser(req)
+    if (!user) return json({ success: false, error: 'Du må være logget inn' }, 401)
+    if (isDemoEmail(user.email)) return json({ success: false, error: 'Demokontoen kan ikke slettes' }, 403)
 
     const userId = user.id
+    const admin = adminClient()
 
-    // Use service role client to delete all user data
-    const admin = createClient(supabaseUrl, serviceRoleKey)
+    const memberships = must(await admin.from('estate_members').select('estate_id, role').eq('user_id', userId)) || []
+    const sharedEstateIds: string[] = []
 
-    // Delete in order: interests, comments, estate_members, profiles
-    await admin.from('interests').delete().eq('user_id', userId)
-    await admin.from('comments').delete().eq('user_id', userId)
-    await admin.from('estate_members').delete().eq('user_id', userId)
-    await admin.from('profiles').delete().eq('user_id', userId)
+    for (const { estate_id: estateId } of memberships) {
+      const members = must(await admin.from('estate_members')
+        .select('user_id, role, joined_at').eq('estate_id', estateId).order('joined_at')) || []
+      const others = members.filter(m => m.user_id !== userId)
 
-    // Finally delete the auth user
+      if (!others.length) {
+        await removeEstateFiles(admin, estateId)
+        must(await admin.from('estates').delete().eq('id', estateId))
+        continue
+      }
+
+      sharedEstateIds.push(estateId)
+      if (!others.some(m => m.role === 'admin')) {
+        must(await admin.from('estate_members').update({ role: 'admin' }).eq('estate_id', estateId).eq('user_id', others[0].user_id))
+      }
+      const estate = must(await admin.from('estates').select('owner_id').eq('id', estateId).single())
+      if (estate?.owner_id === userId) {
+        const nextOwner = others.find(m => m.role === 'admin') || others[0]
+        must(await admin.from('estates').update({ owner_id: nextOwner.user_id }).eq('id', estateId))
+      }
+    }
+
+    if (sharedEstateIds.length) {
+      must(await admin.from('items').update({ added_by_name: null }).eq('added_by', userId).in('estate_id', sharedEstateIds))
+      const items = must(await admin.from('items').select('id, value_suggestions')
+        .in('estate_id', sharedEstateIds).not('value_suggestions', 'is', null)) || []
+      for (const item of items) {
+        const list = Array.isArray(item.value_suggestions) ? item.value_suggestions : []
+        if (!list.some((s: { user_id?: string }) => s?.user_id === userId)) continue
+        const scrubbed = list.map((s: { user_id?: string }) => (s?.user_id === userId ? { ...s, user_id: null, name: 'Slettet bruker' } : s))
+        must(await admin.from('items').update({ value_suggestions: scrubbed }).eq('id', item.id))
+      }
+    }
+
+    must(await admin.from('interests').delete().eq('user_id', userId))
+    must(await admin.from('item_passes').delete().eq('user_id', userId))
+    must(await admin.from('comments').delete().eq('user_id', userId))
+    must(await admin.from('feedback').delete().eq('user_id', userId))
+    must(await admin.from('estate_members').delete().eq('user_id', userId))
+    must(await admin.from('profiles').delete().eq('user_id', userId))
+
     const { error: deleteError } = await admin.auth.admin.deleteUser(userId)
     if (deleteError) throw deleteError
 
-    return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+    return json({ success: true })
   } catch (e) {
-    return new Response(JSON.stringify({ success: false, error: e.message }), {
-      status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    })
+    console.error('delete-account:', e)
+    return json({ success: false, error: e instanceof Error ? e.message : String((e as { message?: string })?.message || e) }, 500)
   }
 })
