@@ -29,8 +29,8 @@ Kjør i SQL Editor, i denne rekkefølgen:
 
 | Funksjon | Brukes til | Hemmeligheter |
 |---|---|---|
-| `analyze-item` | AI-analyse av bilde av en gjenstand | `ANTHROPIC_API_KEY` |
-| `estimate-value` | AI-verdiestimat | `ANTHROPIC_API_KEY` |
+| `analyze-item` | AI-analyse av bilde av en gjenstand (Claude Haiku, teller mot AI-kvoten) | `ANTHROPIC_API_KEY` |
+| `estimate-value` | AI-verdiestimat (Claude Haiku, teller mot AI-kvoten) | `ANTHROPIC_API_KEY` |
 | `delete-account` | Sletting av egen konto (GDPR) | – |
 | `demo-login` | «Test ut demo»: nullstiller demo-boet og logger inn | `DEMO_PASSWORD`, valgfri `DEMO_USER_ID` |
 | `cleanup-closed-estates` | Sletter bo som har vært avsluttet i over 12 måneder | `CRON_SECRET` |

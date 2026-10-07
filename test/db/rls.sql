@@ -195,3 +195,33 @@ select t_eq((select count(*)::int from items i cross join estate_members m
     and m.user_id <> (select id from auth.users where email = 'mona.demo@heirsplit.no')
     and not exists (select 1 from interests x where x.item_id = i.id and x.user_id = m.user_id)
     and not exists (select 1 from item_passes p where p.item_id = i.id and p.user_id = m.user_id)), 0, 'alle andre enn Mona har tatt stilling');
+
+-- AI-kvote: demoen får 5 forsøk per økt, vanlige brukere 30 i timen; klienten kan ikke kalle funksjonen
+select t_as('eva@test.no'); set role authenticated;
+do $$ begin
+  perform claim_ai_call(auth.uid(), 's1', 'x', false);
+  raise exception 'FAIL: klienten kunne kalle claim_ai_call';
+exception when insufficient_privilege then raise notice 'OK   klienten kan ikke kalle claim_ai_call direkte';
+end $$;
+reset role;
+do $$
+declare r jsonb; i int;
+begin
+  for i in 1..5 loop
+    r := claim_ai_call('00000000-0000-0000-0000-00000000000d', 'demo-okt-1', 'estimate-value', true);
+    if not (r->>'ok')::boolean or (r->>'remaining')::int <> 5 - i then raise exception 'FAIL: demo-forsøk % ga %', i, r; end if;
+  end loop;
+  r := claim_ai_call('00000000-0000-0000-0000-00000000000d', 'demo-okt-1', 'estimate-value', true);
+  if (r->>'ok')::boolean or r->>'reason' <> 'demo_limit' then raise exception 'FAIL: sjette demo-forsøk ga %', r; end if;
+  raise notice 'OK   demoen får 5 AI-forsøk per økt, så demo_limit';
+  r := claim_ai_call('00000000-0000-0000-0000-00000000000d', 'demo-okt-2', 'analyze-item', true);
+  if not (r->>'ok')::boolean or (r->>'remaining')::int <> 4 then raise exception 'FAIL: ny demo-økt ga %', r; end if;
+  raise notice 'OK   en ny demo-økt (ny besøkende) får nye forsøk';
+  for i in 1..30 loop
+    r := claim_ai_call('00000000-0000-0000-0000-0000000000e1', 'eva-okt', 'analyze-item', false);
+    if not (r->>'ok')::boolean then raise exception 'FAIL: vanlig bruker stoppet etter % kall', i - 1; end if;
+  end loop;
+  r := claim_ai_call('00000000-0000-0000-0000-0000000000e1', 'eva-okt', 'analyze-item', false);
+  if (r->>'ok')::boolean or r->>'reason' <> 'rate_limit' then raise exception 'FAIL: kall 31 ga %', r; end if;
+  raise notice 'OK   vanlige brukere stoppes etter 30 AI-kall i timen';
+end $$;

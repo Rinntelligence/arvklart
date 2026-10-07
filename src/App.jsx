@@ -181,7 +181,8 @@ export default function App() {
           <Route path="/estate/:id/item/:itemId" element={<ItemDetailPage {...p} />} />
           <Route path="/estate/:id/swipe" element={<SwipePage {...p} />} />
           <Route path="/estate/:id/item/:itemId/edit" element={notForDemo(<EditItemPage {...p} />)} />
-          <Route path="/estate/:id/add" element={notForDemo(<AddItemPage {...p} />)} />
+          {/* Demoen kan prøve AI-funksjonene her (5 forsøk), men ikke lagre */}
+          <Route path="/estate/:id/add" element={<AddItemPage {...p} />} />
           <Route path="/estate/:id/admin" element={notForDemo(<AdminPage {...p} />)} />
           <Route path="/estate/:id/categories" element={notForDemo(<CategoriesPage {...p} />)} />
           <Route path="/estate/:id/tasks" element={<TasksPage {...p} />} />

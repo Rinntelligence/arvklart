@@ -1,8 +1,7 @@
 // Anslår markedsverdi i NOK for en gjenstand (verdifall + AI-estimat).
-// Krever innlogget bruker, slik at funksjonen ikke kan brukes som gratis AI-proxy.
-import { getUser, isDemoEmail, json, preflight } from '../_shared/http.ts'
-
-const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY')
+// Krever innlogget bruker og teller mot AI-kvoten (demoen: 5 forsøk per besøk). Bruker Claude Haiku.
+import { getUser, json, preflight } from '../_shared/http.ts'
+import { MODEL, aiErrorResponse, anthropic, claimAiCall, parseJsonReply } from '../_shared/ai.ts'
 
 // Depreciation rates per category
 const DEPRECIATION_RATES: Record<string, number> = {
@@ -50,11 +49,13 @@ Deno.serve(async (req) => {
   try {
     const user = await getUser(req)
     if (!user) return json({ success: false, error: 'Du må være logget inn' }, 401)
-    if (isDemoEmail(user.email)) return json({ success: false, error: 'Ikke tilgjengelig i demoen' }, 403)
 
     const { title, description, category, condition, purchase_price, purchase_year, ai_identified_model } = await req.json()
     if (typeof title !== 'string' || !title.trim()) return json({ success: false, error: 'Mangler navn på gjenstanden' }, 400)
     const key = categoryKey(category)
+
+    const { denied, quota } = await claimAiCall(req, user, 'estimate-value')
+    if (denied) return denied
 
     // 1. Depreciation calc if we have purchase data
     let depreciationEstimate = null
@@ -71,17 +72,10 @@ Deno.serve(async (req) => {
       }
     }
 
-    // 2. AI market estimate — use haiku (cheapest) for value, only sonnet for images
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': ANTHROPIC_API_KEY,
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001', // cheapest model — ~$0.001 per call
-        max_tokens: 600,
+    // 2. AI-estimat av markedsverdi
+    const message = await anthropic().messages.create({
+        model: MODEL,
+        max_tokens: 1024,
         messages: [{
           role: 'user',
           content: `You are an expert Norwegian estate appraiser. Estimate the current Norwegian market value (in NOK) for this item.
@@ -112,15 +106,8 @@ Respond ONLY with this JSON (no other text):
   "category_trend": "appreciating|stable|depreciating"
 }`
         }]
-      })
     })
-
-    const data = await response.json()
-    if (!response.ok) throw new Error(data?.error?.message || `Anthropic svarte ${response.status}`)
-    const text = data.content?.find((c: { type: string }) => c.type === 'text')?.text || ''
-    const jsonMatch = text.match(/\{[\s\S]*\}/)
-    if (!jsonMatch) throw new Error('No JSON in response')
-    const aiEstimate = JSON.parse(jsonMatch[0])
+    const aiEstimate = parseJsonReply(message)
 
     // Fill in search URLs with actual item title
     const searchTerm = encodeURIComponent(title.split(' ').slice(0, 4).join(' '))
@@ -142,10 +129,10 @@ Respond ONLY with this JSON (no other text):
           high_nok: aiEstimate.high_nok,
           likely_nok: aiEstimate.likely_nok,
         }
-      }
+      },
+      quota,
     })
   } catch (error) {
-    console.error('estimate-value:', error)
-    return json({ success: false, error: error instanceof Error ? error.message : String(error) }, 500)
+    return aiErrorResponse(error, 'estimate-value')
   }
 })

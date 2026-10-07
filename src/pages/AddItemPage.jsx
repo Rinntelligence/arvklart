@@ -1,19 +1,25 @@
 import { useEffect, useRef, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { getCategories, supabase } from '../lib/supabase'
+import { getCategories, supabase, signOut } from '../lib/supabase'
 import { downscaleImage, fileToBase64, fileToDataUrl, uploadEstateImage } from '../lib/images'
 import { hasAiConsent, giveAiConsent } from '../lib/aiConsent'
 import { formatNOK } from '../lib/format'
 import { L } from '../lib/lang'
+import { demoFeatureMessage } from '../lib/demo'
 
-// Kalles med brukerens innlogging; edge-funksjonene avviser anonyme kall.
+// Kalles med brukerens innlogging; edge-funksjonene avviser anonyme kall og teller AI-bruken.
+// Feil får med koden fra funksjonen (demo_limit, rate_limit, ai_busy …).
 async function callEdgeFunction(name, body) {
   const { data, error } = await supabase.functions.invoke(name, { body })
-  if (error) throw error
-  return data
+  if (!error) return data
+  let details = null
+  try { details = await error.context?.json() } catch { /* ikke JSON */ }
+  const err = new Error(details?.error || error.message)
+  err.code = details?.code
+  throw err
 }
 
-export default function AddItemPage({ session, profile, onToast }) {
+export default function AddItemPage({ session, profile, onToast, isDemo }) {
   const { id } = useParams()
   const navigate = useNavigate()
   const [categories, setCategories] = useState([])
@@ -36,7 +42,16 @@ export default function AddItemPage({ session, profile, onToast }) {
   const [newCatLabel, setNewCatLabel] = useState('')
   const [newCatEmoji, setNewCatEmoji] = useState('📦')
   const [savingCat, setSavingCat] = useState(false)
+  const [demoBlocked, setDemoBlocked] = useState(false)
+  const [demoRemaining, setDemoRemaining] = useState(isDemo ? 5 : null)
   const fileRef = useRef()
+
+  // Felles håndtering av svar og feil fra AI-funksjonene
+  const trackQuota = (res) => { if (typeof res?.quota?.remaining === 'number') setDemoRemaining(res.quota.remaining) }
+  const handleAiError = (e, fallback) => {
+    if (e.code === 'demo_limit') { setDemoRemaining(0); setDemoBlocked(true); return }
+    onToast(e.code === 'rate_limit' || e.code === 'ai_busy' ? e.message : fallback, 'error')
+  }
 
   const loadCategories = () => getCategories(id).then(({ data }) => {
     setCategories(data || [])
@@ -80,6 +95,7 @@ export default function AddItemPage({ session, profile, onToast }) {
 
   const analyzeWithAI = async () => {
     if (!imageFiles[0]) return
+    if (isDemo && demoRemaining === 0) { setDemoBlocked(true); return }
     setAnalyzing(true)
     try {
       // Forminsket JPEG: mobilbilder er ofte over grensen på 5 MB, og HEIC støttes ikke
@@ -89,6 +105,7 @@ export default function AddItemPage({ session, profile, onToast }) {
         imageBase64,
         mimeType: image.type || 'image/jpeg',
       })
+      trackQuota(res)
       const result = res.data || res
       if (result.title && !title) setTitle(result.title)
       if (result.description && !description) setDescription(result.description)
@@ -102,7 +119,7 @@ export default function AddItemPage({ session, profile, onToast }) {
       }
       onToast(L('AI identifiserte gjenstanden ✓', 'AI identified the item ✓'))
     } catch (e) {
-      onToast(L('AI-analyse feilet — fyll inn manuelt', 'AI analysis failed — fill in manually'), 'error')
+      handleAiError(e, L('AI-analyse feilet — fyll inn manuelt', 'AI analysis failed — fill in manually'))
     } finally {
       setAnalyzing(false)
     }
@@ -110,6 +127,7 @@ export default function AddItemPage({ session, profile, onToast }) {
 
   const getValueEstimate = async () => {
     if (!title.trim()) { onToast(L('Legg til navn på gjenstanden først', 'Add the item name first'), 'error'); return }
+    if (isDemo && demoRemaining === 0) { setDemoBlocked(true); return }
     setEstimating(true)
     try {
       const cat = categories.find(c => c.id === categoryId)
@@ -121,6 +139,7 @@ export default function AddItemPage({ session, profile, onToast }) {
         purchase_price: purchasePrice ? parseFloat(purchasePrice) : undefined,
         purchase_year: purchaseYear ? parseInt(purchaseYear) : undefined,
       })
+      trackQuota(res)
       const d = res.data || res
       setAiEstimate({
         low_nok: d.summary?.low_nok ?? d.low_nok,
@@ -129,13 +148,14 @@ export default function AddItemPage({ session, profile, onToast }) {
         reasoning: d.market?.reasoning ?? d.reasoning,
       })
     } catch (e) {
-      onToast(L('Verdiestimering feilet', 'Value estimate failed'), 'error')
+      handleAiError(e, L('Verdiestimering feilet', 'Value estimate failed'))
     } finally {
       setEstimating(false)
     }
   }
 
   const save = async () => {
+    if (isDemo) { setDemoBlocked(true); return }
     if (!title.trim()) { onToast(L('Legg til navn på gjenstanden', 'Add the item name'), 'error'); return }
     setSaving(true)
     try {
@@ -198,6 +218,14 @@ export default function AddItemPage({ session, profile, onToast }) {
       <p style={{ color: '#9C8267', fontSize: '14px', marginBottom: '24px' }}>
         {L('Fyll inn navn og ta gjerne bilde — AI kan identifisere og verdsette automatisk', 'Enter a name and add a photo if you can — AI can identify and value it automatically')}
       </p>
+
+      {isDemo && (
+        <div style={{ background: '#DCE3D2', border: '1px solid #B8C8A8', borderRadius: '10px', padding: '12px 14px', fontSize: '13px', color: '#3A5A30', lineHeight: 1.5, marginBottom: '20px' }}>
+          {L('Prøv AI-analyse av bilde og verdiestimat i demoen.', 'Try AI photo analysis and value estimates in the demo.')}{' '}
+          <strong>{L(`${demoRemaining} av 5 AI-forsøk igjen.`, `${demoRemaining} of 5 AI attempts left.`)}</strong>{' '}
+          {L('Gjenstanden lagres ikke.', 'The item is not saved.')}
+        </div>
+      )}
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
 
@@ -282,13 +310,13 @@ export default function AddItemPage({ session, profile, onToast }) {
                 {c.label}
               </button>
             ))}
-            <button onClick={() => setShowAddCat(!showAddCat)} style={{
+            {!isDemo && <button onClick={() => setShowAddCat(!showAddCat)} style={{
               padding: '8px 14px', borderRadius: '20px', cursor: 'pointer', fontSize: '13px',
               fontFamily: 'Karla, sans-serif', border: '2px dashed #D9CFC0',
               background: 'transparent', color: '#9C8267',
             }}>
               {L('+ Ny kategori', '+ New category')}
-            </button>
+            </button>}
           </div>
 
           {showAddCat && (
@@ -461,6 +489,24 @@ export default function AddItemPage({ session, profile, onToast }) {
         >
           {saving ? L('Lagrer…', 'Saving…') : L('✓ Lagre gjenstand', '✓ Save item')}
         </button>
+      </div>
+
+      {demoBlocked && <DemoNotice onClose={() => setDemoBlocked(false)} onSignup={async () => { await signOut(); navigate('/logg-inn') }} />}
+    </div>
+  )
+}
+
+// Demoen kan prøve AI-funksjonene, men ikke lagre eller bruke dem ubegrenset
+function DemoNotice({ onClose, onSignup }) {
+  return (
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 300, padding: '20px' }}>
+      <div onClick={e => e.stopPropagation()} role="dialog" style={{ background: '#fff', borderRadius: '14px', padding: '28px', maxWidth: '400px', width: '100%', fontFamily: 'Karla, sans-serif' }}>
+        <h3 style={{ fontFamily: "'Fraunces', serif", fontSize: '19px', fontWeight: '400', color: '#3A2F26', marginBottom: '10px' }}>{L('Dette er en demo', 'This is a demo')}</h3>
+        <p style={{ fontSize: '14px', color: '#5C4530', lineHeight: 1.6, marginBottom: '22px' }}>{demoFeatureMessage()}</p>
+        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+          <button onClick={onClose} style={{ flex: '1 1 120px', padding: '11px', background: 'none', border: '1px solid #D9CFC0', borderRadius: '8px', cursor: 'pointer', color: '#5C4530', fontSize: '14px', fontFamily: 'Karla, sans-serif' }}>{L('Fortsett demoen', 'Continue the demo')}</button>
+          <button onClick={onSignup} style={{ flex: '2 1 180px', padding: '11px', background: '#3A2F26', color: '#FBF9F5', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '14px', fontFamily: 'Karla, sans-serif' }}>{L('Opprett konto', 'Create an account')}</button>
+        </div>
       </div>
     </div>
   )

@@ -162,7 +162,7 @@ export default function EstatePage({ session, profile, onToast, isDemo }) {
         <div style={{ display:'flex', gap:'8px', flexWrap:'wrap' }}>
           {myRole === 'admin' && !isDemo && <button onClick={() => navigate(`/estate/${id}/admin`)} style={btn}>{L('Administrer', 'Manage')}</button>}
           <button onClick={() => navigate(`/estate/${id}/swipe`)} style={btn}>{L('Sveip', 'Swipe')}</button>
-          {!isDemo && <button onClick={() => navigate(`/estate/${id}/add`)} style={btnPrimary}>{L('+ Legg til', '+ Add')}</button>}
+          <button onClick={() => navigate(`/estate/${id}/add`)} style={btnPrimary}>{isDemo ? L('Prøv AI-verdivurdering', 'Try AI valuation') : L('+ Legg til', '+ Add')}</button>
         </div>
       </div>
 
