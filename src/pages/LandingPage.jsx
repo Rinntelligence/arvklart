@@ -74,24 +74,28 @@ export default function LandingPage({ loggedIn = false }) {
 
         .lp .hero {
           position: relative; min-height: 92vh;
-          display: flex; align-items: center; justify-content: center;
+          display: flex; align-items: flex-end; justify-content: flex-start;
           background-image:
-            linear-gradient(180deg, rgba(42,33,26,0) 0%, rgba(42,33,26,0.08) 45%, rgba(42,33,26,0.6) 75%, rgba(42,33,26,0.9) 100%),
+            linear-gradient(90deg, rgba(42,33,26,0.78) 0%, rgba(42,33,26,0.55) 35%, rgba(42,33,26,0.12) 65%, rgba(42,33,26,0) 100%),
+            linear-gradient(180deg, rgba(42,33,26,0) 0%, rgba(42,33,26,0) 40%, rgba(42,33,26,0.45) 70%, rgba(42,33,26,0.85) 100%),
             url('/hero-bg.jpg');
           background-size: cover; background-position: center;
         }
         .lp .hero-inner {
           position: relative; z-index: 2;
-          max-width: 640px; text-align: left;
-          padding: 0 56px 80px;
+          max-width: 720px; text-align: left;
+          padding: 0 56px 96px;
         }
         .lp .hero-inner h1 {
-          font-size: 42px; line-height: 1.28; color: var(--snow); margin-bottom: 14px;
+          font-size: clamp(32px, 4.2vw, 54px); line-height: 1.12; letter-spacing: -0.5px;
+          color: var(--snow); margin-bottom: 20px;
           font-weight: 400; font-family: 'Fraunces', serif;
+          text-shadow: 0 2px 18px rgba(0,0,0,0.35);
         }
         .lp .hero-inner .subline {
-          font-size: 16px; line-height: 1.6; color: var(--snow); opacity: 0.9;
-          max-width: 480px; margin-bottom: 38px;
+          font-size: clamp(17px, 1.4vw, 19px); line-height: 1.55; color: var(--snow);
+          max-width: 520px; margin-bottom: 40px;
+          text-shadow: 0 1px 10px rgba(0,0,0,0.4);
         }
         .lp .hero-cta { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; }
         .lp .btn {
@@ -177,8 +181,8 @@ export default function LandingPage({ loggedIn = false }) {
           .lp header { padding: 22px 24px; }
           .lp nav ul { gap: 2px; flex-wrap: wrap; justify-content: flex-end; }
           .lp nav a { padding: 6px 10px; font-size: 13.5px; }
-          .lp .hero-inner { padding: 0 24px 64px; }
-          .lp .hero-inner h1 { font-size: 28px; }
+          .lp .hero { background-position: 60% center; }
+          .lp .hero-inner { padding: 0 24px 56px; }
           .lp .intro { padding: 76px 24px; }
           .lp .features { padding: 76px 24px; }
           .lp .feature-grid { grid-template-columns: 1fr; gap: 44px; }
