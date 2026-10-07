@@ -4,7 +4,7 @@ import { getCategories, supabase, signOut } from '../lib/supabase'
 import { downscaleImage, fileToBase64, fileToDataUrl, uploadEstateImage } from '../lib/images'
 import { hasAiConsent, giveAiConsent } from '../lib/aiConsent'
 import { formatNOK } from '../lib/format'
-import { L } from '../lib/lang'
+import { L, isEn } from '../lib/lang'
 import { demoFeatureMessage } from '../lib/demo'
 
 // Kalles med brukerens innlogging; edge-funksjonene avviser anonyme kall og teller AI-bruken.
@@ -104,6 +104,7 @@ export default function AddItemPage({ session, profile, onToast, isDemo }) {
       const res = await callEdgeFunction('analyze-item', {
         imageBase64,
         mimeType: image.type || 'image/jpeg',
+        lang: isEn() ? 'en' : 'no',
       })
       trackQuota(res)
       const result = res.data || res
@@ -138,6 +139,7 @@ export default function AddItemPage({ session, profile, onToast, isDemo }) {
         condition,
         purchase_price: purchasePrice ? parseFloat(purchasePrice) : undefined,
         purchase_year: purchaseYear ? parseInt(purchaseYear) : undefined,
+        lang: isEn() ? 'en' : 'no',
       })
       trackQuota(res)
       const d = res.data || res

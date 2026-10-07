@@ -50,7 +50,9 @@ Deno.serve(async (req) => {
     const user = await getUser(req)
     if (!user) return json({ success: false, error: 'Du må være logget inn' }, 401)
 
-    const { title, description, category, condition, purchase_price, purchase_year, ai_identified_model } = await req.json()
+    const { title, description, category, condition, purchase_price, purchase_year, ai_identified_model, lang } = await req.json()
+    // Begrunnelsen skrives på brukerens språk
+    const language = lang === 'en' ? 'English' : 'Norwegian (bokmål)'
     if (typeof title !== 'string' || !title.trim()) return json({ success: false, error: 'Mangler navn på gjenstanden' }, 400)
     const key = categoryKey(category)
 
@@ -92,6 +94,8 @@ Use your knowledge of:
 - Typical depreciation for this category
 - The specific model/brand if identifiable
 - Condition impact
+
+Write "reasoning" and "market_references" in ${language}.
 
 Respond ONLY with this JSON (no other text):
 {

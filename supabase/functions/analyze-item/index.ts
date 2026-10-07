@@ -21,7 +21,9 @@ Deno.serve(async (req) => {
     const user = await getUser(req)
     if (!user) return json({ success: false, error: 'Du må være logget inn' }, 401)
 
-    const { imageBase64, mimeType } = await req.json()
+    const { imageBase64, mimeType, lang } = await req.json()
+    // Tekstene skrives på brukerens språk; kategorien er alltid et av de norske navnene (lagres i databasen)
+    const english = lang === 'en'
     if (typeof imageBase64 !== 'string' || !imageBase64) return json({ success: false, error: 'Mangler bilde' }, 400)
     if (imageBase64.length > MAX_BASE64_LENGTH) return json({ success: false, error: 'Bildet er for stort' }, 413)
     const mediaType = MEDIA_TYPES.includes(mimeType) ? mimeType : 'image/jpeg'
@@ -43,15 +45,15 @@ Deno.serve(async (req) => {
               type: 'text',
               text: `Du er en arveboassistent. Se på bildet og svar KUN med gyldig JSON, ingen annen tekst.
 
-Gi en kort, enkel norsk beskrivelse av gjenstanden. Vær konkret og presis, ikke bruk fluff.
+Gi en kort, enkel beskrivelse av gjenstanden på ${english ? 'engelsk' : 'norsk'}. Vær konkret og presis, ikke bruk fluff.
 
 Kategorier å velge fra: ${CATEGORIES.join(', ')}
 
 Svar KUN med denne JSON-strukturen:
 {
-  "title": "Kort norsk tittel, f.eks. 'Gyngestol i eik' eller 'Samsung TV 55-tommer'",
-  "description": "1-2 setninger på norsk: materiale, farge, stand, alder hvis synlig. Enkelt språk.",
-  "category": "En av kategoriene over",
+  "title": "${english ? "Kort engelsk tittel, f.eks. 'Oak rocking chair' eller 'Samsung 55-inch TV'" : "Kort norsk tittel, f.eks. 'Gyngestol i eik' eller 'Samsung TV 55-tommer'"}",
+  "description": "1-2 setninger på ${english ? 'engelsk' : 'norsk'}: materiale, farge, stand, alder hvis synlig. Enkelt språk.",
+  "category": "En av kategoriene over, skrevet nøyaktig som i listen (på norsk)",
   "condition": "excellent, good, fair eller poor",
   "confidence": "high, medium eller low"
 }`
