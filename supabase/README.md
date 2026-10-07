@@ -38,11 +38,12 @@ Kjør i SQL Editor, i denne rekkefølgen:
 `SUPABASE_URL`, `SUPABASE_ANON_KEY` og `SUPABASE_SERVICE_ROLE_KEY` legges inn av Supabase automatisk.
 
 ```bash
-supabase functions deploy analyze-item
-supabase functions deploy estimate-value
-supabase functions deploy delete-account
-supabase functions deploy demo-login --no-verify-jwt
-supabase functions deploy cleanup-closed-estates --no-verify-jwt
+# --use-api pakker funksjonene hos Supabase; Docker i Codespaces når ikke esm.sh
+supabase functions deploy analyze-item --use-api
+supabase functions deploy estimate-value --use-api
+supabase functions deploy delete-account --use-api
+supabase functions deploy demo-login --no-verify-jwt --use-api
+supabase functions deploy cleanup-closed-estates --no-verify-jwt --use-api
 
 supabase secrets set DEMO_PASSWORD='<passordet til mona.demo@heirsplit.no>'
 supabase secrets set CRON_SECRET="$(openssl rand -hex 32)"
