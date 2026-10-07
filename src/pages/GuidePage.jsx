@@ -1,14 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { signIn, signUp, upsertProfile } from '../lib/supabase'
+import { signIn, signUp } from '../lib/supabase'
+import { isDemoEmail } from '../lib/demo'
 import {
   getPendingSave, setPendingSave, clearPendingSave,
   createWizardEstate, listAdminEstates, loadWizardContext, saveWizardToEstate,
 } from '../lib/wizardEstate'
 import { L, isEn } from '../lib/lang'
 
-const AVATAR_COLORS = ['#5F6E52', '#8B9A7D', '#9C8267', '#7A8B6E', '#A97C3F', '#6E8B87']
-const DEMO_EMAIL = 'mona.demo@heirsplit.no'
 // Hindrer at en ventende lagring kjøres to ganger hvis siden monteres på nytt underveis
 let processingPending = false
 
@@ -17,24 +16,40 @@ export default function GuidePage({ standalone = false, session = null, onToast 
   const { id } = useParams()
   const frameRef = useRef(null)
   const contextRef = useRef(null)
+  const contextSeq = useRef(0)
+  // Bo som er opprettet her, men der lagringen feilet: brukes igjen i stedet for å opprette et nytt
+  const createdRef = useRef(null)
+  // Brukeren logget inn for å lagre svar fra veiviseren: veiviseren kan ta med svarene fra før innlogging
+  const adoptRef = useRef(false)
   const [modal, setModal] = useState(null) // { kind: 'auth' | 'choose', login, request }
   const [busy, setBusy] = useState(false)
   const userId = session?.user?.id
-  const isDemo = session?.user?.email === DEMO_EMAIL
+  const userEmail = session?.user?.email || ''
+  const isDemo = isDemoEmail(userEmail)
   // Opened from the landing page (no estate) — go back to the home page instead
   const backPath = id ? `/estate/${id}` : '/home'
+
+  // onToast kan være en ny funksjon ved hver rendring; effektene under skal ikke kjøres på nytt av det
+  const toastRef = useRef(onToast)
+  useEffect(() => { toastRef.current = onToast }, [onToast])
+  const toast = useCallback((...args) => toastRef.current?.(...args), [])
 
   const toFrame = useCallback(msg => {
     frameRef.current?.contentWindow?.postMessage(msg, window.location.origin)
   }, [])
 
-  // Forteller veiviseren om brukeren er innlogget, hvilket bo den er åpnet fra og hva som er lagret der
+  // Forteller veiviseren hvem som er innlogget, hvilket bo den er åpnet fra og hva som er lagret der.
+  // Veiviseren lagrer svarene i nettleseren per bruker og bo ut fra dette.
   const sendContext = useCallback(async () => {
-    let ctx = { type: 'veiviser-context', loggedIn: Boolean(userId), estate: null, saved: null }
+    const seq = ++contextSeq.current
+    let ctx = { type: 'veiviser-context', loggedIn: Boolean(userId), userId: userId || null, estateId: id || null, estate: null, saved: null, adoptAnonymous: adoptRef.current }
     if (userId && id) {
-      const { estate, saved } = await loadWizardContext(id, userId)
-      ctx = { ...ctx, estate, saved }
+      try {
+        const { estate, saved } = await loadWizardContext(id, userId)
+        ctx = { ...ctx, estate, saved }
+      } catch { /* veiviseren virker også uten boets navn og lagrede svar */ }
     }
+    if (seq !== contextSeq.current) return // en nyere kontekst er allerede på vei
     contextRef.current = ctx
     toFrame(ctx)
   }, [id, userId, toFrame])
@@ -48,27 +63,38 @@ export default function GuidePage({ standalone = false, session = null, onToast 
     return result
   }, [userId, toFrame])
 
-  // Lagring som ble startet før innlogging, fullføres når brukeren er logget inn
+  // Lagring som ble startet før innlogging, fullføres når brukeren er logget inn – men bare for
+  // brukeren som startet den (samme e-post), og bare ett forsøk: feiler det, prøver vi ikke igjen
+  // av oss selv, men brukeren kan lagre på nytt fra resultatet.
   useEffect(() => {
     if (!userId) return
     if (isDemo) { clearPendingSave(); return }
-    const pending = getPendingSave()
-    if (!pending?.request || processingPending) return
+    if (processingPending) return
+    const pending = getPendingSave(userEmail)
+    if (!pending) return
     processingPending = true
+    clearPendingSave()
+    adoptRef.current = true
+    if (contextRef.current) sendContext()
     ;(async () => {
       setBusy(true)
-      const { data: estate, error } = await createWizardEstate(userId, pending.estateName)
-      if (error) { processingPending = false; setBusy(false); onToast(L('Kunne ikke opprette bo: ', 'Could not create estate: ') + error.message, 'error'); return }
-      clearPendingSave()
-      const saved = await doSave(estate.id, pending.request)
-      processingPending = false
-      setBusy(false)
-      if (saved) {
-        onToast(L('Boet er opprettet, og resultatet fra veiviseren er lagret ✓', 'The estate has been created and the guide result saved ✓'))
+      try {
+        const { data: estate, error } = await createWizardEstate(userId, pending.estateName)
+        if (error) { toast(L('Kunne ikke opprette bo: ', 'Could not create estate: ') + error.message, 'error'); return }
+        createdRef.current = estate
+        const saved = await doSave(estate.id, pending.request)
+        if (!saved) { toast(L(`Boet «${estate.name}» er opprettet, men resultatet ble ikke lagret der. Prøv å lagre på nytt.`, `The estate «${estate.name}» was created, but the result was not saved there. Try saving again.`), 'error'); return }
+        createdRef.current = null
+        toast(L('Boet er opprettet, og resultatet fra veiviseren er lagret ✓', 'The estate has been created and the guide result saved ✓'))
         navigate(`/estate/${estate.id}/guide`)
+      } catch (err) {
+        toast(L('Kunne ikke lagre resultatet: ', 'Could not save the result: ') + (err?.message || L('ukjent feil', 'unknown error')), 'error')
+      } finally {
+        processingPending = false
+        setBusy(false)
       }
     })()
-  }, [userId, isDemo, doSave, navigate, onToast])
+  }, [userId, userEmail, isDemo, doSave, navigate, toast, sendContext])
 
   useEffect(() => {
     const onMessage = async (e) => {
@@ -84,14 +110,25 @@ export default function GuidePage({ standalone = false, session = null, onToast 
         } else if (!userId) {
           setModal({ kind: 'auth', login: Boolean(m.login), request })
         } else if (id) {
-          const estate = contextRef.current?.estate
-          if (estate && estate.role !== 'admin') {
+          // Boet og rollen må være kjent før vi lagrer – hent dem hvis konteksten ikke er lastet ennå
+          let estate = contextRef.current?.estateId === id ? contextRef.current.estate : null
+          if (!estate) {
+            try { estate = (await loadWizardContext(id, userId)).estate } catch { estate = null }
+          }
+          if (!estate) {
+            toFrame({ type: 'veiviser-saved', ok: false, error: L('Vi fant ikke boet. Last inn siden på nytt og prøv igjen.', 'We could not find the estate. Reload the page and try again.') })
+            return
+          }
+          if (estate.role !== 'admin') {
             toFrame({ type: 'veiviser-saved', ok: false, error: L('Bare administratorer av boet kan lagre resultatet her.', 'Only administrators of the estate can save the result here.') })
             return
           }
           const saved = await doSave(id, request)
           if (saved) {
-            toFrame({ type: 'veiviser-saved', ok: true, estate, savedAt: saved.savedAt, text: L(`Lagret! ${saved.heirs} arvinger og stegene dere bør gjøre er oppdatert i boet.`, `Saved! ${saved.heirs} heirs and the steps you should take have been updated in the estate.`) })
+            const text = saved.heirsKept
+              ? L('Lagret! Stegene dere bør gjøre er oppdatert i boet. Arvingene er ikke endret, fordi veiviseren ikke kan beregne fordelingen ennå.', 'Saved! The steps you should take have been updated in the estate. The heirs were not changed, because the guide cannot calculate the distribution yet.')
+              : L(`Lagret! ${saved.heirs} arvinger og stegene dere bør gjøre er oppdatert i boet.`, `Saved! ${saved.heirs} heirs and the steps you should take have been updated in the estate.`)
+            toFrame({ type: 'veiviser-saved', ok: true, estate, savedAt: saved.savedAt, text })
           }
         } else {
           setModal({ kind: 'choose', request })
@@ -105,27 +142,34 @@ export default function GuidePage({ standalone = false, session = null, onToast 
   // Ny kontekst når innlogging eller bo endres mens veiviseren er åpen
   useEffect(() => { if (contextRef.current) sendContext() }, [sendContext])
 
-  const closeModal = () => {
+  const closeModal = useCallback(() => {
     setModal(null)
     toFrame({ type: 'veiviser-saved', ok: false, cancelled: true })
-  }
+  }, [toFrame])
 
   const saveInto = async (estateId, estateName) => {
     setBusy(true)
     const saved = await doSave(estateId, modal.request)
     setBusy(false)
     if (!saved) return
+    if (createdRef.current?.id === estateId) createdRef.current = null
     setModal(null)
-    onToast(L(`Resultatet er lagret i «${estateName}» ✓`, `The result has been saved in «${estateName}» ✓`))
+    toast(L(`Resultatet er lagret i «${estateName}» ✓`, `The result has been saved in «${estateName}» ✓`))
     navigate(`/estate/${estateId}/guide`)
   }
 
   const createAndSave = async (name) => {
-    setBusy(true)
-    const { data, error } = await createWizardEstate(userId, name)
-    if (error) { setBusy(false); onToast(L('Kunne ikke opprette bo: ', 'Could not create estate: ') + error.message, 'error'); return }
-    setBusy(false)
-    await saveInto(data.id, data.name)
+    // Feilet lagringen etter at boet ble opprettet, lagrer vi i det samme boet i stedet for å lage et nytt
+    let estate = createdRef.current
+    if (!estate) {
+      setBusy(true)
+      const { data, error } = await createWizardEstate(userId, name)
+      setBusy(false)
+      if (error) { toast(L('Kunne ikke opprette bo: ', 'Could not create estate: ') + error.message, 'error'); return }
+      estate = data
+      createdRef.current = data
+    }
+    await saveInto(estate.id, estate.name)
   }
 
   return (
@@ -139,7 +183,7 @@ export default function GuidePage({ standalone = false, session = null, onToast 
       </div>
       <iframe
         ref={frameRef}
-        src={id ? '/veiviser.html' : '/veiviser.html?back=home'}
+        src={id ? `/veiviser.html?bo=${encodeURIComponent(id)}` : '/veiviser.html?back=home'}
         style={{ flex: 1, border: 'none', width: '100%' }}
         title={L('Arveprosess-veiviser', 'Inheritance process guide')}
       />
@@ -216,22 +260,19 @@ function AuthModal({ startInLogin, request, onClose }) {
   const submit = async () => {
     if (!canSubmit || loading) return
     setLoading(true); setError(null)
-    // Svarene tas vare på til brukeren er logget inn – også hvis e-posten må bekreftes først
-    setPendingSave({ request, estateName: estateName.trim() })
+    // Svarene tas vare på til brukeren er logget inn – også hvis e-posten må bekreftes først.
+    // Lagringen er bundet til denne e-posten, så den ikke fullføres for noen andre som logger inn.
+    setPendingSave({ request, estateName: estateName.trim(), email: email.trim() })
     if (mode === 'signup') {
-      const { data, error: err } = await signUp(email.trim(), password)
+      // Profilen opprettes fra navnet i App når brukeren er logget inn (også etter e-postbekreftelse)
+      const { data, error: err } = await signUp(email.trim(), password, name.trim())
       if (err) { setError(message(err.message)); setLoading(false); clearPendingSave(); return }
-      if (data?.user) {
-        await upsertProfile({ user_id: data.user.id, display_name: name.trim(), avatar_color: AVATAR_COLORS[Math.floor(Math.random() * AVATAR_COLORS.length)], email: email.trim(), plan: 'free' })
-      }
       if (!data?.session) {
-        const { error: loginErr } = await signIn(email.trim(), password)
-        if (loginErr) {
-          setLoading(false)
-          if (loginErr.message.includes('Email not confirmed')) setInfo(L('Vi har sendt deg en e-post. Bekreft adressen og logg inn – svarene dine er tatt vare på og blir lagt inn i boet når du logger inn.', 'We have sent you an email. Confirm your address and log in – your answers are kept and will be added to the estate when you log in.'))
-          else setError(message(loginErr.message))
-          return
-        }
+        setLoading(false)
+        // Tom identities betyr at e-posten allerede er registrert
+        if (data?.user && !data.user.identities?.length) { setError(message('already registered')); clearPendingSave() }
+        else setInfo(L('Vi har sendt deg en e-post. Bekreft adressen og logg inn – svarene dine er tatt vare på og blir lagt inn i boet når du logger inn.', 'We have sent you an email. Confirm your address and log in – your answers are kept and will be added to the estate when you log in.'))
+        return
       }
     } else {
       const { error: err } = await signIn(email.trim(), password)
@@ -247,6 +288,12 @@ function AuthModal({ startInLogin, request, onClose }) {
 
   const onKey = e => { if (e.key === 'Enter') submit() }
 
+  // Lukkes dialogen, er lagringen avbrutt – med mindre vi venter på at e-posten blir bekreftet
+  const close = () => {
+    if (!info) clearPendingSave()
+    onClose()
+  }
+
   return (
     <Overlay
       title={mode === 'signup' ? L('Opprett bruker og lagre', 'Create account and save') : L('Logg inn og lagre', 'Log in and save')}
@@ -254,7 +301,7 @@ function AuthModal({ startInLogin, request, onClose }) {
         'Vi oppretter et bo for deg i Arvklart og legger inn arvingene, den beregnede fordelingen og stegene dere bør gjøre. Svarene lagres, så du kan gå tilbake og endre dem når som helst.',
         'We create an estate for you in Arvklart and add the heirs, the calculated distribution and the steps you should take. Your answers are saved, so you can go back and change them at any time.',
       )}
-      onClose={onClose}>
+      onClose={close}>
       {info ? (
         <p style={{ background: '#DCE3D2', color: '#3A5A30', padding: '14px', borderRadius: '8px', fontSize: '14px', lineHeight: 1.6 }}>{info}</p>
       ) : (

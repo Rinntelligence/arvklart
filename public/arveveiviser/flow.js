@@ -10,19 +10,58 @@ export function visibleQuestions(answers = {}) {
   return QUESTIONS.filter(q => evaluate(q.showIf, { answers, facts }))
 }
 
-// Fjerner svar på spørsmål som er skjult med dagens svar. Gjentas til svarene er stabile,
-// fordi et skjult svar kan ha påvirket hvilke andre spørsmål som vises.
-// Selve lagrede svar beholdes i UI-et, slik at brukeren ikke mister dem ved å gå frem og tilbake.
+// Fjerner svar på spørsmål som er skjult med dagens svar, og valg i flervalg som ikke lenger
+// vises (for eksempel «Gir noe til samboeren» når avdøde var gift). Spørsmålene gås gjennom i
+// rekkefølge, og hvert spørsmål vurderes bare mot svarene som er beholdt foran det – slik kan et
+// skjult svar aldri styre hvilke andre spørsmål som vises.
+// Alle svarene beholdes i UI-et (state.answers), slik at brukeren ikke mister dem ved å gå frem og
+// tilbake. Navigasjon, validering og beregning skal likevel alltid bruke resultatet herfra.
 export function pruneAnswers(answers = {}) {
-  let current = { ...answers }
-  for (let i = 0; i < 10; i++) {
-    const visible = new Set(visibleQuestions(current).map(q => q.id))
-    const next = {}
-    for (const [k, v] of Object.entries(current)) if (visible.has(k)) next[k] = v
-    if (Object.keys(next).length === Object.keys(current).length) return next
-    current = next
+  const kept = {}
+  for (const q of QUESTIONS) {
+    if (answers[q.id] === undefined) continue
+    const ctx = { answers: kept, facts: deriveFacts(kept) }
+    if (!evaluate(q.showIf, ctx)) continue
+    const v = visibleChoice(q, answers[q.id], ctx)
+    if (v !== undefined) kept[q.id] = v
   }
-  return current
+  // Sikkerhetsnett hvis en betingelse en gang skulle avhenge av et senere spørsmål
+  for (let i = 0; i < 10; i++) {
+    const visible = new Set(visibleQuestions(kept).map(q => q.id))
+    const hidden = Object.keys(kept).filter(k => !visible.has(k))
+    if (!hidden.length) break
+    for (const k of hidden) delete kept[k]
+  }
+  return kept
+}
+
+// Tar bort valg brukeren ikke lenger ser (alternativer med egen `showIf`). Står det ingen valg
+// igjen i et flervalg, regnes spørsmålet som ubesvart.
+function visibleChoice(q, v, ctx) {
+  if (!Array.isArray(q.options) || !q.options.some(o => o.showIf)) return v
+  const hidden = new Set(q.options.filter(o => o.showIf && !evaluate(o.showIf, ctx)).map(o => o.value))
+  if (!hidden.size) return v
+  if (q.type === 'multi') {
+    if (!Array.isArray(v)) return v
+    const left = v.filter(x => !hidden.has(x))
+    return left.length ? left : undefined
+  }
+  return hidden.has(v) ? undefined : v
+}
+
+// Dagens dato (ÅÅÅÅ-MM-DD) i brukerens tidssone. toISOString() gir UTC, som er gårsdagen
+// mellom midnatt og kl. 01/02 norsk tid.
+export function localToday(now = new Date()) {
+  const p = n => String(n).padStart(2, '0')
+  return `${now.getFullYear()}-${p(now.getMonth() + 1)}-${p(now.getDate())}`
+}
+
+// Sammenligner to sett svar uavhengig av rekkefølgen på nøklene (jsonb i Postgres sorterer dem om).
+export function sameAnswers(a, b) {
+  const canon = v => Array.isArray(v) ? v.map(canon)
+    : v && typeof v === 'object' ? Object.fromEntries(Object.keys(v).filter(k => v[k] !== undefined).sort().map(k => [k, canon(v[k])]))
+      : v
+  return JSON.stringify(canon(a ?? null)) === JSON.stringify(canon(b ?? null))
 }
 
 const isYesNo = v => v === 'yes' || v === 'no'
@@ -48,8 +87,7 @@ export function validationError(q, answers) {
       return Array.isArray(v) && v.length ? null : 'Velg minst ett alternativ.'
     case 'date': {
       if (!v || !/^\d{4}-\d{2}-\d{2}$/.test(v)) return 'Skriv inn datoen for dødsfallet.'
-      const today = new Date().toISOString().slice(0, 10)
-      if (v > today) return 'Datoen kan ikke være frem i tid.'
+      if (v > localToday()) return 'Datoen kan ikke være frem i tid.'
       if (v < '1900-01-01') return 'Sjekk at årstallet er riktig.'
       return null
     }
@@ -98,6 +136,8 @@ export function validationError(q, answers) {
   }
 }
 
+// Første spørsmål som mangler et gyldig svar, regnet ut fra svarene slik motoren ser dem.
 export function firstUnanswered(answers) {
-  return visibleQuestions(answers).find(q => validationError(q, answers)) || null
+  const a = pruneAnswers(answers)
+  return visibleQuestions(a).find(q => validationError(q, a)) || null
 }

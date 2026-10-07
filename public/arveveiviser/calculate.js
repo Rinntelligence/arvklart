@@ -227,7 +227,9 @@ export function calculateSkifte(a, f, G) {
         people.push({
           id: h.id, label: h.label, relation: h.relation, lineId: line.id,
           exact: perLine[line.id] * w + fromFirst, fromFirst: round(fromFirst),
-          common: line.common, minor: h.minor,
+          // Særkullsbarn finnes bare når det er en gjenlevende ektefelle eller samboer. Et svar om
+          // felles barn kan bli liggende igjen hvis brukeren senere endrer sivilstand.
+          common: f.hasPartner ? line.common : undefined, minor: h.minor,
           compulsory: round(plikt.perLine * w),
           advance: num(advances[line.id]) || 0,
         })

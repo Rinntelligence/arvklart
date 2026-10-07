@@ -2,6 +2,7 @@
 // jsPDF lastes fra cdnjs først når brukeren ber om en PDF.
 
 import { buildReport } from './report.js'
+import { localToday } from './flow.js'
 
 const JSPDF_URL = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js'
 let loading = null
@@ -188,7 +189,6 @@ export async function downloadPdf(answers) {
     doc.text(`Side ${i} av ${pages}`, W - M, H - 10, { align: 'right' })
   }
 
-  const stamp = new Date().toISOString().slice(0, 10)
-  doc.save(`arveoppgjor-oversikt-${stamp}.pdf`)
+  doc.save(`arveoppgjor-oversikt-${localToday()}.pdf`)
   return report
 }

@@ -2,7 +2,7 @@
 // alt slikt hentes fra questions.js, flow.js og engine.js.
 
 import { QUESTION_BY_ID, SECTIONS, ASSET_FIELDS, DEBT_FIELDS } from './questions.js'
-import { visibleQuestions, validationError } from './flow.js'
+import { visibleQuestions, validationError, pruneAnswers, firstUnanswered, localToday, sameAnswers } from './flow.js'
 import { deriveFacts } from './facts.js'
 import { evaluate } from './conditions.js'
 import { analyze, answerFlags, flagsForQuestion } from './engine.js'
@@ -12,23 +12,67 @@ import { GRANDPARENT_SIDES, childLines } from './heirs.js'
 import { fill, kr as krPlain, pct } from './text.js'
 import { estateRows, answerSummary, toEstatePayload } from './report.js'
 
-const STORAGE_KEY = 'arvklart-arveveiviser-v1'
 const root = document.getElementById('arvWizard')
 
 // ── Tilstand og lagring ──────────────────────────────────────
-function load() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    return raw ? JSON.parse(raw) : null
-  } catch { return null }
+// Svarene lagres i nettleseren per bruker og per bo. Da får et bo aldri svarene til et annet bo,
+// og svarene i et bo overskriver ikke det brukeren holder på med i veiviseren utenfor boet.
+// I Arvklart-appen (iframe i GuidePage) venter vi med å laste svarene til appen har fortalt
+// hvem som er logget inn og hvilket bo veiviseren er åpnet fra (se veiviser-context).
+const STORAGE_PREFIX = 'arvklart-arveveiviser-v2'
+const LEGACY_KEY = 'arvklart-arveveiviser-v1' // felles for alle bo og brukere før
+const store = {
+  get: key => { try { const raw = localStorage.getItem(key); return raw ? JSON.parse(raw) : null } catch { return null } },
+  set: (key, v) => { try { localStorage.setItem(key, JSON.stringify(v)) } catch { /* privat modus o.l. */ } },
+  remove: key => { try { localStorage.removeItem(key) } catch { /* ignorer */ } },
 }
+const scopeKey = (userId, estateId) => `${STORAGE_PREFIX}:${userId || 'anonym'}:${estateId ? 'bo-' + estateId : 'veiviser'}`
+let storageKey = null
+
 function save() {
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)) } catch { /* privat modus o.l. */ }
+  if (storageKey) store.set(storageKey, state)
 }
 // `acks`: varsler brukeren har bekreftet med «OK», per spørsmål (se renderFlags).
+// `synced`: svarene er uendret siden de sist ble hentet fra eller lagret i boet.
 const fresh = () => ({ answers: {}, current: null, view: 'intro', resultView: null, returnTo: null, acks: {} })
-let state = { ...fresh(), ...(load() || {}) }
+let state = fresh()
 let error = null
+const hasAnswers = () => Object.keys(state.answers || {}).length > 0
+
+// Bytter til svarene for en bruker og et bo. Returnerer true hvis det ble byttet.
+function switchScope(userId, estateId) {
+  const key = scopeKey(userId, estateId)
+  if (key === storageKey) return false
+  storageKey = key
+  let stored = store.get(key)
+  if (!stored) {
+    // Svar lagret før lagringen ble delt opp: flyttes bare til samme bo (eller veiviseren utenfor bo)
+    const legacy = store.get(LEGACY_KEY)
+    if (legacy && (legacy.estateId || null) === estateId) {
+      stored = legacy
+      store.remove(LEGACY_KEY)
+      store.set(key, stored)
+    }
+  }
+  state = { ...fresh(), ...(stored || {}) }
+  delete state.estateId
+  error = null
+  needsAck = false
+  return true
+}
+
+// Brukeren har nettopp logget inn for å lagre svar hen fylte ut uten å være innlogget (appen har
+// sjekket e-posten). Svarene flyttes over til brukeren, så de ikke blir liggende synlige for andre
+// som bruker nettleseren uten å logge inn. Har brukeren egne svar her fra før, beholdes de.
+function adoptAnonymous() {
+  const anonKey = scopeKey(null, null)
+  const anon = store.get(anonKey)
+  if (!anon?.answers || !Object.keys(anon.answers).length || hasAnswers()) return
+  state = { ...fresh(), ...anon }
+  delete state.estateId
+  store.remove(anonKey)
+  save()
+}
 
 // Kontakt med Arvklart-appen rundt veiviseren (iframe i GuidePage). Appen tar seg av
 // innlogging og lagring i boet; veiviseren sender bare svarene og ferdig beregnede data.
@@ -94,6 +138,7 @@ function sourceLinks(ids = []) {
 
 function setAnswer(id, value) {
   state.answers = { ...state.answers, [id]: value }
+  state.synced = false
   error = null
   needsAck = false
   save()
@@ -109,11 +154,14 @@ function go(view, current) {
   render()
   root.scrollIntoView({ behavior: 'smooth', block: 'start' })
 }
+// Navigasjon, validering og fremdrift bruker svarene slik motoren ser dem (pruneAnswers):
+// svar på spørsmål som er skjult nå, skal ikke styre hvilke spørsmål som vises.
 function nextQuestion() {
-  const qs = visibleQuestions(state.answers)
+  const a = pruneAnswers(state.answers)
+  const qs = visibleQuestions(a)
   const q = QUESTION_BY_ID[state.current]
   if (q) {
-    const err = validationError(q, state.answers)
+    const err = validationError(q, a)
     if (err) { error = err; render(); return }
     if (unacked(q)) {
       needsAck = true
@@ -125,7 +173,7 @@ function nextQuestion() {
   // Ved endring fra oversikten eller resultatet: gå tilbake dit – men først til spørsmål
   // som endringen har gjort relevante og som ikke er besvart ennå.
   if (state.returnTo) {
-    const open = visibleQuestions(state.answers).find(x => validationError(x, state.answers))
+    const open = qs.find(x => validationError(x, a))
     if (open && open.id !== state.current) return go('question', open.id)
     const to = state.returnTo
     state.returnTo = null
@@ -142,7 +190,7 @@ function editQuestion(id) {
   go('question', id)
 }
 function prevQuestion() {
-  const qs = visibleQuestions(state.answers)
+  const qs = visibleQuestions(pruneAnswers(state.answers))
   const idx = qs.findIndex(x => x.id === state.current)
   if (idx > 0) go('question', qs[idx - 1].id)
   else go('intro')
@@ -150,10 +198,15 @@ function prevQuestion() {
 
 // ── Visninger ────────────────────────────────────────────────
 function render() {
-  const facts = deriveFacts(state.answers)
+  if (!storageKey) {
+    root.innerHTML = '<div class="aw-card"><p class="aw-why">Laster veiviseren …</p></div>'
+    return
+  }
+  const a = pruneAnswers(state.answers)
+  const facts = deriveFacts(a)
   let html = ''
-  if (state.view === 'question' && QUESTION_BY_ID[state.current]) html = renderQuestion(QUESTION_BY_ID[state.current], facts)
-  else if (state.view === 'review') html = renderReview(facts)
+  if (state.view === 'question' && QUESTION_BY_ID[state.current]) html = renderQuestion(QUESTION_BY_ID[state.current], facts, a)
+  else if (state.view === 'review') html = renderReview(facts, a)
   else if (state.view === 'result') html = renderResult()
   else html = renderIntro()
   root.innerHTML = html
@@ -182,10 +235,10 @@ function renderIntro() {
   </div>`
 }
 
-function renderProgress(qs, idx, q) {
+function renderProgress(qs, idx, q, a) {
   const activeSections = SECTIONS.filter(s => qs.some(x => x.section === s.id))
   const pctDone = Math.round((idx / qs.length) * 100)
-  const openIdx = qs.findIndex(x => validationError(x, state.answers))
+  const openIdx = qs.findIndex(x => validationError(x, a))
   const firstOpen = openIdx === -1 ? qs.length : openIdx
   return `
   <div class="aw-progress" aria-label="Fremdrift">
@@ -206,10 +259,10 @@ function renderProgress(qs, idx, q) {
   </div>`
 }
 
-function renderLearnMore(q, facts) {
+function renderLearnMore(q, facts, a) {
   const lm = q.learnMore
   if (!lm || (!lm.text && !lm.sources?.length)) return ''
-  if (lm.showIf && !evaluate(lm.showIf, { answers: state.answers, facts })) return ''
+  if (lm.showIf && !evaluate(lm.showIf, { answers: a, facts })) return ''
   return `
   <details class="aw-more">
     <summary>${esc(fill(lm.title || 'Les mer', facts))}</summary>
@@ -218,29 +271,29 @@ function renderLearnMore(q, facts) {
   </details>`
 }
 
-function renderQuestion(q, facts) {
-  const qs = visibleQuestions(state.answers)
+function renderQuestion(q, facts, a) {
+  const qs = visibleQuestions(a)
   let idx = qs.findIndex(x => x.id === q.id)
-  if (idx === -1) { state.current = qs[0]?.id; return renderQuestion(qs[0], facts) }
+  if (idx === -1) { state.current = qs[0]?.id; return renderQuestion(qs[0], facts, a) }
   const isLast = idx === qs.length - 1
   const flags = flagsForQuestion(state.answers, q.id)
   const acked = !unacked(q)
   return `
   <div class="aw-card aw-question" data-q="${q.id}">
-    ${renderProgress(qs, idx, q)}
+    ${renderProgress(qs, idx, q, a)}
     <h3 class="aw-title" tabindex="-1" data-autofocus>${rich(titleFor(q, facts), facts)}</h3>
     <p class="aw-why"><span>Hvorfor spør vi om dette?</span> ${rich(typeof q.why === 'function' ? q.why(facts) : q.why, facts)}</p>
-    <div class="aw-input">${renderInput(q, facts)}</div>
+    <div class="aw-input">${renderInput(q, facts, a)}</div>
     ${error ? `<p class="aw-error" role="alert">${esc(error)}</p>` : ''}
     ${renderFlags(flags, facts, acked)}
-    ${renderLearnMore(q, facts)}
+    ${renderLearnMore(q, facts, a)}
     <div class="aw-nav">
       <button type="button" class="aw-btn ghost" data-action="prev">${ICON.back} Tilbake</button>
       <button type="button" class="aw-btn primary" data-action="next">${state.returnTo ? 'Lagre endringen' : isLast ? 'Se resultatet' : 'Neste'} ${ICON.arrow}</button>
     </div>
     <div class="aw-quicklinks">
       ${idx > 0 ? '<button type="button" class="aw-link" data-action="review">Se over og endre alle svarene</button>' : ''}
-      ${!state.returnTo && qs.every(x => !validationError(x, state.answers)) ? '<button type="button" class="aw-link" data-action="result">Gå rett til resultatet</button>' : ''}
+      ${!state.returnTo && qs.every(x => !validationError(x, a)) ? '<button type="button" class="aw-link" data-action="result">Gå rett til resultatet</button>' : ''}
     </div>
   </div>`
 }
@@ -287,9 +340,9 @@ function optionHint(o, facts) {
   return hint ? `<span class="aw-option-hint">${esc(fill(hint, facts))}</span>` : ''
 }
 
-function renderInput(q, facts) {
-  const v = state.answers[q.id]
-  const ctx = { answers: state.answers, facts }
+function renderInput(q, facts, a) {
+  const v = a[q.id]
+  const ctx = { answers: a, facts }
   switch (q.type) {
     case 'single':
       return `<div class="aw-options">${q.options.filter(o => evaluate(o.showIf, ctx)).map(o => `
@@ -304,7 +357,7 @@ function renderInput(q, facts) {
         </button>`).join('')}</div>`
     }
     case 'date':
-      return `<input class="aw-date" type="date" data-path="${q.id}" value="${esc(v || '')}" max="${new Date().toISOString().slice(0, 10)}" min="1900-01-01">`
+      return `<input class="aw-date" type="date" data-path="${q.id}" value="${esc(v || '')}" max="${localToday()}" min="1900-01-01">`
     case 'number':
       return moneyInput(q.id, v, 'Beløp', q.optional ? 'La stå tomt hvis du ikke vet' : '')
     case 'percent':
@@ -318,9 +371,9 @@ function renderInput(q, facts) {
     case 'otherChildren': return renderOtherChildren(v)
     case 'siblings': return renderSiblings(v)
     case 'grandparents': return renderGrandparents(v)
-    case 'assets': return renderAssets(v || {}, facts)
+    case 'assets': return renderAssets(v || {}, facts, a)
     case 'advancements': {
-      const lines = childLines(state.answers.children || [])
+      const lines = childLines(a.children || [])
       return lines.map(l => moneyInput(`${q.id}.${l.id}`, v?.[l.id], l.label)).join('') +
         '<p class="aw-hint">La feltet stå tomt for barn som ikke fikk forskudd.</p>'
     }
@@ -411,11 +464,11 @@ function renderGrandparents(v = {}) {
   }).join('')}</div>`
 }
 
-function renderAssets(v, facts) {
+function renderAssets(v, facts, a) {
   const married = facts.married
-  const sep = facts.married && state.answers.separateProperty === 'yes'
-  const sepDeceased = sep && ['deceased', 'both'].includes(state.answers.separatePropertyWho)
-  const sepSurvivor = sep && ['survivor', 'both'].includes(state.answers.separatePropertyWho)
+  const sep = facts.married && a.separateProperty === 'yes'
+  const sepDeceased = sep && ['deceased', 'both'].includes(a.separatePropertyWho)
+  const sepSurvivor = sep && ['survivor', 'both'].includes(a.separatePropertyWho)
   const couple = fill('{couple}', facts)
   const intro = married
     ? `<p class="aw-hint aw-hint-box">Ta med alt <strong>${couple} eide til sammen</strong> – både det som sto på avdøde og på gjenlevende. Ektefellers felles formue deles først i to like deler. Bare avdødes halvdel er arv.${sep ? ' Det som etter ektepakten skal holdes utenfor, fører du opp nederst.' : ''}</p>`
@@ -439,10 +492,10 @@ function renderAssets(v, facts) {
   <fieldset class="aw-group"><legend>Utgifter etter dødsfallet</legend>
     ${moneyInput('assets.funeral', v.funeral, 'Begravelse og gravstein', 'Dekkes av boet før arven fordeles')}
   </fieldset>
-  <div class="aw-live" aria-live="polite">${liveTotal(v, facts)}</div>`
+  <div class="aw-live" aria-live="polite">${liveTotal(v)}</div>`
 }
 
-function liveTotal(v, facts) {
+function liveTotal(v) {
   const n = x => { const k = Number(String(x ?? '').replace(/\s/g, '').replace(',', '.')); return Number.isFinite(k) && k > 0 ? k : 0 }
   const assets = ASSET_FIELDS.reduce((s, f) => s + n(v[f.key]), 0)
   const debts = DEBT_FIELDS.reduce((s, f) => s + n(v[f.key]), 0)
@@ -450,14 +503,14 @@ function liveTotal(v, facts) {
 }
 
 // ── Oversikt over svar ──────────────────────────────────────
-function renderReview(facts) {
-  const rows = answerSummary(state.answers, facts)
+function renderReview(facts, a) {
+  const rows = answerSummary(a, facts)
   const groups = []
   for (const r of rows) {
     if (!groups.length || groups[groups.length - 1].section !== r.section) groups.push({ section: r.section, rows: [] })
     groups[groups.length - 1].rows.push(r)
   }
-  const missing = visibleQuestions(state.answers).find(q => validationError(q, state.answers))
+  const missing = visibleQuestions(a).find(q => validationError(q, a))
   const flags = answerFlags(state.answers)
   const flagTag = id => {
     const own = flags.filter(f => f.questionId === id)
@@ -575,7 +628,7 @@ function renderCompare(r, facts) {
 }
 
 function isDirty() {
-  return Boolean(host.saved) && JSON.stringify(host.saved.answers) !== JSON.stringify(state.answers)
+  return Boolean(host.saved) && !sameAnswers(host.saved.answers, state.answers)
 }
 function renderSaveCard(r) {
   const date = d => new Date(d).toLocaleDateString('nb-NO', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })
@@ -775,8 +828,7 @@ root.addEventListener('click', e => {
   switch (action) {
     case 'start': state.answers = {}; go('question', visibleQuestions({})[0].id); break
     case 'resume': {
-      const qs = visibleQuestions(state.answers)
-      const firstOpen = qs.find(x => validationError(x, state.answers))
+      const firstOpen = firstUnanswered(state.answers)
       if (firstOpen) go('question', firstOpen.id)
       else go('result')
       break
@@ -805,10 +857,18 @@ root.addEventListener('click', e => {
       break
     }
     case 'gotoSave': document.getElementById('awSave')?.scrollIntoView({ behavior: 'smooth', block: 'center' }); break
-    case 'saveToEstate':
+    case 'saveToEstate': {
       host.saving = true; host.message = null; render()
-      toHost({ type: 'veiviser-save', login: Boolean(btn.dataset.login), answers: state.answers, payload: toEstatePayload(state.answers) })
+      const payload = toEstatePayload(state.answers)
+      // Navnet hver arving hadde sist resultatet ble lagret i boet, slik at appen finner igjen
+      // raden – og e-posten som er lagt inn på den – selv om navnet er endret siden.
+      if (host.saved?.answers) {
+        const before = new Map(toEstatePayload(host.saved.answers).heirs.map(h => [h.key, h.name]))
+        for (const h of payload.heirs) h.previousName = before.get(h.key) || null
+      }
+      toHost({ type: 'veiviser-save', login: Boolean(btn.dataset.login), answers: state.answers, payload })
       break
+    }
     case 'open': toHost({ type: 'veiviser-navigate', path }); break
     case 'resultView': state.resultView = value; save(); render(); break
     case 'choose':
@@ -842,7 +902,7 @@ root.addEventListener('input', e => {
   setPath(el.dataset.path, el.value)
   if (el.dataset.path.startsWith('assets.')) {
     const live = root.querySelector('.aw-live')
-    if (live) live.innerHTML = liveTotal(state.answers.assets || {}, deriveFacts(state.answers))
+    if (live) live.innerHTML = liveTotal(state.answers.assets || {})
   }
 })
 root.addEventListener('change', e => {
@@ -867,10 +927,15 @@ window.addEventListener('message', e => {
   if (e.origin !== window.location.origin || e.source !== window.parent) return
   const m = e.data || {}
   if (m.type === 'veiviser-context') {
+    const estateId = m.estateId || m.estate?.id || null
+    if (switchScope(m.userId || null, estateId)) Object.assign(host, { saving: false, message: null })
     Object.assign(host, { ready: true, loggedIn: Boolean(m.loggedIn), estate: m.estate || null, saved: m.saved || null })
-    // Åpnet fra et bo med lagrede svar: bruk dem, med mindre vi allerede jobber med svarene til dette boet.
-    if (m.saved?.answers && state.estateId !== m.estate?.id) {
-      state = { ...fresh(), answers: m.saved.answers, view: 'result', estateId: m.estate.id }
+    if (m.adoptAnonymous && m.userId && !estateId) adoptAnonymous()
+    // Åpnet fra et bo med lagrede svar: bruk dem hvis vi ikke har svar for dette boet her fra før,
+    // eller hvis noen har lagret andre svar i boet siden og brukeren ikke har endret noe her.
+    const saved = estateId ? m.saved : null
+    if (saved?.answers && (!hasAnswers() || (state.synced && !sameAnswers(saved.answers, state.answers)))) {
+      state = { ...fresh(), answers: JSON.parse(JSON.stringify(saved.answers)), view: 'result', synced: true }
       save()
     }
     render()
@@ -878,10 +943,10 @@ window.addEventListener('message', e => {
   if (m.type === 'veiviser-saved') {
     host.saving = false
     if (m.ok) {
-      host.estate = m.estate
+      if (m.estate) host.estate = m.estate
       host.saved = { answers: JSON.parse(JSON.stringify(state.answers)), savedAt: m.savedAt || new Date().toISOString() }
       host.loggedIn = true
-      state.estateId = m.estate.id
+      state.synced = true
       save()
       host.message = { type: 'ok', text: m.text || 'Lagret! Arvingene og stegene er lagt inn i boet.' }
     } else if (m.cancelled) {
@@ -892,6 +957,10 @@ window.addEventListener('message', e => {
     render()
   }
 })
+
 toHost({ type: 'veiviser-ready' })
+// Utenfor appen brukes svarene for ikke-innloggede. Svarer ikke appen, bruker vi boet i adressen.
+if (!embedded) switchScope(null, null)
+else setTimeout(() => { if (!storageKey) { switchScope(null, new URLSearchParams(window.location.search).get('bo')); render() } }, 5000)
 
 render()

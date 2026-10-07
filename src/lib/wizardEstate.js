@@ -14,9 +14,25 @@ const store = {
   remove: key => { try { localStorage.removeItem(key) } catch { /* ignorer */ } },
 }
 
-// Lagring som venter på at brukeren har opprettet bruker eller logget inn.
-export const getPendingSave = () => store.get(PENDING_KEY)
-export const setPendingSave = data => store.set(PENDING_KEY, { ...data, createdAt: Date.now() })
+// Lagring som venter på at brukeren har opprettet bruker eller logget inn. Den gjelder i ett døgn
+// (nok til å bekrefte e-posten), og bare for e-posten som ble brukt i innloggingsdialogen.
+// getPendingSave() gir null for utløpte eller ugyldige lagringer – og for en annen bruker når
+// e-posten til den innloggede er oppgitt – og fjerner dem.
+const PENDING_TTL_MS = 24 * 60 * 60 * 1000
+const normEmail = e => String(e || '').trim().toLowerCase()
+
+export function getPendingSave(email) {
+  const p = store.get(PENDING_KEY)
+  if (!p) return null
+  const age = Date.now() - Number(p.createdAt)
+  const valid = p.request && p.email && Number.isFinite(age) && age >= 0 && age <= PENDING_TTL_MS
+  if (!valid || (email !== undefined && normEmail(email) !== p.email)) {
+    store.remove(PENDING_KEY)
+    return null
+  }
+  return p
+}
+export const setPendingSave = data => store.set(PENDING_KEY, { ...data, email: normEmail(data.email), createdAt: Date.now() })
 export const clearPendingSave = () => store.remove(PENDING_KEY)
 
 const genCode = () => Math.random().toString(36).substring(2, 8).toUpperCase()
@@ -32,6 +48,8 @@ function sanitize(payload = {}) {
       relationship: str(h.relationship, 50) || 'Annen',
       percentage: Math.min(100, Math.max(0, num(h.percentage))),
       notes: str(h.notes, 1000),
+      // Navnet arvingen hadde sist veiviseren lagret i boet (brukes bare til å finne igjen raden)
+      previousName: str(h.previousName, 100),
     })),
     tasks: (Array.isArray(payload.tasks) ? payload.tasks : []).slice(0, 50).map(t => ({
       title: str(t.title, 200),
@@ -88,15 +106,12 @@ export async function saveWizardToEstate(estateId, userId, { answers, payload })
   const { error: answersError } = await supabase.from('estates').update({ wizard_answers: answers, wizard_updated_at: savedAt }).eq('id', estateId)
   store.set(localAnswersKey(estateId), { answers, savedAt })
 
-  // Arvinger: erstatt de som kom fra veiviseren sist, men behold e-post som er lagt inn
-  // på dem (trengs for at arvingen skal kunne bli med i boet).
-  const { data: prevHeirs } = await supabase.from('heirs').select('name, email').eq('estate_id', estateId).like('notes', `${WIZARD_TAG}%`)
-  const emailByName = new Map((prevHeirs || []).filter(h => h.email).map(h => [h.name, h.email]))
-  const { error: delHeirs } = await supabase.from('heirs').delete().eq('estate_id', estateId).like('notes', `${WIZARD_TAG}%`)
-  if (delHeirs) return { error: delHeirs }
+  // Arvinger: oppdater de som kom fra veiviseren sist, i stedet for å slette dem og legge dem inn
+  // på nytt. Da blir e-posten som er lagt inn på dem stående – den avgjør hvem som kan bli med i
+  // boet. Har resultatet ingen arvinger (veiviseren mangler opplysninger), røres de ikke.
   if (p.heirs.length) {
-    const { error } = await supabase.from('heirs').insert(p.heirs.map(h => ({ ...h, email: emailByName.get(h.name) || null, estate_id: estateId })))
-    if (error) return { error }
+    const heirsError = await replaceWizardHeirs(estateId, p.heirs)
+    if (heirsError) return { error: heirsError }
   }
 
   // Oppgaver: erstatt de ufullførte fra veiviseren, og hopp over steg som allerede er gjort.
@@ -111,5 +126,44 @@ export async function saveWizardToEstate(estateId, userId, { answers, payload })
     if (error) return { error }
   }
 
-  return { savedAt, answersInDatabase: !answersError, heirs: p.heirs.length, tasks: newTasks.length }
+  return { savedAt, answersInDatabase: !answersError, heirs: p.heirs.length, heirsKept: !p.heirs.length, tasks: newTasks.length }
+}
+
+// Finner hvilken tidligere arving fra veiviseren hver ny arving er: først etter navnet personen
+// hadde sist (navnet kan være endret i veiviseren), så etter samme navn.
+function matchWizardHeirs(prev, next) {
+  const free = [...prev]
+  const norm = s => String(s || '').trim().toLowerCase()
+  const take = name => {
+    const i = name ? free.findIndex(o => norm(o.name) === norm(name)) : -1
+    return i === -1 ? null : free.splice(i, 1)[0]
+  }
+  const matched = next.map(h => take(h.previousName))
+  next.forEach((h, i) => { if (!matched[i]) matched[i] = take(h.name) })
+  return { matched, removed: free }
+}
+
+async function replaceWizardHeirs(estateId, heirs) {
+  const { data: prev, error: prevError } = await supabase.from('heirs').select('id, name')
+    .eq('estate_id', estateId).like('notes', `${WIZARD_TAG}%`).order('created_at')
+  if (prevError) return prevError
+  const { matched, removed } = matchWizardHeirs(prev || [], heirs)
+  const row = ({ previousName: _, ...h }) => h // previousName er ingen kolonne
+
+  const updates = await Promise.all(heirs.map((h, i) => matched[i]
+    ? supabase.from('heirs').update(row(h)).eq('id', matched[i].id)
+    : { error: null }))
+  const updateError = updates.find(r => r.error)?.error
+  if (updateError) return updateError
+
+  const added = heirs.filter((_, i) => !matched[i])
+  if (added.length) {
+    const { error } = await supabase.from('heirs').insert(added.map(h => ({ ...row(h), email: null, estate_id: estateId })))
+    if (error) return error
+  }
+  if (removed.length) {
+    const { error } = await supabase.from('heirs').delete().in('id', removed.map(h => h.id))
+    if (error) return error
+  }
+  return null
 }

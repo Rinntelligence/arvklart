@@ -232,6 +232,8 @@ export function toEstatePayload(answers) {
         p.isPartner && s.estate.kind === 'married' ? `Beholder i tillegg sin halvdel av felles formue (${kr(s.estate.half)}).` : '',
       ].filter(Boolean).join(' ')
       heirs.push({
+        // Fast id for personen i veiviseren (endres ikke når navnet endres), se ui.js og wizardEstate.js
+        key: p.id,
         name: p.isPartner && f.survivor ? 'Meg (gjenlevende)' : p.label,
         relationship: RELATIONSHIP[p.relation] || 'Annen',
         percentage: Math.round((p.amount / s.fullE) * 10000) / 100,
