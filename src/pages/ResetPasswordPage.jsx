@@ -2,19 +2,20 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { L } from '../lib/lang'
+import { isDemoSession } from '../lib/demo'
 
 const inputStyle = { width:'100%', padding:'12px 14px', border:'1px solid #D9CFC0', borderRadius:'8px', fontSize:'15px', background:'#FBF9F5', color:'#3A2F26', outline:'none', fontFamily:'Karla, sans-serif', boxSizing:'border-box' }
 const linkStyle = { background:'none', border:'none', color:'#5F6E52', cursor:'pointer', fontSize:'13px', fontFamily:'Karla, sans-serif', textDecoration:'underline' }
 
 // Landing page for the reset link from "Forgot password". Supabase signs the user in
 // from the link, so a session here means the link was valid.
-export default function ResetPasswordPage({ session, onToast }) {
+export default function ResetPasswordPage({ session, onToast, onDone }) {
   const navigate = useNavigate()
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
   const [loading, setLoading] = useState(false)
 
-  const isDemo = session?.user?.email === 'mona.demo@heirsplit.no'
+  const isDemo = isDemoSession(session)
   const mismatch = confirm && password !== confirm
   const canSubmit = password.length >= 6 && password === confirm
 
@@ -31,7 +32,8 @@ export default function ResetPasswordPage({ session, onToast }) {
     setLoading(false)
     if (error) { onToast(errMsg(error.message), 'error'); return }
     onToast(L('Passordet er oppdatert', 'Your password has been updated'))
-    navigate('/')
+    if (onDone) onDone()
+    else navigate('/')
   }
 
   return (

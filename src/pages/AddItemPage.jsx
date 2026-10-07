@@ -1,31 +1,16 @@
 import { useEffect, useRef, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { getCategories, uploadImage, supabase } from '../lib/supabase'
-import { L, locale } from '../lib/lang'
+import { getCategories, supabase } from '../lib/supabase'
+import { downscaleImage, fileToBase64, fileToDataUrl, uploadEstateImage } from '../lib/images'
+import { hasAiConsent, giveAiConsent } from '../lib/aiConsent'
+import { formatNOK } from '../lib/format'
+import { L } from '../lib/lang'
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL
-const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY
-
+// Kalles med brukerens innlogging; edge-funksjonene avviser anonyme kall.
 async function callEdgeFunction(name, body) {
-  const res = await fetch(`${SUPABASE_URL}/functions/v1/${name}`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-    },
-    body: JSON.stringify(body),
-  })
-  if (!res.ok) throw new Error(`${name} feilet: ${res.status}`)
-  return res.json()
-}
-
-function fileToBase64(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = ev => resolve(ev.target.result.split(',')[1])
-    reader.onerror = reject
-    reader.readAsDataURL(file)
-  })
+  const { data, error } = await supabase.functions.invoke(name, { body })
+  if (error) throw error
+  return data
 }
 
 export default function AddItemPage({ session, profile, onToast }) {
@@ -45,8 +30,8 @@ export default function AddItemPage({ session, profile, onToast }) {
   const [purchasePrice, setPurchasePrice] = useState('')
   const [purchaseYear, setPurchaseYear] = useState('')
   const [myEstimateVote, setMyEstimateVote] = useState(null) // 'agree' | 'disagree'
-  const [aiConsented, setAiConsented] = useState(() => { try { return localStorage.getItem('aiConsented') === 'true' } catch { return false } })
-  const [showAiConsent, setShowAiConsent] = useState(false)
+  const [aiConsented, setAiConsented] = useState(hasAiConsent)
+  const [consentFor, setConsentFor] = useState(null) // 'analyze' | 'estimate' mens samtykket vises
   const [showAddCat, setShowAddCat] = useState(false)
   const [newCatLabel, setNewCatLabel] = useState('')
   const [newCatEmoji, setNewCatEmoji] = useState('📦')
@@ -63,8 +48,9 @@ export default function AddItemPage({ session, profile, onToast }) {
   const addCategory = async () => {
     if (!newCatLabel.trim()) return
     setSavingCat(true)
-    const { data: newCat } = await supabase.from('categories').insert({ label: newCatLabel.trim(), emoji: newCatEmoji, estate_id: id }).select().single()
+    const { data: newCat, error } = await supabase.from('categories').insert({ label: newCatLabel.trim(), emoji: newCatEmoji, estate_id: id }).select().single()
     setSavingCat(false)
+    if (error) { onToast(L('Kunne ikke legge til kategorien', 'Could not add the category'), 'error'); return }
     setNewCatLabel(''); setNewCatEmoji('📦'); setShowAddCat(false)
     await loadCategories()
     if (newCat) setCategoryId(newCat.id)
@@ -77,18 +63,14 @@ export default function AddItemPage({ session, profile, onToast }) {
       return true
     }).slice(0, 5)
     if (!files.length) return
-    const newFiles = [...imageFiles, ...files].slice(0, 5)
-    setImageFiles(newFiles)
-    newFiles.forEach((file, i) => {
-      if (imagePreviews[i]) return
-      const reader = new FileReader()
-      reader.onload = ev => setImagePreviews(prev => {
-        const next = [...prev]
-        next[i] = ev.target.result
-        return next
-      })
-      reader.readAsDataURL(file)
-    })
+    const room = 5 - imageFiles.length
+    const added = files.slice(0, room)
+    if (files.length > room) onToast(L('Maks 5 bilder per gjenstand', 'Max 5 photos per item'), 'error')
+    if (!added.length) return
+    setImageFiles(prev => [...prev, ...added])
+    // Forhåndsvisningene legges til i samme rekkefølge som filene
+    Promise.all(added.map(fileToDataUrl)).then(urls => setImagePreviews(prev => [...prev, ...urls]))
+    e.target.value = ''
   }
 
   const removeImage = (index) => {
@@ -100,10 +82,12 @@ export default function AddItemPage({ session, profile, onToast }) {
     if (!imageFiles[0]) return
     setAnalyzing(true)
     try {
-      const imageBase64 = await fileToBase64(imageFiles[0])
+      // Forminsket JPEG: mobilbilder er ofte over grensen på 5 MB, og HEIC støttes ikke
+      const image = await downscaleImage(imageFiles[0], 1568)
+      const imageBase64 = await fileToBase64(image)
       const res = await callEdgeFunction('analyze-item', {
         imageBase64,
-        mimeType: imageFiles[0].type || 'image/jpeg',
+        mimeType: image.type || 'image/jpeg',
       })
       const result = res.data || res
       if (result.title && !title) setTitle(result.title)
@@ -175,23 +159,25 @@ export default function AddItemPage({ session, profile, onToast }) {
 
       if (error) throw error
 
+      let failedImages = imageFiles.length
       if (imageFiles.length > 0) {
         const urls = []
         for (const file of imageFiles) {
           try {
-            const url = await uploadImage(file, newItem.id + '-' + Date.now())
-            urls.push(url)
+            urls.push(await uploadEstateImage(file, id))
           } catch (e) { console.error('Bilde feilet:', e) }
         }
         if (urls.length > 0) {
-          await supabase.from('items').update({
+          const { error: imgError } = await supabase.from('items').update({
             image_url: urls[0],
             extra_images: urls.slice(1),
           }).eq('id', newItem.id)
+          if (!imgError) failedImages -= urls.length
         }
       }
 
-      onToast(L('Gjenstand lagt til! ✓', 'Item added! ✓'))
+      if (failedImages > 0) onToast(L(`Gjenstanden er lagt til, men ${failedImages} ${failedImages === 1 ? 'bilde' : 'bilder'} kunne ikke lastes opp. Prøv igjen fra «Rediger».`, `The item was added, but ${failedImages} ${failedImages === 1 ? 'photo' : 'photos'} could not be uploaded. Try again from «Edit».`), 'error')
+      else onToast(L('Gjenstand lagt til! ✓', 'Item added! ✓'))
       navigate(`/estate/${id}`)
     } catch (e) {
       onToast(L('Feil: ', 'Error: ') + e.message, 'error')
@@ -199,8 +185,6 @@ export default function AddItemPage({ session, profile, onToast }) {
       setSaving(false)
     }
   }
-
-  const formatNOK = (n) => n ? new Intl.NumberFormat(locale(), { style: 'currency', currency: 'NOK', maximumFractionDigits: 0 }).format(n) : '—'
 
   return (
     <div style={{ maxWidth: '560px', margin: '0 auto', padding: '20px 16px 100px', fontFamily: 'Karla, sans-serif' }}>
@@ -249,8 +233,8 @@ export default function AddItemPage({ session, profile, onToast }) {
           <input ref={fileRef} type="file" accept="image/*" capture="environment" multiple onChange={handleImages} style={{ display: 'none' }} />
 
           {/* AI-analyseknapp */}
-          {imageFiles.length > 0 && !showAiConsent && (
-            <button onClick={() => aiConsented ? analyzeWithAI() : setShowAiConsent(true)} disabled={analyzing} style={{
+          {imageFiles.length > 0 && !consentFor && (
+            <button onClick={() => aiConsented ? analyzeWithAI() : setConsentFor('analyze')} disabled={analyzing} style={{
               marginTop: '10px', padding: '9px 16px', background: analyzing ? '#D9CFC0' : '#5F6E52',
               color: '#fff', border: 'none', borderRadius: '8px', cursor: analyzing ? 'not-allowed' : 'pointer',
               fontSize: '13px', fontFamily: 'Karla, sans-serif', display: 'flex', alignItems: 'center', gap: '6px',
@@ -258,18 +242,7 @@ export default function AddItemPage({ session, profile, onToast }) {
               {analyzing ? L('Analyserer…', 'Analysing…') : L('Analyser med AI', 'Analyse with AI')}
             </button>
           )}
-          {showAiConsent && (
-            <div style={{ marginTop: '10px', background: '#FBF9F5', border: '1px solid #D9CFC0', borderRadius: '10px', padding: '14px' }}>
-              <div style={{ fontSize: '13px', color: '#3A2F26', fontWeight: '500', marginBottom: '6px' }}>{L('Bildet sendes til en AI-tjeneste', 'The photo is sent to an AI service')}</div>
-              <p style={{ fontSize: '12px', color: '#5C4530', lineHeight: '1.6', marginBottom: '10px' }}>
-                {L('For å identifisere gjenstanden sendes bildet til Anthropic (USA) for analyse. Bildet brukes kun til dette og lagres ikke av dem. Les mer i vår', 'To identify the item, the photo is sent to Anthropic (USA) for analysis. The photo is used only for this and is not stored by them. Read more in our')} <a href="/personvern" target="_blank" style={{ color: '#5F6E52' }}>{L('personvernerklæring', 'privacy policy')}</a>.
-              </p>
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <button onClick={() => setShowAiConsent(false)} style={{ flex: 1, padding: '8px', background: 'none', border: '1px solid #D9CFC0', borderRadius: '7px', cursor: 'pointer', fontSize: '13px', fontFamily: 'Karla, sans-serif', color: '#5C4530' }}>{L('Avbryt', 'Cancel')}</button>
-                <button onClick={() => { try { localStorage.setItem('aiConsented', 'true') } catch {} setAiConsented(true); setShowAiConsent(false); analyzeWithAI() }} style={{ flex: 2, padding: '8px', background: '#5F6E52', color: '#fff', border: 'none', borderRadius: '7px', cursor: 'pointer', fontSize: '13px', fontFamily: 'Karla, sans-serif' }}>{L('Godta og analyser', 'Accept and analyse')}</button>
-              </div>
-            </div>
-          )}
+          {consentFor === 'analyze' && <AiConsent onCancel={() => setConsentFor(null)} onAccept={() => { giveAiConsent(); setAiConsented(true); setConsentFor(null); analyzeWithAI() }} />}
         </div>
 
         {/* Navn */}
@@ -402,8 +375,10 @@ export default function AddItemPage({ session, profile, onToast }) {
         </div>
 
         {/* Verdiestimat-knapp */}
-        {title.trim() && (
-          <button onClick={getValueEstimate} disabled={estimating} style={{
+        {consentFor === 'estimate' && <AiConsent onCancel={() => setConsentFor(null)} onAccept={() => { giveAiConsent(); setAiConsented(true); setConsentFor(null); getValueEstimate() }} />}
+
+        {title.trim() && !consentFor && (
+          <button onClick={() => aiConsented ? getValueEstimate() : setConsentFor('estimate')} disabled={estimating} style={{
             padding: '11px 18px', background: estimating ? '#D9CFC0' : '#8B9A7D',
             color: '#fff', border: 'none', borderRadius: '8px', cursor: estimating ? 'not-allowed' : 'pointer',
             fontSize: '14px', fontFamily: 'Karla, sans-serif',
@@ -486,6 +461,22 @@ export default function AddItemPage({ session, profile, onToast }) {
         >
           {saving ? L('Lagrer…', 'Saving…') : L('✓ Lagre gjenstand', '✓ Save item')}
         </button>
+      </div>
+    </div>
+  )
+}
+
+// Samtykke før noe sendes til AI-tjenesten (GDPR art. 6 nr. 1 a). Kan trekkes tilbake under «Min konto».
+function AiConsent({ onCancel, onAccept }) {
+  return (
+    <div style={{ marginTop: '10px', background: '#FBF9F5', border: '1px solid #D9CFC0', borderRadius: '10px', padding: '14px' }}>
+      <div style={{ fontSize: '13px', color: '#3A2F26', fontWeight: '500', marginBottom: '6px' }}>{L('Opplysningene sendes til en AI-tjeneste', 'The information is sent to an AI service')}</div>
+      <p style={{ fontSize: '12px', color: '#5C4530', lineHeight: '1.6', marginBottom: '10px' }}>
+        {L('For å identifisere og verdsette gjenstanden sendes bildet og beskrivelsen til Anthropic (USA). De brukes kun til dette og lagres ikke av dem. Du kan trekke samtykket tilbake under «Min konto». Les mer i vår', 'To identify and value the item, the photo and description are sent to Anthropic (USA). They are used only for this and are not stored by them. You can withdraw your consent under «My account». Read more in our')} <a href="/personvern" target="_blank" rel="noreferrer" style={{ color: '#5F6E52' }}>{L('personvernerklæring', 'privacy policy')}</a>.
+      </p>
+      <div style={{ display: 'flex', gap: '8px' }}>
+        <button onClick={onCancel} style={{ flex: 1, padding: '8px', background: 'none', border: '1px solid #D9CFC0', borderRadius: '7px', cursor: 'pointer', fontSize: '13px', fontFamily: 'Karla, sans-serif', color: '#5C4530' }}>{L('Avbryt', 'Cancel')}</button>
+        <button onClick={onAccept} style={{ flex: 2, padding: '8px', background: '#5F6E52', color: '#fff', border: 'none', borderRadius: '7px', cursor: 'pointer', fontSize: '13px', fontFamily: 'Karla, sans-serif' }}>{L('Godta og fortsett', 'Accept and continue')}</button>
       </div>
     </div>
   )

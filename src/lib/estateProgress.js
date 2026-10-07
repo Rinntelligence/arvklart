@@ -3,10 +3,26 @@
 // (item_passes). Tildelte gjenstander er ferdige og teller ikke med.
 import { L } from './lang.js'
 
+const normEmail = e => (e || '').trim().toLowerCase()
+
+// Medlemmer som er lagt inn som bobestyrer, advokat eller rådgiver arver ikke, og trenger ikke
+// ta stilling til gjenstandene. Alle andre medlemmer (også eieren) må det.
+export const ADVISOR_RELATIONSHIPS = ['Bobestyrer', 'Advokat', 'Rådgiver']
+
+export const decidingMembers = (members, heirs = []) => {
+  const advisorEmails = heirs
+    .filter(h => ADVISOR_RELATIONSHIPS.includes(h.relationship) && h.email)
+    .map(h => normEmail(h.email))
+  return members.filter(m => !advisorEmails.includes(normEmail(m.profiles?.email)))
+}
+
+// Flere vil ha gjenstanden, og den er ikke tildelt ennå.
+export const isContested = item => item.status !== 'assigned' && (item.interests?.length || 0) > 1
+
 // Returnerer [{ member, items }] for hvert medlem som ikke har tatt stilling til alt.
-export const getUndecided = (items, members, passes) => {
+export const getUndecided = (items, members, passes, heirs = []) => {
   const open = items.filter(i => i.status !== 'assigned')
-  return members.map(member => ({
+  return decidingMembers(members, heirs).map(member => ({
     member,
     items: open.filter(i =>
       !i.interests?.some(x => x.user_id === member.user_id) &&
@@ -14,8 +30,6 @@ export const getUndecided = (items, members, passes) => {
     ),
   })).filter(u => u.items.length > 0)
 }
-
-const normEmail = e => (e || '').trim().toLowerCase()
 
 // Gjenstående steg i fornuftig rekkefølge. Bare steg som ikke er ferdige tas med.
 export const buildRemainingSteps = ({ estateId, userId, items, members, passes, heirs, tasks }) => {
@@ -33,7 +47,7 @@ export const buildRemainingSteps = ({ estateId, userId, items, members, passes, 
     path: `/estate/${estateId}/heirs`,
   })
 
-  const undecided = getUndecided(items, members, passes)
+  const undecided = getUndecided(items, members, passes, heirs)
   if (undecided.length) steps.push({
     key: 'decide',
     title: L('Alle må ta stilling til gjenstandene', 'Everyone must decide on the items'),
@@ -41,7 +55,7 @@ export const buildRemainingSteps = ({ estateId, userId, items, members, passes, 
     ...(undecided.some(u => u.member.user_id === userId) && { path: `/estate/${estateId}/swipe`, pathLabel: L('Ta stilling', 'Decide') }),
   })
 
-  const contested = open.filter(i => (i.interests?.length || 0) > 1)
+  const contested = open.filter(isContested)
   if (contested.length) steps.push({
     key: 'conflicts',
     title: L(`${item(contested.length)} ønskes av flere`, `${item(contested.length)} wanted by several heirs`),
@@ -58,7 +72,8 @@ export const buildRemainingSteps = ({ estateId, userId, items, members, passes, 
     detail: L('Administrator tildeler fra gjenstandssiden', 'The administrator assigns from the item page'),
   })
 
-  const everyonePassed = i => members.length > 0 && members.every(m => passes.some(p => p.item_id === i.id && p.user_id === m.user_id))
+  const deciding = decidingMembers(members, heirs)
+  const everyonePassed = i => deciding.length > 0 && deciding.every(m => passes.some(p => p.item_id === i.id && p.user_id === m.user_id))
   const unwanted = open.filter(i => !i.interests?.length && !i.marked_for_disposal && everyonePassed(i))
   if (unwanted.length) steps.push({
     key: 'unwanted',

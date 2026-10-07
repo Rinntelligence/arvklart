@@ -1,7 +1,7 @@
 // Hvem som mangler å ta stilling, og hva som gjenstår i boet.
 import { test, describe } from 'node:test'
 import assert from 'node:assert/strict'
-import { getUndecided, buildRemainingSteps, getStatusBreakdown } from '../../src/lib/estateProgress.js'
+import { getUndecided, buildRemainingSteps, getStatusBreakdown, decidingMembers, isContested } from '../../src/lib/estateProgress.js'
 
 const kari = { user_id: 'k', profiles: { display_name: 'Kari', email: 'kari@x.no' } }
 const ola = { user_id: 'o', profiles: { display_name: 'Ola', email: 'ola@x.no' } }
@@ -23,6 +23,31 @@ describe('getUndecided', () => {
   test('alle har tatt stilling gir tom liste', () => {
     const items = [{ id: 'a', interests: want('k', 'o') }]
     assert.deepEqual(getUndecided(items, [kari, ola], []), [])
+  })
+})
+
+describe('decidingMembers', () => {
+  const advokat = { user_id: 'a', profiles: { display_name: 'Advokat', email: 'Advokat@Firma.no' } }
+  const heirs = [
+    { name: 'Kari', email: 'kari@x.no', relationship: 'Barn' },
+    { name: 'Advokaten', email: 'advokat@firma.no ', relationship: 'Advokat' },
+  ]
+
+  test('bobestyrer, advokat og rådgiver trenger ikke ta stilling', () => {
+    assert.deepEqual(decidingMembers([kari, ola, advokat], heirs).map(m => m.user_id), ['k', 'o'])
+  })
+
+  test('getUndecided venter ikke på rådgivere', () => {
+    const items = [{ id: 'a', interests: want('k', 'o') }]
+    assert.deepEqual(getUndecided(items, [kari, ola, advokat], [], heirs), [])
+  })
+})
+
+describe('isContested', () => {
+  test('tildelte gjenstander er ikke ettertraktet lenger', () => {
+    assert.equal(isContested({ interests: want('k', 'o') }), true)
+    assert.equal(isContested({ interests: want('k', 'o'), status: 'assigned' }), false)
+    assert.equal(isContested({ interests: want('k') }), false)
   })
 })
 

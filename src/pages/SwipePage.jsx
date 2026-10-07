@@ -1,8 +1,9 @@
 import { useEffect, useState, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { getItems, supabase } from '../lib/supabase'
-import { getPasses, addPass, addInterestClearingPass } from '../lib/decisions'
+import { getEstatePasses, addPass, addInterestClearingPass } from '../lib/decisions'
 import { L } from '../lib/lang'
+import { formatNOK } from '../lib/format'
 
 export default function SwipePage({ session, profile, onToast }) {
   const { id } = useParams()
@@ -16,11 +17,12 @@ export default function SwipePage({ session, profile, onToast }) {
   const [action, setAction] = useState(null) // 'like' | 'pass' | 'trash'
   const startPos = useRef(null)
   const cardRef = useRef(null)
+  const busy = useRef(false) // ett kort om gangen, også ved dobbeltklikk
 
   useEffect(() => {
     getItems(id).then(async ({ data }) => {
       const all = data || []
-      const myPasses = (await getPasses(all.map(i => i.id))).filter(p => p.user_id === session.user.id)
+      const myPasses = (await getEstatePasses(id)).filter(p => p.user_id === session.user.id)
       const unswipedItems = all.filter(item =>
         item.status !== 'assigned' &&
         !item.interests?.some(x => x.user_id === session.user.id) &&
@@ -33,25 +35,28 @@ export default function SwipePage({ session, profile, onToast }) {
 
   const currentItem = items[index]
 
-  const handleAction = async (type) => {
-    if (!currentItem) return
+  const handleAction = (type) => {
+    const item = currentItem
+    if (!item || busy.current) return
+    busy.current = true
     setAction(type)
 
     setTimeout(async () => {
+      let error
       if (type === 'like') {
-        await addInterestClearingPass(currentItem.id, session.user.id, '')
-        onToast(L('Interesse registrert!', 'Interest registered!'))
+        ({ error } = await addInterestClearingPass(item.id, session.user.id, ''))
       } else if (type === 'trash') {
-        await supabase.from('items').update({ marked_for_disposal: true }).eq('id', currentItem.id)
-        await addPass(currentItem.id, session.user.id)
-        onToast(L('Merket for kast', 'Marked for disposal'))
+        ({ error } = await addPass(item.id, session.user.id))
+        if (!error) ({ error } = await supabase.from('items').update({ marked_for_disposal: true }).eq('id', item.id))
       } else {
-        await addPass(currentItem.id, session.user.id)
-        onToast(L('Ikke interessert', 'Not interested'))
+        ({ error } = await addPass(item.id, session.user.id))
       }
 
       setOffset({ x: 0, y: 0 })
       setAction(null)
+      busy.current = false
+      if (error) { onToast(L('Kunne ikke lagre valget. Prøv igjen.', 'Could not save your choice. Please try again.'), 'error'); return }
+      onToast(type === 'like' ? L('Interesse registrert!', 'Interest registered!') : type === 'trash' ? L('Merket for kast', 'Marked for disposal') : L('Ikke interessert', 'Not interested'))
       if (index + 1 >= items.length) {
         setDone(true)
       } else {
@@ -208,7 +213,7 @@ export default function SwipePage({ session, profile, onToast }) {
                 {currentItem.categories?.emoji} {currentItem.categories?.label || L('Annet', 'Other')}
               </span>
               {currentItem.estimated_value && (
-                <span style={{ fontSize:'12px', color:'#5F6E52' }}>{currentItem.estimated_value}</span>
+                <span style={{ fontSize:'12px', color:'#5F6E52' }}>{formatNOK(currentItem.estimated_value)}</span>
               )}
             </div>
             {currentItem.description && (

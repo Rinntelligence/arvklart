@@ -17,7 +17,7 @@ export default function StatusPage({ session }) {
     (async () => {
       const [{ data: est }, { data: its }] = await Promise.all([getEstate(id), getItems(id)])
       const all = its || []
-      const extras = await loadStatusExtras(id, all)
+      const extras = await loadStatusExtras(id)
       setEstate(est)
       setItems(all)
       setSteps(buildRemainingSteps({ estateId: id, userId: session.user.id, items: all, ...extras }))

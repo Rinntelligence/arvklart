@@ -1,9 +1,8 @@
 import { useState } from 'react'
-import { supabase, signIn, signUp, upsertProfile } from '../lib/supabase'
+import { supabase, signIn, signUp } from '../lib/supabase'
 import { L } from '../lib/lang'
 
-const AVATAR_COLORS = ['#5F6E52','#8B9A7D','#9C8267','#7A8B6E','#A97C3F','#6E8B87']
-const randColor = () => AVATAR_COLORS[Math.floor(Math.random()*AVATAR_COLORS.length)]
+const hasPendingInvite = () => { try { return Boolean(localStorage.getItem('pendingJoinCode')) } catch { return false } }
 
 export default function LoginPage({ onToast }) {
   const [mode, setMode] = useState('login')
@@ -12,16 +11,19 @@ export default function LoginPage({ onToast }) {
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [resetSent, setResetSent] = useState(false)
+  const [confirmSent, setConfirmSent] = useState(false)
+  const [invited] = useState(hasPendingInvite)
 
   const errMsg = (msg) => {
     if (msg.includes('Invalid login')) return L('Feil e-post eller passord', 'Wrong email or password')
+    if (msg.includes('Email not confirmed')) return L('E-posten er ikke bekreftet ennå — sjekk innboksen din', 'Your email is not confirmed yet — check your inbox')
     if (msg.includes('already registered')) return L('E-posten er allerede registrert — logg inn i stedet', 'This email is already registered — log in instead')
     if (msg.includes('Password should')) return L('Passordet må ha minst 6 tegn', 'The password must have at least 6 characters')
     if (msg.includes('rate limit') || msg.includes('security purposes')) return L('For mange forsøk — vent litt og prøv igjen', 'Too many attempts — wait a moment and try again')
     return msg
   }
 
-  const switchMode = (m) => { setMode(m); setResetSent(false) }
+  const switchMode = (m) => { setMode(m); setResetSent(false); setConfirmSent(false) }
 
   const handleReset = async () => {
     if (!email.trim()) return
@@ -41,12 +43,14 @@ export default function LoginPage({ onToast }) {
     setLoading(true)
 
     if (mode === 'signup') {
-      const { data, error } = await signUp(email.trim(), password)
+      // Profilen opprettes fra navnet i App når brukeren er logget inn
+      const { data, error } = await signUp(email.trim(), password, name.trim())
       if (error) { onToast(errMsg(error.message), 'error'); setLoading(false); return }
-      if (data?.user) {
-        await upsertProfile({ user_id: data.user.id, display_name: name.trim(), avatar_color: randColor(), email: email.trim(), plan: 'free' })
+      // Uten økt må e-posten bekreftes først. Tom identities betyr at e-posten allerede er registrert.
+      if (!data?.session) {
+        if (data?.user && !data.user.identities?.length) onToast(errMsg('already registered'), 'error')
+        else setConfirmSent(true)
       }
-      await signIn(email.trim(), password)
     } else {
       const { error } = await signIn(email.trim(), password)
       if (error) { onToast(errMsg(error.message), 'error') }
@@ -89,7 +93,17 @@ export default function LoginPage({ onToast }) {
             </div>
             )}
 
-            {mode==='forgot' && resetSent ? (
+            {invited && mode !== 'forgot' && !confirmSent && (
+              <div style={{ background:'#DCE3D2', borderRadius:'8px', padding:'12px 14px', fontSize:'13px', color:'#3A5A30', lineHeight:'1.5', marginBottom:'18px' }}>
+                {L('Du er invitert til et bo. Logg inn eller opprett konto med e-posten invitasjonen ble sendt til, så blir du med automatisk.', 'You have been invited to an estate. Log in or create an account with the email the invitation was sent to, and you will join automatically.')}
+              </div>
+            )}
+
+            {confirmSent ? (
+              <div style={{ background:'#DCE3D2', borderRadius:'8px', padding:'16px', fontSize:'14px', color:'#3A2F26', lineHeight:'1.6', marginBottom:'4px' }}>
+                {L('Vi har sendt en bekreftelseslenke til', 'We have sent a confirmation link to')} <strong>{email.trim()}</strong>. {L('Klikk på lenken i e-posten for å fullføre registreringen. Sjekk søppelpost hvis den ikke dukker opp.', 'Click the link in the email to complete your registration. Check your spam folder if it does not arrive.')}
+              </div>
+            ) : mode==='forgot' && resetSent ? (
               <div style={{ background:'#DCE3D2', borderRadius:'8px', padding:'16px', fontSize:'14px', color:'#3A2F26', lineHeight:'1.6', marginBottom:'4px' }}>
                 {L('Hvis det finnes en konto for', 'If an account exists for')} <strong>{email.trim()}</strong>, {L('får du snart en e-post med en lenke for å tilbakestille passordet. Sjekk søppelpost hvis den ikke dukker opp.', 'you will soon receive an email with a link to reset your password. Check your spam folder if it does not show up.')}
               </div>

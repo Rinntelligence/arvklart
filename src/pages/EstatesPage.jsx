@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { getMyEstates, createEstate, ensureDefaultCategories, supabase } from '../lib/supabase'
 import { usePlan } from '../hooks/usePlan'
 import { joinEstateByCode } from '../lib/joinEstate'
-import { Card, Button, Avatar } from '../components/UI'
+import { Card } from '../components/UI'
 import { L, locale } from '../lib/lang'
 
 function genCode() { return Math.random().toString(36).substring(2,8).toUpperCase() }
@@ -17,10 +17,12 @@ export default function EstatesPage({ session, profile, onToast }) {
   const [creating, setCreating] = useState(false)
   const [joinCode, setJoinCode] = useState('')
   const navigate = useNavigate()
-  const { plan, limit } = usePlan()
+  const [joining, setJoining] = useState(false)
+  const { limit } = usePlan()
 
   const load = async () => {
-    const { data } = await getMyEstates(session.user.id)
+    const { data, error } = await getMyEstates(session.user.id)
+    if (error) onToast(L('Kunne ikke hente boene dine. Last siden på nytt.', 'Could not load your estates. Reload the page.'), 'error')
     setEstates(data || [])
     setLoading(false)
   }
@@ -37,8 +39,9 @@ export default function EstatesPage({ session, profile, onToast }) {
       owner_id: session.user.id, invite_code: genCode(),
       branding_color: '#3A2F26', status: 'active',
     })
-    if (error) { onToast(L('Feil: ', 'Error: ') + error.message, 'error'); setCreating(false); return }
-    await supabase.from('estate_members').insert({ estate_id: data.id, user_id: session.user.id, role: 'admin' })
+    if (error) { onToast(L('Kunne ikke opprette boet: ', 'Could not create the estate: ') + error.message, 'error'); setCreating(false); return }
+    const { error: memberError } = await supabase.from('estate_members').insert({ estate_id: data.id, user_id: session.user.id, role: 'admin' })
+    if (memberError) { onToast(L('Boet ble opprettet, men du ble ikke lagt til som admin: ', 'The estate was created, but you were not added as admin: ') + memberError.message, 'error'); setCreating(false); return }
     await ensureDefaultCategories(data.id)
     onToast(L('Bo opprettet! ✓', 'Estate created! ✓'))
     setShowNew(false); setNewName(''); setNewDesc('')
@@ -47,8 +50,10 @@ export default function EstatesPage({ session, profile, onToast }) {
   }
 
   const joinByCode = async () => {
-    if (!joinCode.trim()) return
+    if (!joinCode.trim() || joining) return
+    setJoining(true)
     const { estate, error } = await joinEstateByCode(joinCode, session.user.email)
+    setJoining(false)
     if (error) { onToast(error, 'error'); return }
     onToast(L(`Ble med i "${estate.name}" ✓`, `Joined "${estate.name}" ✓`))
     load(); setJoinCode('')
@@ -122,7 +127,10 @@ export default function EstatesPage({ session, profile, onToast }) {
                       <path d="M12 3v18M7 21h10M5 7h4M15 7h4M5 7L2.5 12a2.5 2.5 0 0 0 5 0L5 7zM19 7l-2.5 5a2.5 2.5 0 0 0 5 0L19 7z"/>
                     </svg>
                   </div>
-                  <span style={{ fontSize:'11px', background: e.role==='admin'?'#E8DFD0':'#DCE3D2', color: e.role==='admin'?'#5C4530':'#3A5A30', padding:'3px 8px', borderRadius:'20px', textTransform:'uppercase', letterSpacing:'0.5px' }}>{e.role}</span>
+                  <div style={{ display:'flex', gap:'6px' }}>
+                    {est?.status === 'closed' && <span style={{ fontSize:'11px', background:'#E8DFD0', color:'#9C8267', padding:'3px 8px', borderRadius:'20px', textTransform:'uppercase', letterSpacing:'0.5px' }}>{L('Avsluttet', 'Closed')}</span>}
+                    <span style={{ fontSize:'11px', background: e.role==='admin'?'#E8DFD0':'#DCE3D2', color: e.role==='admin'?'#5C4530':'#3A5A30', padding:'3px 8px', borderRadius:'20px', textTransform:'uppercase', letterSpacing:'0.5px' }}>{e.role === 'admin' ? L('Admin', 'Admin') : L('Medlem', 'Member')}</span>
+                  </div>
                 </div>
                 <h3 style={{ fontFamily:'Fraunces, serif', fontSize:'17px', fontWeight:'400', color:'#3A2F26', marginBottom:'6px' }}>{est?.name}</h3>
                 {est?.description && <p style={{ fontSize:'13px', color:'#9C8267', marginBottom:'12px', lineHeight:'1.5' }}>{est.description}</p>}
@@ -141,7 +149,7 @@ export default function EstatesPage({ session, profile, onToast }) {
         <div style={{ display:'flex', gap:'10px' }}>
           <input value={joinCode} onChange={e=>setJoinCode(e.target.value.toUpperCase())} onKeyDown={e=>e.key==='Enter'&&joinByCode()} placeholder={L('Skriv invitasjonskode (f.eks. AB3X9K)', 'Enter invite code (e.g. AB3X9K)')} maxLength={10}
             style={{ flex:1, padding:'11px 14px', border:'1px solid #D9CFC0', borderRadius:'8px', fontSize:'15px', background:'#FBF9F5', color:'#3A2F26', outline:'none', fontFamily:'Karla, sans-serif', letterSpacing:'2px' }} />
-          <button onClick={joinByCode} style={{ padding:'11px 20px', background:'#3A2F26', color:'#FBF9F5', border:'none', borderRadius:'8px', cursor:'pointer', fontSize:'14px', fontFamily:'Karla, sans-serif' }}>{L('Bli med', 'Join')}</button>
+          <button onClick={joinByCode} disabled={joining} style={{ padding:'11px 20px', background:'#3A2F26', color:'#FBF9F5', border:'none', borderRadius:'8px', cursor:'pointer', fontSize:'14px', fontFamily:'Karla, sans-serif' }}>{joining ? L('Vent…', 'Wait…') : L('Bli med', 'Join')}</button>
         </div>
       </Card>
     </div>

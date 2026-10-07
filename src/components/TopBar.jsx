@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { signOut } from '../lib/supabase'
 import { getLang, setLang, L } from '../lib/lang'
+import { isDemoSession } from '../lib/demo'
 
 const tc = c => { if(!c)return'#FBF9F5'; const r=parseInt(c.slice(1,3),16),g=parseInt(c.slice(3,5),16),b=parseInt(c.slice(5,7),16); return(0.299*r+0.587*g+0.114*b)/255>0.55?'#3A2F26':'#FBF9F5' }
 
@@ -24,7 +25,7 @@ export default function TopBar({ profile, session, estate }) {
     window.location.reload()
   }
 
-  const isDemo = session?.user?.email === 'mona.demo@heirsplit.no'
+  const isDemo = isDemoSession(session)
 
   const goHome = async () => {
     setLogoMenuOpen(false)
@@ -118,8 +119,10 @@ export default function TopBar({ profile, session, estate }) {
             </button>
 
             {[
-              { label: L('Min profil', 'My profile'), action: () => { navigate('/setup'); setMenuOpen(false) } },
-              { label: L('Min konto', 'My account'), action: () => { navigate('/konto'); setMenuOpen(false) } },
+              ...(isDemo ? [] : [
+                { label: L('Min profil', 'My profile'), action: () => { navigate('/setup'); setMenuOpen(false) } },
+                { label: L('Min konto', 'My account'), action: () => { navigate('/konto'); setMenuOpen(false) } },
+              ]),
               ...(profile?.is_founder ? [{ label: 'Founder dashboard', action: () => { navigate('/founder'); setMenuOpen(false) } }] : []),
               ...(isDemo ? [] : [{ label: L('Tilbake til hjemmesiden', 'Back to the home page'), action: goHome }]),
               { label: isDemo ? L('Avslutt demo', 'End demo') : L('Logg ut', 'Log out'), action: logout, danger: true },

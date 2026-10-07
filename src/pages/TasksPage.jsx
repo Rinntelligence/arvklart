@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { supabase } from '../lib/supabase'
-import { L, locale } from '../lib/lang'
+import { supabase, getEstateMembers } from '../lib/supabase'
+import { isOverdue, formatDateOnly } from '../lib/format'
+import { L } from '../lib/lang'
 
 const tc = c => { if(!c)return'#FBF9F5'; const r=parseInt(c.slice(1,3),16),g=parseInt(c.slice(3,5),16),b=parseInt(c.slice(5,7),16); return(0.299*r+0.587*g+0.114*b)/255>0.55?'#3A2F26':'#FBF9F5' }
 
@@ -36,7 +37,7 @@ const CATEGORY_COLORS = {
   'Fordeling':   { bg: '#E8E4D4', border: '#C8BEA0', text: '#5C4530', dot: '#9C8267' },
 }
 
-export default function TasksPage({ session, profile }) {
+export default function TasksPage({ session, onToast, isDemo }) {
   const { id } = useParams()
   const navigate = useNavigate()
   const [tasks, setTasks] = useState([])
@@ -50,7 +51,7 @@ export default function TasksPage({ session, profile }) {
     const [{ data: ts }, { data: mems }, { data: mem }] = await Promise.all([
       // tasks.assigned_to peker ikke på profiles, så profilen hentes fra medlemslisten i stedet for en join
       supabase.from('tasks').select('*').eq('estate_id', id).order('priority').order('created_at'),
-      supabase.from('estate_members').select('user_id, profiles(display_name, avatar_color)').eq('estate_id', id),
+      getEstateMembers(id),
       supabase.from('estate_members').select('role').eq('estate_id', id).eq('user_id', session.user.id).single(),
     ])
     setTasks((ts || []).map(t => ({ ...t, assigned_to_profile: mems?.find(m => m.user_id === t.assigned_to)?.profiles || null })))
@@ -59,39 +60,50 @@ export default function TasksPage({ session, profile }) {
     setLoading(false)
   }
 
-  const seedTasks = async () => {
-    const toInsert = DEFAULT_TASKS.map(({ title_en, description_en, ...t }) => ({
+  // Viser feilen og laster listen på nytt uansett, så skjermen stemmer med databasen.
+  const run = async (query, errMsg) => {
+    const { error } = await query
+    if (error) onToast(errMsg, 'error')
+    load()
+    return !error
+  }
+
+  const seedTasks = () => run(
+    // Sjekklisten lagres på brukerens språk; title_en/description_en er ikke kolonner i tasks
+    supabase.from('tasks').insert(DEFAULT_TASKS.map(({ title_en, description_en, ...t }) => ({
       ...t, title: L(t.title, title_en), description: L(t.description, description_en),
       estate_id: id, completed: false, added_by: session.user.id,
-    }))
-    await supabase.from('tasks').insert(toInsert)
-    load()
-  }
+    }))),
+    L('Kunne ikke laste sjekklisten', 'Could not load the checklist'),
+  )
 
   useEffect(() => { load() }, [id])
 
-  const toggleTask = async (task) => {
-    await supabase.from('tasks').update({ completed: !task.completed, completed_by: !task.completed ? session.user.id : null, completed_at: !task.completed ? new Date().toISOString() : null }).eq('id', task.id)
-    load()
-  }
+  const toggleTask = (task) => run(
+    supabase.from('tasks').update({ completed: !task.completed, completed_by: !task.completed ? session.user.id : null, completed_at: !task.completed ? new Date().toISOString() : null }).eq('id', task.id),
+    L('Kunne ikke oppdatere oppgaven', 'Could not update the task'),
+  )
 
-  const assignTask = async (taskId, userId) => {
-    await supabase.from('tasks').update({ assigned_to: userId || null }).eq('id', taskId)
-    load()
-  }
+  const assignTask = (taskId, userId) => run(
+    supabase.from('tasks').update({ assigned_to: userId || null }).eq('id', taskId),
+    L('Kunne ikke tildele oppgaven', 'Could not assign the task'),
+  )
 
   const addTask = async () => {
     if (!newTask.title.trim()) return
-    await supabase.from('tasks').insert({ ...newTask, estate_id: id, completed: false, added_by: session.user.id, priority: 99 })
+    const ok = await run(supabase.from('tasks').insert({
+      title: newTask.title.trim(),
+      description: newTask.description.trim() || null,
+      category: newTask.category,
+      due_date: newTask.due_date || null, // tom streng er ikke en gyldig dato
+      estate_id: id, completed: false, added_by: session.user.id, priority: 99,
+    }), L('Kunne ikke legge til oppgaven', 'Could not add the task'))
+    if (!ok) return
     setNewTask({ title: '', description: '', category: 'Uke 1', due_date: '' })
     setShowAdd(false)
-    load()
   }
 
-  const deleteTask = async (taskId) => {
-    await supabase.from('tasks').delete().eq('id', taskId)
-    load()
-  }
+  const deleteTask = (taskId) => run(supabase.from('tasks').delete().eq('id', taskId), L('Kunne ikke slette oppgaven', 'Could not delete the task'))
 
   const completed = tasks.filter(t => t.completed).length
   const total = tasks.length
@@ -116,7 +128,7 @@ export default function TasksPage({ session, profile }) {
           <h1 style={{ fontFamily: 'Fraunces, serif', fontSize: '26px', fontWeight: '400', color: '#3A2F26', marginBottom: '4px' }}>{L('Oppgaveliste', 'Task list')}</h1>
           <p style={{ color: '#9C8267', fontSize: '14px' }}>{L('Steg-for-steg-veiledning gjennom arveprosessen', 'Step-by-step guidance through the inheritance process')}</p>
         </div>
-        <div style={{ display: 'flex', gap: '8px' }}>
+        {!isDemo && <div style={{ display: 'flex', gap: '8px' }}>
           {tasks.length === 0 && (
             <button onClick={seedTasks} style={{ padding: '9px 18px', background: '#5F6E52', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '14px', fontFamily: 'Karla, sans-serif' }}>
               {L('Last standard sjekkliste', 'Load standard checklist')}
@@ -125,7 +137,7 @@ export default function TasksPage({ session, profile }) {
           <button onClick={() => setShowAdd(!showAdd)} style={{ padding: '9px 18px', background: '#3A2F26', color: '#FBF9F5', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '14px', fontFamily: 'Karla, sans-serif' }}>
             {L('+ Legg til oppgave', '+ Add task')}
           </button>
-        </div>
+        </div>}
       </div>
 
       {/* Fremdriftslinje */}
@@ -170,7 +182,7 @@ export default function TasksPage({ session, profile }) {
       {tasks.length === 0 ? (
         <div style={{ textAlign: 'center', padding: '80px 20px', color: '#9C8267' }}>
           <p style={{ marginBottom: '20px', fontSize: '15px' }}>{L('Ingen oppgaver ennå. Last standard sjekkliste for å komme i gang.', 'No tasks yet. Load the standard checklist to get started.')}</p>
-          <button onClick={seedTasks} style={{ padding: '12px 28px', background: '#5F6E52', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '15px', fontFamily: 'Karla, sans-serif' }}>{L('Last standard sjekkliste', 'Load standard checklist')}</button>
+          {!isDemo && <button onClick={seedTasks} style={{ padding: '12px 28px', background: '#5F6E52', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '15px', fontFamily: 'Karla, sans-serif' }}>{L('Last standard sjekkliste', 'Load standard checklist')}</button>}
         </div>
       ) : (
         allCats.map(cat => {
@@ -186,7 +198,7 @@ export default function TasksPage({ session, profile }) {
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 {catTasks.map(task => (
-                  <TaskRow key={task.id} task={task} members={members} session={session} myRole={myRole}
+                  <TaskRow key={task.id} task={task} members={members} session={session} myRole={myRole} readOnly={isDemo}
                     onToggle={() => toggleTask(task)}
                     onAssign={(uid) => assignTask(task.id, uid)}
                     onDelete={() => deleteTask(task.id)} />
@@ -200,20 +212,20 @@ export default function TasksPage({ session, profile }) {
   )
 }
 
-function TaskRow({ task, members, session, myRole, onToggle, onAssign, onDelete }) {
+function TaskRow({ task, members, myRole, readOnly, onToggle, onAssign, onDelete }) {
   const [expanded, setExpanded] = useState(false)
-  const isOverdue = task.due_date && !task.completed && new Date(task.due_date) < new Date()
+  const overdue = !task.completed && isOverdue(task.due_date)
 
   return (
     <div style={{
       background: task.completed ? '#f9f9f9' : '#fff',
-      border: `1px solid ${isOverdue ? '#C8BEA0' : '#D9CFC0'}`,
+      border: `1px solid ${overdue ? '#C8BEA0' : '#D9CFC0'}`,
       borderRadius: '10px', overflow: 'hidden',
       opacity: task.completed ? 0.75 : 1,
       transition: 'opacity 0.2s',
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '14px 16px', cursor: 'pointer' }} onClick={() => setExpanded(!expanded)}>
-        <button onClick={e => { e.stopPropagation(); onToggle() }} style={{
+        <button onClick={e => { e.stopPropagation(); if (!readOnly) onToggle() }} disabled={readOnly} style={{
           width: '22px', height: '22px', borderRadius: '6px', flexShrink: 0,
           background: task.completed ? '#8B9A7D' : '#fff',
           border: `2px solid ${task.completed ? '#8B9A7D' : '#D9CFC0'}`,
@@ -227,8 +239,8 @@ function TaskRow({ task, members, session, myRole, onToggle, onAssign, onDelete 
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
-          {isOverdue && <span style={{ fontSize: '11px', background: '#E8DFD0', color: '#5C4530', padding: '2px 7px', borderRadius: '20px' }}>{L('Forfalt', 'Overdue')}</span>}
-          {task.due_date && !isOverdue && <span style={{ fontSize: '11px', color: '#9C8267' }}>{new Date(task.due_date).toLocaleDateString(locale(), { day: 'numeric', month: 'short' })}</span>}
+          {overdue && <span style={{ fontSize: '11px', background: '#E8DFD0', color: '#5C4530', padding: '2px 7px', borderRadius: '20px' }}>{L('Forfalt', 'Overdue')}</span>}
+          {task.due_date && !overdue && <span style={{ fontSize: '11px', color: '#9C8267' }}>{formatDateOnly(task.due_date)}</span>}
           {task.assigned_to_profile && (
             <div title={task.assigned_to_profile.display_name} style={{ width: '24px', height: '24px', borderRadius: '50%', background: task.assigned_to_profile.avatar_color || '#DCE3D2', border:tc(task.assigned_to_profile.avatar_color||'#DCE3D2')==='#3A2F26'?'1px solid #D9CFC0':'none', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', color: tc(task.assigned_to_profile.avatar_color || '#DCE3D2'), fontWeight: '500' }}>
               {task.assigned_to_profile.display_name[0].toUpperCase()}
@@ -244,13 +256,13 @@ function TaskRow({ task, members, session, myRole, onToggle, onAssign, onDelete 
           <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
               <span style={{ fontSize: '12px', color: '#9C8267' }}>{L('Tildel til:', 'Assign to:')}</span>
-              <select value={task.assigned_to || ''} onChange={e => onAssign(e.target.value)}
+              <select value={task.assigned_to || ''} onChange={e => onAssign(e.target.value)} disabled={readOnly}
                 style={{ padding: '5px 10px', border: '1px solid #D9CFC0', borderRadius: '6px', fontSize: '13px', background: '#FBF9F5', color: '#3A2F26', outline: 'none', fontFamily: 'Karla, sans-serif' }}>
                 <option value="">{L('— ikke tildelt —', '— not assigned —')}</option>
                 {members.map(m => <option key={m.user_id} value={m.user_id}>{m.profiles?.display_name}</option>)}
               </select>
             </div>
-            {myRole === 'admin' && (
+            {myRole === 'admin' && !readOnly && (
               <button onClick={onDelete} style={{ fontSize: '12px', color: '#9C8267', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'Karla, sans-serif', marginLeft: 'auto' }}>{L('Slett oppgave', 'Delete task')}</button>
             )}
           </div>

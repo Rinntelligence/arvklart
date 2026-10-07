@@ -13,7 +13,7 @@ const normEmail = e => (e || '').trim().toLowerCase()
 const isEmail = e => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)
 const tc = c => { if(!c)return'#FBF9F5'; const r=parseInt(c.slice(1,3),16),g=parseInt(c.slice(3,5),16),b=parseInt(c.slice(5,7),16); return(0.299*r+0.587*g+0.114*b)/255>0.55?'#3A2F26':'#FBF9F5' }
 
-export default function HeirsPage({ session, profile, onToast }) {
+export default function HeirsPage({ session, profile, onToast, isDemo }) {
   const { id } = useParams()
   const navigate = useNavigate()
   const [heirs, setHeirs] = useState([])
@@ -47,15 +47,21 @@ export default function HeirsPage({ session, profile, onToast }) {
 
   useEffect(() => { load() }, [id])
 
+  // Arvinger og e-postene deres styrer hvem som kan bli med i boet, så bare admin endrer dem.
+  const canEdit = myRole === 'admin' && !isDemo
+
   const saveSettings = async () => {
     setSaving(true)
-    await supabase.from('estates').update({ total_value: parseFloat(totalValue) || null, split_mode: splitMode }).eq('id', id)
-    if (splitMode === 'custom') {
+    const { error } = await supabase.from('estates').update({ total_value: parseFloat(totalValue) || null, split_mode: splitMode }).eq('id', id)
+    let failed = Boolean(error)
+    if (!error && splitMode === 'custom') {
       for (const heir of heirs) {
-        await supabase.from('heirs').update({ percentage: parseFloat(heir.percentage) || 0 }).eq('id', heir.id)
+        const { error: heirError } = await supabase.from('heirs').update({ percentage: parseFloat(heir.percentage) || 0 }).eq('id', heir.id)
+        if (heirError) failed = true
       }
     }
     setSaving(false)
+    onToast?.(failed ? L('Kunne ikke lagre alle innstillingene', 'Could not save all the settings') : L('Innstillingene er lagret', 'The settings have been saved'), failed ? 'error' : 'success')
     load()
   }
 
@@ -90,7 +96,8 @@ export default function HeirsPage({ session, profile, onToast }) {
   const inviteUrl = inviteCode ? `${window.location.origin}/join/${inviteCode}` : ''
 
   const removeHeir = async (heirId) => {
-    await supabase.from('heirs').delete().eq('id', heirId)
+    const { error } = await supabase.from('heirs').delete().eq('id', heirId)
+    if (error) onToast?.(L('Kunne ikke fjerne arvingen', 'Could not remove the heir'), 'error')
     load()
   }
 
@@ -126,9 +133,9 @@ export default function HeirsPage({ session, profile, onToast }) {
           <h1 style={{ fontFamily:'Fraunces, serif', fontSize:'26px', fontWeight:'400', color:'#3A2F26', marginBottom:'4px' }}>{L('Arvinger og fordeling', 'Heirs and distribution')}</h1>
           <p style={{ color:'#9C8267', fontSize:'14px' }}>{L('Administrer arvinger og beregn hvordan boet fordeles', 'Manage heirs and calculate how the estate is distributed')}</p>
         </div>
-        <button onClick={() => setShowAdd(!showAdd)} style={{ padding:'9px 18px', background:'#3A2F26', color:'#FBF9F5', border:'none', borderRadius:'8px', cursor:'pointer', fontSize:'14px', fontFamily:'Karla, sans-serif' }}>
+        {canEdit && <button onClick={() => setShowAdd(!showAdd)} style={{ padding:'9px 18px', background:'#3A2F26', color:'#FBF9F5', border:'none', borderRadius:'8px', cursor:'pointer', fontSize:'14px', fontFamily:'Karla, sans-serif' }}>
           {L('+ Legg til arving', '+ Add heir')}
-        </button>
+        </button>}
       </div>
 
       {heirs.some(h => h.notes?.startsWith(WIZARD_TAG)) && (
@@ -139,14 +146,14 @@ export default function HeirsPage({ session, profile, onToast }) {
               'The heirs and percentages were calculated in the inheritance guide under the Norwegian Inheritance Act. If you change your answers there and save again, they are updated automatically.',
             )}
           </p>
-          <button onClick={() => navigate(`/estate/${id}/guide`)} style={{ padding:'9px 16px', background:'#3A2F26', color:'#FBF9F5', border:'none', borderRadius:'8px', cursor:'pointer', fontSize:'14px', fontFamily:'Karla, sans-serif', whiteSpace:'nowrap' }}>
+          {canEdit && <button onClick={() => navigate(`/estate/${id}/guide`)} style={{ padding:'9px 16px', background:'#3A2F26', color:'#FBF9F5', border:'none', borderRadius:'8px', cursor:'pointer', fontSize:'14px', fontFamily:'Karla, sans-serif', whiteSpace:'nowrap' }}>
             {L('Endre svarene i veiviseren', 'Change the answers in the guide')}
-          </button>
+          </button>}
         </div>
       )}
 
       {/* Invitasjon */}
-      {inviteCode && (
+      {inviteCode && canEdit && (
         <div style={{ background:'#fff', border:'1px solid #D9CFC0', borderRadius:'12px', padding:'24px', marginBottom:'20px' }}>
           <h2 style={{ fontFamily:'Fraunces, serif', fontSize:'18px', fontWeight:'400', color:'#3A2F26', marginBottom:'6px' }}>{L('Inviter arvinger', 'Invite heirs')}</h2>
           <p style={{ fontSize:'13px', color:'#9C8267', lineHeight:'1.6', marginBottom:'16px' }}>
@@ -203,7 +210,7 @@ export default function HeirsPage({ session, profile, onToast }) {
           </div>
         </div>
 
-        {myRole === 'admin' && (
+        {canEdit && (
           <button onClick={saveSettings} disabled={saving} style={{ padding:'10px 20px', background:'#3A2F26', color:'#FBF9F5', border:'none', borderRadius:'8px', cursor:'pointer', fontSize:'14px', fontFamily:'Karla, sans-serif' }}>
             {saving ? L('Lagrer…', 'Saving…') : L('Lagre innstillinger', 'Save settings')}
           </button>
@@ -211,7 +218,7 @@ export default function HeirsPage({ session, profile, onToast }) {
       </div>
 
       {/* Legg til arving */}
-      {showAdd && (
+      {showAdd && canEdit && (
         <div style={{ background:'#fff', border:'1px solid #D9CFC0', borderRadius:'12px', padding:'24px', marginBottom:'20px' }}>
           <h3 style={{ fontFamily:'Fraunces, serif', fontSize:'16px', fontWeight:'400', color:'#3A2F26', marginBottom:'16px' }}>{L('Legg til arving', 'Add heir')}</h3>
           <div style={{ display:'flex', flexDirection:'column', gap:'12px' }}>
@@ -271,8 +278,8 @@ export default function HeirsPage({ session, profile, onToast }) {
       {/* Arvingsliste */}
       {heirs.length === 0 ? (
         <div style={{ textAlign:'center', padding:'60px 20px', color:'#9C8267' }}>
-          <p style={{ marginBottom:'20px' }}>{L('Ingen arvinger lagt til ennå.', 'No heirs added yet.')}</p>
-          <button onClick={() => setShowAdd(true)} style={{ padding:'11px 24px', background:'#3A2F26', color:'#FBF9F5', border:'none', borderRadius:'8px', cursor:'pointer', fontSize:'14px', fontFamily:'Karla, sans-serif' }}>{L('Legg til første arving', 'Add the first heir')}</button>
+          <p style={{ marginBottom:'20px' }}>{canEdit ? L('Ingen arvinger lagt til ennå.', 'No heirs added yet.') : L('Administratoren har ikke lagt inn arvinger ennå.', 'The administrator has not added any heirs yet.')}</p>
+          {canEdit && <button onClick={() => setShowAdd(true)} style={{ padding:'11px 24px', background:'#3A2F26', color:'#FBF9F5', border:'none', borderRadius:'8px', cursor:'pointer', fontSize:'14px', fontFamily:'Karla, sans-serif' }}>{L('Legg til første arving', 'Add the first heir')}</button>}
         </div>
       ) : (
         <div style={{ display:'flex', flexDirection:'column', gap:'10px' }}>
@@ -309,7 +316,7 @@ export default function HeirsPage({ session, profile, onToast }) {
                           : { label:L('Venter på at arvingen blir med', 'Waiting for the heir to join'), bg:'#FBF9F5', fg:'#9C8267' }
                         return <span style={{ fontSize:'11px', background:st.bg, color:st.fg, border:'1px solid #D9CFC0', padding:'1px 8px', borderRadius:'20px' }}>{st.label}</span>
                       })()}
-                      {!memberEmails.includes(normEmail(heir.email)) && (
+                      {canEdit && !memberEmails.includes(normEmail(heir.email)) && (
                         <button onClick={() => setEmailEdit({ id: heir.id, value: heir.email || '' })} style={{ fontSize:'12px', color:'#9C8267', background:'none', border:'none', padding:0, cursor:'pointer', textDecoration:'underline', fontFamily:'Karla, sans-serif' }}>
                           {heir.email ? L('Endre e-post', 'Change email') : L('Legg til e-post', 'Add email')}
                         </button>
@@ -332,7 +339,7 @@ export default function HeirsPage({ session, profile, onToast }) {
                   {share !== null && (
                     <div style={{ fontSize:'13px', color:'#3A2F26', fontWeight:'500' }}>{formatMoney(share)}</div>
                   )}
-                  {myRole === 'admin' && (
+                  {canEdit && (
                     <button onClick={() => removeHeir(heir.id)} style={{ fontSize:'11px', color:'#9C8267', background:'none', border:'none', cursor:'pointer', marginTop:'6px', fontFamily:'Karla, sans-serif' }}>{L('Fjern', 'Remove')}</button>
                   )}
                 </div>

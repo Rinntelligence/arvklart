@@ -1,9 +1,12 @@
 import { useEffect, useState, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { getEstate, getEstateMembers, updateEstate, uploadLogo, supabase } from '../lib/supabase'
+import { getEstate, getEstateMembers, updateEstate, supabase } from '../lib/supabase'
 import { usePlan } from '../hooks/usePlan'
+import { uploadEstateImage } from '../lib/images'
 import { Avatar, Card } from '../components/UI'
-import { L } from '../lib/lang'
+import { L, locale } from '../lib/lang'
+
+const genCode = () => Math.random().toString(36).substring(2, 8).toUpperCase()
 
 export default function AdminPage({ session, profile, onToast }) {
   const { id } = useParams()
@@ -15,6 +18,9 @@ export default function AdminPage({ session, profile, onToast }) {
   const [logoFile, setLogoFile] = useState(null)
   const [logoPreview, setLogoPreview] = useState(null)
   const [copied, setCopied] = useState(false)
+  const [loaded, setLoaded] = useState(false)
+  const [confirmRemove, setConfirmRemove] = useState(null)
+  const [confirmClose, setConfirmClose] = useState(false)
   const logoRef = useRef()
   const { can } = usePlan()
 
@@ -25,6 +31,7 @@ export default function AdminPage({ session, profile, onToast }) {
     ])
     setEstate(est)
     setMembers(mems || [])
+    setLoaded(true)
     setBrandColor(est?.branding_color || '#3A2F26')
     setLogoPreview(est?.branding_logo || null)
   }
@@ -40,25 +47,46 @@ export default function AdminPage({ session, profile, onToast }) {
   }
 
   const regenerateCode = async () => {
-    const code = Math.random().toString(36).substring(2,8).toUpperCase()
-    await updateEstate(id, { invite_code: code })
-    onToast(L('Invitasjonslenke fornyet ✓', 'Invite link renewed ✓'))
-    load()
+    // Koden er unik; prøv på nytt hvis den tilfeldigvis er tatt
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const { error } = await updateEstate(id, { invite_code: genCode() })
+      if (!error) { onToast(L('Invitasjonslenke fornyet ✓', 'Invite link renewed ✓')); load(); return }
+      if (error.code !== '23505') break
+    }
+    onToast(L('Kunne ikke fornye invitasjonskoden', 'Could not renew the invite code'), 'error')
   }
 
   const saveBranding = async () => {
     if (!can('whitelabel')) { onToast(L('Hvitmerking krever Business-plan', 'White-label requires the Business plan'), 'error'); return }
     setSaving(true)
-    let logoUrl = estate.branding_logo
-    if (logoFile) logoUrl = await uploadLogo(logoFile, id)
-    await updateEstate(id, { branding_color: brandColor, branding_logo: logoUrl })
-    onToast(L('Merkevare lagret ✓', 'Branding saved ✓'))
-    setSaving(false); load()
+    try {
+      let logoUrl = estate.branding_logo
+      if (logoFile) logoUrl = await uploadEstateImage(logoFile, id, 'logo')
+      const { error } = await updateEstate(id, { branding_color: brandColor, branding_logo: logoUrl })
+      if (error) throw error
+      setLogoFile(null)
+      onToast(L('Merkevare lagret ✓', 'Branding saved ✓'))
+      load()
+    } catch {
+      onToast(L('Kunne ikke lagre merkevaren', 'Could not save the branding'), 'error')
+    }
+    setSaving(false)
   }
 
-  const removeMember = async (userId) => {
-    await supabase.from('estate_members').delete().eq('estate_id', id).eq('user_id', userId)
+  const removeMember = async (member) => {
+    const { error } = await supabase.rpc('remove_estate_member', { p_estate_id: id, p_user_id: member.user_id })
+    setConfirmRemove(null)
+    if (error) { onToast(error.message.includes('cannot_remove_owner') ? L('Eieren av boet kan ikke fjernes', 'The owner of the estate cannot be removed') : L('Kunne ikke fjerne medlemmet', 'Could not remove the member'), 'error'); return }
     onToast(L('Medlem fjernet', 'Member removed'))
+    load()
+  }
+
+  // Avsluttede bo slettes automatisk etter 12 måneder (se personvernerklæringen)
+  const setClosed = async (closed) => {
+    const { error } = await updateEstate(id, closed ? { status: 'closed', closed_at: new Date().toISOString() } : { status: 'active', closed_at: null })
+    setConfirmClose(false)
+    if (error) { onToast(L('Kunne ikke endre status på boet', 'Could not change the status of the estate'), 'error'); return }
+    onToast(closed ? L('Boet er avsluttet', 'The estate is closed') : L('Boet er åpnet igjen', 'The estate has been reopened'))
     load()
   }
 
@@ -71,7 +99,15 @@ export default function AdminPage({ session, profile, onToast }) {
     reader.readAsDataURL(file)
   }
 
-  if (!estate) return <div style={{ padding:'80px', textAlign:'center', color:'#9C8267', fontFamily:'Karla, sans-serif' }}>{L('Laster…', 'Loading…')}</div>
+  if (!loaded) return <div style={{ padding:'80px', textAlign:'center', color:'#9C8267', fontFamily:'Karla, sans-serif' }}>{L('Laster…', 'Loading…')}</div>
+
+  const myRole = members.find(m => m.user_id === session.user.id)?.role
+  if (!estate || myRole !== 'admin') return (
+    <div style={{ padding:'80px 16px', textAlign:'center', color:'#9C8267', fontFamily:'Karla, sans-serif' }}>
+      <p style={{ marginBottom:'16px' }}>{L('Bare administratorer av boet har tilgang til denne siden.', 'Only administrators of the estate can access this page.')}</p>
+      <button onClick={() => navigate(estate ? `/estate/${id}` : '/')} style={{ padding:'10px 20px', background:'#3A2F26', color:'#FBF9F5', border:'none', borderRadius:'8px', cursor:'pointer', fontSize:'14px', fontFamily:'Karla, sans-serif' }}>{L('Tilbake', 'Back')}</button>
+    </div>
+  )
 
   return (
     <div style={{ maxWidth:'680px', margin:'0 auto', padding:'28px 16px', fontFamily:'Karla, sans-serif' }}>
@@ -81,7 +117,10 @@ export default function AdminPage({ session, profile, onToast }) {
       {/* Invite link */}
       <Card style={{ padding:'28px', marginBottom:'20px' }}>
         <h2 style={{ fontFamily:'Fraunces, serif', fontSize:'18px', fontWeight:'400', color:'#3A2F26', marginBottom:'6px' }}>{L('Invitasjonslenke', 'Invite link')}</h2>
-        <p style={{ fontSize:'13px', color:'#9C8267', marginBottom:'16px' }}>{L('Send denne lenken til familiemedlemmer — de klikker og legges automatisk til i boet.', 'Send this link to family members — they click it and are added to the estate automatically.')}</p>
+        <p style={{ fontSize:'13px', color:'#9C8267', marginBottom:'16px', lineHeight:'1.6' }}>
+          {L('Send lenken til arvingene. For å bli med må de logge inn med e-posten som er lagt inn på dem under', 'Send the link to the heirs. To join, they must log in with the email address added for them under')}{' '}
+          <button onClick={() => navigate(`/estate/${id}/heirs`)} style={{ background:'none', border:'none', padding:0, color:'#5F6E52', cursor:'pointer', fontSize:'13px', textDecoration:'underline', fontFamily:'Karla, sans-serif' }}>{L('Arvinger', 'Heirs')}</button>.
+        </p>
         <div style={{ display:'flex', gap:'8px', marginBottom:'12px' }}>
           <input value={inviteUrl} readOnly
             style={{ flex:1, padding:'11px 14px', border:'1px solid #D9CFC0', borderRadius:'8px', fontSize:'13px', background:'#FBF9F5', color:'#5C4530', outline:'none', fontFamily:'monospace' }} />
@@ -106,13 +145,23 @@ export default function AdminPage({ session, profile, onToast }) {
                 <div style={{ fontSize:'14px', color:'#3A2F26', fontWeight:'500' }}>{m.profiles?.display_name}</div>
                 <div style={{ fontSize:'12px', color:'#9C8267' }}>{m.profiles?.email}</div>
               </div>
-              <span style={{ fontSize:'11px', background:m.role==='admin'?'#E8DFD0':'#DCE3D2', color:m.role==='admin'?'#5C4530':'#3A5A30', padding:'3px 8px', borderRadius:'20px', textTransform:'uppercase', letterSpacing:'0.5px' }}>{m.role}</span>
-              {m.user_id !== session.user.id && (
-                <button onClick={()=>removeMember(m.user_id)} style={{ background:'none', border:'none', color:'#9C8267', cursor:'pointer', fontSize:'18px', padding:'0 4px' }}>×</button>
+              <span style={{ fontSize:'11px', background:m.role==='admin'?'#E8DFD0':'#DCE3D2', color:m.role==='admin'?'#5C4530':'#3A5A30', padding:'3px 8px', borderRadius:'20px', textTransform:'uppercase', letterSpacing:'0.5px' }}>{m.user_id === estate.owner_id ? L('Eier', 'Owner') : m.role === 'admin' ? L('Admin', 'Admin') : L('Medlem', 'Member')}</span>
+              {m.user_id !== session.user.id && m.user_id !== estate.owner_id && (
+                confirmRemove === m.user_id ? (
+                  <span style={{ display:'flex', gap:'6px' }}>
+                    <button onClick={()=>removeMember(m)} style={{ padding:'4px 10px', background:'#8B3A3A', color:'#fff', border:'none', borderRadius:'6px', cursor:'pointer', fontSize:'12px', fontFamily:'Karla, sans-serif' }}>{L('Fjern', 'Remove')}</button>
+                    <button onClick={()=>setConfirmRemove(null)} style={{ padding:'4px 10px', background:'none', border:'1px solid #D9CFC0', borderRadius:'6px', cursor:'pointer', fontSize:'12px', color:'#5C4530', fontFamily:'Karla, sans-serif' }}>{L('Avbryt', 'Cancel')}</button>
+                  </span>
+                ) : (
+                  <button onClick={()=>setConfirmRemove(m.user_id)} title={L('Fjern fra boet', 'Remove from the estate')} style={{ background:'none', border:'none', color:'#9C8267', cursor:'pointer', fontSize:'18px', padding:'0 4px' }}>×</button>
+                )
               )}
             </div>
           ))}
         </div>
+        <p style={{ fontSize:'12px', color:'#9C8267', marginTop:'12px', lineHeight:'1.5' }}>
+          {L('Når et medlem fjernes, fjernes også interessene deres for gjenstander som ikke er tildelt. Fjern arvingens e-post under Arvinger hvis de ikke skal kunne bli med igjen.', 'When a member is removed, their interests in unassigned items are removed too. Remove the heir\'s email under Heirs if they should not be able to rejoin.')}
+        </p>
       </Card>
 
       {/* White-label branding */}
@@ -160,12 +209,33 @@ export default function AdminPage({ session, profile, onToast }) {
       </Card>
 
       {/* Categories */}
-      <Card style={{ padding:'28px' }}>
+      <Card style={{ padding:'28px', marginBottom:'20px' }}>
         <h2 style={{ fontFamily:'Fraunces, serif', fontSize:'18px', fontWeight:'400', color:'#3A2F26', marginBottom:'6px' }}>{L('Kategorier', 'Categories')}</h2>
         <p style={{ fontSize:'13px', color:'#9C8267', marginBottom:'16px' }}>{L('Administrer kategoriene som er tilgjengelige for gjenstander i dette boet.', 'Manage the categories available for items in this estate.')}</p>
         <button onClick={()=>navigate(`/estate/${id}/categories`)} style={{ padding:'9px 18px', background:'none', border:'1px solid #D9CFC0', borderRadius:'8px', cursor:'pointer', color:'#5C4530', fontSize:'14px', fontFamily:'Karla, sans-serif' }}>
           {L('Administrer kategorier →', 'Manage categories →')}
         </button>
+      </Card>
+
+      {/* Avslutt boet */}
+      <Card style={{ padding:'28px' }}>
+        <h2 style={{ fontFamily:'Fraunces, serif', fontSize:'18px', fontWeight:'400', color:'#3A2F26', marginBottom:'6px' }}>{estate.status === 'closed' ? L('Boet er avsluttet', 'The estate is closed') : L('Avslutt boet', 'Close the estate')}</h2>
+        <p style={{ fontSize:'13px', color:'#9C8267', marginBottom:'16px', lineHeight:'1.6' }}>
+          {estate.status === 'closed'
+            ? `${L('Avsluttet', 'Closed')} ${estate.closed_at ? new Date(estate.closed_at).toLocaleDateString(locale(), { day:'numeric', month:'long', year:'numeric' }) : ''}. ${L('Boet med bilder og dokumenter slettes automatisk 12 måneder etter dette. Åpner du boet igjen, stopper slettingen.', 'The estate with its photos and documents is deleted automatically 12 months after this. Reopening the estate stops the deletion.')}`
+            : L('Når oppgjøret er ferdig, kan du avslutte boet. Det slettes da automatisk med alle bilder og dokumenter etter 12 måneder. Last ned det dere trenger før det.', 'When the settlement is finished, you can close the estate. It is then deleted automatically with all photos and documents after 12 months. Download what you need before then.')}
+        </p>
+        {estate.status === 'closed' ? (
+          <button onClick={() => setClosed(false)} style={{ padding:'9px 18px', background:'none', border:'1px solid #D9CFC0', borderRadius:'8px', cursor:'pointer', color:'#5C4530', fontSize:'14px', fontFamily:'Karla, sans-serif' }}>{L('Åpne boet igjen', 'Reopen the estate')}</button>
+        ) : confirmClose ? (
+          <div style={{ display:'flex', gap:'10px', alignItems:'center', flexWrap:'wrap' }}>
+            <span style={{ fontSize:'13px', color:'#8B3A3A' }}>{L('Avslutte boet?', 'Close the estate?')}</span>
+            <button onClick={() => setClosed(true)} style={{ padding:'8px 16px', background:'#8B3A3A', color:'#fff', border:'none', borderRadius:'8px', cursor:'pointer', fontSize:'13px', fontFamily:'Karla, sans-serif' }}>{L('Ja, avslutt', 'Yes, close it')}</button>
+            <button onClick={() => setConfirmClose(false)} style={{ padding:'8px 16px', background:'none', border:'1px solid #D9CFC0', borderRadius:'8px', cursor:'pointer', color:'#5C4530', fontSize:'13px', fontFamily:'Karla, sans-serif' }}>{L('Avbryt', 'Cancel')}</button>
+          </div>
+        ) : (
+          <button onClick={() => setConfirmClose(true)} style={{ padding:'9px 18px', background:'none', border:'1px solid #8B3A3A', borderRadius:'8px', cursor:'pointer', color:'#8B3A3A', fontSize:'14px', fontFamily:'Karla, sans-serif' }}>{L('Avslutt boet…', 'Close the estate…')}</button>
+        )}
       </Card>
     </div>
   )

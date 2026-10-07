@@ -1,11 +1,12 @@
-import { useEffect, useLayoutEffect, useState, useRef } from 'react'
-
+import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { getEstate, getItems, getCategories, supabase } from '../lib/supabase'
-import { buildRemainingSteps, getUndecided, getStatusBreakdown } from '../lib/estateProgress'
+import { buildRemainingSteps, getUndecided, getStatusBreakdown, isContested } from '../lib/estateProgress'
 import { loadStatusExtras } from '../lib/decisions'
+import { formatNOK } from '../lib/format'
+import { removeImages, itemImageUrls } from '../lib/images'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
-import { L } from '../lib/lang'
+import { L, locale } from '../lib/lang'
 
 const PALETTE = ['#5F6E52','#8B9A7D','#A97C3F','#7A8B6E','#9C8267','#6E8B87']
 
@@ -22,7 +23,7 @@ export default function EstatePage({ session, profile, onToast, isDemo }) {
   const [loading, setLoading] = useState(true)
   const [confirmItem, setConfirmItem] = useState(null)
   const [statusExtras, setStatusExtras] = useState(null)
-  const scrollPos = useRef(0)
+  const [deleting, setDeleting] = useState(false)
 
   useEffect(() => {
     const onScroll = () => sessionStorage.setItem('estate_scroll_' + id, window.scrollY)
@@ -54,7 +55,7 @@ export default function EstatePage({ session, profile, onToast, isDemo }) {
     setCategories(cats || [])
     setMyRole(mem?.role || 'member')
     setLoading(false)
-    setStatusExtras(await loadStatusExtras(id, its || []))
+    setStatusExtras(await loadStatusExtras(id))
   }
 
   useEffect(() => {
@@ -68,16 +69,16 @@ export default function EstatePage({ session, profile, onToast, isDemo }) {
   }, [id])
 
   if (loading) return <div style={{ padding:'80px', textAlign:'center', color:'#9C8267', fontFamily:'Karla, sans-serif' }}>{L('Laster…', 'Loading…')}</div>
-  if (!estate) return <div style={{ padding:'60px', textAlign:'center', color:'#9C8267' }}>{L('Fant ikke boet.', 'Estate not found.')}</div>
+  if (!estate) return <div style={{ padding:'60px', textAlign:'center', color:'#9C8267', fontFamily:'Karla, sans-serif' }}>{L('Fant ikke boet. Det kan være slettet, eller du er ikke medlem.', 'Estate not found. It may have been deleted, or you are not a member.')}</div>
 
   const myItems = items.filter(i => i.interests?.some(x => x.user_id === session.user.id))
   const otherItems = items.filter(i => !i.interests?.some(x => x.user_id === session.user.id))
 
   const getFiltered = () => {
     if (filterStatus === 'mine') return items.filter(i => i.interests?.some(x => x.user_id === session.user.id))
-    if (filterStatus === 'contested') return items.filter(i => i.interests?.length > 1)
+    if (filterStatus === 'contested') return items.filter(isContested)
     if (filterStatus === 'wanted') return items.filter(i => i.interests?.length > 0)
-    if (filterStatus === 'unwanted') return items.filter(i => i.interests?.length === 0)
+    if (filterStatus === 'unwanted') return items.filter(i => i.status !== 'assigned' && !i.interests?.length)
     if (filterStatus === 'assigned') return items.filter(i => i.status === 'assigned')
     return items
   }
@@ -85,22 +86,25 @@ export default function EstatePage({ session, profile, onToast, isDemo }) {
   const filtered = getFiltered().filter(i => filterCat === 'all' || i.category_id === filterCat)
 
   const myCount = myItems.length
-  const contested = items.filter(i => i.interests?.length > 1).length
-  const unwanted = items.filter(i => i.interests?.length === 0).length
+  const contested = items.filter(isContested).length
+  const unwanted = items.filter(i => i.status !== 'assigned' && !i.interests?.length).length
   const assigned = items.filter(i => i.status === 'assigned').length
-  const undecidedCount = statusExtras ? getUndecided(items, statusExtras.members, statusExtras.passes).length : 0
+  const undecided = statusExtras ? getUndecided(items, statusExtras.members, statusExtras.passes, statusExtras.heirs) : []
+  const undecidedCount = undecided.length
   const remainingSteps = statusExtras ? buildRemainingSteps({ estateId: id, userId: session.user.id, items, ...statusExtras }).length : null
 
   const handleDelete = (item, e) => {
     e.stopPropagation()
-    const canDelete = myRole === 'admin' || item.added_by === session.user.id
-    if (!canDelete) { onToast(L('Bare admin kan slette andres gjenstander', 'Only an admin can delete items added by others'), 'error'); return }
     setConfirmItem(item)
   }
 
   const confirmDelete = async () => {
-    if (!confirmItem) return
-    await supabase.from('items').delete().eq('id', confirmItem.id)
+    if (!confirmItem || deleting) return
+    setDeleting(true)
+    const { data, error } = await supabase.from('items').delete().eq('id', confirmItem.id).select('id')
+    setDeleting(false)
+    if (error || !data?.length) { onToast(L('Kunne ikke slette gjenstanden. Bare admin og den som la den inn kan slette den.', 'Could not delete the item. Only an admin and the person who added it can delete it.'), 'error'); return }
+    await removeImages(itemImageUrls(confirmItem))
     onToast(L('Gjenstand slettet', 'Item deleted'))
     setConfirmItem(null)
     load()
@@ -114,14 +118,12 @@ export default function EstatePage({ session, profile, onToast, isDemo }) {
   const pieData = [
     { name: L('Tildelt', 'Assigned'), value: assigned },
     { name: L('Ettertraktet', 'Contested'), value: contested },
-    { name: L('Ønsket', 'Wanted'), value: items.filter(i => i.interests?.length === 1).length },
+    { name: L('Ønsket', 'Wanted'), value: items.filter(i => i.status !== 'assigned' && i.interests?.length === 1).length },
     { name: L('Ingen vil ha', 'Unwanted'), value: unwanted },
   ].filter(d => d.value > 0)
 
   const breakdown = getStatusBreakdown(items)
-  const myUndecided = statusExtras
-    ? getUndecided(items, statusExtras.members, statusExtras.passes).find(u => u.member.user_id === session.user.id)?.items.length || 0
-    : 0
+  const myUndecided = undecided.find(u => u.member.user_id === session.user.id)?.items.length || 0
   const memberCount = statusExtras?.members.length
 
   const statusTabs = [
@@ -158,11 +160,18 @@ export default function EstatePage({ session, profile, onToast, isDemo }) {
           </p>
         </div>
         <div style={{ display:'flex', gap:'8px', flexWrap:'wrap' }}>
-          {myRole === 'admin' && <button onClick={() => navigate(`/estate/${id}/admin`)} style={btn}>{L('Administrer', 'Manage')}</button>}
+          {myRole === 'admin' && !isDemo && <button onClick={() => navigate(`/estate/${id}/admin`)} style={btn}>{L('Administrer', 'Manage')}</button>}
           <button onClick={() => navigate(`/estate/${id}/swipe`)} style={btn}>{L('Sveip', 'Swipe')}</button>
           {!isDemo && <button onClick={() => navigate(`/estate/${id}/add`)} style={btnPrimary}>{L('+ Legg til', '+ Add')}</button>}
         </div>
       </div>
+
+      {estate.status === 'closed' && (
+        <div style={{ background:'#E8DFD0', border:'1px solid #D9CFC0', borderRadius:'10px', padding:'12px 16px', marginBottom:'16px', fontSize:'13px', color:'#5C4530', lineHeight:1.5 }}>
+          {L('Boet er avsluttet. Det slettes automatisk, med alle bilder og dokumenter, 12 måneder etter at det ble avsluttet.', 'This estate is closed. It is deleted automatically, with all photos and documents, 12 months after it was closed.')}
+          {estate.closed_at && ` (${new Date(estate.closed_at).toLocaleDateString(locale(), { day:'numeric', month:'long', year:'numeric' })})`}
+        </div>
+      )}
 
       {/* Status for boet */}
       {items.length > 0 && (
@@ -331,7 +340,7 @@ export default function EstatePage({ session, profile, onToast, isDemo }) {
             <p style={{ fontSize:'13px', color:'#9C8267', marginBottom:'24px' }}>{L('Kan ikke angres.', 'This cannot be undone.')}</p>
             <div style={{ display:'flex', gap:'10px' }}>
               <button onClick={() => setConfirmItem(null)} style={{ flex:1, padding:'11px', background:'none', border:'1px solid #D9CFC0', borderRadius:'8px', cursor:'pointer', color:'#5C4530', fontSize:'14px', fontFamily:'Karla, sans-serif' }}>{L('Avbryt', 'Cancel')}</button>
-              <button onClick={confirmDelete} style={{ flex:1, padding:'11px', background:'#8B3A3A', color:'#fff', border:'none', borderRadius:'8px', cursor:'pointer', fontSize:'14px', fontFamily:'Karla, sans-serif' }}>{L('Slett', 'Delete')}</button>
+              <button onClick={confirmDelete} disabled={deleting} style={{ flex:1, padding:'11px', background:'#8B3A3A', color:'#fff', border:'none', borderRadius:'8px', cursor:'pointer', fontSize:'14px', fontFamily:'Karla, sans-serif' }}>{deleting ? L('Sletter…', 'Deleting…') : L('Slett', 'Delete')}</button>
             </div>
           </div>
         </div>
@@ -385,7 +394,7 @@ function ItemCard({ item, userId, onClick, onDelete, myRole, isDemo }) {
 
       <div style={{ padding:'10px 12px 12px' }}>
         <div style={{ fontSize:'14px', fontWeight:'500', color:'#3A2F26', marginBottom:'2px', lineHeight:'1.3' }}>{item.title}</div>
-        {item.estimated_value && <div style={{ fontSize:'12px', color:'#9C8267' }}>{item.estimated_value}</div>}
+        {item.estimated_value && <div style={{ fontSize:'12px', color:'#9C8267' }}>{formatNOK(item.estimated_value)}</div>}
         <div style={{ marginTop:'8px', fontSize:'12px', color: count ? '#5C4530' : '#9C8267', fontStyle: count ? 'normal' : 'italic' }}>
           {count === 0 ? L('Ingen ennå', 'No one yet') : names === L('deg', 'you') ? L('Bare deg', 'Only you') : names.charAt(0).toUpperCase() + names.slice(1)}
         </div>

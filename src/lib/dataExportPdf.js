@@ -1,4 +1,4 @@
-// Bygger GDPR-dataeksporten (profil, interesser, kommentarer) som en lesbar PDF
+// Bygger GDPR-dataeksporten (alt som er knyttet til brukeren) som en lesbar PDF
 import { jsPDF } from 'jspdf'
 import { L, locale } from './lang'
 
@@ -9,6 +9,7 @@ const BORDER = '#D9CFC0'
 
 const PROFILE_LABELS = {
   display_name: L('Visningsnavn', 'Display name'),
+  email: L('E-post', 'Email'),
   avatar_color: L('Avatarfarge', 'Avatar colour'),
   plan: L('Abonnement', 'Subscription'),
   is_founder: 'Founder',
@@ -32,7 +33,10 @@ const fmtValue = v => {
   return String(v)
 }
 
-export function buildDataExportPdf({ email, profile, interests = [], comments = [], exportedAt = new Date() }) {
+export function buildDataExportPdf({
+  email, profile, estates = [], interests = [], passes = [], comments = [], items = [], documents = [], feedback = [],
+  exportedAt = new Date(),
+}) {
   const doc = new jsPDF({ unit: 'mm', format: 'a4' })
   const M = 20
   const W = doc.internal.pageSize.getWidth() - M * 2
@@ -59,7 +63,7 @@ export function buildDataExportPdf({ email, profile, interests = [], comments = 
   text(L('Mine data – Arvklart', 'My data – Arvklart'), { size: 20, color: ESPRESSO, bold: true, gap: 2 })
   text(`${L('Eksportert', 'Exported')} ${fmtDate(exportedAt)}`, { color: LATTE, gap: 0.5 })
   if (email) text(`${L('Konto', 'Account')}: ${email}`, { color: LATTE })
-  text(L('Dette dokumentet inneholder alle personopplysninger Arvklart har lagret om deg: profil, interesser og kommentarer.', 'This document contains all personal data Arvklart has stored about you: profile, interests and comments.'), { size: 9.5, color: LATTE, gap: 2 })
+  text(L('Dette dokumentet inneholder personopplysningene Arvklart har lagret om deg: profil, bo du er med i, interesser, nei takk, kommentarer, gjenstander og dokumenter du har lagt inn, og tilbakemeldinger.', 'This document contains the personal data Arvklart has stored about you: profile, estates you belong to, interests, declined items, comments, items and documents you have added, and feedback.'), { size: 9.5, color: LATTE, gap: 2 })
 
   heading(L('Profil', 'Profile'))
   const entries = Object.entries(profile || {}).filter(([, v]) => v !== null && v !== '')
@@ -68,6 +72,25 @@ export function buildDataExportPdf({ email, profile, interests = [], comments = 
     text(PROFILE_LABELS[k] || k, { size: 9, color: LATTE, gap: 0.3 })
     text(fmtValue(v), { gap: 2.5 })
   }
+
+  // Én oppføring per rad: tittel, dato og valgfri tekst
+  const addEntries = (title, rows, empty, toEntry) => {
+    heading(`${title} (${rows.length})`)
+    if (!rows.length) text(empty, { color: LATTE })
+    for (const row of rows) {
+      const { head, date, body } = toEntry(row)
+      ensure(14)
+      text(head || '–', { size: 11, color: ESPRESSO, bold: true, gap: 0.5 })
+      if (date) text(fmtDate(date), { size: 9, color: LATTE, gap: 0.8 })
+      if (body) text(body, { gap: 0.5 })
+      y += 3
+    }
+  }
+
+  addEntries(L('Bo du er med i', 'Estates you belong to'), estates, L('Du er ikke med i noen bo.', 'You do not belong to any estates.'), e => ({
+    head: e.estates?.name || L('Ukjent bo', 'Unknown estate'), date: e.joined_at,
+    body: e.role === 'admin' ? L('Rolle: administrator', 'Role: administrator') : L('Rolle: medlem', 'Role: member'),
+  }))
 
   heading(`${L('Interesser', 'Interests')} (${interests.length})`)
   if (!interests.length) text(L('Du har ikke meldt interesse for noen gjenstander.', 'You have not registered interest in any items.'), { color: LATTE })
@@ -88,6 +111,21 @@ export function buildDataExportPdf({ email, profile, interests = [], comments = 
     if (c.content) text(c.content, { gap: 0.5 })
     y += 3
   }
+
+  addEntries(L('Nei takk', 'Declined'), passes, L('Du har ikke sagt nei takk til noen gjenstander.', 'You have not declined any items.'), p => ({
+    head: p.items?.title || L('Ukjent gjenstand', 'Unknown item'), date: p.created_at,
+  }))
+  addEntries(L('Gjenstander du har lagt inn', 'Items you have added'), items, L('Du har ikke lagt inn noen gjenstander.', 'You have not added any items.'), i => ({
+    head: i.title, date: i.created_at,
+    body: [i.estates?.name && `${L('Bo', 'Estate')}: ${i.estates.name}`, i.description, i.estimated_value && `${L('Anslått verdi', 'Estimated value')}: ${i.estimated_value} kr`].filter(Boolean).join('\n'),
+  }))
+  addEntries(L('Dokumenter du har lastet opp', 'Documents you have uploaded'), documents, L('Du har ikke lastet opp noen dokumenter.', 'You have not uploaded any documents.'), d => ({
+    head: d.name, date: d.created_at, body: d.estates?.name && `${L('Bo', 'Estate')}: ${d.estates.name}`,
+  }))
+  addEntries(L('Tilbakemeldinger', 'Feedback'), feedback, L('Du har ikke sendt noen tilbakemeldinger.', 'You have not sent any feedback.'), f => ({
+    head: f.type === 'bug' ? L('Feil', 'Bug') : f.type === 'idea' ? L('Idé', 'Idea') : L('Generelt', 'General'), date: f.created_at,
+    body: [f.content, f.nps_score && `${L('Anbefaling', 'Recommendation')}: ${f.nps_score}/10`].filter(Boolean).join('\n'),
+  }))
 
   const pages = doc.getNumberOfPages()
   for (let p = 1; p <= pages; p++) {

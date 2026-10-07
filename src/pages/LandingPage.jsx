@@ -1,9 +1,7 @@
 import { useState } from 'react'
-import { signIn } from '../lib/supabase'
+import { useNavigate } from 'react-router-dom'
+import { startDemoSession } from '../lib/demo'
 import { L, isEn, setLang } from '../lib/lang'
-
-const DEMO_EMAIL = 'mona.demo@heirsplit.no'
-const DEMO_PASSWORD = import.meta.env.VITE_DEMO_PASSWORD || ''
 
 // Språkbytte for besøkende som ikke er innlogget (innloggede bytter i TopBar)
 const toggleLang = (e) => {
@@ -14,22 +12,25 @@ const toggleLang = (e) => {
 const langLabel = () => (isEn() ? 'Norsk' : 'English')
 
 export default function LandingPage({ loggedIn = false }) {
+  const navigate = useNavigate()
   const [demoLoading, setDemoLoading] = useState(false)
   const [demoError, setDemoError] = useState('')
 
+  // Innloggede (også demoen) går rett til appen; ellers startes en demo-økt i samme fane.
   const handleDemo = async () => {
+    if (loggedIn) { navigate('/'); return }
     setDemoLoading(true)
     setDemoError('')
-    const { error } = await signIn(DEMO_EMAIL, DEMO_PASSWORD)
+    const { error } = await startDemoSession()
     if (error) {
       console.error('Demo login error:', error.message)
       setDemoLoading(false)
-      setDemoError(L('Demo er ikke tilgjengelig akkurat nå. Sjekk at VITE_DEMO_PASSWORD er satt riktig.', 'The demo is not available right now. Check that VITE_DEMO_PASSWORD is set correctly.'))
+      setDemoError(L('Demoen er ikke tilgjengelig akkurat nå. Prøv igjen om litt.', 'The demo is not available right now. Please try again shortly.'))
       return
     }
-    window.open('/', '_blank')
-    setDemoLoading(false)
+    navigate('/')
   }
+  const demoLabel = (idle) => demoLoading ? L('Åpner demo…', 'Opening the demo…') : loggedIn ? L('Gå til mine bo', 'Go to my estates') : idle
 
   return (
     <>
@@ -217,7 +218,7 @@ export default function LandingPage({ loggedIn = false }) {
                 onClick={handleDemo}
                 disabled={demoLoading}
               >
-                {demoLoading ? L('Logger inn…', 'Logging in…') : L('Test ut demo nå', 'Try the demo now')}
+                {demoLabel(L('Test ut demo nå', 'Try the demo now'))}
               </button>
               <a className="btn btn-line" href="#slik-fungerer">{L('Se hvordan det fungerer', 'See how it works')}</a>
             </div>
@@ -267,7 +268,7 @@ export default function LandingPage({ loggedIn = false }) {
             disabled={demoLoading}
             style={{ margin: '0 auto' }}
           >
-            {demoLoading ? L('Logger inn…', 'Logging in…') : L('Åpne demo', 'Open the demo')}
+            {demoLabel(L('Åpne demo', 'Open the demo'))}
           </button>
           {demoError && <div style={{ marginTop: '14px', fontSize: '13px', color: '#F5C2C2', background: 'rgba(0,0,0,0.3)', padding: '8px 14px', borderRadius: '6px', display: 'inline-block' }}>{demoError}</div>}
 

@@ -1,16 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { supabase } from '../lib/supabase'
+import { supabase, getEstateMembers } from '../lib/supabase'
 import { L, locale } from '../lib/lang'
-
-const GOODWILL_EVENTS = {
-  chore_small:     { points: 15, label: L('Fullførte en liten oppgave', 'Completed a small task') },
-  chore_medium:    { points: 35, label: L('Fullførte en middels oppgave', 'Completed a medium task') },
-  chore_large:     { points: 70, label: L('Fullførte en stor oppgave', 'Completed a large task') },
-  yielded_item:    { points: 25, label: L('Ga opp en ønsket gjenstand', 'Gave up a wanted item') },
-  added_items:     { points: 5,  label: L('La til gjenstander i inventaret', 'Added items to the inventory') },
-  drove_to_dump:   { points: 40, label: L('Kjørte til søppelplassen', 'Drove to the dump') },
-}
 
 const CHORE_SIZES = [
   { id: 'small',  label: L('Liten', 'Small'),           desc: L('Under 1 time', 'Under 1 hour'),        points: 15 },
@@ -22,30 +13,31 @@ const CHORE_SIZES = [
 const SCORE_COLORS = ['#5F6E52','#8B9A7D','#A97C3F','#7A8B6E','#9C8267','#6E8B87','#8B3A3A']
 const tc = c => { if(!c)return'#FBF9F5'; const r=parseInt(c.slice(1,3),16),g=parseInt(c.slice(3,5),16),b=parseInt(c.slice(5,7),16); return(0.299*r+0.587*g+0.114*b)/255>0.55?'#3A2F26':'#FBF9F5' }
 const getScoreColor = (i) => SCORE_COLORS[i % SCORE_COLORS.length]
+// complete_chore() lagrer loggteksten på norsk; oversettes ved visning
+const logText = d => d?.replace(/^Fullførte: /, L('Fullførte: ', 'Completed: '))
 
-export default function GoodwillPage({ session, profile }) {
+export default function GoodwillPage({ session, onToast }) {
   const { id } = useParams()
   const navigate = useNavigate()
   const [members, setMembers] = useState([])
   const [chores, setChores] = useState([])
   const [goodwillLog, setGoodwillLog] = useState([])
-  const [myRole, setMyRole] = useState('member')
   const [tab, setTab] = useState('overview')
   const [showAddChore, setShowAddChore] = useState(false)
   const [newChore, setNewChore] = useState({ title: '', description: '', size: 'medium', assigned_to: '' })
   const [loading, setLoading] = useState(true)
 
   const load = async () => {
-    const [{ data: mems }, { data: chs }, { data: log }, { data: mem }] = await Promise.all([
-      supabase.from('estate_members').select('user_id, profiles(display_name, avatar_color, email)').eq('estate_id', id),
-      supabase.from('chores').select('*, assigned_to_profile:profiles!chores_assigned_to_fkey(display_name, avatar_color), completed_by_profile:profiles!chores_completed_by_fkey(display_name, avatar_color)').eq('estate_id', id).order('created_at', { ascending: false }),
-      supabase.from('goodwill_log').select('*, profiles(display_name, avatar_color)').eq('estate_id', id).order('created_at', { ascending: false }),
-      supabase.from('estate_members').select('role').eq('estate_id', id).eq('user_id', session.user.id).single(),
+    // chores og goodwill_log peker på auth.users, så profilene hentes fra medlemslisten
+    const [{ data: mems }, { data: chs }, { data: log }] = await Promise.all([
+      getEstateMembers(id),
+      supabase.from('chores').select('*').eq('estate_id', id).order('created_at', { ascending: false }),
+      supabase.from('goodwill_log').select('*').eq('estate_id', id).order('created_at', { ascending: false }),
     ])
+    const profileOf = uid => (mems || []).find(m => m.user_id === uid)?.profiles || null
     setMembers(mems || [])
-    setChores(chs || [])
-    setGoodwillLog(log || [])
-    setMyRole(mem?.role || 'member')
+    setChores((chs || []).map(c => ({ ...c, assigned_to_profile: profileOf(c.assigned_to), completed_by_profile: profileOf(c.completed_by) })))
+    setGoodwillLog((log || []).map(e => ({ ...e, profiles: profileOf(e.user_id) })))
     setLoading(false)
   }
 
@@ -68,31 +60,29 @@ export default function GoodwillPage({ session, profile }) {
   const myScore = scores.find(s => s.user_id === session.user.id)?.score || 0
 
   const claimChore = async (choreId) => {
-    await supabase.from('chores').update({ assigned_to: session.user.id }).eq('id', choreId)
+    const { error } = await supabase.from('chores').update({ assigned_to: session.user.id }).eq('id', choreId).is('assigned_to', null)
+    if (error) onToast(L('Kunne ikke ta oppgaven', 'Could not take the task'), 'error')
     load()
   }
 
+  // Databasen markerer oppgaven som ferdig og gir poeng én gang, også ved dobbeltklikk
   const completeChore = async (chore) => {
-    const size = CHORE_SIZES.find(s => s.id === chore.size) || CHORE_SIZES[1]
-    await supabase.from('chores').update({ completed: true, completed_by: session.user.id, completed_at: new Date().toISOString() }).eq('id', chore.id)
-    await supabase.from('goodwill_log').insert({
-      estate_id: id, user_id: session.user.id,
-      event_type: `chore_${chore.size}`, points: size.points,
-      description: L(`Fullførte: ${chore.title}`, `Completed: ${chore.title}`), reference_id: chore.id,
-    })
+    const { error } = await supabase.rpc('complete_chore', { p_chore_id: chore.id })
+    if (error) onToast(L('Kunne ikke fullføre oppgaven', 'Could not complete the task'), 'error')
     load()
   }
 
   const addChore = async () => {
     if (!newChore.title.trim()) return
     const size = CHORE_SIZES.find(s => s.id === newChore.size)
-    await supabase.from('chores').insert({
+    const { error } = await supabase.from('chores').insert({
       estate_id: id, title: newChore.title.trim(),
       description: newChore.description.trim(), size: newChore.size,
       assigned_to: newChore.assigned_to || null,
       added_by: session.user.id, completed: false,
       points: size?.points || 35,
     })
+    if (error) { onToast(L('Kunne ikke legge til oppgaven', 'Could not add the task'), 'error'); return }
     setNewChore({ title: '', description: '', size: 'medium', assigned_to: '' })
     setShowAddChore(false)
     load()
@@ -109,7 +99,7 @@ export default function GoodwillPage({ session, profile }) {
           <h1 style={{ fontFamily:'Fraunces, serif', fontSize:'26px', fontWeight:'400', color:'#3A2F26', marginBottom:'4px' }}>{L('Goodwill og arbeid', 'Goodwill and work')}</h1>
           <p style={{ color:'#9C8267', fontSize:'14px' }}>{L('Spor bidrag, kompromisser og rettferdighet', 'Track contributions, compromises and fairness')}</p>
         </div>
-        <button onClick={() => setShowAddChore(true)} style={{ padding:'9px 18px', background:'#3A2F26', color:'#FBF9F5', border:'none', borderRadius:'8px', cursor:'pointer', fontSize:'14px', fontFamily:'Karla, sans-serif' }}>
+        <button onClick={() => { setShowAddChore(true); setTab('chores') }} style={{ padding:'9px 18px', background:'#3A2F26', color:'#FBF9F5', border:'none', borderRadius:'8px', cursor:'pointer', fontSize:'14px', fontFamily:'Karla, sans-serif' }}>
           {L('+ Legg til oppgave', '+ Add task')}
         </button>
       </div>
@@ -187,7 +177,7 @@ export default function GoodwillPage({ session, profile }) {
                 </div>
                 {s.events.slice(0, 2).map(e => (
                   <div key={e.id} style={{ fontSize:'12px', color:'#9C8267', marginTop:'4px', paddingLeft:'42px' }}>
-                    {e.description} <span style={{ color:'#5F6E52' }}>+{e.points}</span>
+                    {logText(e.description)} <span style={{ color:'#5F6E52' }}>+{e.points}</span>
                   </div>
                 ))}
               </div>
@@ -203,8 +193,6 @@ export default function GoodwillPage({ session, profile }) {
                 { action: L('Middels oppgave (1–3 timer)', 'Medium task (1–3 hours)'), pts: '+35' },
                 { action: L('Stor oppgave (halv/hel dag)', 'Large task (half/full day)'), pts: '+70' },
                 { action: L('Søppelkjøring', 'Dump run'), pts: '+40' },
-                { action: L('Ga opp en ønsket gjenstand', 'Gave up a wanted item'), pts: '+25' },
-                { action: L('La til gjenstand i inventaret', 'Added an item to the inventory'), pts: '+5' },
               ].map(g => (
                 <div key={g.action} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'8px 12px', background:'#fff', borderRadius:'8px', border:'1px solid #D9CFC0' }}>
                   <span style={{ fontSize:'13px', color:'#5C4530' }}>{g.action}</span>
@@ -292,7 +280,7 @@ export default function GoodwillPage({ session, profile }) {
         <div>
           {goodwillLog.length === 0 ? (
             <div style={{ textAlign:'center', padding:'60px', color:'#9C8267' }}>
-              <p>{L('Ingen aktivitet ennå. Fullfør oppgaver og gi avkall på gjenstander for å bygge goodwill.', 'No activity yet. Complete tasks and give up items to build goodwill.')}</p>
+              <p>{L('Ingen aktivitet ennå. Fullfør oppgaver for å bygge goodwill.', 'No activity yet. Complete tasks to build goodwill.')}</p>
             </div>
           ) : (
             <div style={{ background:'#fff', border:'1px solid #D9CFC0', borderRadius:'12px', overflow:'hidden' }}>
@@ -303,7 +291,7 @@ export default function GoodwillPage({ session, profile }) {
                   </div>
                   <div style={{ flex:1 }}>
                     <div style={{ fontSize:'14px', color:'#3A2F26' }}>
-                      <strong>{event.profiles?.display_name}</strong> — {event.description}
+                      <strong>{event.profiles?.display_name}</strong> — {logText(event.description)}
                     </div>
                     <div style={{ fontSize:'12px', color:'#9C8267', marginTop:'2px' }}>
                       {new Date(event.created_at).toLocaleDateString(locale(), { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' })}
