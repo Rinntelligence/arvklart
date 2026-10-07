@@ -123,12 +123,12 @@ export default function AdminPage({ session, profile, onToast }) {
         </p>
         <div style={{ display:'flex', gap:'8px', marginBottom:'12px' }}>
           <input value={inviteUrl} readOnly
-            style={{ flex:1, padding:'11px 14px', border:'1px solid #D9CFC0', borderRadius:'8px', fontSize:'13px', background:'#FBF9F5', color:'#5C4530', outline:'none', fontFamily:'monospace' }} />
+            style={{ flex:1, minWidth:0, padding:'11px 14px', border:'1px solid #D9CFC0', borderRadius:'8px', fontSize:'13px', background:'#FBF9F5', color:'#5C4530', outline:'none', fontFamily:'monospace' }} />
           <button onClick={copyInvite} style={{ padding:'11px 18px', background: copied?'#8B9A7D':'#3A2F26', color:'#fff', border:'none', borderRadius:'8px', cursor:'pointer', fontSize:'14px', fontFamily:'Karla, sans-serif', whiteSpace:'nowrap' }}>
             {copied ? L('✓ Kopiert!', '✓ Copied!') : L('Kopier lenke', 'Copy link')}
           </button>
         </div>
-        <div style={{ display:'flex', alignItems:'center', gap:'12px' }}>
+        <div style={{ display:'flex', alignItems:'center', gap:'4px 12px', flexWrap:'wrap' }}>
           <span style={{ fontSize:'13px', color:'#9C8267' }}>{L('Invitasjonskode:', 'Invite code:')} <strong style={{ letterSpacing:'2px', color:'#3A2F26' }}>{estate.invite_code}</strong></span>
           <button onClick={regenerateCode} style={{ fontSize:'12px', color:'#9C8267', background:'none', border:'none', cursor:'pointer', textDecoration:'underline', fontFamily:'Karla, sans-serif' }}>{L('Forny kode', 'Renew code')}</button>
         </div>
@@ -141,11 +141,11 @@ export default function AdminPage({ session, profile, onToast }) {
           {members.map(m => (
             <div key={m.user_id} style={{ display:'flex', alignItems:'center', gap:'12px', padding:'12px 14px', background:'#FBF9F5', border:'1px solid #D9CFC0', borderRadius:'8px' }}>
               <Avatar name={m.profiles?.display_name||'?'} size={38} color={m.profiles?.avatar_color} />
-              <div style={{ flex:1 }}>
+              <div style={{ flex:1, minWidth:0 }}>
                 <div style={{ fontSize:'14px', color:'#3A2F26', fontWeight:'500' }}>{m.profiles?.display_name}</div>
-                <div style={{ fontSize:'12px', color:'#9C8267' }}>{m.profiles?.email}</div>
+                <div style={{ fontSize:'12px', color:'#9C8267', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{m.profiles?.email}</div>
               </div>
-              <span style={{ fontSize:'11px', background:m.role==='admin'?'#E8DFD0':'#DCE3D2', color:m.role==='admin'?'#5C4530':'#3A5A30', padding:'3px 8px', borderRadius:'20px', textTransform:'uppercase', letterSpacing:'0.5px' }}>{m.user_id === estate.owner_id ? L('Eier', 'Owner') : m.role === 'admin' ? L('Admin', 'Admin') : L('Medlem', 'Member')}</span>
+              <span style={{ flexShrink:0, fontSize:'11px', background:m.role==='admin'?'#E8DFD0':'#DCE3D2', color:m.role==='admin'?'#5C4530':'#3A5A30', padding:'3px 8px', borderRadius:'20px', textTransform:'uppercase', letterSpacing:'0.5px' }}>{m.user_id === estate.owner_id ? L('Eier', 'Owner') : m.role === 'admin' ? L('Admin', 'Admin') : L('Medlem', 'Member')}</span>
               {m.user_id !== session.user.id && m.user_id !== estate.owner_id && (
                 confirmRemove === m.user_id ? (
                   <span style={{ display:'flex', gap:'6px' }}>

@@ -55,7 +55,15 @@ export default function FounderPage({ session, onToast }) {
 
   return (
     <div style={{ maxWidth:'960px', margin:'0 auto', padding:'28px 16px', fontFamily:'Karla, sans-serif' }}>
-      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'32px' }}>
+      <style>{`@media (max-width: 600px) {
+        .fd-tabs { overflow-x: auto; scrollbar-width: none; }
+        .fd-tabs::-webkit-scrollbar { display: none; }
+        .fd-tabs > button { flex-shrink: 0; white-space: nowrap; }
+        .fd-grid { grid-template-columns: 1fr !important; }
+        .fd-table { overflow-x: auto !important; }
+        .fd-table > table { min-width: 640px; }
+      }`}</style>
+      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'32px', flexWrap:'wrap', gap:'12px' }}>
         <div>
           <h1 style={{ fontFamily:'Fraunces, serif', fontSize:'28px', fontWeight:'400', color:'#3A2F26', marginBottom:'4px' }}>Founder Dashboard</h1>
           <p style={{ color:'#9C8267', fontSize:'14px' }}>Privat — kun synlig for deg</p>
@@ -86,7 +94,7 @@ export default function FounderPage({ session, onToast }) {
       </div>
 
       {/* Tabs */}
-      <div style={{ display:'flex', gap:'4px', borderBottom:'1px solid #D9CFC0', marginBottom:'24px' }}>
+      <div className="fd-tabs" style={{ display:'flex', gap:'4px', borderBottom:'1px solid #D9CFC0', marginBottom:'24px' }}>
         {[['overview','Oversikt'],['users','Brukere'],['feedback','Tilbakemelding'],['estates','Boer'],['founders','Founders']].map(([t,l])=>(
           <button key={t} onClick={()=>setTab(t)} style={{
             padding:'10px 18px', border:'none', background:'none', cursor:'pointer',
@@ -98,7 +106,7 @@ export default function FounderPage({ session, onToast }) {
       </div>
 
       {tab==='overview' && (
-        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'20px' }}>
+        <div className="fd-grid" style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'20px' }}>
           <div style={{ background:'#fff', border:'1px solid #D9CFC0', borderRadius:'12px', padding:'24px' }}>
             <h3 style={{ fontFamily:'Fraunces, serif', fontSize:'16px', fontWeight:'400', color:'#3A2F26', marginBottom:'20px' }}>Brukervekst (siste 6 mnd)</h3>
             <ResponsiveContainer width="100%" height={180}>
@@ -141,7 +149,7 @@ export default function FounderPage({ session, onToast }) {
       )}
 
       {tab==='users' && (
-        <div style={{ background:'#fff', border:'1px solid #D9CFC0', borderRadius:'12px', overflow:'hidden' }}>
+        <div className="fd-table" style={{ background:'#fff', border:'1px solid #D9CFC0', borderRadius:'12px', overflow:'hidden' }}>
           <table style={{ width:'100%', borderCollapse:'collapse' }}>
             <thead>
               <tr style={{ background:'#FBF9F5', borderBottom:'1px solid #D9CFC0' }}>
@@ -214,7 +222,7 @@ export default function FounderPage({ session, onToast }) {
       {tab==='founders' && <FounderManagement session={session} onToast={onToast} />}
 
       {tab==='estates' && (
-        <div style={{ background:'#fff', border:'1px solid #D9CFC0', borderRadius:'12px', overflow:'hidden' }}>
+        <div className="fd-table" style={{ background:'#fff', border:'1px solid #D9CFC0', borderRadius:'12px', overflow:'hidden' }}>
           <table style={{ width:'100%', borderCollapse:'collapse' }}>
             <thead>
               <tr style={{ background:'#FBF9F5', borderBottom:'1px solid #D9CFC0' }}>

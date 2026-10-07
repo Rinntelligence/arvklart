@@ -117,10 +117,11 @@ export default function GoodwillPage({ session, onToast }) {
                myScore < 300 ? L('Sterk bidragsyter!', 'Strong contributor!') : L('Enestående bidrag!', 'Outstanding contribution!')}
             </div>
           </div>
-          <div style={{ textAlign:'right' }}>
+          <div className="gw-rank" style={{ textAlign:'right' }}>
+            <style>{`@media (max-width: 600px) { .gw-rank { text-align: left !important; flex-basis: 100%; } .gw-rank-row { justify-content: flex-start !important; } }`}</style>
             <div style={{ fontSize:'13px', color:'#C8BEA0', marginBottom:'8px' }}>{L('Familierangering', 'Family ranking')}</div>
             {scores.slice(0, 3).map((s, i) => (
-              <div key={s.user_id} style={{ display:'flex', alignItems:'center', gap:'8px', justifyContent:'flex-end', marginBottom:'4px' }}>
+              <div key={s.user_id} className="gw-rank-row" style={{ display:'flex', alignItems:'center', gap:'8px', justifyContent:'flex-end', marginBottom:'4px' }}>
                 <span style={{ fontSize:'12px', color:'#C8BEA0' }}>#{i+1}</span>
                 <div style={{ width:'20px', height:'20px', borderRadius:'50%', background:s.profiles?.avatar_color||'#DCE3D2', border:tc(s.profiles?.avatar_color||'#DCE3D2')==='#3A2F26'?'1px solid #D9CFC0':'none', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'9px', color:tc(s.profiles?.avatar_color||'#DCE3D2'), fontWeight:'600' }}>
                   {(s.profiles?.display_name||'?')[0].toUpperCase()}
@@ -135,7 +136,8 @@ export default function GoodwillPage({ session, onToast }) {
       </div>
 
       {/* Faner */}
-      <div style={{ display:'flex', gap:'4px', borderBottom:'1px solid #D9CFC0', marginBottom:'24px' }}>
+      <style>{`@media (max-width: 400px) { .gw-tabs > button { padding-left: 10px !important; padding-right: 10px !important; } }`}</style>
+      <div className="gw-tabs" style={{ display:'flex', gap:'4px', borderBottom:'1px solid #D9CFC0', marginBottom:'24px' }}>
         {[['overview',L('Oversikt','Overview')],['chores',L('Oppgaver','Tasks')],['log',L('Aktivitetslogg','Activity log')]].map(([t,l]) => (
           <button key={t} onClick={() => setTab(t)} style={{
             padding:'10px 18px', border:'none', background:'none', cursor:'pointer',

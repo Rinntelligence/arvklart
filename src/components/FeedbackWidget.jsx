@@ -25,7 +25,9 @@ export default function FeedbackWidget({ session, onToast }) {
 
   return (
     <>
-      <button onClick={() => setOpen(true)} style={{
+      {/* På smale skjermer ville knappen dekket faste lagreknapper nederst (.bottom-bar) */}
+      <style>{`@media (max-width: 720px) { body:has(.bottom-bar) .fb-launch { display: none; } }`}</style>
+      <button className="fb-launch" onClick={() => setOpen(true)} style={{
         position: 'fixed', bottom: '16px', right: '16px', zIndex: 9999,
         background: '#3A2F26', color: '#FBF9F5', border: 'none',
         borderRadius: '20px', boxShadow: '0 2px 8px rgba(0,0,0,0.15)',

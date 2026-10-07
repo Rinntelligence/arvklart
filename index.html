@@ -15,6 +15,8 @@
       body { background: #FBF9F5; font-family: 'Karla', sans-serif; color: #3A2F26; -webkit-font-smoothing: antialiased; }
       ::-webkit-scrollbar { width: 5px; }
       ::-webkit-scrollbar-thumb { background: #D9CFC0; border-radius: 3px; }
+      /* iOS zoomer inn på felt med skrift under 16px */
+      @media (max-width: 600px) { input, select, textarea { font-size: 16px !important; } }
     </style>
   </head>
   <body>

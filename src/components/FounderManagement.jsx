@@ -72,7 +72,7 @@ export default function FounderManagement({ session, onToast }) {
         </div>
       </form>
 
-      <div style={{ background:'#fff', border:'1px solid #D9CFC0', borderRadius:'12px', overflow:'hidden' }}>
+      <div className="fd-table" style={{ background:'#fff', border:'1px solid #D9CFC0', borderRadius:'12px', overflow:'hidden' }}>
         <table style={{ width:'100%', borderCollapse:'collapse' }}>
           <thead>
             <tr style={{ background:'#FBF9F5', borderBottom:'1px solid #D9CFC0' }}>

@@ -470,7 +470,7 @@ export default function AddItemPage({ session, profile, onToast, isDemo }) {
       </div>
 
       {/* Fast lagreknapp nederst */}
-      <div style={{
+      <div className="bottom-bar" style={{
         position: 'fixed', bottom: 0, left: 0, right: 0,
         padding: '16px', background: '#fff',
         borderTop: '1px solid #D9CFC0',

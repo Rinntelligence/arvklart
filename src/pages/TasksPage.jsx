@@ -128,13 +128,13 @@ export default function TasksPage({ session, onToast, isDemo }) {
           <h1 style={{ fontFamily: 'Fraunces, serif', fontSize: '26px', fontWeight: '400', color: '#3A2F26', marginBottom: '4px' }}>{L('Oppgaveliste', 'Task list')}</h1>
           <p style={{ color: '#9C8267', fontSize: '14px' }}>{L('Steg-for-steg-veiledning gjennom arveprosessen', 'Step-by-step guidance through the inheritance process')}</p>
         </div>
-        {!isDemo && <div style={{ display: 'flex', gap: '8px' }}>
+        {!isDemo && <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
           {tasks.length === 0 && (
-            <button onClick={seedTasks} style={{ padding: '9px 18px', background: '#5F6E52', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '14px', fontFamily: 'Karla, sans-serif' }}>
+            <button onClick={seedTasks} style={{ padding: '9px 18px', background: '#5F6E52', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '14px', fontFamily: 'Karla, sans-serif', whiteSpace: 'nowrap' }}>
               {L('Last standard sjekkliste', 'Load standard checklist')}
             </button>
           )}
-          <button onClick={() => setShowAdd(!showAdd)} style={{ padding: '9px 18px', background: '#3A2F26', color: '#FBF9F5', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '14px', fontFamily: 'Karla, sans-serif' }}>
+          <button onClick={() => setShowAdd(!showAdd)} style={{ padding: '9px 18px', background: '#3A2F26', color: '#FBF9F5', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '14px', fontFamily: 'Karla, sans-serif', whiteSpace: 'nowrap' }}>
             {L('+ Legg til oppgave', '+ Add task')}
           </button>
         </div>}

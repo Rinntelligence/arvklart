@@ -171,11 +171,18 @@ export default function DocumentVaultPage({ session, onToast }) {
         <div style={{ fontSize:'12px', color:'#D9CFC0' }}>{L('PDF, Word, Excel og bilder støttes', 'PDF, Word, Excel and images are supported')}</div>
       </div>
 
+      {/* Mobil: mappene som en vannrett rad i stedet for en høy liste */}
+      <style>{`@media (max-width: 600px) {
+        .doc-folders { flex-basis: 100% !important; }
+        .doc-folder-list { display: flex; gap: 6px; overflow-x: auto !important; scrollbar-width: none; background: none !important; border: none !important; border-radius: 0 !important; }
+        .doc-folder-list::-webkit-scrollbar { display: none; }
+        .doc-folder { width: auto !important; flex-shrink: 0; gap: 8px; white-space: nowrap; padding: 8px 14px !important; border: 1px solid #D9CFC0 !important; border-radius: 999px; }
+      }`}</style>
       <div style={{ display:'flex', flexWrap:'wrap', gap:'20px', alignItems:'flex-start' }}>
         {/* Mappevalg */}
-        <div style={{ flex:'1 1 200px', maxWidth:'100%' }}>
-          <div style={{ background:'#fff', border:'1px solid #D9CFC0', borderRadius:'12px', overflow:'hidden' }}>
-            <button onClick={() => setActiveFolder('all')} style={{
+        <div className="doc-folders" style={{ flex:'1 1 200px', maxWidth:'100%' }}>
+          <div className="doc-folder-list" style={{ background:'#fff', border:'1px solid #D9CFC0', borderRadius:'12px', overflow:'hidden' }}>
+            <button className="doc-folder" onClick={() => setActiveFolder('all')} style={{
               width:'100%', padding:'12px 16px', background:activeFolder==='all'?'#E8DFD0':'none',
               border:'none', borderBottom:'1px solid #E8DFD0', textAlign:'left', cursor:'pointer',
               fontSize:'14px', color:'#3A2F26', fontFamily:'Karla, sans-serif',
@@ -185,7 +192,7 @@ export default function DocumentVaultPage({ session, onToast }) {
               <span style={{ fontSize:'12px', color:'#9C8267', background:'#FBF9F5', padding:'1px 7px', borderRadius:'20px' }}>{docs.length}</span>
             </button>
             {FOLDER_TYPES.map((folder, i) => (
-              <button key={folder.id} onClick={() => setActiveFolder(folder.id)} style={{
+              <button key={folder.id} className="doc-folder" onClick={() => setActiveFolder(folder.id)} style={{
                 width:'100%', padding:'11px 16px',
                 background:activeFolder===folder.id?'#E8DFD0':'none',
                 border:'none', borderBottom:i < FOLDER_TYPES.length-1?'1px solid #FBF9F5':'none',

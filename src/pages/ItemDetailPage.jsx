@@ -455,7 +455,9 @@ export default function ItemDetailPage({ session, profile, onToast, isDemo }) {
             {(profile?.display_name||'?')[0].toUpperCase()}
           </div>
           <div style={{ flex:1 }}>
-            <textarea value={commentText} onChange={e => setCommentText(e.target.value)}
+            {/* Mobil: feltet får 16px skrift (index.html), så plassholderen trenger tre linjer */}
+            <style>{`@media (max-width: 600px) { .comment-input { min-height: 80px; } }`}</style>
+            <textarea className="comment-input" value={commentText} onChange={e => setCommentText(e.target.value)}
               onKeyDown={e => { if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();handleComment()} }}
               placeholder={L('Skriv en kommentar… (Enter for å sende)', 'Write a comment… (Enter to send)')} rows={2} maxLength={2000}
               style={{ width:'100%', padding:'10px 14px', border:'1px solid #D9CFC0', borderRadius:'8px', fontSize:'14px', fontFamily:'Karla, sans-serif', color:'#3A2F26', background:'#FBF9F5', resize:'none', outline:'none', boxSizing:'border-box' }} />

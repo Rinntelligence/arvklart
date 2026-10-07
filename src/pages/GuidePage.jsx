@@ -173,7 +173,9 @@ export default function GuidePage({ standalone = false, session = null, onToast 
   }
 
   return (
-    <div style={{ height: standalone ? '100vh' : 'calc(100vh - 56px)', display: 'flex', flexDirection: 'column' }}>
+    <div className={standalone ? 'guide-shell standalone' : 'guide-shell'} style={{ height: standalone ? '100vh' : 'calc(100vh - 56px)', display: 'flex', flexDirection: 'column' }}>
+      {/* Mobilnettlesere regner adresselinjen med i vh; dvh er den synlige høyden (lik vh på PC) */}
+      <style>{`@supports (height: 100dvh) { .guide-shell { height: calc(100dvh - 56px) !important; } .guide-shell.standalone { height: 100dvh !important; } }`}</style>
       <div style={{ padding: '12px 20px', background: '#FBF9F5', borderBottom: '1px solid #D9CFC0', display: 'flex', alignItems: 'center', gap: '12px' }}>
         <button onClick={() => navigate(backPath)} style={{ background: 'none', border: 'none', color: '#9C8267', cursor: 'pointer', fontSize: '14px', fontFamily: 'Karla, sans-serif' }}>
           {id ? L('← Tilbake til boet', '← Back to the estate') : L('← Tilbake til hjemmesiden', '← Back to the home page')}

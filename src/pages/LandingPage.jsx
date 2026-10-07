@@ -15,6 +15,7 @@ export default function LandingPage({ loggedIn = false }) {
   const navigate = useNavigate()
   const [demoLoading, setDemoLoading] = useState(false)
   const [demoError, setDemoError] = useState('')
+  const [navOpen, setNavOpen] = useState(false)
 
   // Innloggede (også demoen) går rett til appen; ellers startes en demo-økt i samme fane.
   const handleDemo = async () => {
@@ -71,6 +72,7 @@ export default function LandingPage({ loggedIn = false }) {
         .lp nav a.nav-login:hover, .lp nav a.nav-login:focus-visible {
           background: var(--snow); color: var(--espresso); text-shadow: none; border-color: var(--snow);
         }
+        .lp .nav-toggle { display: none; }
 
         .lp .hero {
           position: relative; min-height: 92vh;
@@ -190,23 +192,54 @@ export default function LandingPage({ loggedIn = false }) {
           .lp .demo-section { padding: 90px 24px; }
           .lp .demo-mockup { margin: 40px 0 0; }
           footer.lp-footer { flex-direction: column; gap: 26px; text-align: center; }
+          footer.lp-footer .foot-links { flex-wrap: wrap; justify-content: center; gap: 12px 24px; }
+          footer.lp-footer .foot-links a { white-space: nowrap; }
+        }
+
+        /* Mobil: lenkene samles i en meny, «Logg inn» står alltid synlig */
+        @media (max-width: 640px) {
+          .lp header { padding: 16px 16px 32px; }
+          .lp nav { display: flex; align-items: center; gap: 8px; }
+          .lp nav ul {
+            display: none; position: absolute; top: 64px; left: 16px; right: 16px;
+            flex-direction: column; align-items: stretch; gap: 0; padding: 6px;
+            background: var(--espresso); border: 1px solid rgba(251,249,245,0.18);
+            border-radius: 14px; box-shadow: 0 12px 36px rgba(0,0,0,0.35);
+          }
+          .lp header.nav-open nav ul { display: flex; }
+          .lp nav ul li.nav-login-item { display: none; }
+          .lp nav ul a { display: block; padding: 13px 14px; font-size: 15px; border-radius: 10px; text-shadow: none; }
+          .lp nav > a.nav-login { display: inline-block; margin-left: 0; }
+          .lp .nav-toggle {
+            display: inline-flex; align-items: center; justify-content: center;
+            width: 40px; height: 40px; border-radius: 999px; cursor: pointer;
+            background: none; border: 1px solid rgba(251,249,245,0.45); color: var(--snow);
+            font-size: 18px; line-height: 1;
+          }
+        }
+        @media (min-width: 641px) {
+          .lp nav > a.nav-login { display: none; }
         }
       `}</style>
 
       <div className={loggedIn ? 'lp logged-in' : 'lp'}>
         {/* NAV — når innlogget ligger lenkene i TopBar i stedet */}
-        {!loggedIn && <header>
+        {!loggedIn && <header className={navOpen ? 'nav-open' : ''}>
           <div className="logo">
             <img src="/ARVKLART Horizontal Negative.svg" alt="Arvklart" />
           </div>
           <nav>
-            <ul>
+            <a className="nav-login" href="/logg-inn">{L('Logg inn', 'Log in')}</a>
+            <button className="nav-toggle" aria-expanded={navOpen} aria-label={L('Meny', 'Menu')} onClick={() => setNavOpen(o => !o)}>
+              {navOpen ? '✕' : '☰'}
+            </button>
+            <ul onClick={() => setNavOpen(false)}>
               <li><a href="#slik-fungerer">{L('Slik fungerer det', 'How it works')}</a></li>
               <li><a href="#for-hvem">{L('For hvem', 'Who it is for')}</a></li>
               <li><a href="#demo" onClick={(e) => { e.preventDefault(); document.getElementById('demo').scrollIntoView({ behavior: 'smooth' }) }}>{L('Prøv demo', 'Try the demo')}</a></li>
               <li><a href="/veiviser">{L('Veiviser', 'Guide')}</a></li>
               <li><a href="#" onClick={toggleLang} lang={isEn() ? 'no' : 'en'}>{langLabel()}</a></li>
-              <li><a className="nav-login" href="/logg-inn">{L('Logg inn', 'Log in')}</a></li>
+              <li className="nav-login-item"><a className="nav-login" href="/logg-inn">{L('Logg inn', 'Log in')}</a></li>
             </ul>
           </nav>
         </header>}

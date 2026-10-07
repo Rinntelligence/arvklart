@@ -149,6 +149,7 @@ export default function EstatePage({ session, profile, onToast, isDemo }) {
 
   return (
     <div style={{ maxWidth:'960px', margin:'0 auto', padding:'24px 16px 64px', fontFamily:'Karla, sans-serif' }}>
+      <style>{`@media (max-width: 600px) { .item-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 10px !important; } }`}</style>
       {/* Header */}
       <button onClick={() => navigate('/')} style={{ background:'none', border:'none', color:'#9C8267', cursor:'pointer', fontSize:'13px', padding:'0 0 8px', fontFamily:'Karla, sans-serif' }}>{L('← Alle bo', '← All estates')}</button>
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-end', marginBottom:'20px', flexWrap:'wrap', gap:'12px' }}>
@@ -302,7 +303,7 @@ export default function EstatePage({ session, profile, onToast, isDemo }) {
           {filterStatus === 'all' && myItems.length > 0 && (
             <div style={{ marginBottom:'24px' }}>
               <div style={{ ...sectionLabel, color:'#5F6E52' }}>{L('Mine interesser', 'My interests')} ({myItems.length})</div>
-              <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(200px, 1fr))', gap:'12px', marginBottom:'20px' }}>
+              <div className="item-grid" style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(200px, 1fr))', gap:'12px', marginBottom:'20px' }}>
                 {myItems.filter(i => filterCat === 'all' || i.category_id === filterCat).map(item => (
                   <ItemCard key={item.id} item={item} userId={session.user.id} myRole={myRole} isDemo={isDemo}
                     onClick={() => openItem(item)} onDelete={e => handleDelete(item, e)} />
@@ -322,7 +323,7 @@ export default function EstatePage({ session, profile, onToast, isDemo }) {
               </button>}
             </div>
           ) : (
-            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(200px, 1fr))', gap:'12px' }}>
+            <div className="item-grid" style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(200px, 1fr))', gap:'12px' }}>
               {(filterStatus === 'all' ? otherItems : filtered).filter(i => filterCat === 'all' || i.category_id === filterCat).map(item => (
                 <ItemCard key={item.id} item={item} userId={session.user.id} myRole={myRole} isDemo={isDemo}
                   onClick={() => openItem(item)} onDelete={e => handleDelete(item, e)} />

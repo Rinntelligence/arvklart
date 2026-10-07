@@ -226,7 +226,7 @@ export default function EditItemPage({ session, profile, onToast }) {
       </div>
 
       {/* Fixed save button */}
-      <div style={{ position:'fixed', bottom:0, left:0, right:0, padding:'16px', background:'#fff', borderTop:'1px solid #D9CFC0', boxShadow:'0 -4px 20px rgba(0,0,0,0.08)', zIndex:100 }}>
+      <div className="bottom-bar" style={{ position:'fixed', bottom:0, left:0, right:0, padding:'16px', background:'#fff', borderTop:'1px solid #D9CFC0', boxShadow:'0 -4px 20px rgba(0,0,0,0.08)', zIndex:100 }}>
         <button onClick={save} disabled={saving || !title.trim()} style={{
           width:'100%', maxWidth:'560px', display:'block', margin:'0 auto',
           padding:'16px', background: title.trim() ? '#3A2F26' : '#D9CFC0',

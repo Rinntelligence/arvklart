@@ -268,7 +268,16 @@ export default function ConflictPage({ session, onToast }) {
   )
 
   return (
-    <div style={{ maxWidth:'920px', margin:'0 auto', padding:'28px 16px 80px', fontFamily:'Karla, sans-serif' }}>
+    <div className="cf-page" style={{ maxWidth:'920px', margin:'0 auto', padding:'28px 16px 80px', fontFamily:'Karla, sans-serif' }}>
+      <style>{`@media (max-width: 600px) {
+        .cf-page { padding-bottom: 170px !important; }
+        .cf-modes { grid-template-columns: 1fr !important; gap: 8px !important; }
+        .cf-action { flex-basis: 100% !important; text-align: left !important; }
+        .cf-action > button { width: 100%; }
+        .cf-winner { justify-content: flex-start !important; }
+        .cf-pick-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 10px !important; }
+        .cf-apply { width: 100%; }
+      }`}</style>
 
       <button onClick={() => navigate(`/estate/${id}`)} style={{ background:'none', border:'none', color:'#9C8267', cursor:'pointer', fontSize:'13px', padding:'0 0 16px', fontFamily:'Karla, sans-serif' }}>{L('← Tilbake til boet', '← Back to the estate')}</button>
       <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', marginBottom:'28px', flexWrap:'wrap', gap:'12px' }}>
@@ -282,7 +291,7 @@ export default function ConflictPage({ session, onToast }) {
       </div>
 
       {/* Mode selector */}
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:'10px', marginBottom:'28px' }}>
+      <div className="cf-modes" style={{ display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:'10px', marginBottom:'28px' }}>
         {[
           { id: 'lottery', title: L('Loddtrekning', 'Lottery'), desc: L('Tilfeldig trekk per gjenstand — rettferdig for emosjonelle gjenstander', 'Random draw per item — fair for sentimental items') },
           { id: 'snake', title: L('Vekslende runder', 'Alternating rounds'), desc: L('Arvingene velger på omgang — snake draft', 'Heirs take turns choosing — snake draft') },
@@ -341,11 +350,11 @@ export default function ConflictPage({ session, onToast }) {
                       })}
                     </div>
                   </div>
-                  <div style={{ flexShrink:0, textAlign:'center', minWidth:'120px' }}>
+                  <div className="cf-action" style={{ flexShrink:0, textAlign:'center', minWidth:'120px' }}>
                     {winner ? (
                       <div>
                         <div style={{ fontSize:'11px', color:'#3A5A30', marginBottom:'6px' }}>{L('Vinner', 'Winner')}</div>
-                        <div style={{ display:'flex', alignItems:'center', gap:'8px', justifyContent:'center' }}>
+                        <div className="cf-winner" style={{ display:'flex', alignItems:'center', gap:'8px', justifyContent:'center' }}>
                           <Avatar name={winner.profiles?.display_name} color={memberColor(winner.user_id)} size={34} />
                           <span style={{ fontSize:'13px', fontWeight:'500', color:'#3A2F26' }}>{winner.profiles?.display_name}</span>
                         </div>
@@ -441,7 +450,7 @@ export default function ConflictPage({ session, onToast }) {
           )}
 
           {unclaimedItems.length > 0 && (
-            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(190px, 1fr))', gap:'12px', marginBottom:'24px' }}>
+            <div className="cf-pick-grid" style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(190px, 1fr))', gap:'12px', marginBottom:'24px' }}>
               {unclaimedItems.map(item => {
                 const isMine = item.interests?.some(x => x.user_id === currentSnakeUser)
                 return (
@@ -539,13 +548,13 @@ export default function ConflictPage({ session, onToast }) {
 
       {/* BEKREFT OG TILDEL */}
       {resolvedCount > 0 && (
-        <div style={{ position:'fixed', bottom:0, left:0, right:0, padding:'16px', background:'#fff', borderTop:'1px solid #D9CFC0', boxShadow:'0 -4px 20px rgba(0,0,0,0.08)', zIndex:100 }}>
+        <div className="bottom-bar" style={{ position:'fixed', bottom:0, left:0, right:0, padding:'16px', background:'#fff', borderTop:'1px solid #D9CFC0', boxShadow:'0 -4px 20px rgba(0,0,0,0.08)', zIndex:100 }}>
           <div style={{ maxWidth:'920px', margin:'0 auto', display:'flex', alignItems:'center', justifyContent:'space-between', gap:'16px', flexWrap:'wrap' }}>
             <div>
               <div style={{ fontSize:'14px', fontWeight:'500', color:'#3A2F26' }}>{L(`${resolvedCount} av ${items.length} gjenstander løst`, `${resolvedCount} of ${items.length} items resolved`)}</div>
               {!allResolved && <div style={{ fontSize:'12px', color:'#9C8267' }}>{L('Gjenværende forblir ukrevde til neste runde', 'The rest stay unclaimed until the next round')}</div>}
             </div>
-            <button onClick={apply} disabled={applying} style={{
+            <button className="cf-apply" onClick={apply} disabled={applying} style={{
               padding:'13px 32px', background:applying?'#D9CFC0':'#3A2F26', color:'#FBF9F5',
               border:'none', borderRadius:'10px', cursor:applying?'not-allowed':'pointer',
               fontSize:'15px', fontFamily:'Karla, sans-serif', fontWeight:'500', whiteSpace:'nowrap',

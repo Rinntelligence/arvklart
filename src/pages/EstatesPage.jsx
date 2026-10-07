@@ -144,12 +144,14 @@ export default function EstatesPage({ session, profile, onToast }) {
       )}
 
       <Card style={{ padding:'24px' }}>
+        <style>{`@media (max-width: 600px) { .join-code::placeholder { letter-spacing: 0; } }`}</style>
         <h3 style={{ fontSize:'15px', color:'#3A2F26', marginBottom:'6px', fontWeight:'500' }}>{L('Bli med i et bo', 'Join an estate')}</h3>
         <p style={{ fontSize:'13px', color:'#9C8267', marginBottom:'16px' }}>{L('Har du en invitasjonskode? Skriv den inn nedenfor.', 'Have an invite code? Enter it below.')}</p>
         <div style={{ display:'flex', gap:'10px' }}>
           <input value={joinCode} onChange={e=>setJoinCode(e.target.value.toUpperCase())} onKeyDown={e=>e.key==='Enter'&&joinByCode()} placeholder={L('Skriv invitasjonskode (f.eks. AB3X9K)', 'Enter invite code (e.g. AB3X9K)')} maxLength={10}
-            style={{ flex:1, padding:'11px 14px', border:'1px solid #D9CFC0', borderRadius:'8px', fontSize:'15px', background:'#FBF9F5', color:'#3A2F26', outline:'none', fontFamily:'Karla, sans-serif', letterSpacing:'2px' }} />
-          <button onClick={joinByCode} disabled={joining} style={{ padding:'11px 20px', background:'#3A2F26', color:'#FBF9F5', border:'none', borderRadius:'8px', cursor:'pointer', fontSize:'14px', fontFamily:'Karla, sans-serif' }}>{joining ? L('Vent…', 'Wait…') : L('Bli med', 'Join')}</button>
+            className="join-code"
+            style={{ flex:1, minWidth:0, padding:'11px 14px', border:'1px solid #D9CFC0', borderRadius:'8px', fontSize:'15px', background:'#FBF9F5', color:'#3A2F26', outline:'none', fontFamily:'Karla, sans-serif', letterSpacing:'2px' }} />
+          <button onClick={joinByCode} disabled={joining} style={{ padding:'11px 20px', background:'#3A2F26', color:'#FBF9F5', border:'none', borderRadius:'8px', cursor:'pointer', fontSize:'14px', fontFamily:'Karla, sans-serif', whiteSpace:'nowrap' }}>{joining ? L('Vent…', 'Wait…') : L('Bli med', 'Join')}</button>
         </div>
       </Card>
     </div>
