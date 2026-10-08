@@ -131,6 +131,7 @@ export default function AddItemPage({ session, profile, onToast, isDemo }) {
         high_nok: d.summary?.high_nok ?? d.high_nok,
         likely_nok: d.summary?.likely_nok ?? d.likely_nok,
         reasoning: d.market?.reasoning ?? d.reasoning,
+        confidence: d.market?.confidence ?? d.confidence,
       })
     } catch (e) {
       handleAiError(e, L('Verdiestimering feilet', 'Value estimate failed'))
@@ -155,6 +156,8 @@ export default function AddItemPage({ session, profile, onToast, isDemo }) {
         status: 'active',
         image_url: null,
         estimated_value: aiEstimate?.likely_nok || null,
+        estimate_reasoning: aiEstimate?.reasoning || null,
+        estimate_confidence: aiEstimate?.confidence || null,
         purchase_price: purchasePrice ? parseFloat(purchasePrice) : null,
         purchase_year: purchaseYear ? parseInt(purchaseYear) : null,
         value_agree_count: myEstimateVote === 'agree' ? 1 : 0,
