@@ -357,28 +357,7 @@ export default function ItemDetailPage({ session, profile, onToast, isDemo }) {
           )}
           {!item.interests?.length ? (
             <div>
-              <p style={{ color:'#9C8267', fontSize:'14px', fontStyle:'italic', marginBottom:'16px' }}>{L('Ingen har vist interesse ennå.', 'No one has shown interest yet.')}</p>
-              {!isAssigned && (
-                <div style={{ display:'flex', flexDirection:'column', gap:'8px' }}>
-                  {[
-                    { label:L('Legg ut på Finn.no', 'List on Finn.no'), desc:L('Selg gjenstanden på nett', 'Sell the item online'), url:`https://www.finn.no/bap/forsale/new?title=${encodeURIComponent(item.title)}` },
-                    { label:L('Doner til veldedighet', 'Donate to charity'), desc:L('Gi til Fretex eller lignende', 'Give to Fretex or similar'), url:'https://www.fretex.no' },
-                    { label:L('Bestill tømming', 'Book a clearance'), desc:L('Hent og fjern fra boet', 'Collect and remove from the estate'), url:'https://www.google.no/search?q=bestill+boligtømming' },
-                  ].map(({ label, desc, url }) => (
-                    <button key={label} onClick={() => window.open(url, '_blank')} style={{
-                      width:'100%', padding:'13px 16px', background:'#FBF9F5', border:'1px solid #D9CFC0',
-                      borderRadius:'9px', cursor:'pointer', textAlign:'left', fontFamily:'Karla, sans-serif',
-                      display:'flex', justifyContent:'space-between', alignItems:'center',
-                    }}>
-                      <div>
-                        <div style={{ fontSize:'14px', color:'#3A2F26', fontWeight:'500' }}>{label}</div>
-                        <div style={{ fontSize:'12px', color:'#9C8267', marginTop:'2px' }}>{desc}</div>
-                      </div>
-                      <span style={{ color:'#9C8267', fontSize:'16px' }}>›</span>
-                    </button>
-                  ))}
-                </div>
-              )}
+              <p style={{ color:'#9C8267', fontSize:'14px', fontStyle:'italic', marginBottom:'16px' }}>Ingen har vist interesse ennå.</p>
             </div>
           ) : (
             <div style={{ display:'flex', flexDirection:'column', gap:'10px' }}>
