@@ -233,6 +233,19 @@ export default function ItemDetailPage({ session, profile, onToast, isDemo }) {
               <div style={{ fontSize:'20px', color:'#3A2F26', fontFamily:'Fraunces, serif', marginBottom:'8px' }}>
                 {formatNOK(item.estimated_value)}
               </div>
+              {item.estimate_reasoning && (
+                <p style={{ fontSize:'12px', color:'#5C4530', lineHeight:'1.5', marginBottom:'8px', marginTop:'-2px' }}>
+                  {item.estimate_reasoning}
+                </p>
+              )}
+              {item.estimate_confidence === 'low' && (
+                <div style={{ fontSize:'12px', color:'#7A5A2A', background:'#FBF0DC', border:'1px solid #E8D4A0', borderRadius:'7px', padding:'8px 10px', marginBottom:'8px' }}>
+                  {L(
+                    'Estimatet er usikkert — gjenstanden kan ha spesiell verdi. Sjekk gjerne på Finn.no eller spør en fagperson.',
+                    'The estimate is uncertain — the item may have special value. Consider checking on Finn.no or asking an expert.'
+                  )}
+                </div>
+              )}
               {totalVotes > 0 && (
                 <div style={{ fontSize:'12px', color:'#5C4530', marginBottom:'8px' }}>
                   {L('Enig', 'Agree')}: {item.value_agree_count || 0} · {L('Uenig', 'Disagree')}: {item.value_disagree_count || 0} ({totalVotes} {totalVotes === 1 ? L('stemme', 'vote') : L('stemmer', 'votes')})
