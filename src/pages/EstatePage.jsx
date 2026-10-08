@@ -294,7 +294,7 @@ export default function EstatePage({ session, profile, onToast, isDemo }) {
         <>
           {categories.length > 0 && (
             <div style={{ marginBottom:'20px' }}>
-              <select value={filterCat} onChange={e => setFilterCat(e.target.value)}
+              <select value={filterCat} onChange={e => setFilterCat(e.target.value)} aria-label={L('Vis kategori', 'Show category')}
                 style={{ minWidth:'200px', padding:'9px 12px', border:'1px solid #9A8B78', borderRadius:'8px', fontSize:'14px', background:'#fff', color:'#3A2F26', fontFamily:'Karla, sans-serif' }}>
                 <option value="all">{L('Alle kategorier', 'All categories')}</option>
                 {categories.map(c => <option key={c.id} value={c.id}>{c.emoji} {categoryLabel(c.label)}</option>)}

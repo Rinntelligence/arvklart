@@ -122,7 +122,7 @@ export default function AdminPage({ session, profile, onToast }) {
           <button onClick={() => navigate(`/estate/${id}/heirs`)} style={{ background:'none', border:'none', padding:0, color:'#5F6E52', cursor:'pointer', fontSize:'13px', textDecoration:'underline', fontFamily:'Karla, sans-serif' }}>{L('Arvinger', 'Heirs')}</button>.
         </p>
         <div style={{ display:'flex', gap:'8px', marginBottom:'12px' }}>
-          <input value={inviteUrl} readOnly
+          <input value={inviteUrl} readOnly aria-label={L('Invitasjonslenke', 'Invite link')}
             style={{ flex:1, minWidth:0, padding:'11px 14px', border:'1px solid #9A8B78', borderRadius:'8px', fontSize:'13px', background:'#FBF9F5', color:'#5C4530', fontFamily:'monospace' }} />
           <button onClick={copyInvite} style={{ padding:'11px 18px', background: copied?'#5F6E52':'#3A2F26', color:'#fff', border:'none', borderRadius:'8px', cursor:'pointer', fontSize:'14px', fontFamily:'Karla, sans-serif', whiteSpace:'nowrap' }}>
             {copied ? L('✓ Kopiert!', '✓ Copied!') : L('Kopier lenke', 'Copy link')}
