@@ -8,10 +8,11 @@ import { L } from '../lib/lang'
 const MAX_SIDE = 2000
 
 // multi: { itemNumber, itemCount, photoCount, sameItem, onSameItem, onNextItem, maxItems, full }
-// undo: { text, onUndo } vises som en angre-knapp en kort stund etter sletting
+// undo: { text, onUndo } vises som en angre-knapp etter sletting, til neste bilde tas (siden har den videre)
 export default function CameraCapture({ photos, maxPhotos = 5, onCapture, onClose, onRemovePhoto, multi, undo }) {
   const videoRef = useRef()
   const shutterRef = useRef()
+  const dialogRef = useRef()
   const [status, setStatus] = useState('starting') // starting | live | unavailable
   const [flash, setFlash] = useState(false)
   const [newItem, setNewItem] = useState(null) // «Gjenstand 4 ✓» et øyeblikk når en ny gjenstand starter
@@ -38,7 +39,20 @@ export default function CameraCapture({ photos, maxPhotos = 5, onCapture, onClos
     return () => { cancelled = true; stream?.getTracks().forEach(t => t.stop()) }
   }, [])
 
-  useEffect(() => { if (status === 'live') shutterRef.current?.focus() }, [status])
+  // Fokus: inn i dialogen når den åpnes, tilbake til knappen som åpnet den når den lukkes.
+  // Finnes ikke den knappen lenger, brukes siden sin «Ta bilder»-knapp ([data-camera-return]).
+  useEffect(() => {
+    const opener = document.activeElement
+    dialogRef.current?.focus()
+    return () => {
+      const target = opener && opener !== document.body && opener.isConnected ? opener : document.querySelector('[data-camera-return]')
+      target?.focus?.()
+    }
+  }, [])
+  useEffect(() => {
+    if (status === 'live') shutterRef.current?.focus()
+    else if (status === 'unavailable') dialogRef.current?.querySelector('label, button')?.focus()
+  }, [status])
 
   // Lukk med Esc på PC
   useEffect(() => {
@@ -46,6 +60,17 @@ export default function CameraCapture({ photos, maxPhotos = 5, onCapture, onClos
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [onClose])
+
+  // Tab blir værende i dialogen (fokusfelle)
+  const trapTab = (e) => {
+    if (e.key !== 'Tab') return
+    const items = [...dialogRef.current.querySelectorAll('button:not([disabled]), label[tabindex], input:not([type=file]):not([disabled])')]
+      .filter(el => el.offsetParent !== null)
+    if (!items.length) return
+    const first = items[0], last = items[items.length - 1]
+    if (e.shiftKey && (document.activeElement === first || document.activeElement === dialogRef.current)) { e.preventDefault(); last.focus() }
+    else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus() }
+  }
 
   // Ny gjenstand: vis nummeret tydelig et øyeblikk
   useEffect(() => {
@@ -80,6 +105,13 @@ export default function CameraCapture({ photos, maxPhotos = 5, onCapture, onClos
     if (files.length) onCapture(files)
   }
 
+  // Filvalgene er <label> rundt et skjult <input>; Enter/mellomrom åpner dem fra tastaturet
+  const fileKey = (e) => {
+    if (e.key !== 'Enter' && e.key !== ' ') return
+    e.preventDefault()
+    e.currentTarget.querySelector('input')?.click()
+  }
+
   const deleteLast = () => { if (photos.length && onRemovePhoto) onRemovePhoto(photos.length - 1) }
 
   const pill = (primary, disabled) => ({
@@ -103,9 +135,9 @@ export default function CameraCapture({ photos, maxPhotos = 5, onCapture, onClos
       : L(`Maks ${maxPhotos} bilder`, `Max ${maxPhotos} photos`)
 
   return (
-    <div role="dialog" aria-modal="true" aria-label={L('Kamera', 'Camera')} style={{
+    <div ref={dialogRef} role="dialog" aria-modal="true" aria-label={L('Kamera', 'Camera')} tabIndex={-1} onKeyDown={trapTab} style={{
       position: 'fixed', inset: 0, zIndex: 400, background: '#000', color: '#fff',
-      display: 'flex', flexDirection: 'column', fontFamily: 'Karla, sans-serif',
+      display: 'flex', flexDirection: 'column', fontFamily: 'Karla, sans-serif', outline: 'none',
     }}>
       {/* Topp: antall og «Ferdig» */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', padding: 'max(12px, env(safe-area-inset-top)) 16px 8px' }}>
@@ -126,11 +158,20 @@ export default function CameraCapture({ photos, maxPhotos = 5, onCapture, onClos
         }}>{nextShotText}</div>
       )}
 
-      {/* Søker */}
-      <div style={{ flex: 1, position: 'relative', minHeight: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      {/* Søker. I «flere bilder av samme gjenstand» har den en tydelig ramme og en merkelapp i bildet */}
+      <div data-same-item={multi?.sameItem ? 'true' : undefined} style={{
+        flex: 1, position: 'relative', minHeight: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+        margin: multi?.sameItem ? '0 8px' : 0, borderRadius: multi?.sameItem ? '14px' : 0, overflow: 'hidden',
+      }}>
         <video ref={videoRef} playsInline muted autoPlay onClick={shoot}
           style={{ width: '100%', height: '100%', objectFit: 'contain', display: status === 'live' ? 'block' : 'none' }} />
         {flash && <div style={{ position: 'absolute', inset: 0, background: '#fff', opacity: 0.6 }} />}
+        {multi?.sameItem && status === 'live' && !blocked && (
+          <div aria-hidden="true" style={{
+            position: 'absolute', top: '14px', left: '14px', padding: '6px 12px', borderRadius: '10px',
+            background: '#DCE3D2', color: '#3A2F26', fontSize: '14px', fontWeight: '600',
+          }}>{L(`▣ Samme gjenstand (${multi.itemNumber}) · bilde ${Math.min(photos.length + 1, maxPhotos)} av ${maxPhotos}`, `▣ Same item (${multi.itemNumber}) · photo ${Math.min(photos.length + 1, maxPhotos)} of ${maxPhotos}`)}</div>
+        )}
         {newItem && (
           <div role="status" style={{
             position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', padding: '14px 22px',
@@ -145,11 +186,11 @@ export default function CameraCapture({ photos, maxPhotos = 5, onCapture, onClos
                  'Could not access the camera here. You can use the camera app or choose photos instead.')}
             </p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              <label style={{ ...pill(true, blocked), display: 'block' }}>
+              <label tabIndex={0} role="button" onKeyDown={fileKey} style={{ ...pill(true, blocked), display: 'block' }}>
                 {L('Åpne kamera-appen', 'Open the camera app')}
                 <input type="file" accept="image/*" capture="environment" onChange={fromInput} disabled={blocked} style={{ display: 'none' }} />
               </label>
-              <label style={{ ...pill(false, blocked), display: 'block' }}>
+              <label tabIndex={0} role="button" onKeyDown={fileKey} style={{ ...pill(false, blocked), display: 'block' }}>
                 {L('Velg bilder', 'Choose photos')}
                 <input type="file" accept="image/*" multiple onChange={fromInput} disabled={blocked} style={{ display: 'none' }} />
               </label>
@@ -161,6 +202,7 @@ export default function CameraCapture({ photos, maxPhotos = 5, onCapture, onClos
             {blockedText}
           </div>
         )}
+        {multi?.sameItem && <div aria-hidden="true" style={{ position: 'absolute', inset: 0, borderRadius: '14px', boxShadow: 'inset 0 0 0 5px #DCE3D2', pointerEvents: 'none' }} />}
         {undo && (
           <button onClick={undo.onUndo} style={{ ...pill(true), position: 'absolute', bottom: '12px', left: '50%', transform: 'translateX(-50%)', whiteSpace: 'nowrap' }}>
             {undo.text} · <u>{L('Angre', 'Undo')}</u>

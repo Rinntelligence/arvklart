@@ -169,6 +169,18 @@ describe('slette bilde og angre (scenario C)', () => {
     const once = restoreRemoved(after, removed)
     assert.deepEqual(layout(restoreRemoved(once, removed)), ['a:1+2'])
   })
+
+  test('angre uten tidsfrist: full gjenstand eller full liste endres ikke', () => {
+    // Bilde slettet, så tatt et nytt: gjenstanden har igjen 2 av 2 bilder
+    const { drafts: after, removed } = removePhotoAt([d('a', ['1', '2'], 'Stol')], 'a', 0)
+    const refilled = after.map(x => ({ ...x, photos: [...x.photos, { url: '3' }] }))
+    assert.equal(restoreRemoved(refilled, removed, { maxPhotos: 2 }), refilled)
+    // Gjenstand fjernet, så er listen fylt opp
+    const { drafts: after2, removed: removed2 } = removePhotoAt([d('a', ['1']), d('b', ['2'])], 'b', 0)
+    const full = [...after2, d('c', ['3'])]
+    assert.equal(restoreRemoved(full, removed2, { maxItems: 2 }), full)
+    assert.deepEqual(layout(restoreRemoved(after2, removed2, { maxItems: 2 })), ['a:1', 'b:2'])
+  })
 })
 
 describe('dele opp feil gruppering (scenario D)', () => {

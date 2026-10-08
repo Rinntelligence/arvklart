@@ -86,16 +86,21 @@ export function removePhotoAt(drafts, key, index) {
   return { drafts: next, removed: { draft, draftIndex, photoIndex: index, photo, draftRemoved } }
 }
 
-// Angrer removePhotoAt: legger bildet tilbake på samme plass, og gjenstanden tilbake hvis den ble fjernet
-export function restoreRemoved(drafts, removed) {
+// Angrer removePhotoAt: legger bildet tilbake på samme plass, og gjenstanden tilbake hvis den ble fjernet.
+// Angring har ingen tidsfrist, så det kan ha kommet nye bilder i mellomtiden: er gjenstanden full (maxPhotos)
+// eller listen full (maxItems), returneres samme liste uendret, og siden sier fra.
+export function restoreRemoved(drafts, removed, { maxPhotos = Infinity, maxItems = Infinity } = {}) {
   if (!removed) return drafts
   const { draft, draftIndex, photoIndex, photo, draftRemoved } = removed
   if (draftRemoved || !drafts.some(d => d.key === draft.key)) {
+    if (drafts.length >= maxItems) return drafts
     const at = Math.min(draftIndex, drafts.length)
     return [...drafts.slice(0, at), draft, ...drafts.slice(at)]
   }
+  const target = drafts.find(d => d.key === draft.key)
+  if (target.photos.some(p => p.url === photo.url) || target.photos.length >= maxPhotos) return drafts
   return drafts.map(d => {
-    if (d.key !== draft.key || d.photos.some(p => p.url === photo.url)) return d
+    if (d !== target) return d
     const photos = [...d.photos]
     photos.splice(Math.min(photoIndex, photos.length), 0, photo)
     return { ...d, photos }

@@ -1,4 +1,5 @@
-// Akseptansetester A–G for «Legg til flere» (fase 1) i ekte Chromium med falskt kamera og simulert Supabase.
+// Akseptansetester A–G for «Legg til flere» (fase 1), og justeringene før release (T1–T6),
+// i ekte Chromium med falskt kamera og simulert Supabase.
 // Kjøres med npm run test:e2e (test/e2e/run.sh starter Vite). Skjermbilder havner i $SHOTS hvis den er satt.
 import { chromium } from 'playwright-core'
 import assert from 'node:assert/strict'
@@ -19,10 +20,10 @@ const run = async (name, fn) => {
   try { await fn(); results.push(`OK   ${name}`) } catch (e) { results.push(`FAIL ${name}: ${e.message.split('\n').slice(0,6).join(' | ')}`) }
 }
 
-async function setup(browser, { lang = 'no', failCall = null } = {}) {
-  const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, hasTouch: true, permissions: ['camera'] })
+async function setup(browser, { lang = 'no', failCall = null, viewport = { width: 390, height: 844 } } = {}) {
+  const ctx = await browser.newContext({ viewport, deviceScaleFactor: 2, hasTouch: true, permissions: ['camera'] })
   const page = await ctx.newPage()
-  const calls = { analyze: 0, itemInserts: 0, uploads: 0, analyzeLangs: [] }
+  const calls = { analyze: 0, itemInserts: 0, uploads: 0, analyzeLangs: [], analyzeEstimate: [] }
   await page.route('https://test.supabase.co/**', async route => {
     const req = route.request()
     const url = new URL(req.url())
@@ -31,6 +32,7 @@ async function setup(browser, { lang = 'no', failCall = null } = {}) {
       calls.analyze++
       const body = JSON.parse(req.postData() || '{}')
       calls.analyzeLangs.push(body.lang)
+      calls.analyzeEstimate.push(Boolean(body.estimate))
       if (failCall && failCall(calls.analyze)) return json({ success: false, code: 'ai_error', error: 'AI-tjenesten svarte med feil (500)' }, 502)
       const en = body.lang === 'en'
       return json({ success: true, data: {
@@ -105,11 +107,15 @@ await run('B: tre bilder av samme gjenstand grupperes, «Neste gjenstand» start
   await shoot(page)
   await page.getByRole('button', { name: /Flere bilder av gjenstand 1/ }).click()
   await page.getByText('Flere bilder av gjenstand 1 · 1 av 5').waitFor()
+  // T5: samme-modus synes med ramme og tekst i selve søkeren, ikke bare farge
+  assert.equal(await page.locator('[data-same-item="true"]').count(), 1)
+  await page.getByText('▣ Samme gjenstand (1) · bilde 2 av 5').waitFor()
   await shot(page, 'B0-flere-bilder-modus.png')
   await shoot(page); await shoot(page)
   await page.getByText('Flere bilder av gjenstand 1 · 3 av 5').waitFor()
   await page.getByRole('button', { name: 'Neste gjenstand →' }).click()
   await page.getByText('Hvert bilde blir en ny gjenstand').waitFor()
+  assert.equal(await page.locator('[data-same-item="true"]').count(), 0)
   await shoot(page)
   assert.match(await header(page), /2 gjenstander · 4 bilder/)
   await page.getByRole('button', { name: 'Ferdig' }).click()
@@ -131,13 +137,18 @@ await run('C: feil bilde slettes rett etter, og kan angres', async () => {
   await page.getByRole('button', { name: 'Slett siste bilde' }).click()
   await shoot(page)   // «ta på nytt»
   assert.match(await header(page), /2 gjenstander · 2 bilder/)
+  // I kameraet forsvinner angre-knappen når neste bilde er tatt (den står fortsatt nederst på siden)
+  assert.equal(await page.getByRole('button', { name: /Bilde slettet · Angre/ }).count(), 0)
   await page.getByRole('button', { name: 'Ferdig' }).click()
   await page.getByText(/^Gjenstand 2$/).waitFor()
   // Slett bilde på kortet etter at kameraet er lukket
   await page.getByRole('button', { name: 'Slett bilde 1' }).nth(1).click()
   assert.equal(await page.getByText(/^Gjenstand 2/).count(), 0)
+  // T1: angre uten tidsfrist (tidligere 6 s)
+  await page.waitForTimeout(8000)
   await page.getByRole('button', { name: 'Angre' }).click()
   await page.getByText(/^Gjenstand 2$/).waitFor()
+  assert.equal(await page.getByRole('button', { name: 'Angre' }).count(), 0)
   await ctx.close()
 })
 
@@ -164,6 +175,11 @@ await run('E: AI-analyse av sju lagrer ingenting; kortene kan redigeres; «Godkj
   await page.getByRole('button', { name: 'Analyser med AI (7)' }).click()
   await page.getByRole('button', { name: 'Godkjenn og lagre alle (7)' }).waitFor()
   assert.equal(calls.analyze, 7)
+  // T2: ingen verdiestimat i bulk, og verdifeltet er tomt
+  assert.deepEqual(calls.analyzeEstimate, Array(7).fill(false))
+  assert.equal(await page.getByText(/AI-estimat/).count(), 0)
+  await page.getByText('Mer · beskrivelse').first().click()
+  assert.equal(await page.getByRole('textbox', { name: 'Verdi i NOK (valgfri)' }).first().inputValue(), '')
   assert.equal(calls.itemInserts, 0, 'ingenting lagret etter analyse')
   assert.equal(calls.uploads, 0, 'ingen bilder lastet opp etter analyse')
   assert.equal(await page.getByText('✓ Fylt inn av AI – se over').count(), 7)
@@ -189,13 +205,25 @@ await run('F: AI feiler på én av sju: seks kan lagres, den siste kan prøves i
   await page.getByText('AI klarte ikke denne').waitFor()
   assert.equal(await page.getByText('✓ Fylt inn av AI – se over').count(), 6)
   assert.equal(calls.itemInserts, 0)
+  // T3: oppsummeringen blir stående, og lenken går til riktig kort
+  const summary = page.getByText(/AI klarte ikke 1 gjenstand\./)
+  await summary.waitFor()
+  await page.waitForTimeout(5000)
+  assert.equal(await summary.count(), 1, 'oppsummeringen står fortsatt')
+  // Hvilken som feiler avhenger av rekkefølgen i den parallelle analysen
+  await page.getByRole('button', { name: /^Gå til gjenstand \d$/ }).click()
+  const focusedId = await page.evaluate(() => document.activeElement?.id || '')
+  assert.match(focusedId, /^draft-title-/)
+  assert.equal(await page.evaluate(() => document.activeElement.value), '')
   await shot(page, 'F0-en-feilet.png', true)
   await page.getByRole('button', { name: 'Godkjenn og lagre alle (6)' }).click()
   await page.getByText(/6 lagt til\. 1 mangler navn\./).waitFor()
   assert.equal(calls.itemInserts, 6)
+  assert.equal(await summary.count(), 1, 'oppsummeringen står etter lagring av de andre')
   failing = false
   await page.getByRole('button', { name: 'Prøv AI igjen' }).click()
   await page.getByRole('button', { name: 'Godkjenn og lagre alle (1)' }).waitFor()
+  assert.equal(await summary.count(), 0, 'oppsummeringen forsvinner når alt er rettet')
   await page.getByRole('button', { name: 'Godkjenn og lagre alle (1)' }).click()
   await page.getByText('✓ 1 gjenstand lagt til i boet').waitFor()
   assert.equal(calls.itemInserts, 7)
@@ -232,8 +260,53 @@ await run('Tastatur: kameraet kan brukes uten mus (utløser i fokus, Esc lukker)
   assert.equal(focused, 'Ta bilde')
   await page.keyboard.press('Enter')
   await page.waitForFunction(() => /1 gjenstand · 1 bilde/.test(document.querySelector('[role=dialog] span[aria-live]')?.textContent || ''))
+  // Tab blir i dialogen
+  for (let i = 0; i < 12; i++) {
+    await page.keyboard.press('Tab')
+    assert.ok(await page.evaluate(() => !!document.activeElement.closest('[role=dialog]')), `fokus forlot kameraet etter ${i + 1} Tab`)
+  }
   await page.keyboard.press('Escape')
   await page.getByText(/^Gjenstand 1$/).waitFor()
+  // T4: fokus tilbake til knappen som åpnet kameraet
+  assert.equal(await page.evaluate(() => document.activeElement?.textContent), 'Ta bilderEtt bilde = én gjenstand')
+  // … også når kameraet åpnes fra et kort
+  await page.getByRole('button', { name: '+ Ta bilde' }).click()
+  await page.getByRole('button', { name: 'Ta bilde', exact: true }).waitFor()
+  await page.keyboard.press('Escape')
+  await page.getByText(/^Gjenstand 1$/).waitFor()
+  assert.equal(await page.evaluate(() => document.activeElement?.textContent), '+ Ta bilde')
+  await ctx.close()
+})
+
+// Et lite, gyldig PNG-bilde (1×1) for filvelgeren
+const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64')
+
+await run('T6: 20 gjenstander på liten skjerm (360×640): lagreknappen er alltid synlig, og siste kort kan leses', async () => {
+  const { ctx, page } = await setup(browser, { viewport: { width: 360, height: 640 } })
+  const files = Array.from({ length: 20 }, (_, i) => ({ name: `bilde-${i + 1}.png`, mimeType: 'image/png', buffer: PNG }))
+  await page.locator('input[type=file][multiple]').first().setInputFiles(files)
+  await page.getByRole('button', { name: '20 ulike gjenstander' }).click()
+  await page.getByText(/^Gjenstand 20$/).waitFor()
+  await page.getByRole('button', { name: 'Analyser med AI (20)' }).click()
+  const save = page.getByRole('button', { name: 'Godkjenn og lagre alle (20)' })
+  await save.waitFor()
+  // Meldingen etter analysen ligger over bunnlinjen, ikke oppå lagreknappen
+  const toast = page.getByText(/AI har fylt inn gjenstandene/)
+  await toast.waitFor()
+  const barTop0 = await page.locator('.bottom-bar').evaluate(el => el.getBoundingClientRect().top)
+  const toastBox = await toast.boundingBox()
+  assert.ok(toastBox.y + toastBox.height <= barTop0, 'meldingen dekker bunnlinjen')
+  for (const y of [0, 2000, 100000]) {
+    await page.evaluate(top => window.scrollTo(0, top), y)
+    const box = await save.boundingBox()
+    assert.ok(box && box.y >= 0 && box.y + box.height <= 640, `lagreknappen er utenfor skjermen ved scroll ${y}`)
+  }
+  // Nederst på siden ligger siste kort over bunnlinjen, ikke bak den
+  const barTop = await page.locator('.bottom-bar').evaluate(el => el.getBoundingClientRect().top)
+  const lastBottom = await page.locator('[id^="draft-"]:not([id^="draft-title"])').last().evaluate(el => el.getBoundingClientRect().bottom)
+  assert.ok(lastBottom <= barTop, `siste kort (${lastBottom}) skjules av bunnlinjen (${barTop})`)
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), true, 'ingen horisontal rulling')
+  await shot(page, 'T6-20-gjenstander-liten-skjerm.png')
   await ctx.close()
 })
 
