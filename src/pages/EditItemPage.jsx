@@ -20,7 +20,15 @@ export default function EditItemPage({ session, profile, onToast }) {
   const [newFiles, setNewFiles] = useState([])
   const [newPreviews, setNewPreviews] = useState([])
   const [saving, setSaving] = useState(false)
+  // Verdien brukes i fordelingen: bare administrator eller den som la inn gjenstanden kan endre den
+  // (håndheves også i databasen, guard_item_update)
+  const [isAdmin, setIsAdmin] = useState(false)
   const fileRef = useRef()
+
+  useEffect(() => {
+    supabase.from('estate_members').select('role').eq('estate_id', id).eq('user_id', session.user.id).maybeSingle()
+      .then(({ data }) => setIsAdmin(data?.role === 'admin'))
+  }, [id, session.user.id])
 
   useEffect(() => {
     Promise.all([getItem(itemId), getCategories(id)]).then(([{ data: it }, { data: cats }]) => {
@@ -105,6 +113,8 @@ export default function EditItemPage({ session, profile, onToast }) {
       setSaving(false)
     }
   }
+
+  const canEditValue = isAdmin || item?.added_by === session.user.id
 
   if (!loaded) return <div style={{ padding:'80px', textAlign:'center', color:'#9C8267', fontFamily:'Karla, sans-serif' }}>{L('Laster…', 'Loading…')}</div>
   if (!item) return (
@@ -218,10 +228,16 @@ export default function EditItemPage({ session, profile, onToast }) {
 
         {/* Estimated value */}
         <div>
-          <label style={{ display:'block', fontSize:'13px', color:'#9C8267', marginBottom:'6px' }}>{L('Estimert verdi i kroner (valgfri)', 'Estimated value in NOK (optional)')}</label>
-          <input value={estimatedValue} onChange={e => setEstimatedValue(e.target.value)} maxLength={100} inputMode="decimal"
-            placeholder={L('f.eks. 1500', 'e.g. 1500')}
-            style={{ width:'100%', padding:'14px', border:'1px solid #D9CFC0', borderRadius:'10px', fontSize:'15px', background:'#FBF9F5', color:'#3A2F26', outline:'none', fontFamily:'Karla, sans-serif', boxSizing:'border-box' }} />
+          <label htmlFor="edit-value" style={{ display:'block', fontSize:'13px', color:'#9C8267', marginBottom:'6px' }}>{L('Estimert verdi i kroner (valgfri)', 'Estimated value in NOK (optional)')}</label>
+          <input id="edit-value" value={estimatedValue} onChange={e => setEstimatedValue(e.target.value)} maxLength={100} inputMode="decimal"
+            readOnly={!canEditValue} aria-describedby={canEditValue ? undefined : 'edit-value-note'}
+            placeholder={canEditValue ? L('f.eks. 1500', 'e.g. 1500') : ''}
+            style={{ width:'100%', padding:'14px', border:'1px solid #D9CFC0', borderRadius:'10px', fontSize:'15px', background: canEditValue ? '#FBF9F5' : '#E8DFD0', color:'#3A2F26', outline:'none', fontFamily:'Karla, sans-serif', boxSizing:'border-box' }} />
+          {!canEditValue && (
+            <p id="edit-value-note" style={{ fontSize:'13px', color:'#5C4530', margin:'6px 0 0', lineHeight:1.5 }}>
+              {L('Verdien brukes i fordelingen. Bare administrator eller den som la inn gjenstanden kan endre den.', 'The value is used in the distribution. Only the administrator or the person who added the item can change it.')}
+            </p>
+          )}
         </div>
       </div>
 

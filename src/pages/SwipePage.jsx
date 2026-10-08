@@ -18,6 +18,13 @@ export default function SwipePage({ session, profile, onToast }) {
   const startPos = useRef(null)
   const cardRef = useRef(null)
   const busy = useRef(false) // ett kort om gangen, også ved dobbeltklikk
+  // «Kast» gjelder hele boet og er en admin-handling (håndheves også i databasen)
+  const [isAdmin, setIsAdmin] = useState(false)
+
+  useEffect(() => {
+    supabase.from('estate_members').select('role').eq('estate_id', id).eq('user_id', session.user.id).maybeSingle()
+      .then(({ data }) => setIsAdmin(data?.role === 'admin'))
+  }, [id, session.user.id])
 
   useEffect(() => {
     getItems(id).then(async ({ data }) => {
@@ -38,6 +45,7 @@ export default function SwipePage({ session, profile, onToast }) {
   const handleAction = (type) => {
     const item = currentItem
     if (!item || busy.current) return
+    if (type === 'trash' && !isAdmin) return
     busy.current = true
     setAction(type)
 
@@ -76,7 +84,7 @@ export default function SwipePage({ session, profile, onToast }) {
     const dy = e.touches[0].clientY - startPos.current.y
     setOffset({ x: dx, y: dy })
 
-    if (dy < -80) setAction('trash')
+    if (dy < -80 && isAdmin) setAction('trash')
     else if (dx > 60) setAction('like')
     else if (dx < -60) setAction('pass')
     else setAction(null)
@@ -102,7 +110,7 @@ export default function SwipePage({ session, profile, onToast }) {
     const dx = e.clientX - startPos.current.x
     const dy = e.clientY - startPos.current.y
     setOffset({ x: dx, y: dy })
-    if (dy < -80) setAction('trash')
+    if (dy < -80 && isAdmin) setAction('trash')
     else if (dx > 60) setAction('like')
     else if (dx < -60) setAction('pass')
     else setAction(null)
@@ -240,12 +248,12 @@ export default function SwipePage({ session, profile, onToast }) {
           fontSize:'13px', fontWeight:'600', color:'#8B3A3A', fontFamily:'Karla, sans-serif',
         }}>Pass</button>
 
-        <button onClick={() => handleAction('trash')} style={{
+        {isAdmin && <button onClick={() => handleAction('trash')} style={{
           width:'52px', height:'52px', borderRadius:'50%', border:'2px solid #D9CFC0',
           background:'#fff', cursor:'pointer',
           boxShadow:'0 4px 16px rgba(0,0,0,0.08)', display:'flex', alignItems:'center', justifyContent:'center',
           fontSize:'11px', fontWeight:'600', color:'#9C6B30', fontFamily:'Karla, sans-serif',
-        }}>{L('Kast', 'Discard')}</button>
+        }}>{L('Kast', 'Discard')}</button>}
 
         <button onClick={() => handleAction('like')} style={{
           width:'64px', height:'64px', borderRadius:'50%', border:'2px solid #B8C8A8',
@@ -257,7 +265,7 @@ export default function SwipePage({ session, profile, onToast }) {
 
       {/* Hint */}
       <div style={{ textAlign:'center', paddingBottom:'16px', fontSize:'12px', color:'#D9CFC0' }}>
-        {L('Sveip ← pass · ↑ kast · → vil ha', 'Swipe ← pass · ↑ discard · → want')}
+        {isAdmin ? L('Sveip ← pass · ↑ kast · → vil ha', 'Swipe ← pass · ↑ discard · → want') : L('Sveip ← pass · → vil ha', 'Swipe ← pass · → want')}
       </div>
     </div>
   )

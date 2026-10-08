@@ -23,6 +23,7 @@ Sist verifisert: 2026-10-08, ved å sammenligne prod med en lokal database bygge
 | `migrations/20261007_security_hardening.sql` | ja | alle policies, `guard_item_update`, `is_estate_*`, Storage-policies lik |
 | `migrations/20261008_estimate_reasoning.sql` | **ja, 2026-10-08 16:31 UTC** | kjørt med `lock_timeout` via MCP (`schema_migrations` 20261008163106). 223 eksisterende rader uendret (hash før/etter), røyktest som innlogget bruker rullet tilbake |
 | `migrations/20261008_revoke_cleanup_old_closed_estates.sql` | **ja, 2026-10-08 16:33 UTC** | `schema_migrations` 20261008163341. `anon`/`authenticated` får 42501, `service_role` kan fortsatt |
+| `migrations/20261008_guard_item_value_disposal.sql` | **nei** | ny: verdi og kastmerking håndheves i `guard_item_update`, og sletting av egen gjenstand bare før tildeling. Kjøres etter godkjenning, og etter at frontend som skjuler «Kast» for arvinger er ute (ellers får arvinger en feilmelding på «Kast») |
 | `migrations/20261008_cleanup_runs.sql` | **nei** | må kjøres før `cleanup-closed-estates` / `cleanup-orphan-images` deployes (uten tabellen avbrytes kjøringen før noe slettes) |
 
 ## Finnes bare i produksjon (ikke i repoet)

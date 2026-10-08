@@ -68,6 +68,32 @@ insert into item_passes (item_id, user_id) values ('11110000-0000-0000-0000-0000
 with d as (delete from items where id = '11110000-0000-0000-0000-000000000002' returning 1) select t_eq((select count(*)::int from d), 1, 'den som la inn gjenstanden kan slette den');
 with d as (delete from items where id = '11110000-0000-0000-0000-000000000001' returning 1) select t_eq((select count(*)::int from d), 0, 'medlem kan ikke slette andres gjenstand');
 with d as (delete from categories returning 1) select t_eq((select count(*)::int from d), 0, 'medlem kan ikke slette kategorier');
+-- Verdi og kastmerking er fordelingskritiske (20261008_guard_item_value_disposal.sql)
+do $$ begin
+  update items set estimated_value = '1' where id = '11110000-0000-0000-0000-000000000001';
+  raise exception 'FAIL: medlem kunne endre verdien på andres gjenstand';
+exception when insufficient_privilege then raise notice 'OK   medlem kan ikke endre verdien på andres gjenstand';
+end $$;
+do $$ begin
+  update items set estimate_reasoning = 'Nesten verdiløs' where id = '11110000-0000-0000-0000-000000000001';
+  raise exception 'FAIL: medlem kunne endre verdibegrunnelsen';
+exception when insufficient_privilege then raise notice 'OK   medlem kan ikke endre verdibegrunnelsen på andres gjenstand';
+end $$;
+do $$ begin
+  update items set marked_for_disposal = true where id = '11110000-0000-0000-0000-000000000001';
+  raise exception 'FAIL: medlem kunne merke for kast';
+exception when insufficient_privilege then raise notice 'OK   medlem kan ikke merke gjenstander for kast';
+end $$;
+update items set title = 'Stol i eik', estimated_value = estimated_value where id = '11110000-0000-0000-0000-000000000001';
+select t_eq((select title from items where id = '11110000-0000-0000-0000-000000000001'), 'Stol i eik', 'medlem kan fortsatt rette tittel når verdien er uendret');
+insert into items (id, estate_id, title, added_by) values ('11110000-0000-0000-0000-000000000003', 'eeee0000-0000-0000-0000-000000000001', 'Klokke', auth.uid());
+update items set estimated_value = '2500' where id = '11110000-0000-0000-0000-000000000003';
+select t_eq((select estimated_value::text from items where id = '11110000-0000-0000-0000-000000000003'), '2500', 'den som la inn gjenstanden kan sette verdien');
+do $$ begin
+  update items set marked_for_disposal = true where id = '11110000-0000-0000-0000-000000000003';
+  raise exception 'FAIL: medlem kunne merke egen gjenstand for kast';
+exception when insufficient_privilege then raise notice 'OK   medlem kan ikke merke egen gjenstand for kast heller';
+end $$;
 -- Poeng kan bare gis via complete_chore
 insert into chores (id, estate_id, title, size, points) values ('cccc0000-0000-0000-0000-000000000001', 'eeee0000-0000-0000-0000-000000000001', 'Rydde', 'small', 9999);
 do $$ begin
@@ -140,6 +166,14 @@ select t_eq((select count(*)::int from storage.objects where bucket_id = 'estate
 update items set assigned_to = '00000000-0000-0000-0000-0000000000f1'::uuid, status = 'assigned' where id = '11110000-0000-0000-0000-000000000001';
 select t_eq((select status from items where id = '11110000-0000-0000-0000-000000000001'), 'assigned', 'admin kan tildele');
 update items set assigned_to = null, status = 'active' where id = '11110000-0000-0000-0000-000000000001';
+update items set marked_for_disposal = true, estimated_value = '100' where id = '11110000-0000-0000-0000-000000000001';
+select t_eq((select marked_for_disposal::text || ':' || estimated_value::text from items where id = '11110000-0000-0000-0000-000000000001'), 'true:100', 'admin kan merke for kast og endre verdi');
+update items set assigned_to = '00000000-0000-0000-0000-0000000000f1'::uuid, status = 'assigned' where id = '11110000-0000-0000-0000-000000000003';
+reset role;
+select t_as('frank@test.no'); set role authenticated;
+with d as (delete from items where id = '11110000-0000-0000-0000-000000000003' returning 1) select t_eq((select count(*)::int from d), 0, 'kan ikke slette egen gjenstand etter at den er tildelt');
+reset role;
+select t_as('eva@test.no'); set role authenticated;
 do $$ begin
   perform remove_estate_member('eeee0000-0000-0000-0000-000000000001', auth.uid());
   raise exception 'FAIL: eieren ble fjernet';
