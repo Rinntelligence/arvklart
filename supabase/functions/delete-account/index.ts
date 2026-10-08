@@ -1,11 +1,11 @@
 // Sletter kontoen til den innloggede brukeren og personopplysningene om hen (GDPR art. 17).
 //
-// • Bo der brukeren er eneste medlem slettes helt, med filer.
+// • Bo der brukeren er eneste medlem slettes helt, med filer og tilbakemeldinger knyttet til boet.
 // • I bo som deles med andre beholdes boet. Var brukeren eneste admin, blir det medlemmet som har
 //   vært lengst med admin (og eier), slik at boet ikke blir stående uten noen som kan administrere det.
 // • Navnet fjernes fra gjenstander brukeren la inn og fra verdiforslag.
 import { adminClient, getUser, isDemoEmail, json, preflight } from '../_shared/http.ts'
-import { removeEstateFiles } from '../_shared/estateFiles.ts'
+import { deleteEstate } from '../_shared/estateFiles.ts'
 
 const must = <T>(res: { data: T; error: unknown }) => {
   if (res.error) throw res.error
@@ -33,8 +33,7 @@ Deno.serve(async (req) => {
       const others = members.filter(m => m.user_id !== userId)
 
       if (!others.length) {
-        await removeEstateFiles(admin, estateId)
-        must(await admin.from('estates').delete().eq('id', estateId))
+        await deleteEstate(admin, estateId)
         continue
       }
 

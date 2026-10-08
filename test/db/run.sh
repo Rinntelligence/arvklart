@@ -45,4 +45,4 @@ docker run -d --name "$API" --network "container:$DB" \
 until curl -sf localhost:54330/ >/dev/null 2>&1; do sleep 1; done
 
 echo "Spørringer gjennom PostgREST:"
-node --test test/db/queries.mjs
+node --test test/db/queries.mjs test/db/cleanup.mjs
