@@ -1,3 +1,4 @@
+import { L } from '../lib/lang'
 const CONTACT_EMAIL = 'admin@arvklart.no'
 
 export default function ContactPage() {
@@ -52,19 +53,21 @@ export default function ContactPage() {
       <div className="cp">
         <header>
           <a href="/home"><img src="/ARVKLART Horizontal Negative.svg" alt="Arvklart" /></a>
-          <a className="back" href="/home">Til forsiden</a>
+          <a className="back" href="/home">{L('Til forsiden', 'To the home page')}</a>
         </header>
 
         <main>
-          <div className="eyebrow">Kontakt</div>
-          <h1>Ta kontakt med oss</h1>
+          <div className="eyebrow">{L('Kontakt', 'Contact')}</div>
+          <h1>{L('Ta kontakt med oss', 'Get in touch')}</h1>
           <p className="lead">
-            Har du spørsmål om Arvklart, trenger hjelp med et bo eller vil gi oss tilbakemelding?
-            Send oss en e-post.
+            {L(
+              'Har du spørsmål om Arvklart, trenger hjelp med et bo eller vil gi oss tilbakemelding? Send oss en e-post.',
+              'Do you have questions about Arvklart, need help with an estate or want to give us feedback? Send us an email.',
+            )}
           </p>
 
           <div className="card">
-            <div className="label">E-post</div>
+            <div className="label">{L('E-post', 'Email')}</div>
             <a className="mail" href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>
           </div>
         </main>

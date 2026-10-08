@@ -1,33 +1,15 @@
 import { useEffect, useRef, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { getCategories, uploadImage, supabase } from '../lib/supabase'
+import { getCategories, supabase, signOut } from '../lib/supabase'
+import { fileToDataUrl, uploadEstateImage } from '../lib/images'
+import { hasAiConsent, giveAiConsent } from '../lib/aiConsent'
+import { formatNOK } from '../lib/format'
+import { L, isEn } from '../lib/lang'
+import { analyzeItemPhotos, callEdgeFunction, matchCategory } from '../lib/itemAi'
+import { AiConsent, DemoNotice } from '../components/AiDialogs'
+import CameraCapture from '../components/CameraCapture'
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL
-const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY
-
-async function callEdgeFunction(name, body) {
-  const res = await fetch(`${SUPABASE_URL}/functions/v1/${name}`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-    },
-    body: JSON.stringify(body),
-  })
-  if (!res.ok) throw new Error(`${name} feilet: ${res.status}`)
-  return res.json()
-}
-
-function fileToBase64(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = ev => resolve(ev.target.result.split(',')[1])
-    reader.onerror = reject
-    reader.readAsDataURL(file)
-  })
-}
-
-export default function AddItemPage({ session, profile, onToast }) {
+export default function AddItemPage({ session, profile, onToast, isDemo }) {
   const { id } = useParams()
   const navigate = useNavigate()
   const [categories, setCategories] = useState([])
@@ -44,13 +26,23 @@ export default function AddItemPage({ session, profile, onToast }) {
   const [purchasePrice, setPurchasePrice] = useState('')
   const [purchaseYear, setPurchaseYear] = useState('')
   const [myEstimateVote, setMyEstimateVote] = useState(null) // 'agree' | 'disagree'
-  const [aiConsented, setAiConsented] = useState(() => { try { return localStorage.getItem('aiConsented') === 'true' } catch { return false } })
-  const [showAiConsent, setShowAiConsent] = useState(false)
+  const [aiConsented, setAiConsented] = useState(hasAiConsent)
+  const [consentFor, setConsentFor] = useState(null) // 'analyze' | 'estimate' mens samtykket vises
   const [showAddCat, setShowAddCat] = useState(false)
   const [newCatLabel, setNewCatLabel] = useState('')
   const [newCatEmoji, setNewCatEmoji] = useState('📦')
   const [savingCat, setSavingCat] = useState(false)
+  const [demoBlocked, setDemoBlocked] = useState(false)
+  const [demoRemaining, setDemoRemaining] = useState(isDemo ? 5 : null)
+  const [cameraOpen, setCameraOpen] = useState(false)
   const fileRef = useRef()
+
+  // Felles håndtering av svar og feil fra AI-funksjonene
+  const trackQuota = (res) => { if (typeof res?.quota?.remaining === 'number') setDemoRemaining(res.quota.remaining) }
+  const handleAiError = (e, fallback) => {
+    if (e.code === 'demo_limit') { setDemoRemaining(0); setDemoBlocked(true); return }
+    onToast(e.code === 'rate_limit' || e.code === 'ai_busy' ? e.message : fallback, 'error')
+  }
 
   const loadCategories = () => getCategories(id).then(({ data }) => {
     setCategories(data || [])
@@ -62,32 +54,34 @@ export default function AddItemPage({ session, profile, onToast }) {
   const addCategory = async () => {
     if (!newCatLabel.trim()) return
     setSavingCat(true)
-    const { data: newCat } = await supabase.from('categories').insert({ label: newCatLabel.trim(), emoji: newCatEmoji, estate_id: id }).select().single()
+    const { data: newCat, error } = await supabase.from('categories').insert({ label: newCatLabel.trim(), emoji: newCatEmoji, estate_id: id }).select().single()
     setSavingCat(false)
+    if (error) { onToast(L('Kunne ikke legge til kategorien', 'Could not add the category'), 'error'); return }
     setNewCatLabel(''); setNewCatEmoji('📦'); setShowAddCat(false)
     await loadCategories()
     if (newCat) setCategoryId(newCat.id)
   }
 
-  const handleImages = (e) => {
+  // Fra filvelgeren (kamerarull/filer) eller kameraet i appen
+  const addImages = (picked) => {
     const MAX_IMAGE_SIZE = 10 * 1024 * 1024 // 10 MB
-    const files = Array.from(e.target.files).filter(f => {
-      if (f.size > MAX_IMAGE_SIZE) { onToast(`"${f.name}" er for stor (maks 10 MB)`, 'error'); return false }
+    const files = picked.filter(f => {
+      if (f.size > MAX_IMAGE_SIZE) { onToast(L(`"${f.name}" er for stor (maks 10 MB)`, `"${f.name}" is too large (max 10 MB)`), 'error'); return false }
       return true
-    }).slice(0, 5)
-    if (!files.length) return
-    const newFiles = [...imageFiles, ...files].slice(0, 5)
-    setImageFiles(newFiles)
-    newFiles.forEach((file, i) => {
-      if (imagePreviews[i]) return
-      const reader = new FileReader()
-      reader.onload = ev => setImagePreviews(prev => {
-        const next = [...prev]
-        next[i] = ev.target.result
-        return next
-      })
-      reader.readAsDataURL(file)
     })
+    if (!files.length) return
+    const room = 5 - imageFiles.length
+    const added = files.slice(0, room)
+    if (files.length > room) onToast(L('Maks 5 bilder per gjenstand', 'Max 5 photos per item'), 'error')
+    if (!added.length) return
+    setImageFiles(prev => [...prev, ...added])
+    // Forhåndsvisningene legges til i samme rekkefølge som filene
+    Promise.all(added.map(fileToDataUrl)).then(urls => setImagePreviews(prev => [...prev, ...urls]))
+  }
+
+  const handleImages = (e) => {
+    addImages(Array.from(e.target.files || []))
+    e.target.value = ''
   }
 
   const removeImage = (index) => {
@@ -97,34 +91,27 @@ export default function AddItemPage({ session, profile, onToast }) {
 
   const analyzeWithAI = async () => {
     if (!imageFiles[0]) return
+    if (isDemo && demoRemaining === 0) { setDemoBlocked(true); return }
     setAnalyzing(true)
     try {
-      const imageBase64 = await fileToBase64(imageFiles[0])
-      const res = await callEdgeFunction('analyze-item', {
-        imageBase64,
-        mimeType: imageFiles[0].type || 'image/jpeg',
-      })
-      const result = res.data || res
+      const { result, quota } = await analyzeItemPhotos(imageFiles, { categories })
+      trackQuota({ quota })
       if (result.title && !title) setTitle(result.title)
       if (result.description && !description) setDescription(result.description)
       if (result.condition) setCondition(result.condition)
-      if (result.category) {
-        const match = categories.find(c =>
-          c.label.toLowerCase().includes(result.category.toLowerCase()) ||
-          result.category.toLowerCase().includes(c.label.toLowerCase())
-        )
-        if (match) setCategoryId(match.id)
-      }
-      onToast('AI identifiserte gjenstanden ✓')
+      const match = matchCategory(categories, result.category)
+      if (match) setCategoryId(match.id)
+      onToast(L('AI identifiserte gjenstanden ✓', 'AI identified the item ✓'))
     } catch (e) {
-      onToast('AI-analyse feilet — fyll inn manuelt', 'error')
+      handleAiError(e, L('AI-analyse feilet — fyll inn manuelt', 'AI analysis failed — fill in manually'))
     } finally {
       setAnalyzing(false)
     }
   }
 
   const getValueEstimate = async () => {
-    if (!title.trim()) { onToast('Legg til navn på gjenstanden først', 'error'); return }
+    if (!title.trim()) { onToast(L('Legg til navn på gjenstanden først', 'Add the item name first'), 'error'); return }
+    if (isDemo && demoRemaining === 0) { setDemoBlocked(true); return }
     setEstimating(true)
     try {
       const cat = categories.find(c => c.id === categoryId)
@@ -135,7 +122,9 @@ export default function AddItemPage({ session, profile, onToast }) {
         condition,
         purchase_price: purchasePrice ? parseFloat(purchasePrice) : undefined,
         purchase_year: purchaseYear ? parseInt(purchaseYear) : undefined,
+        lang: isEn() ? 'en' : 'no',
       })
+      trackQuota(res)
       const d = res.data || res
       setAiEstimate({
         low_nok: d.summary?.low_nok ?? d.low_nok,
@@ -144,14 +133,15 @@ export default function AddItemPage({ session, profile, onToast }) {
         reasoning: d.market?.reasoning ?? d.reasoning,
       })
     } catch (e) {
-      onToast('Verdiestimering feilet', 'error')
+      handleAiError(e, L('Verdiestimering feilet', 'Value estimate failed'))
     } finally {
       setEstimating(false)
     }
   }
 
   const save = async () => {
-    if (!title.trim()) { onToast('Legg til navn på gjenstanden', 'error'); return }
+    if (isDemo) { setDemoBlocked(true); return }
+    if (!title.trim()) { onToast(L('Legg til navn på gjenstanden', 'Add the item name'), 'error'); return }
     setSaving(true)
     try {
       const { data: newItem, error } = await supabase.from('items').insert({
@@ -174,52 +164,68 @@ export default function AddItemPage({ session, profile, onToast }) {
 
       if (error) throw error
 
+      let failedImages = imageFiles.length
       if (imageFiles.length > 0) {
         const urls = []
         for (const file of imageFiles) {
           try {
-            const url = await uploadImage(file, newItem.id + '-' + Date.now())
-            urls.push(url)
+            urls.push(await uploadEstateImage(file, id))
           } catch (e) { console.error('Bilde feilet:', e) }
         }
         if (urls.length > 0) {
-          await supabase.from('items').update({
+          const { error: imgError } = await supabase.from('items').update({
             image_url: urls[0],
             extra_images: urls.slice(1),
           }).eq('id', newItem.id)
+          if (!imgError) failedImages -= urls.length
         }
       }
 
-      onToast('Gjenstand lagt til! ✓')
+      if (failedImages > 0) onToast(L(`Gjenstanden er lagt til, men ${failedImages} ${failedImages === 1 ? 'bilde' : 'bilder'} kunne ikke lastes opp. Prøv igjen fra «Rediger».`, `The item was added, but ${failedImages} ${failedImages === 1 ? 'photo' : 'photos'} could not be uploaded. Try again from «Edit».`), 'error')
+      else onToast(L('Gjenstand lagt til! ✓', 'Item added! ✓'))
       navigate(`/estate/${id}`)
     } catch (e) {
-      onToast('Feil: ' + e.message, 'error')
+      onToast(L('Feil: ', 'Error: ') + e.message, 'error')
     } finally {
       setSaving(false)
     }
   }
 
-  const formatNOK = (n) => n ? new Intl.NumberFormat('nb-NO', { style: 'currency', currency: 'NOK', maximumFractionDigits: 0 }).format(n) : '—'
-
   return (
     <div style={{ maxWidth: '560px', margin: '0 auto', padding: '20px 16px 100px', fontFamily: 'Karla, sans-serif' }}>
       <button onClick={() => navigate(`/estate/${id}`)} style={{ background: 'none', border: 'none', color: '#9C8267', cursor: 'pointer', fontSize: '14px', padding: '0 0 16px', fontFamily: 'Karla, sans-serif' }}>
-        ← Tilbake
+        {L('← Tilbake', '← Back')}
       </button>
 
       <h1 style={{ fontFamily: 'Fraunces, serif', fontSize: '24px', fontWeight: '400', color: '#3A2F26', marginBottom: '6px' }}>
-        Legg til gjenstand
+        {L('Legg til gjenstand', 'Add item')}
       </h1>
-      <p style={{ color: '#9C8267', fontSize: '14px', marginBottom: '24px' }}>
-        Fyll inn navn og ta gjerne bilde — AI kan identifisere og verdsette automatisk
+      <p style={{ color: '#9C8267', fontSize: '14px', marginBottom: '12px' }}>
+        {L('Fyll inn navn og ta gjerne bilde — AI kan identifisere og verdsette automatisk', 'Enter a name and add a photo if you can — AI can identify and value it automatically')}
       </p>
+      <button onClick={() => navigate(`/estate/${id}/add-many`)} style={{
+        width: '100%', textAlign: 'left', marginBottom: '24px', padding: '12px 14px', background: '#DCE3D2',
+        border: '1px solid #B8C8A8', borderRadius: '10px', cursor: 'pointer', fontFamily: 'Karla, sans-serif',
+        fontSize: '14px', color: '#3A5A30', lineHeight: 1.4,
+      }}>
+        <strong>{L('Mange gjenstander?', 'Many items?')}</strong>{' '}
+        {L('Ta bilder av opptil 20 på en gang og la AI legge dem inn →', 'Photograph up to 20 at once and let AI add them →')}
+      </button>
+
+      {isDemo && (
+        <div style={{ background: '#DCE3D2', border: '1px solid #B8C8A8', borderRadius: '10px', padding: '12px 14px', fontSize: '13px', color: '#3A5A30', lineHeight: 1.5, marginBottom: '20px' }}>
+          {L('Prøv AI-analyse av bilde og verdiestimat i demoen.', 'Try AI photo analysis and value estimates in the demo.')}{' '}
+          <strong>{L(`${demoRemaining} av 5 AI-forsøk igjen.`, `${demoRemaining} of 5 AI attempts left.`)}</strong>{' '}
+          {L('Gjenstanden lagres ikke.', 'The item is not saved.')}
+        </div>
+      )}
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
 
         {/* Bilder */}
         <div>
           <label style={{ display: 'block', fontSize: '13px', color: '#9C8267', marginBottom: '8px' }}>
-            Bilder (valgfri, maks 5)
+            {L('Bilder (valgfri, maks 5)', 'Photos (optional, max 5)')}
           </label>
           <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
             {imagePreviews.map((src, i) => (
@@ -233,53 +239,37 @@ export default function AddItemPage({ session, profile, onToast }) {
                 }}>×</button>
               </div>
             ))}
-            {imagePreviews.length < 5 && (
-              <div onClick={() => fileRef.current.click()} style={{
-                width: '80px', height: '80px', borderRadius: '8px',
-                border: '2px dashed #D9CFC0', background: '#FBF9F5',
-                display: 'flex', flexDirection: 'column', alignItems: 'center',
-                justifyContent: 'center', cursor: 'pointer', gap: '4px',
-              }}>
-                <span style={{ fontSize: '20px', color: '#9C8267' }}>+</span>
-                <span style={{ fontSize: '10px', color: '#9C8267' }}>Legg til</span>
-              </div>
-            )}
+            {imagePreviews.length < 5 && <>
+              <PhotoTile onClick={() => setCameraOpen(true)} label={L('Ta bilder', 'Take photos')} />
+              <PhotoTile onClick={() => fileRef.current.click()} label={L('Velg bilder', 'Choose photos')} />
+            </>}
           </div>
-          <input ref={fileRef} type="file" accept="image/*" capture="environment" multiple onChange={handleImages} style={{ display: 'none' }} />
+          {/* Uten capture-attributt: mobilen tilbyr kamerarull, kamera og filer */}
+          <input ref={fileRef} type="file" accept="image/*" multiple onChange={handleImages} style={{ display: 'none' }} />
+          {cameraOpen && <CameraCapture photos={imagePreviews} onCapture={addImages} onClose={() => setCameraOpen(false)} />}
 
           {/* AI-analyseknapp */}
-          {imageFiles.length > 0 && !showAiConsent && (
-            <button onClick={() => aiConsented ? analyzeWithAI() : setShowAiConsent(true)} disabled={analyzing} style={{
+          {imageFiles.length > 0 && !consentFor && (
+            <button onClick={() => aiConsented ? analyzeWithAI() : setConsentFor('analyze')} disabled={analyzing} style={{
               marginTop: '10px', padding: '9px 16px', background: analyzing ? '#D9CFC0' : '#5F6E52',
               color: '#fff', border: 'none', borderRadius: '8px', cursor: analyzing ? 'not-allowed' : 'pointer',
               fontSize: '13px', fontFamily: 'Karla, sans-serif', display: 'flex', alignItems: 'center', gap: '6px',
             }}>
-              {analyzing ? 'Analyserer…' : 'Analyser med AI'}
+              {analyzing ? L('Analyserer…', 'Analysing…') : L('Analyser med AI', 'Analyse with AI')}
             </button>
           )}
-          {showAiConsent && (
-            <div style={{ marginTop: '10px', background: '#FBF9F5', border: '1px solid #D9CFC0', borderRadius: '10px', padding: '14px' }}>
-              <div style={{ fontSize: '13px', color: '#3A2F26', fontWeight: '500', marginBottom: '6px' }}>Bildet sendes til en AI-tjeneste</div>
-              <p style={{ fontSize: '12px', color: '#5C4530', lineHeight: '1.6', marginBottom: '10px' }}>
-                For å identifisere gjenstanden sendes bildet til Anthropic (USA) for analyse. Bildet brukes kun til dette og lagres ikke av dem. Les mer i vår <a href="/personvern" target="_blank" style={{ color: '#5F6E52' }}>personvernerklæring</a>.
-              </p>
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <button onClick={() => setShowAiConsent(false)} style={{ flex: 1, padding: '8px', background: 'none', border: '1px solid #D9CFC0', borderRadius: '7px', cursor: 'pointer', fontSize: '13px', fontFamily: 'Karla, sans-serif', color: '#5C4530' }}>Avbryt</button>
-                <button onClick={() => { try { localStorage.setItem('aiConsented', 'true') } catch {} setAiConsented(true); setShowAiConsent(false); analyzeWithAI() }} style={{ flex: 2, padding: '8px', background: '#5F6E52', color: '#fff', border: 'none', borderRadius: '7px', cursor: 'pointer', fontSize: '13px', fontFamily: 'Karla, sans-serif' }}>Godta og analyser</button>
-              </div>
-            </div>
-          )}
+          {consentFor === 'analyze' && <AiConsent onCancel={() => setConsentFor(null)} onAccept={() => { giveAiConsent(); setAiConsented(true); setConsentFor(null); analyzeWithAI() }} />}
         </div>
 
         {/* Navn */}
         <div>
           <label style={{ display: 'block', fontSize: '13px', color: '#9C8267', marginBottom: '6px' }}>
-            Navn på gjenstand *
+            {L('Navn på gjenstand *', 'Item name *')}
           </label>
           <input
             value={title}
             onChange={e => setTitle(e.target.value)}
-            placeholder="f.eks. Bestemors gyngestol"
+            placeholder={L('f.eks. Bestemors gyngestol', 'e.g. Grandmother\'s rocking chair')}
             autoFocus
             maxLength={200}
             style={{
@@ -294,7 +284,7 @@ export default function AddItemPage({ session, profile, onToast }) {
         {/* Kategori */}
         <div>
           <label style={{ display: 'block', fontSize: '13px', color: '#9C8267', marginBottom: '8px' }}>
-            Kategori
+            {L('Kategori', 'Category')}
           </label>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
             {categories.map(c => (
@@ -308,13 +298,13 @@ export default function AddItemPage({ session, profile, onToast }) {
                 {c.label}
               </button>
             ))}
-            <button onClick={() => setShowAddCat(!showAddCat)} style={{
+            {!isDemo && <button onClick={() => setShowAddCat(!showAddCat)} style={{
               padding: '8px 14px', borderRadius: '20px', cursor: 'pointer', fontSize: '13px',
               fontFamily: 'Karla, sans-serif', border: '2px dashed #D9CFC0',
               background: 'transparent', color: '#9C8267',
             }}>
-              + Ny kategori
-            </button>
+              {L('+ Ny kategori', '+ New category')}
+            </button>}
           </div>
 
           {showAddCat && (
@@ -324,7 +314,7 @@ export default function AddItemPage({ session, profile, onToast }) {
                   value={newCatLabel}
                   onChange={e => setNewCatLabel(e.target.value)}
                   onKeyDown={e => e.key === 'Enter' && addCategory()}
-                  placeholder="Kategorinavn…"
+                  placeholder={L('Kategorinavn…', 'Category name…')}
                   maxLength={60}
                   autoFocus
                   style={{
@@ -337,7 +327,7 @@ export default function AddItemPage({ session, profile, onToast }) {
                   border: 'none', borderRadius: '8px', cursor: newCatLabel.trim() ? 'pointer' : 'not-allowed',
                   fontSize: '13px', fontFamily: 'Karla, sans-serif', whiteSpace: 'nowrap',
                 }}>
-                  {savingCat ? '…' : 'Legg til'}
+                  {savingCat ? '…' : L('Legg til', 'Add')}
                 </button>
                 <button onClick={() => { setShowAddCat(false); setNewCatLabel('') }} style={{
                   padding: '8px', background: 'none', border: 'none', cursor: 'pointer', color: '#9C8267', fontSize: '16px',
@@ -350,10 +340,10 @@ export default function AddItemPage({ session, profile, onToast }) {
         {/* Tilstand */}
         <div>
           <label style={{ display: 'block', fontSize: '13px', color: '#9C8267', marginBottom: '8px' }}>
-            Tilstand
+            {L('Tilstand', 'Condition')}
           </label>
           <div style={{ display: 'flex', gap: '8px' }}>
-            {[['excellent','Utmerket'],['good','God'],['fair','Middels'],['poor','Dårlig']].map(([val, label]) => (
+            {[['excellent',L('Utmerket','Excellent')],['good',L('God','Good')],['fair',L('Middels','Fair')],['poor',L('Dårlig','Poor')]].map(([val, label]) => (
               <button key={val} onClick={() => setCondition(val)} style={{
                 flex: 1, padding: '10px 4px',
                 border: `2px solid ${condition === val ? '#3A2F26' : '#D9CFC0'}`,
@@ -369,12 +359,12 @@ export default function AddItemPage({ session, profile, onToast }) {
         {/* Beskrivelse */}
         <div>
           <label style={{ display: 'block', fontSize: '13px', color: '#9C8267', marginBottom: '6px' }}>
-            Beskrivelse (valgfri)
+            {L('Beskrivelse (valgfri)', 'Description (optional)')}
           </label>
           <textarea
             value={description}
             onChange={e => setDescription(e.target.value)}
-            placeholder="Materiale, farge, historikk, minner…"
+            placeholder={L('Materiale, farge, historikk, minner…', 'Material, colour, history, memories…')}
             rows={3}
             maxLength={2000}
             style={{
@@ -389,43 +379,45 @@ export default function AddItemPage({ session, profile, onToast }) {
         {/* Kjøpspris og -år for verdiestimat */}
         <div style={{ display: 'flex', gap: '10px' }}>
           <div style={{ flex: 1 }}>
-            <label style={{ display: 'block', fontSize: '13px', color: '#9C8267', marginBottom: '6px' }}>Kjøpspris (NOK, valgfri)</label>
-            <input type="number" value={purchasePrice} onChange={e => setPurchasePrice(e.target.value)} placeholder="f.eks. 5000"
+            <label style={{ display: 'block', fontSize: '13px', color: '#9C8267', marginBottom: '6px' }}>{L('Kjøpspris (NOK, valgfri)', 'Purchase price (NOK, optional)')}</label>
+            <input type="number" value={purchasePrice} onChange={e => setPurchasePrice(e.target.value)} placeholder={L('f.eks. 5000', 'e.g. 5000')}
               style={{ width: '100%', padding: '12px 14px', border: '1px solid #D9CFC0', borderRadius: '10px', fontSize: '15px', background: '#FBF9F5', color: '#3A2F26', outline: 'none', fontFamily: 'Karla, sans-serif', boxSizing: 'border-box' }} />
           </div>
           <div style={{ flex: 1 }}>
-            <label style={{ display: 'block', fontSize: '13px', color: '#9C8267', marginBottom: '6px' }}>Kjøpsår (valgfri)</label>
-            <input type="number" value={purchaseYear} onChange={e => setPurchaseYear(e.target.value)} placeholder="f.eks. 2010"
+            <label style={{ display: 'block', fontSize: '13px', color: '#9C8267', marginBottom: '6px' }}>{L('Kjøpsår (valgfri)', 'Year of purchase (optional)')}</label>
+            <input type="number" value={purchaseYear} onChange={e => setPurchaseYear(e.target.value)} placeholder={L('f.eks. 2010', 'e.g. 2010')}
               style={{ width: '100%', padding: '12px 14px', border: '1px solid #D9CFC0', borderRadius: '10px', fontSize: '15px', background: '#FBF9F5', color: '#3A2F26', outline: 'none', fontFamily: 'Karla, sans-serif', boxSizing: 'border-box' }} />
           </div>
         </div>
 
         {/* Verdiestimat-knapp */}
-        {title.trim() && (
-          <button onClick={getValueEstimate} disabled={estimating} style={{
+        {consentFor === 'estimate' && <AiConsent onCancel={() => setConsentFor(null)} onAccept={() => { giveAiConsent(); setAiConsented(true); setConsentFor(null); getValueEstimate() }} />}
+
+        {title.trim() && !consentFor && (
+          <button onClick={() => aiConsented ? getValueEstimate() : setConsentFor('estimate')} disabled={estimating} style={{
             padding: '11px 18px', background: estimating ? '#D9CFC0' : '#8B9A7D',
             color: '#fff', border: 'none', borderRadius: '8px', cursor: estimating ? 'not-allowed' : 'pointer',
             fontSize: '14px', fontFamily: 'Karla, sans-serif',
           }}>
-            {estimating ? 'Estimerer…' : 'Få verdiestimat'}
+            {estimating ? L('Estimerer…', 'Estimating…') : L('Få verdiestimat', 'Get value estimate')}
           </button>
         )}
 
         {/* Verdiestimat-resultat */}
         {aiEstimate && (
           <div style={{ background: '#DCE3D2', border: '1px solid #B8C8A8', borderRadius: '12px', padding: '20px' }}>
-            <div style={{ fontSize: '13px', color: '#3A5A30', fontWeight: '500', marginBottom: '12px' }}>Verdiestimat (NOK)</div>
+            <div style={{ fontSize: '13px', color: '#3A5A30', fontWeight: '500', marginBottom: '12px' }}>{L('Verdiestimat (NOK)', 'Value estimate (NOK)')}</div>
             <div style={{ display: 'flex', gap: '16px', marginBottom: '12px', flexWrap: 'wrap' }}>
               <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: '11px', color: '#9C8267', marginBottom: '2px' }}>Lavt</div>
+                <div style={{ fontSize: '11px', color: '#9C8267', marginBottom: '2px' }}>{L('Lavt', 'Low')}</div>
                 <div style={{ fontSize: '18px', color: '#3A2F26', fontFamily: 'Fraunces, serif' }}>{formatNOK(aiEstimate.low_nok)}</div>
               </div>
               <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: '11px', color: '#9C8267', marginBottom: '2px' }}>Mest sannsynlig</div>
+                <div style={{ fontSize: '11px', color: '#9C8267', marginBottom: '2px' }}>{L('Mest sannsynlig', 'Most likely')}</div>
                 <div style={{ fontSize: '22px', color: '#3A5A30', fontFamily: 'Fraunces, serif', fontWeight: '500' }}>{formatNOK(aiEstimate.likely_nok)}</div>
               </div>
               <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: '11px', color: '#9C8267', marginBottom: '2px' }}>Høyt</div>
+                <div style={{ fontSize: '11px', color: '#9C8267', marginBottom: '2px' }}>{L('Høyt', 'High')}</div>
                 <div style={{ fontSize: '18px', color: '#3A2F26', fontFamily: 'Fraunces, serif' }}>{formatNOK(aiEstimate.high_nok)}</div>
               </div>
             </div>
@@ -433,7 +425,7 @@ export default function AddItemPage({ session, profile, onToast }) {
 
             {/* Voting */}
             <div style={{ borderTop: '1px solid #B8C8A8', paddingTop: '12px', marginTop: '4px' }}>
-              <div style={{ fontSize: '12px', color: '#5C4530', marginBottom: '8px' }}>Er du enig i estimatet?</div>
+              <div style={{ fontSize: '12px', color: '#5C4530', marginBottom: '8px' }}>{L('Er du enig i estimatet?', 'Do you agree with the estimate?')}</div>
               <div style={{ display: 'flex', gap: '8px' }}>
                 <button onClick={() => setMyEstimateVote(myEstimateVote === 'agree' ? null : 'agree')} style={{
                   flex: 1, padding: '9px', border: `2px solid ${myEstimateVote === 'agree' ? '#5F6E52' : '#B8C8A8'}`,
@@ -441,30 +433,30 @@ export default function AddItemPage({ session, profile, onToast }) {
                   background: myEstimateVote === 'agree' ? '#5F6E52' : '#fff',
                   color: myEstimateVote === 'agree' ? '#fff' : '#5C4530',
                   fontFamily: 'Karla, sans-serif', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
-                }}>Enig</button>
+                }}>{L('Enig', 'Agree')}</button>
                 <button onClick={() => setMyEstimateVote(myEstimateVote === 'disagree' ? null : 'disagree')} style={{
                   flex: 1, padding: '9px', border: `2px solid ${myEstimateVote === 'disagree' ? '#A97C3F' : '#B8C8A8'}`,
                   borderRadius: '8px', cursor: 'pointer', fontSize: '14px',
                   background: myEstimateVote === 'disagree' ? '#A97C3F' : '#fff',
                   color: myEstimateVote === 'disagree' ? '#fff' : '#5C4530',
                   fontFamily: 'Karla, sans-serif', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
-                }}>Uenig</button>
+                }}>{L('Uenig', 'Disagree')}</button>
               </div>
               {myEstimateVote && (
                 <p style={{ fontSize: '11px', color: '#5C4530', marginTop: '6px', marginBottom: 0 }}>
-                  {myEstimateVote === 'agree' ? 'Stemmen din lagres — andre arvinger kan også stemme.' : 'Stemmen din lagres — andre arvinger kan også stemme.'}
+                  {L('Stemmen din lagres — andre arvinger kan også stemme.', 'Your vote is saved — other heirs can vote too.')}
                 </p>
               )}
             </div>
 
-            <p style={{ fontSize: '11px', color: '#9C8267', marginTop: '8px', marginBottom: 0 }}>Estimater er kun veiledende — ikke profesjonell takst.</p>
+            <p style={{ fontSize: '11px', color: '#9C8267', marginTop: '8px', marginBottom: 0 }}>{L('Estimater er kun veiledende — ikke profesjonell takst.', 'Estimates are for guidance only — not a professional appraisal.')}</p>
           </div>
         )}
 
       </div>
 
       {/* Fast lagreknapp nederst */}
-      <div style={{
+      <div className="bottom-bar" style={{
         position: 'fixed', bottom: 0, left: 0, right: 0,
         padding: '16px', background: '#fff',
         borderTop: '1px solid #D9CFC0',
@@ -483,9 +475,26 @@ export default function AddItemPage({ session, profile, onToast }) {
             fontSize: '16px', fontFamily: 'Karla, sans-serif', fontWeight: '500',
           }}
         >
-          {saving ? 'Lagrer…' : '✓ Lagre gjenstand'}
+          {saving ? L('Lagrer…', 'Saving…') : L('✓ Lagre gjenstand', '✓ Save item')}
         </button>
       </div>
+
+      {demoBlocked && <DemoNotice onClose={() => setDemoBlocked(false)} onSignup={async () => { await signOut(); navigate('/logg-inn') }} />}
     </div>
+  )
+}
+
+function PhotoTile({ onClick, label }) {
+  return (
+    <button type="button" onClick={onClick} style={{
+      width: '80px', height: '80px', borderRadius: '8px',
+      border: '2px dashed #D9CFC0', background: '#FBF9F5',
+      display: 'flex', flexDirection: 'column', alignItems: 'center',
+      justifyContent: 'center', cursor: 'pointer', gap: '4px', padding: 0,
+      fontFamily: 'Karla, sans-serif',
+    }}>
+      <span style={{ fontSize: '20px', color: '#9C8267' }}>+</span>
+      <span style={{ fontSize: '11px', color: '#9C8267' }}>{label}</span>
+    </button>
   )
 }

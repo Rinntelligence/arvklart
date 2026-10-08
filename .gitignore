@@ -15,6 +15,7 @@ build/
 .env.development.local
 .env.test.local
 .env.production.local
+.env*.save
 
 # Logs
 npm-debug.log*
@@ -36,3 +37,7 @@ lerna-debug.log*
 # OS
 .DS_Store
 Thumbs.db
+
+# Supabase CLI (lokal kobling til prosjektet)
+supabase/.temp/
+supabase/.branches/

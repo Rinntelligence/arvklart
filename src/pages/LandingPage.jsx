@@ -1,26 +1,37 @@
 import { useState } from 'react'
-import { signIn } from '../lib/supabase'
+import { useNavigate } from 'react-router-dom'
+import { startDemoSession } from '../lib/demo'
+import { L, isEn, setLang } from '../lib/lang'
 
-const DEMO_EMAIL = 'mona.demo@heirsplit.no'
-const DEMO_PASSWORD = import.meta.env.VITE_DEMO_PASSWORD || ''
+// Språkbytte for besøkende som ikke er innlogget (innloggede bytter i TopBar)
+const toggleLang = (e) => {
+  e.preventDefault()
+  setLang(isEn() ? 'no' : 'en')
+  window.location.reload()
+}
+const langLabel = () => (isEn() ? 'Norsk' : 'English')
 
-export default function LandingPage() {
+export default function LandingPage({ loggedIn = false }) {
+  const navigate = useNavigate()
   const [demoLoading, setDemoLoading] = useState(false)
   const [demoError, setDemoError] = useState('')
+  const [navOpen, setNavOpen] = useState(false)
 
+  // Innloggede (også demoen) går rett til appen; ellers startes en demo-økt i samme fane.
   const handleDemo = async () => {
+    if (loggedIn) { navigate('/'); return }
     setDemoLoading(true)
     setDemoError('')
-    const { error } = await signIn(DEMO_EMAIL, DEMO_PASSWORD)
+    const { error } = await startDemoSession()
     if (error) {
       console.error('Demo login error:', error.message)
       setDemoLoading(false)
-      setDemoError('Demo er ikke tilgjengelig akkurat nå. Sjekk at VITE_DEMO_PASSWORD er satt riktig.')
+      setDemoError(L('Demoen er ikke tilgjengelig akkurat nå. Prøv igjen om litt.', 'The demo is not available right now. Please try again shortly.'))
       return
     }
-    window.open('/', '_blank')
-    setDemoLoading(false)
+    navigate('/')
   }
+  const demoLabel = (idle) => demoLoading ? L('Åpner demo…', 'Opening the demo…') : loggedIn ? L('Gå til mine bo', 'Go to my estates') : idle
 
   return (
     <>
@@ -33,9 +44,10 @@ export default function LandingPage() {
           --text2:#7A6C5D;
         }
         .lp * { box-sizing: border-box; margin: 0; padding: 0; }
-        .lp { font-family: 'Karla', sans-serif; color: var(--espresso); background: var(--lin); }
+        .lp { position: relative; font-family: 'Karla', sans-serif; color: var(--espresso); background: var(--lin); }
         .lp .serif { font-family: 'Fraunces', serif; font-weight: 400; }
         .lp a { color: inherit; text-decoration: none; }
+        .lp.logged-in section { scroll-margin-top: 56px; }
 
         .lp header {
           position: absolute; top: 0; left: 0; right: 0; z-index: 10;
@@ -60,27 +72,32 @@ export default function LandingPage() {
         .lp nav a.nav-login:hover, .lp nav a.nav-login:focus-visible {
           background: var(--snow); color: var(--espresso); text-shadow: none; border-color: var(--snow);
         }
+        .lp .nav-toggle { display: none; }
 
         .lp .hero {
           position: relative; min-height: 92vh;
-          display: flex; align-items: center; justify-content: center;
+          display: flex; align-items: flex-end; justify-content: flex-start;
           background-image:
-            linear-gradient(180deg, rgba(42,33,26,0) 0%, rgba(42,33,26,0.08) 45%, rgba(42,33,26,0.6) 75%, rgba(42,33,26,0.9) 100%),
+            linear-gradient(90deg, rgba(42,33,26,0.78) 0%, rgba(42,33,26,0.55) 35%, rgba(42,33,26,0.12) 65%, rgba(42,33,26,0) 100%),
+            linear-gradient(180deg, rgba(42,33,26,0) 0%, rgba(42,33,26,0) 40%, rgba(42,33,26,0.45) 70%, rgba(42,33,26,0.85) 100%),
             url('/hero-bg.jpg');
           background-size: cover; background-position: center;
         }
         .lp .hero-inner {
           position: relative; z-index: 2;
-          max-width: 640px; text-align: left;
-          padding: 0 56px 80px;
+          max-width: 720px; text-align: left;
+          padding: 0 56px 96px;
         }
         .lp .hero-inner h1 {
-          font-size: 42px; line-height: 1.28; color: var(--snow); margin-bottom: 14px;
+          font-size: clamp(32px, 4.2vw, 54px); line-height: 1.12; letter-spacing: -0.5px;
+          color: var(--snow); margin-bottom: 20px;
           font-weight: 400; font-family: 'Fraunces', serif;
+          text-shadow: 0 2px 18px rgba(0,0,0,0.35);
         }
         .lp .hero-inner .subline {
-          font-size: 16px; line-height: 1.6; color: var(--snow); opacity: 0.9;
-          max-width: 480px; margin-bottom: 38px;
+          font-size: clamp(17px, 1.4vw, 19px); line-height: 1.55; color: var(--snow);
+          max-width: 520px; margin-bottom: 40px;
+          text-shadow: 0 1px 10px rgba(0,0,0,0.4);
         }
         .lp .hero-cta { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; }
         .lp .btn {
@@ -166,8 +183,8 @@ export default function LandingPage() {
           .lp header { padding: 22px 24px; }
           .lp nav ul { gap: 2px; flex-wrap: wrap; justify-content: flex-end; }
           .lp nav a { padding: 6px 10px; font-size: 13.5px; }
-          .lp .hero-inner { padding: 0 24px 64px; }
-          .lp .hero-inner h1 { font-size: 28px; }
+          .lp .hero { background-position: 60% center; }
+          .lp .hero-inner { padding: 0 24px 56px; }
           .lp .intro { padding: 76px 24px; }
           .lp .features { padding: 76px 24px; }
           .lp .feature-grid { grid-template-columns: 1fr; gap: 44px; }
@@ -175,40 +192,72 @@ export default function LandingPage() {
           .lp .demo-section { padding: 90px 24px; }
           .lp .demo-mockup { margin: 40px 0 0; }
           footer.lp-footer { flex-direction: column; gap: 26px; text-align: center; }
+          footer.lp-footer .foot-links { flex-wrap: wrap; justify-content: center; gap: 12px 24px; }
+          footer.lp-footer .foot-links a { white-space: nowrap; }
+        }
+
+        /* Mobil: lenkene samles i en meny, «Logg inn» står alltid synlig */
+        @media (max-width: 640px) {
+          .lp header { padding: 16px 16px 32px; }
+          .lp nav { display: flex; align-items: center; gap: 8px; }
+          .lp nav ul {
+            display: none; position: absolute; top: 64px; left: 16px; right: 16px;
+            flex-direction: column; align-items: stretch; gap: 0; padding: 6px;
+            background: var(--espresso); border: 1px solid rgba(251,249,245,0.18);
+            border-radius: 14px; box-shadow: 0 12px 36px rgba(0,0,0,0.35);
+          }
+          .lp header.nav-open nav ul { display: flex; }
+          .lp nav ul li.nav-login-item { display: none; }
+          .lp nav ul a { display: block; padding: 13px 14px; font-size: 15px; border-radius: 10px; text-shadow: none; }
+          .lp nav > a.nav-login { display: inline-block; margin-left: 0; }
+          .lp .nav-toggle {
+            display: inline-flex; align-items: center; justify-content: center;
+            width: 40px; height: 40px; border-radius: 999px; cursor: pointer;
+            background: none; border: 1px solid rgba(251,249,245,0.45); color: var(--snow);
+            font-size: 18px; line-height: 1;
+          }
+        }
+        @media (min-width: 641px) {
+          .lp nav > a.nav-login { display: none; }
         }
       `}</style>
 
-      <div className="lp">
-        {/* NAV */}
-        <header>
+      <div className={loggedIn ? 'lp logged-in' : 'lp'}>
+        {/* NAV — når innlogget ligger lenkene i TopBar i stedet */}
+        {!loggedIn && <header className={navOpen ? 'nav-open' : ''}>
           <div className="logo">
             <img src="/ARVKLART Horizontal Negative.svg" alt="Arvklart" />
           </div>
           <nav>
-            <ul>
-              <li><a href="#slik-fungerer">Slik fungerer det</a></li>
-              <li><a href="#for-hvem">For hvem</a></li>
-              <li><a href="#demo" onClick={(e) => { e.preventDefault(); document.getElementById('demo').scrollIntoView({ behavior: 'smooth' }) }}>Prøv demo</a></li>
-              <li><a href="/veiviser">Veiviser</a></li>
-              <li><a className="nav-login" href="/logg-inn">Logg inn</a></li>
+            <a className="nav-login" href="/logg-inn">{L('Logg inn', 'Log in')}</a>
+            <button className="nav-toggle" aria-expanded={navOpen} aria-label={L('Meny', 'Menu')} onClick={() => setNavOpen(o => !o)}>
+              {navOpen ? '✕' : '☰'}
+            </button>
+            <ul onClick={() => setNavOpen(false)}>
+              <li><a href="#slik-fungerer">{L('Slik fungerer det', 'How it works')}</a></li>
+              <li><a href="#for-hvem">{L('For hvem', 'Who it is for')}</a></li>
+              <li><a href="#demo" onClick={(e) => { e.preventDefault(); document.getElementById('demo').scrollIntoView({ behavior: 'smooth' }) }}>{L('Prøv demo', 'Try the demo')}</a></li>
+              <li><a href="/veiviser">{L('Veiviser', 'Guide')}</a></li>
+              <li><a href="#" onClick={toggleLang} lang={isEn() ? 'no' : 'en'}>{langLabel()}</a></li>
+              <li className="nav-login-item"><a className="nav-login" href="/logg-inn">{L('Logg inn', 'Log in')}</a></li>
             </ul>
           </nav>
-        </header>
+        </header>}
 
         {/* HERO */}
         <section className="hero">
           <div className="hero-inner">
-            <h1>Arvefordeling gjort enklere og inkluderende</h1>
-            <div className="subline">Så struktur og ro kan verne om det som betyr mest</div>
+            <h1>{L('Arvefordeling gjort enklere og inkluderende', 'Inheritance distribution made simpler and more inclusive')}</h1>
+            <div className="subline">{L('Så struktur og ro kan verne om det som betyr mest', 'So that structure and calm can protect what matters most')}</div>
             <div className="hero-cta">
               <button
                 className="btn btn-fill"
                 onClick={handleDemo}
                 disabled={demoLoading}
               >
-                {demoLoading ? 'Logger inn…' : 'Test ut demo nå'}
+                {demoLabel(L('Test ut demo nå', 'Try the demo now'))}
               </button>
-              <a className="btn btn-line" href="#slik-fungerer">Se hvordan det fungerer</a>
+              <a className="btn btn-line" href="#slik-fungerer">{L('Se hvordan det fungerer', 'See how it works')}</a>
             </div>
             {demoError && <div style={{ marginTop: '12px', fontSize: '13px', color: '#F5C2C2', background: 'rgba(0,0,0,0.3)', padding: '8px 14px', borderRadius: '6px', maxWidth: '400px' }}>{demoError}</div>}
           </div>
@@ -216,47 +265,47 @@ export default function LandingPage() {
 
         {/* INTRO */}
         <section className="intro" id="for-hvem">
-          <div className="eyebrow">Hvorfor Arvklart</div>
-          <h2>Vi hjelper deg med det. <em>Så dere kan bruke tiden på hverandre, ikke på regneark og misforståelser.</em></h2>
+          <div className="eyebrow">{L('Hvorfor Arvklart', 'Why Arvklart')}</div>
+          <h2>{L('Vi hjelper deg med det.', 'We help you with it.')} <em>{L('Så dere kan bruke tiden på hverandre, ikke på regneark og misforståelser.', 'So you can spend your time on each other, not on spreadsheets and misunderstandings.')}</em></h2>
         </section>
 
         {/* FEATURES */}
         <section className="features" id="slik-fungerer">
           <div className="features-head">
-            <div className="eyebrow">Slik fungerer det</div>
-            <h2>Én rolig, tydelig vei gjennom en vanskelig prosess.</h2>
+            <div className="eyebrow">{L('Slik fungerer det', 'How it works')}</div>
+            <h2>{L('Én rolig, tydelig vei gjennom en vanskelig prosess.', 'One calm, clear path through a difficult process.')}</h2>
           </div>
           <div className="feature-grid">
             <div className="feature">
               <div className="num">01</div>
-              <h3 className="serif">Rettferdig, ikke bare likt</h3>
-              <p>En felles, forståelig måte å komme fram til fordelinger alle kan stå bak — uten at noen må regne det ut selv.</p>
+              <h3 className="serif">{L('Rettferdig, ikke bare likt', 'Fair, not just equal')}</h3>
+              <p>{L('En felles, forståelig måte å komme fram til fordelinger alle kan stå bak — uten at noen må regne det ut selv.', 'A shared, understandable way to reach a distribution everyone can stand behind — without anyone having to work it out themselves.')}</p>
             </div>
             <div className="feature">
               <div className="num">02</div>
-              <h3 className="serif">Alt samlet på ett sted</h3>
-              <p>Testament, skjøter og verdivurderinger ligger trygt og oversiktlig, tilgjengelig for dem som skal ha det.</p>
+              <h3 className="serif">{L('Alt samlet på ett sted', 'Everything in one place')}</h3>
+              <p>{L('Testament, skjøter og verdivurderinger ligger trygt og oversiktlig, tilgjengelig for dem som skal ha det.', 'Wills, deeds and valuations are kept safe and organised, available to those who need them.')}</p>
             </div>
             <div className="feature">
               <div className="num">03</div>
-              <h3 className="serif">Rom til å snakke sammen</h3>
-              <p>Et nøytralt sted å ta opp det som er vanskelig å si rundt middagsbordet — før eller etter at det skjer.</p>
+              <h3 className="serif">{L('Rom til å snakke sammen', 'Room to talk together')}</h3>
+              <p>{L('Et nøytralt sted å ta opp det som er vanskelig å si rundt middagsbordet — før eller etter at det skjer.', 'A neutral place to raise what is hard to say around the dinner table — before or after it happens.')}</p>
             </div>
           </div>
         </section>
 
         {/* DEMO */}
         <section className="demo-section" id="demo">
-          <div className="eyebrow">Test ut demo</div>
-          <h2>Se hvordan Arvklart gjør arvefordeling enklere — uten å måtte registrere deg</h2>
-          <p>Utforsk oversikten, interesseregistrering og fordeling i en ferdig oppsatt familie. Ingen konto nødvendig.</p>
+          <div className="eyebrow">{L('Test ut demo', 'Try the demo')}</div>
+          <h2>{L('Se hvordan Arvklart gjør arvefordeling enklere — uten å måtte registrere deg', 'See how Arvklart makes inheritance distribution simpler — without signing up')}</h2>
+          <p>{L('Utforsk oversikten, interesseregistrering og fordeling i en ferdig oppsatt familie. Ingen konto nødvendig.', 'Explore the overview, interest registration and distribution in a ready-made family. No account needed.')}</p>
           <button
             className="btn btn-fill"
             onClick={handleDemo}
             disabled={demoLoading}
             style={{ margin: '0 auto' }}
           >
-            {demoLoading ? 'Logger inn…' : 'Åpne demo'}
+            {demoLabel(L('Åpne demo', 'Open the demo'))}
           </button>
           {demoError && <div style={{ marginTop: '14px', fontSize: '13px', color: '#F5C2C2', background: 'rgba(0,0,0,0.3)', padding: '8px 14px', borderRadius: '6px', display: 'inline-block' }}>{demoError}</div>}
 
@@ -265,28 +314,28 @@ export default function LandingPage() {
               <img src="/ARVKLART Horizontal Negative.svg" alt="Arvklart" />
             </div>
             <div className="demo-body">
-              <div className="demo-title">Fam. Hansen sitt bo</div>
-              <div className="demo-sub">12 gjenstander · 4 arvinger</div>
+              <div className="demo-title">{L('Fam. Hansen sitt bo', 'The Hansen family estate')}</div>
+              <div className="demo-sub">{L('12 gjenstander · 4 arvinger', '12 items · 4 heirs')}</div>
               <div className="demo-conflict">
                 <div className="demo-conflict-left">
-                  <h4>Bestemors gyngestol</h4>
-                  <span>Erik og Mona er interesserte</span>
+                  <h4>{L('Bestemors gyngestol', "Grandmother's rocking chair")}</h4>
+                  <span>{L('Erik og Mona er interesserte', 'Erik and Mona are interested')}</span>
                 </div>
-                <span className="demo-badge orange">Avventer</span>
+                <span className="demo-badge orange">{L('Avventer', 'Pending')}</span>
               </div>
               <div className="demo-conflict">
                 <div className="demo-conflict-left">
-                  <h4>Antikk eiketresbord</h4>
-                  <span>Tildelt Mona</span>
+                  <h4>{L('Antikk eiketresbord', 'Antique oak table')}</h4>
+                  <span>{L('Tildelt Mona', 'Assigned to Mona')}</span>
                 </div>
-                <span className="demo-badge">Avklart</span>
+                <span className="demo-badge">{L('Avklart', 'Settled')}</span>
               </div>
               <div className="demo-conflict">
                 <div className="demo-conflict-left">
-                  <h4>Mahognibokhylle</h4>
-                  <span>Lars er eneste interesserte</span>
+                  <h4>{L('Mahognibokhylle', 'Mahogany bookcase')}</h4>
+                  <span>{L('Lars er eneste interesserte', 'Lars is the only one interested')}</span>
                 </div>
-                <span className="demo-badge">Avklart</span>
+                <span className="demo-badge">{L('Avklart', 'Settled')}</span>
               </div>
             </div>
           </div>
@@ -296,9 +345,10 @@ export default function LandingPage() {
         <footer className="lp-footer">
           <img src="/ARVKLART Horizontal Negative.svg" alt="Arvklart" />
           <ul className="foot-links">
-            <li><a href="/personvern">Personvernerklæring</a></li>
-            <li><a href="/personvern#vilkar">Vilkår for bruk</a></li>
-            <li><a href="/kontakt">Kontakt</a></li>
+            <li><a href="/personvern">{L('Personvernerklæring', 'Privacy policy')}</a></li>
+            <li><a href="/personvern#vilkar">{L('Vilkår for bruk', 'Terms of use')}</a></li>
+            <li><a href="/kontakt">{L('Kontakt', 'Contact')}</a></li>
+            <li><a href="#" onClick={toggleLang} lang={isEn() ? 'no' : 'en'}>{langLabel()}</a></li>
           </ul>
         </footer>
       </div>

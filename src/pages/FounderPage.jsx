@@ -1,35 +1,35 @@
 import { useEffect, useState } from 'react'
-import { getAllEstates, getAllProfiles, getAllFeedback, supabase } from '../lib/supabase'
+import { getFounderDashboard, setUserPlan } from '../lib/founder'
+import FounderManagement from '../components/FounderManagement'
 
 const tc = c => { if(!c)return'#FBF9F5'; const r=parseInt(c.slice(1,3),16),g=parseInt(c.slice(3,5),16),b=parseInt(c.slice(5,7),16); return(0.299*r+0.587*g+0.114*b)/255>0.55?'#3A2F26':'#FBF9F5' }
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LineChart, Line, CartesianGrid } from 'recharts'
 
-export default function FounderPage({ session }) {
+export default function FounderPage({ session, onToast }) {
   const [estates, setEstates] = useState([])
   const [profiles, setProfiles] = useState([])
   const [feedback, setFeedback] = useState([])
-  const [items, setItems] = useState([])
+  const [itemCount, setItemCount] = useState(0)
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState(false)
   const [tab, setTab] = useState('overview')
 
   useEffect(() => {
     const load = async () => {
-      const [{ data: es }, { data: ps }, { data: fb }, { data: its }] = await Promise.all([
-        getAllEstates(),
-        getAllProfiles(),
-        getAllFeedback(),
-        supabase.from('items').select('id, created_at, estate_id'),
-      ])
-      setEstates(es || [])
-      setProfiles(ps || [])
-      setFeedback(fb || [])
-      setItems(its || [])
+      // Én security definer-funksjon; avviser kallet uten founder-rolle og tofaktor
+      const { data, error } = await getFounderDashboard()
+      if (error) setLoadError(true)
+      setEstates(data?.estates || [])
+      setProfiles(data?.profiles || [])
+      setFeedback(data?.feedback || [])
+      setItemCount(data?.item_count || 0)
       setLoading(false)
     }
     load()
   }, [])
 
   if (loading) return <div style={{ padding:'80px', textAlign:'center', color:'#9C8267', fontFamily:'Karla, sans-serif' }}>Laster dashboard…</div>
+  if (loadError) return <div style={{ padding:'80px', textAlign:'center', color:'#9C8267', fontFamily:'Karla, sans-serif' }}>Ingen tilgang til dashboardet.</div>
 
   const planCounts = profiles.reduce((acc, p) => { acc[p.plan||'free']=(acc[p.plan||'free']||0)+1; return acc }, {})
   const mrr = (planCounts.family||0)*9 + (planCounts.business||0)*99 + (planCounts.enterprise||0)*299
@@ -49,13 +49,21 @@ export default function FounderPage({ session }) {
   // Activity: estates with most items
   const estateActivity = estates.map(e => ({
     name: e.name,
-    items: items.filter(i=>i.estate_id===e.id).length,
+    items: e.item_count || 0,
     owner: e.profiles?.display_name || e.profiles?.email || 'Unknown',
   })).sort((a,b)=>b.items-a.items).slice(0,8)
 
   return (
     <div style={{ maxWidth:'960px', margin:'0 auto', padding:'28px 16px', fontFamily:'Karla, sans-serif' }}>
-      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'32px' }}>
+      <style>{`@media (max-width: 600px) {
+        .fd-tabs { overflow-x: auto; scrollbar-width: none; }
+        .fd-tabs::-webkit-scrollbar { display: none; }
+        .fd-tabs > button { flex-shrink: 0; white-space: nowrap; }
+        .fd-grid { grid-template-columns: 1fr !important; }
+        .fd-table { overflow-x: auto !important; }
+        .fd-table > table { min-width: 640px; }
+      }`}</style>
+      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'32px', flexWrap:'wrap', gap:'12px' }}>
         <div>
           <h1 style={{ fontFamily:'Fraunces, serif', fontSize:'28px', fontWeight:'400', color:'#3A2F26', marginBottom:'4px' }}>Founder Dashboard</h1>
           <p style={{ color:'#9C8267', fontSize:'14px' }}>Privat — kun synlig for deg</p>
@@ -71,7 +79,7 @@ export default function FounderPage({ session }) {
         {[
           { v:profiles.length, l:'Totalt brukere' },
           { v:estates.length, l:'Boer opprettet' },
-          { v:items.length, l:'Gjenstander' },
+          { v:itemCount, l:'Gjenstander' },
           { v:planCounts.family||0, l:'Family-plan' },
           { v:planCounts.business||0, l:'Business-plan' },
           { v:planCounts.enterprise||0, l:'Enterprise' },
@@ -86,8 +94,8 @@ export default function FounderPage({ session }) {
       </div>
 
       {/* Tabs */}
-      <div style={{ display:'flex', gap:'4px', borderBottom:'1px solid #D9CFC0', marginBottom:'24px' }}>
-        {[['overview','Oversikt'],['users','Brukere'],['feedback','Tilbakemelding'],['estates','Boer']].map(([t,l])=>(
+      <div className="fd-tabs" style={{ display:'flex', gap:'4px', borderBottom:'1px solid #D9CFC0', marginBottom:'24px' }}>
+        {[['overview','Oversikt'],['users','Brukere'],['feedback','Tilbakemelding'],['estates','Boer'],['founders','Founders']].map(([t,l])=>(
           <button key={t} onClick={()=>setTab(t)} style={{
             padding:'10px 18px', border:'none', background:'none', cursor:'pointer',
             fontSize:'14px', fontFamily:'Karla, sans-serif',
@@ -98,7 +106,7 @@ export default function FounderPage({ session }) {
       </div>
 
       {tab==='overview' && (
-        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'20px' }}>
+        <div className="fd-grid" style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'20px' }}>
           <div style={{ background:'#fff', border:'1px solid #D9CFC0', borderRadius:'12px', padding:'24px' }}>
             <h3 style={{ fontFamily:'Fraunces, serif', fontSize:'16px', fontWeight:'400', color:'#3A2F26', marginBottom:'20px' }}>Brukervekst (siste 6 mnd)</h3>
             <ResponsiveContainer width="100%" height={180}>
@@ -141,7 +149,7 @@ export default function FounderPage({ session }) {
       )}
 
       {tab==='users' && (
-        <div style={{ background:'#fff', border:'1px solid #D9CFC0', borderRadius:'12px', overflow:'hidden' }}>
+        <div className="fd-table" style={{ background:'#fff', border:'1px solid #D9CFC0', borderRadius:'12px', overflow:'hidden' }}>
           <table style={{ width:'100%', borderCollapse:'collapse' }}>
             <thead>
               <tr style={{ background:'#FBF9F5', borderBottom:'1px solid #D9CFC0' }}>
@@ -164,8 +172,10 @@ export default function FounderPage({ session }) {
                     <select
                       value={p.plan || 'free'}
                       onChange={async (e) => {
-                        await supabase.from('profiles').update({ plan: e.target.value }).eq('user_id', p.user_id)
-                        setProfiles(prev => prev.map(x => x.user_id === p.user_id ? {...x, plan: e.target.value} : x))
+                        const plan = e.target.value
+                        const { error } = await setUserPlan(p.user_id, plan)
+                        if (error) return onToast?.('Kunne ikke endre plan.', 'error')
+                        setProfiles(prev => prev.map(x => x.user_id === p.user_id ? {...x, plan} : x))
                       }}
                       style={{ fontSize:'12px', border:'1px solid #D9CFC0', borderRadius:'6px', padding:'3px 8px', background:'#fff', cursor:'pointer', fontFamily:'Karla, sans-serif' }}
                     >
@@ -209,8 +219,10 @@ export default function FounderPage({ session }) {
         </div>
       )}
 
+      {tab==='founders' && <FounderManagement session={session} onToast={onToast} />}
+
       {tab==='estates' && (
-        <div style={{ background:'#fff', border:'1px solid #D9CFC0', borderRadius:'12px', overflow:'hidden' }}>
+        <div className="fd-table" style={{ background:'#fff', border:'1px solid #D9CFC0', borderRadius:'12px', overflow:'hidden' }}>
           <table style={{ width:'100%', borderCollapse:'collapse' }}>
             <thead>
               <tr style={{ background:'#FBF9F5', borderBottom:'1px solid #D9CFC0' }}>
@@ -228,7 +240,7 @@ export default function FounderPage({ session }) {
                     <span style={{ fontSize:'11px', background:e.status==='active'?'#DCE3D2':'#E8DFD0', color:e.status==='active'?'#3A5A30':'#5C4530', padding:'3px 8px', borderRadius:'20px' }}>{e.status||'active'}</span>
                   </td>
                   <td style={{ padding:'12px 16px', fontSize:'13px', color:'#9C8267' }}>{new Date(e.created_at).toLocaleDateString('nb-NO', { day:'numeric', month:'short' })}</td>
-                  <td style={{ padding:'12px 16px', fontSize:'13px', color:'#5F6E52', fontWeight:'500' }}>{items.filter(it=>it.estate_id===e.id).length}</td>
+                  <td style={{ padding:'12px 16px', fontSize:'13px', color:'#5F6E52', fontWeight:'500' }}>{e.item_count || 0}</td>
                 </tr>
               ))}
             </tbody>

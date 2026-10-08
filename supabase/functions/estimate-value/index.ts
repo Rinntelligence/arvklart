@@ -1,11 +1,7 @@
-import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
-
-const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY')
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
+// Anslår markedsverdi i NOK for en gjenstand (verdifall + AI-estimat).
+// Krever innlogget bruker og teller mot AI-kvoten (demoen: 5 forsøk per besøk). Bruker Claude Haiku.
+import { getUser, json, preflight } from '../_shared/http.ts'
+import { MODEL, aiErrorResponse, anthropic, claimAiCall, parseJsonReply } from '../_shared/ai.ts'
 
 // Depreciation rates per category
 const DEPRECIATION_RATES: Record<string, number> = {
@@ -19,6 +15,22 @@ const VALUE_FLOORS: Record<string, number> = {
   'Jewelry': 0.40, 'Collectibles': 0.50, 'Other': 0.10,
 }
 
+// Kategoriene i appen er norske og kan navngis fritt per bo; finn nærmeste tabellnøkkel.
+const CATEGORY_KEYWORDS: [RegExp, string][] = [
+  [/elektronikk|tv|data|telefon/i, 'Electronics'],
+  [/møbl|stol|bord|sofa/i, 'Furniture'],
+  [/kunst|maleri|bilde/i, 'Art & pictures'],
+  [/smykk|\bur\b|klokke|gull|sølv/i, 'Jewelry'],
+  [/bok|bøker/i, 'Books'],
+  [/kjøkken|porselen|servise|glass/i, 'Kitchen'],
+  [/klær|tekstil|tøy/i, 'Clothing & textiles'],
+  [/samle|antikk|minne|arvestykke/i, 'Collectibles'],
+  [/verktøy/i, 'Tools'],
+  [/sport|friluft/i, 'Sports & outdoors'],
+  [/dekor|pynt/i, 'Decorations'],
+]
+const categoryKey = (label = '') => CATEGORY_KEYWORDS.find(([re]) => re.test(label))?.[1] || 'Other'
+
 // Free price sources by category
 const PRICE_SOURCES: Record<string, string[]> = {
   'Electronics': ['finn.no', 'prisjakt.no', 'ebay.com'],
@@ -30,18 +42,29 @@ const PRICE_SOURCES: Record<string, string[]> = {
   'Other': ['finn.no', 'ebay.com'],
 }
 
-serve(async (req) => {
-  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
+Deno.serve(async (req) => {
+  const pre = preflight(req)
+  if (pre) return pre
 
   try {
-    const { title, description, category, condition, purchase_price, purchase_year, ai_identified_model } = await req.json()
+    const user = await getUser(req)
+    if (!user) return json({ success: false, error: 'Du må være logget inn' }, 401)
+
+    const { title, description, category, condition, purchase_price, purchase_year, ai_identified_model, lang } = await req.json()
+    // Begrunnelsen skrives på brukerens språk
+    const language = lang === 'en' ? 'English' : 'Norwegian (bokmål)'
+    if (typeof title !== 'string' || !title.trim()) return json({ success: false, error: 'Mangler navn på gjenstanden' }, 400)
+    const key = categoryKey(category)
+
+    const { denied, quota } = await claimAiCall(req, user, 'estimate-value')
+    if (denied) return denied
 
     // 1. Depreciation calc if we have purchase data
     let depreciationEstimate = null
     if (purchase_price && purchase_year) {
       const yearsOld = new Date().getFullYear() - parseInt(purchase_year)
-      const rate = DEPRECIATION_RATES[category] || 0.12
-      const floor = VALUE_FLOORS[category] || 0.10
+      const rate = DEPRECIATION_RATES[key] ?? 0.12
+      const floor = VALUE_FLOORS[key] ?? 0.10
       const depreciated = purchase_price * Math.pow(1 - rate, yearsOld)
       depreciationEstimate = {
         value: Math.max(depreciated, purchase_price * floor),
@@ -51,17 +74,10 @@ serve(async (req) => {
       }
     }
 
-    // 2. AI market estimate — use haiku (cheapest) for value, only sonnet for images
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': ANTHROPIC_API_KEY,
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001', // cheapest model — ~$0.001 per call
-        max_tokens: 600,
+    // 2. AI-estimat av markedsverdi
+    const message = await anthropic().messages.create({
+        model: MODEL,
+        max_tokens: 1024,
         messages: [{
           role: 'user',
           content: `You are an expert Norwegian estate appraiser. Estimate the current Norwegian market value (in NOK) for this item.
@@ -79,6 +95,8 @@ Use your knowledge of:
 - The specific model/brand if identifiable
 - Condition impact
 
+Write "reasoning" and "market_references" in ${language}.
+
 Respond ONLY with this JSON (no other text):
 {
   "low_nok": <number>,
@@ -92,14 +110,8 @@ Respond ONLY with this JSON (no other text):
   "category_trend": "appreciating|stable|depreciating"
 }`
         }]
-      })
     })
-
-    const data = await response.json()
-    const text = data.content[0].text
-    const jsonMatch = text.match(/\{[\s\S]*\}/)
-    if (!jsonMatch) throw new Error('No JSON in response')
-    const aiEstimate = JSON.parse(jsonMatch[0])
+    const aiEstimate = parseJsonReply(message)
 
     // Fill in search URLs with actual item title
     const searchTerm = encodeURIComponent(title.split(' ').slice(0, 4).join(' '))
@@ -108,9 +120,9 @@ Respond ONLY with this JSON (no other text):
       `https://www.ebay.com/sch/i.html?_nkw=${searchTerm}&LH_Sold=1&LH_Complete=1`,
     ]
 
-    const sources = PRICE_SOURCES[category] || PRICE_SOURCES['Other']
+    const sources = PRICE_SOURCES[key] || PRICE_SOURCES['Other']
 
-    return new Response(JSON.stringify({
+    return json({
       success: true,
       data: {
         depreciation: depreciationEstimate,
@@ -121,12 +133,10 @@ Respond ONLY with this JSON (no other text):
           high_nok: aiEstimate.high_nok,
           likely_nok: aiEstimate.likely_nok,
         }
-      }
-    }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
-
-  } catch (error) {
-    return new Response(JSON.stringify({ success: false, error: error.message }), {
-      status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      },
+      quota,
     })
+  } catch (error) {
+    return aiErrorResponse(error, 'estimate-value')
   }
 })

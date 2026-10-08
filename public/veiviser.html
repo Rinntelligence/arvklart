@@ -6,65 +6,36 @@
   <title>Veiviser — Arvklart</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,500;8..60,600;8..60,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Karla:wght@400;500;600;700&display=swap" rel="stylesheet">
 
 <style>
+  /* Arvklart-paletten: beige flater, salviegrønn aksent, mørk brun tekst og knapper */
   :root{
-    --bg: #F5F6F0;
+    --bg: #FBF9F5;              /* snø-lin */
     --surface: #FFFFFF;
-    --surface-alt: #FBF1DF;
-    --ink: #212B26;
-    --ink-muted: #5C6B63;
-    --ink-faint: #8A968F;
-    --primary: #1E3D3A;
-    --primary-strong: #14302C;
-    --primary-soft: #E6EDEA;
-    --primary-soft-border: #CFDCD7;
-    --accent: #A97C3F;
-    --accent-strong: #8E672F;
-    --accent-soft: #F3E3C8;
-    --border: #E2E0D4;
-    --shadow: 0 1px 2px rgba(30,61,58,0.06), 0 8px 24px -12px rgba(30,61,58,0.18);
+    --surface-alt: #F7F3EC;     /* lin */
+    --sand: #E8DFD0;            /* sand */
+    --ink: #3A2F26;             /* espresso */
+    --ink-muted: #7A6146;       /* kastanje */
+    --ink-faint: #9C8267;       /* kaffe latte */
+    --primary: #5F6E52;         /* salvie mørk */
+    --primary-strong: #3F4A37;  /* skoggrønn */
+    --primary-soft: #F1F3EC;
+    --primary-soft-border: #DCE3D2; /* salvie tåke */
+    --accent: #C9AE8E;          /* latte */
+    --accent-strong: #7A6146;   /* kastanje */
+    --accent-soft: #F7F3EC;     /* lin */
+    --border: #E8DFD0;          /* sand */
+    --border-strong: #D9CFC0;   /* lys sandgrå */
+    --btn: #3A2F26;             /* espresso */
+    --btn-hover: #2A211A;       /* bark */
+    --btn-ink: #FBF9F5;
+    --error: #9B3B2E;
+    --shadow: 0 1px 2px rgba(58,47,38,0.05), 0 8px 24px -12px rgba(58,47,38,0.16);
     --radius-s: 10px;
     --radius-m: 14px;
     --radius-l: 20px;
-  }
-
-  @media (prefers-color-scheme: dark){
-    :root:not([data-theme="light"]){
-      --bg: #131C19;
-      --surface: #1A2521;
-      --surface-alt: #2B2412;
-      --ink: #ECEEE8;
-      --ink-muted: #A6B2AB;
-      --ink-faint: #78857E;
-      --primary: #8FC1B3;
-      --primary-strong: #A9D3C6;
-      --primary-soft: #223330;
-      --primary-soft-border: #33463F;
-      --accent: #D9A758;
-      --accent-strong: #E7BC78;
-      --accent-soft: #3A2E17;
-      --border: #2B3733;
-      --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 12px 28px -14px rgba(0,0,0,0.5);
-    }
-  }
-  :root[data-theme="dark"]{
-    --bg: #131C19;
-    --surface: #1A2521;
-    --surface-alt: #2B2412;
-    --ink: #ECEEE8;
-    --ink-muted: #A6B2AB;
-    --ink-faint: #78857E;
-    --primary: #8FC1B3;
-    --primary-strong: #A9D3C6;
-    --primary-soft: #223330;
-    --primary-soft-border: #33463F;
-    --accent: #D9A758;
-    --accent-strong: #E7BC78;
-    --accent-soft: #3A2E17;
-    --border: #2B3733;
-    --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 12px 28px -14px rgba(0,0,0,0.5);
+    color-scheme: light;
   }
 
   *{ box-sizing: border-box; }
@@ -72,7 +43,7 @@
   body{
     background: var(--bg);
     color: var(--ink);
-    font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-family: "Karla", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     line-height: 1.5;
     -webkit-font-smoothing: antialiased;
   }
@@ -87,7 +58,7 @@
   }
 
   h1,h2,h3{
-    font-family: "Source Serif 4", Georgia, serif;
+    font-family: "Fraunces", Georgia, serif;
     color: var(--ink);
     text-wrap: balance;
     margin: 0;
@@ -102,20 +73,20 @@
   .mark{
     width: 34px; height: 34px;
     border-radius: 9px;
-    background: var(--primary);
-    color: var(--surface);
+    background: var(--btn);
+    color: var(--btn-ink);
     display:flex; align-items:center; justify-content:center;
     flex-shrink:0;
   }
   .mark svg{ width:18px; height:18px; }
   .wordmark{
-    font-family: "Source Serif 4", Georgia, serif;
+    font-family: "Fraunces", Georgia, serif;
     font-weight: 600;
     font-size: 1.05rem;
     letter-spacing: 0.01em;
     color: var(--ink);
   }
-  .wordmark span{ color: var(--ink-muted); font-family: "Inter", sans-serif; font-weight: 400; font-size: 0.85rem; }
+  .wordmark span{ color: var(--ink-muted); font-family: "Karla", sans-serif; font-weight: 400; font-size: 0.85rem; }
 
   .intro{ margin-bottom: 44px; }
   .eyebrow{
@@ -135,39 +106,6 @@
   .section-head h2{ font-size: 1.3rem; font-weight: 600; }
   .section-head p{ color: var(--ink-muted); font-size: 0.92rem; margin: 6px 0 0; max-width: 58ch; }
 
-  .role-grid{
-    display:grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 10px;
-  }
-  @media (max-width: 640px){ .role-grid{ grid-template-columns: repeat(2, 1fr); } }
-  .role-btn{
-    font-family: inherit;
-    font-size: 0.88rem;
-    font-weight: 500;
-    color: var(--ink);
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-m);
-    padding: 14px 12px;
-    cursor: pointer;
-    display:flex;
-    flex-direction: column;
-    align-items:center;
-    gap: 8px;
-    text-align:center;
-    transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease, transform 0.1s ease;
-  }
-  .role-btn svg{ width:20px; height:20px; stroke: var(--ink-muted); transition: stroke 0.15s ease; }
-  .role-btn:hover{ border-color: var(--primary-soft-border); background: var(--primary-soft); }
-  .role-btn:focus-visible{ outline: 2px solid var(--primary); outline-offset: 2px; }
-  .role-btn.active{
-    background: var(--primary);
-    border-color: var(--primary);
-    color: var(--surface);
-  }
-  .role-btn.active svg{ stroke: var(--surface); }
-
   .timeline{ display:flex; flex-direction:column; }
   .phase{
     position: relative;
@@ -178,7 +116,7 @@
     overflow: hidden;
     box-shadow: var(--shadow);
   }
-  .phase.is-focus{ border-color: var(--accent-soft); }
+  .phase.is-focus{ border-color: var(--border-strong); }
   .phase-head{
     display:flex;
     align-items:center;
@@ -201,9 +139,9 @@
     display:flex; align-items:center; justify-content:center;
     font-size: 0.82rem;
     font-weight: 600;
-    font-family: "Source Serif 4", serif;
+    font-family: "Fraunces", Georgia, serif;
   }
-  .phase.is-focus .phase-num{ background: var(--accent-soft); color: var(--accent-strong); }
+  .phase.is-focus .phase-num{ background: var(--sand); color: var(--accent-strong); }
   .phase-title-wrap{ flex:1; min-width:0; }
   .phase-title{ font-weight: 600; font-size: 0.98rem; }
   .phase-sub{ color: var(--ink-muted); font-size: 0.82rem; margin-top: 2px; }
@@ -213,7 +151,7 @@
     letter-spacing: 0.04em;
     text-transform: uppercase;
     color: var(--accent-strong);
-    background: var(--accent-soft);
+    background: var(--sand);
     padding: 4px 9px;
     border-radius: 999px;
     white-space: nowrap;
@@ -320,7 +258,7 @@
     display:flex;
     align-items:flex-start;
     gap: 10px;
-    background: var(--accent-soft);
+    background: var(--sand);
     border-radius: var(--radius-s);
     padding: 12px 14px;
     margin-bottom: 16px;
@@ -338,21 +276,21 @@
   .gs-head{ display:flex; align-items:flex-start; gap: 12px; }
   .gs-head svg{ width:20px; height:20px; stroke: var(--primary); flex-shrink:0; margin-top:1px; }
   .gs-head-text{ flex:1; }
-  .gs-head-text h4{ margin:0 0 3px; font-size: 0.92rem; font-weight:600; color: var(--ink); font-family:"Inter",sans-serif; }
+  .gs-head-text h4{ margin:0 0 3px; font-size: 0.92rem; font-weight:600; color: var(--ink); font-family:"Karla",sans-serif; }
   .gs-head-text p{ margin:0; font-size: 0.82rem; color: var(--ink-muted); }
   .gs-start-btn{
     margin-top: 12px;
     font-family: inherit;
     font-size: 0.85rem;
     font-weight: 600;
-    color: var(--surface);
-    background: var(--primary);
+    color: var(--btn-ink);
+    background: var(--btn);
     border: none;
     border-radius: 999px;
     padding: 9px 16px;
     cursor: pointer;
   }
-  .gs-start-btn:hover{ background: var(--primary-strong); }
+  .gs-start-btn:hover{ background: var(--btn-hover); }
 
   .gs-quiz{ margin-top: 14px; }
   .gs-progress{
@@ -424,41 +362,8 @@
     padding-top: 16px;
   }
   .grief-note svg{ width:18px; height:18px; stroke: var(--ink-faint); flex-shrink:0; margin-top:2px; }
-  .grief-note h4{ margin: 0 0 4px; font-size: 0.86rem; font-weight:600; color: var(--ink); font-family: "Inter", sans-serif; }
+  .grief-note h4{ margin: 0 0 4px; font-size: 0.86rem; font-weight:600; color: var(--ink); font-family: "Karla", sans-serif; }
   .grief-note p{ margin:0; font-size: 0.84rem; color: var(--ink-muted); line-height:1.55; }
-
-  .rights-empty{
-    border: 1px dashed var(--border);
-    border-radius: var(--radius-m);
-    padding: 22px;
-    color: var(--ink-muted);
-    font-size: 0.92rem;
-    text-align:center;
-  }
-  .rights-card{
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-m);
-    padding: 22px 24px;
-    box-shadow: var(--shadow);
-    display:flex;
-    gap: 16px;
-  }
-  .rights-card svg{ width:24px; height:24px; stroke: var(--primary); flex-shrink:0; margin-top: 2px; }
-  .rights-card h3{ font-size: 1.05rem; font-weight:600; margin-bottom:6px; }
-  .rights-card p{ margin:0; color: var(--ink-muted); font-size: 0.92rem; }
-  .rights-card .law-ref{
-    display:inline-block; margin-top:10px;
-    font-size: 0.72rem; color: var(--ink-faint);
-    letter-spacing: 0.02em;
-  }
-  .rights-footnote{
-    margin-top: 10px;
-    font-size: 0.8rem;
-    color: var(--ink-muted);
-    padding: 0 2px;
-  }
-  .rights-footnote em{ font-style: normal; font-weight: 600; color: var(--ink); }
 
   .glossary-grid{
     display:flex;
@@ -531,7 +436,7 @@
   .resource-card .rc-arrow{ flex-shrink:0; width:16px; height:16px; stroke: var(--ink-faint); }
 
   .cta-band{
-    background: var(--primary);
+    background: var(--btn);
     border-radius: var(--radius-l);
     padding: clamp(28px, 5vw, 40px);
     display:flex;
@@ -546,7 +451,7 @@
     font-family: inherit;
     font-size: 0.95rem;
     font-weight: 600;
-    color: var(--primary-strong);
+    color: var(--ink);
     background: var(--surface);
     border: none;
     border-radius: 999px;
@@ -557,7 +462,7 @@
     gap:8px;
     transition: transform 0.1s ease, background 0.15s ease;
   }
-  .cta-btn:hover{ background: var(--accent-soft); }
+  .cta-btn:hover{ background: var(--sand); }
   .cta-btn svg{ width:16px; height:16px; }
 
   footer.note{
@@ -570,6 +475,266 @@
   .visually-hidden{
     position:absolute; width:1px; height:1px; overflow:hidden;
     clip:rect(0 0 0 0); white-space:nowrap;
+  }
+
+  /* ── Arveveiviser ─────────────────────────────────────────── */
+  #arv{ scroll-margin-top: 16px; }
+  .aw-card{
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-l);
+    box-shadow: var(--shadow);
+    padding: clamp(20px, 4.5vw, 36px);
+    animation: aw-in .25s ease;
+  }
+  @keyframes aw-in{ from{ opacity:0; transform: translateY(6px); } to{ opacity:1; transform:none; } }
+  .aw-card h2{ font-size: clamp(1.45rem, 3.6vw, 1.85rem); font-weight: 600; margin-bottom: 10px; }
+  .aw-intro p{ color: var(--ink-muted); max-width: 56ch; margin: 0 0 18px; }
+  .aw-intro-list{ list-style:none; padding:0; margin: 0 0 24px; display:grid; gap: 8px; }
+  .aw-intro-list li{ display:flex; gap:10px; align-items:flex-start; font-size: .92rem; }
+  .aw-intro-list svg{ width:18px; height:18px; stroke: var(--primary); flex-shrink:0; margin-top:2px; }
+  .aw-actions, .aw-nav{ display:flex; flex-wrap:wrap; gap: 10px; align-items:center; }
+  .aw-nav{ justify-content: space-between; margin-top: 26px; padding-top: 18px; border-top: 1px solid var(--border); }
+  .aw-btn{
+    font-family: inherit; font-size: .95rem; font-weight: 600;
+    border-radius: 999px; padding: 12px 22px; cursor:pointer;
+    display:inline-flex; align-items:center; gap: 8px;
+    border: 1px solid transparent; transition: background .15s ease, border-color .15s ease;
+  }
+  .aw-btn svg{ width:16px; height:16px; }
+  .aw-btn.primary{ background: var(--btn); color: var(--btn-ink); }
+  .aw-btn.primary:hover{ background: var(--btn-hover); }
+  .aw-btn.ghost{ background: var(--surface); color: var(--ink); border-color: var(--border-strong); }
+  .aw-btn.ghost:hover{ border-color: var(--primary-soft-border); color: var(--ink); }
+  .aw-btn.small{ padding: 7px 14px; font-size: .82rem; background: var(--btn); color: var(--btn-ink); margin-top: 6px; }
+  .aw-btn:focus-visible, .aw-option:focus-visible, .aw-seg button:focus-visible, .aw-link:focus-visible, .aw-choice button:focus-visible{ outline: 2px solid var(--primary); outline-offset: 2px; }
+  .aw-link{ background:none; border:none; padding: 0; margin-top: 14px; font-family: inherit; font-size: .84rem; color: var(--ink-muted); text-decoration: underline; cursor:pointer; display:inline-flex; align-items:center; gap:5px; }
+  .aw-link svg{ width:13px; height:13px; }
+  .aw-link.inline{ margin: 0 0 0 4px; font-size: .8rem; }
+
+  .aw-progress{ margin-bottom: 22px; }
+  .aw-progress-top{ display:flex; justify-content: space-between; font-size: .76rem; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--ink-faint); margin-bottom: 8px; }
+  .aw-progress-section{ color: var(--accent-strong); }
+  .aw-bar{ height: 6px; background: var(--primary-soft); border-radius: 999px; overflow:hidden; }
+  .aw-bar span{ display:block; height:100%; background: var(--primary); border-radius: 999px; transition: width .3s ease; }
+  .aw-steps{ list-style:none; padding:0; margin: 10px 0 0; display:flex; flex-wrap:wrap; gap: 4px 14px; font-size: .74rem; color: var(--ink-faint); }
+  .aw-steps li.done{ color: var(--primary); }
+  .aw-steps li.current{ color: var(--ink); font-weight: 600; }
+
+  .aw-title{ font-size: clamp(1.2rem, 3vw, 1.45rem); font-weight: 600; margin-bottom: 8px; outline: none; }
+  .aw-why{ color: var(--ink-muted); font-size: .9rem; margin: 0 0 20px; max-width: 62ch; }
+  .aw-why span{ font-weight: 600; color: var(--ink); }
+  .aw-error{ color: var(--error); font-size: .88rem; font-weight: 500; margin: 12px 0 0; }
+
+  .aw-options{ display:grid; gap: 10px; }
+  .aw-option{
+    display:flex; gap: 14px; align-items:flex-start; text-align:left;
+    font-family: inherit; color: var(--ink); background: var(--surface);
+    border: 1.5px solid var(--border-strong); border-radius: var(--radius-m);
+    padding: 15px 16px; cursor:pointer; transition: border-color .15s ease, background .15s ease;
+  }
+  .aw-option:hover{ border-color: var(--primary-soft-border); background: var(--primary-soft); }
+  .aw-option.selected{ border-color: var(--primary); background: var(--primary-soft); }
+  .aw-option-label{ display:block; font-weight: 600; font-size: .96rem; }
+  .aw-option-hint{ display:block; font-size: .84rem; color: var(--ink-muted); margin-top: 2px; }
+  .aw-radio{ width: 20px; height: 20px; border-radius: 50%; border: 2px solid var(--ink-faint); flex-shrink:0; margin-top: 1px; position:relative; }
+  .aw-option.selected .aw-radio{ border-color: var(--primary); }
+  .aw-option.selected .aw-radio::after{ content:''; position:absolute; inset: 3px; border-radius:50%; background: var(--primary); }
+  .aw-checkbox{ width: 20px; height: 20px; border-radius: 6px; border: 2px solid var(--ink-faint); flex-shrink:0; margin-top:1px; display:flex; align-items:center; justify-content:center; }
+  .aw-checkbox svg{ width: 13px; height: 13px; stroke: var(--surface); opacity: 0; }
+  .aw-option.selected .aw-checkbox{ background: var(--primary); border-color: var(--primary); }
+  .aw-option.selected .aw-checkbox svg{ opacity: 1; }
+
+  .aw-date, .aw-name, .aw-count, .aw-money-field input{
+    font-family: inherit; font-size: 1rem; color: var(--ink); background: var(--surface);
+    border: 1.5px solid var(--border-strong); border-radius: var(--radius-s); padding: 11px 12px;
+  }
+  .aw-date:focus, .aw-name:focus, .aw-count:focus, .aw-money-field input:focus{ outline: none; border-color: var(--primary); }
+  .aw-count{ width: 90px; }
+  .aw-date{ min-width: 200px; }
+  .aw-money{ display:flex; justify-content: space-between; align-items:center; gap: 14px; padding: 9px 0; border-bottom: 1px solid var(--border); }
+  .aw-money:last-child{ border-bottom: none; }
+  .aw-money-label{ font-size: .92rem; }
+  .aw-money-label small{ display:block; color: var(--ink-faint); font-size: .78rem; }
+  .aw-money-field{ display:flex; align-items:center; gap: 6px; flex-shrink:0; }
+  .aw-money-field input{ width: 150px; text-align: right; }
+  .aw-money-field span{ color: var(--ink-faint); font-size: .85rem; }
+  @media (max-width: 520px){
+    .aw-money{ flex-direction: column; align-items: stretch; gap: 6px; }
+    .aw-money-field input{ width: 100%; }
+  }
+  .aw-group{ border: 1px solid var(--border); border-radius: var(--radius-m); padding: 6px 16px 8px; margin: 0 0 14px; }
+  .aw-group legend{ font-weight: 600; font-size: .86rem; padding: 0 6px; color: var(--ink); }
+  .aw-live{ display:flex; flex-wrap:wrap; gap: 6px 16px; justify-content:flex-end; font-size: .88rem; color: var(--ink-muted); padding: 6px 2px; }
+  .aw-live strong{ color: var(--ink); }
+  .aw-hint{ font-size: .84rem; color: var(--ink-muted); margin: 10px 0 0; }
+  .aw-hint-box{ background: var(--primary-soft); border-radius: var(--radius-s); padding: 12px 14px; margin: 0 0 16px; color: var(--ink); }
+
+  .aw-rows{ display:grid; gap: 12px; }
+  .aw-row{ border: 1px solid var(--border); border-radius: var(--radius-m); padding: 14px 16px; display:grid; gap: 12px; background: var(--bg); }
+  .aw-row-head{ display:flex; gap: 10px; align-items:center; }
+  .aw-row-head .aw-name{ flex:1; min-width: 0; }
+  .aw-row-title{ font-weight: 600; }
+  .aw-sub{ display:grid; gap: 10px; border-top: 1px dashed var(--border); padding-top: 12px; }
+  .aw-subrow{ display:grid; gap: 10px; padding: 12px; border-radius: var(--radius-s); background: var(--surface); border: 1px solid var(--border); }
+  .aw-field{ display:grid; gap: 7px; font-size: .9rem; }
+  .aw-row, .aw-sub, .aw-subrow, .aw-field, .aw-rows{ min-width: 0; }
+  .aw-row-head .aw-name{ width: 100%; }
+  .aw-field small{ color: var(--ink-faint); font-size: .78rem; margin-left: 4px; }
+  .aw-seg{ display:flex; flex-wrap:wrap; gap: 6px; }
+  .aw-seg button{
+    font-family: inherit; font-size: .86rem; font-weight: 500; cursor:pointer;
+    padding: 8px 14px; border-radius: 999px; border: 1.5px solid var(--border-strong);
+    background: var(--surface); color: var(--ink); max-width: 100%; white-space: normal; text-align: left;
+  }
+  .aw-seg button.on{ background: var(--primary); border-color: var(--primary); color: var(--surface); }
+  .aw-check{ display:flex; gap: 8px; align-items:center; font-size: .88rem; cursor:pointer; }
+  .aw-check input{ width: 18px; height: 18px; accent-color: var(--primary); }
+  .aw-add{ font-family: inherit; font-size: .88rem; font-weight: 600; color: var(--primary); background: none; border: 1.5px dashed var(--primary-soft-border); border-radius: var(--radius-m); padding: 11px; cursor:pointer; display:flex; justify-content:center; align-items:center; gap: 6px; }
+  .aw-add svg{ width: 15px; height: 15px; }
+  .aw-add:hover{ background: var(--primary-soft); }
+  .aw-remove{ font-family: inherit; font-size: .8rem; color: var(--ink-muted); background:none; border:none; text-decoration: underline; cursor:pointer; }
+
+  .aw-more{ margin-top: 16px; border-top: 1px solid var(--border); padding-top: 12px; }
+  .aw-more summary{ cursor:pointer; font-weight: 600; font-size: .88rem; color: var(--primary); }
+  .aw-more p{ font-size: .88rem; color: var(--ink-muted); margin: 10px 0; }
+  .aw-sources{ display:flex; flex-wrap:wrap; gap: 6px; margin-top: 8px; }
+  .aw-term{ font: inherit; color: inherit; background: none; border: none; padding: 0; border-bottom: 1.5px dotted var(--accent); cursor: help; }
+  .aw-term-pop{ display:block; margin: 6px 0; padding: 10px 12px; background: var(--accent-soft); border: 1px solid var(--sand); border-radius: var(--radius-s); font-size: .84rem; color: var(--ink); font-weight: 400; }
+  .aw-title .aw-term-pop{ font-family: "Karla", sans-serif; font-size: .9rem; line-height: 1.5; letter-spacing: 0; }
+
+  .aw-review{ margin: 0; display:grid; gap: 0; }
+  .aw-review > div{ display:grid; grid-template-columns: 1fr auto; gap: 2px 12px; padding: 12px 0; border-bottom: 1px solid var(--border); }
+  .aw-review dt{ font-size: .84rem; color: var(--ink-muted); }
+  .aw-review dd{ margin: 0; font-weight: 600; font-size: .92rem; grid-column: 1; }
+  .aw-review .aw-link{ grid-column: 2; grid-row: 1 / span 2; align-self:center; margin: 0; }
+
+  .aw-result .aw-disclaimer{ font-size: .82rem; color: var(--ink-muted); margin: 0 0 22px; }
+  .aw-summary{ display:grid; gap: 10px; margin-bottom: 26px; }
+  .aw-summary-item{ display:flex; gap: 14px; background: var(--primary-soft); border: 1px solid var(--primary-soft-border); border-radius: var(--radius-m); padding: 16px 18px; }
+  .aw-summary-item h4{ margin: 0 0 3px; font-size: .78rem; text-transform: uppercase; letter-spacing: .05em; color: var(--primary); }
+  .aw-summary-item p{ margin: 0; font-size: .98rem; font-weight: 500; }
+  .aw-num{ width: 28px; height: 28px; border-radius: 50%; background: var(--primary); color: var(--surface); display:flex; align-items:center; justify-content:center; font-family: "Fraunces", Georgia, serif; font-weight: 600; flex-shrink: 0; }
+  .aw-block{ margin-top: 30px; }
+  .aw-block > h3, .aw-method summary h3{ font-size: 1.2rem; font-weight: 600; margin-bottom: 10px; }
+  .aw-block p{ font-size: .94rem; margin: 0 0 8px; }
+  .aw-block h4{ font-size: .95rem; margin: 18px 0 8px; font-family: "Karla", sans-serif; }
+  .aw-lead{ font-size: 1rem !important; }
+  .aw-assumptions{ margin-top: 14px; background: var(--accent-soft); border: 1px solid var(--sand); border-radius: var(--radius-m); padding: 14px 18px; }
+  .aw-assumptions h4{ margin: 0 0 6px; }
+  .aw-assumptions ul{ margin: 0; padding-left: 18px; font-size: .9rem; }
+  .aw-assumptions li{ margin-bottom: 4px; }
+
+  .aw-flow{ border: 1px solid var(--border); border-radius: var(--radius-m); overflow:hidden; margin: 14px 0; }
+  .aw-flow-row{ display:flex; justify-content: space-between; gap: 12px; padding: 10px 16px; font-size: .9rem; border-bottom: 1px solid var(--border); }
+  .aw-flow-row:last-child{ border-bottom: none; }
+  .aw-flow-row strong{ white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .aw-flow-row.sum{ background: var(--bg); font-weight: 600; }
+  .aw-flow-row.keep{ color: var(--ink-muted); font-style: italic; }
+  .aw-flow-row.total{ background: var(--btn); color: var(--btn-ink); font-weight: 600; }
+
+  .aw-heirs{ display:grid; gap: 10px; margin: 14px 0; }
+  .aw-heir{ border: 1px solid var(--border); border-radius: var(--radius-m); padding: 14px 16px; background: var(--surface); }
+  .aw-heir.partner{ border-color: var(--primary-soft-border); background: var(--primary-soft); }
+  .aw-heir.testament{ border-style: dashed; }
+  .aw-heir-top{ display:flex; justify-content: space-between; gap: 12px; align-items:flex-start; }
+  .aw-heir-name{ font-weight: 600; }
+  .aw-heir-rel{ font-size: .8rem; color: var(--ink-muted); }
+  .aw-heir-amount{ text-align:right; font-family: "Fraunces", Georgia, serif; font-weight: 600; font-size: 1.15rem; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .aw-heir-amount small{ display:block; font-family: "Karla", sans-serif; font-weight: 500; font-size: .76rem; color: var(--ink-muted); }
+  .aw-heir-bar{ height: 6px; background: var(--bg); border-radius: 999px; margin-top: 10px; overflow:hidden; }
+  .aw-heir-bar span{ display:block; height: 100%; background: var(--accent); border-radius: 999px; }
+  .aw-heir.partner .aw-heir-bar span{ background: var(--primary); }
+
+  .aw-choice{ display:grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 12px; }
+  @media (max-width: 640px){ .aw-choice{ grid-template-columns: 1fr; } }
+  .aw-choice button{ font-family: inherit; text-align:left; cursor:pointer; color: var(--ink); background: var(--surface); border: 1.5px solid var(--border-strong); border-radius: var(--radius-m); padding: 14px 16px; display:grid; gap: 3px; }
+  .aw-choice button:hover{ border-color: var(--primary-soft-border); background: var(--primary-soft); }
+  .aw-choice button.on{ border-color: var(--primary); background: var(--primary-soft); }
+  .aw-choice strong{ font-size: .98rem; }
+  .aw-choice span{ font-size: .82rem; color: var(--ink-muted); }
+
+  .aw-cols, .aw-compare{ display:grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 640px){ .aw-cols, .aw-compare{ grid-template-columns: 1fr; } }
+  .aw-compare-col{ border: 1px solid var(--border); border-radius: var(--radius-m); padding: 4px 18px 14px; }
+  .aw-list{ margin: 0; padding-left: 18px; font-size: .9rem; }
+  .aw-list li{ margin-bottom: 6px; }
+
+  .aw-notice{ display:flex; gap: 12px; padding: 14px 16px; border-radius: var(--radius-m); margin: 10px 0; border: 1px solid var(--border); background: var(--surface); }
+  .aw-notice-icon svg{ width: 20px; height: 20px; stroke: var(--primary); }
+  .aw-notice h4{ margin: 0 0 4px !important; font-size: .95rem; }
+  .aw-notice p{ font-size: .9rem; color: var(--ink-muted); margin: 0; }
+  .aw-notice .aw-more{ margin-top: 8px; padding-top: 8px; }
+  .aw-notice.warning{ background: var(--accent-soft); border-color: var(--sand); }
+  .aw-notice.warning .aw-notice-icon svg{ stroke: var(--accent-strong); }
+  .aw-notice.warning p{ color: var(--ink); }
+  .aw-notice.critical{ border: 1.5px solid var(--accent); background: var(--accent-soft); }
+  .aw-notice.critical .aw-notice-icon svg{ stroke: var(--accent-strong); }
+  .aw-notice.critical p{ color: var(--ink); }
+  .aw-notice p + p{ margin-top: 6px; }
+  .aw-flag{ margin-top: 16px; }
+  .aw-flag .aw-flag-after{ color: var(--ink-muted); font-size: .84rem; }
+  .aw-flag .aw-btn{ margin-top: 12px; }
+  .aw-flag.attention{ box-shadow: 0 0 0 3px var(--accent); }
+  .aw-flag .aw-flag-need{ margin-top: 8px; font-weight: 600; color: var(--accent-strong); }
+  .aw-flag .aw-flag-done{ display:flex; align-items:center; gap: 6px; margin-top: 8px; font-size: .82rem; color: var(--ink-muted); }
+  .aw-flag .aw-flag-done svg{ width: 14px; height: 14px; stroke: var(--primary); }
+  .aw-flag-tag{ display:inline-flex; align-items:center; gap: 4px; margin-left: 8px; padding: 1px 8px; border-radius: 999px; background: var(--accent-soft); color: var(--accent-strong); font-size: .74rem; font-weight: 600; white-space: nowrap; vertical-align: middle; }
+  .aw-flag-tag svg{ width: 12px; height: 12px; stroke: currentColor; }
+  .aw-reasons{ margin: 10px 0 12px; padding-left: 20px; font-size: .9rem; }
+  .aw-reasons li{ margin-bottom: 12px; }
+  .aw-reasons li strong{ display:block; margin-bottom: 2px; }
+  .aw-reasons .aw-link.inline{ margin: 2px 0 0; }
+
+  .aw-timeline{ list-style:none; counter-reset: step; padding: 0; margin: 12px 0 0; }
+  .aw-timeline li{ counter-increment: step; position: relative; padding: 0 0 18px 44px; }
+  .aw-timeline li::before{ content: counter(step); position:absolute; left: 0; top: 0; width: 28px; height: 28px; border-radius: 50%; background: var(--primary-soft); color: var(--primary); font-weight: 600; font-size: .85rem; display:flex; align-items:center; justify-content:center; }
+  .aw-timeline li::after{ content:''; position:absolute; left: 13.5px; top: 30px; bottom: 2px; width: 1px; background: var(--border); }
+  .aw-timeline li:last-child::after{ display:none; }
+  .aw-timeline h4{ margin: 3px 0 4px !important; }
+  .aw-timeline p{ color: var(--ink-muted); font-size: .9rem; }
+
+  .aw-method{ border-top: 1px solid var(--border); padding-top: 16px; }
+  .aw-method summary{ cursor:pointer; list-style: none; }
+  .aw-method summary::-webkit-details-marker{ display:none; }
+  .aw-method summary h3{ display:inline; color: var(--primary); }
+  .aw-method summary h3::after{ content: ' ▾'; font-size: .8em; }
+  .aw-method[open] summary h3::after{ content: ' ▴'; }
+  .aw-method-list{ padding-left: 20px; font-size: .9rem; }
+  .aw-method-list li{ margin-bottom: 10px; }
+  .aw-source-list{ padding-left: 18px; font-size: .86rem; }
+  .aw-source-list a{ color: var(--primary); }
+  .aw-source-list small{ color: var(--ink-faint); }
+  .aw-result-nav{ justify-content: flex-start; }
+  .aw-src-line{ font-size: .76rem !important; color: var(--ink-faint) !important; margin: 4px 0 0 !important; }
+  .aw-src-line a{ color: var(--ink-muted); }
+
+
+  .aw-toolbar{ display:flex; flex-wrap:wrap; gap: 8px; margin: -8px 0 22px; }
+  .aw-btn.small-ghost{ padding: 8px 14px; font-size: .84rem; }
+  .aw-btn:disabled{ opacity: .6; cursor: progress; }
+  a.aw-btn{ text-decoration: none; }
+  .aw-quicklinks{ display:flex; flex-wrap:wrap; gap: 4px 18px; }
+  .aw-steps li button{ font: inherit; color: inherit; background: none; border: none; padding: 0; cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
+  .aw-review-section{ margin: 22px 0 2px; font-size: .74rem; text-transform: uppercase; letter-spacing: .06em; color: var(--accent-strong); font-family: "Karla", sans-serif; }
+  .aw-save{ background: var(--primary-soft); border: 1px solid var(--primary-soft-border); border-radius: var(--radius-m); padding: 18px 20px; }
+  .aw-save > h3{ margin-bottom: 6px !important; }
+  .aw-save .aw-actions{ margin-top: 12px; }
+  .aw-save .aw-link{ margin-top: 0; }
+  .aw-save-status{ font-size: .84rem !important; color: var(--ink-muted); }
+  .aw-save-status.dirty{ color: var(--accent-strong); font-weight: 600; }
+  .aw-save-msg{ font-weight: 600; padding: 10px 12px; border-radius: var(--radius-s); }
+  .aw-save-msg.ok{ background: var(--surface); color: var(--primary); }
+  .aw-save-msg.error{ background: var(--accent-soft); color: var(--ink); }
+  /* Overskrifter i Fraunces med rolig vekt, som i resten av Arvklart */
+  :root h1, :root h2, :root h3{ font-weight: 500; letter-spacing: -0.005em; }
+  :root .aw-num, :root .phase-num, :root .aw-heir-amount{ font-weight: 500; }
+
+  @media print{
+    body{ background: #fff; }
+    .masthead, #timeline, #glossary, #resources, #cta, footer.note, .aw-nav, .aw-choice, .aw-link, .aw-toolbar, .aw-save{ display:none !important; }
+    .aw-card{ box-shadow:none; border:none; padding:0; }
+    .aw-method{ display:block; }
   }
 </style>
 </head>
@@ -587,15 +752,11 @@
   <div class="intro">
     <span class="eyebrow">Om arveprosessen</span>
     <h1>Fra dødsfall til fordelt bo — steg for steg</h1>
-    <p>En kort oversikt over hva som skjer, hva som forventes av deg, og hvilke rettigheter som gjelder. Klikk deg videre der du trenger mer detalj.</p>
+    <p>Finn ut hvem som arver og hvor mye, basert på din situasjon. Under finner du også en oversikt over hele prosessen, ord og ressurser.</p>
   </div>
 
-  <section id="roles">
-    <div class="section-head">
-      <h2>Hvem er du i denne prosessen?</h2>
-      <p>Arverekkefølgen er forskjellig avhengig av din rolle. Velg et alternativ for å se reglene som gjelder deg.</p>
-    </div>
-    <div class="role-grid" id="roleGrid"></div>
+  <section id="arv" aria-label="Arveveiviser">
+    <div id="arvWizard"><noscript>Arveveiviseren krever JavaScript.</noscript></div>
   </section>
 
   <section id="timeline">
@@ -604,14 +765,6 @@
       <p>Klikk på en fase for å se hva som skjer automatisk, og hva som krever handling fra deg.</p>
     </div>
     <div class="timeline" id="timelineWrap"></div>
-  </section>
-
-  <section id="rights">
-    <div class="section-head">
-      <h2>Arverettigheter</h2>
-      <p>Basert på rollen du valgte over.</p>
-    </div>
-    <div id="rightsWrap"></div>
   </section>
 
   <section id="glossary">
@@ -635,7 +788,7 @@
       <h2>Klar for å fordele eiendelene?</h2>
       <p>Når boet er kartlagt og verdsatt, gjør Arvklart selve fordelingen ryddig, sporbar og rettferdig for alle arvinger.</p>
       <button class="cta-btn" id="ctaBtn" type="button">
-        Tilbake til boet
+        <span id="ctaLabel">Tilbake til boet</span>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
       </button>
     </div>
@@ -734,13 +887,6 @@
     wireStart();
   }
 
-  const ROLES = [
-    { id: 'ektefelle', label: 'Ektefelle', icon: ICONS.spouse },
-    { id: 'samboer', label: 'Samboer', icon: ICONS.partner },
-    { id: 'barn', label: 'Barn', icon: ICONS.child },
-    { id: 'annet', label: 'Annen pårørende', icon: ICONS.other }
-  ];
-
   const PHASES = [
     { title: 'Rett etter dødsfallet', sub: 'Registrering og de første avklaringene', icon: ICONS.docReg, focus: false, griefNote: 'Sorg er en helt naturlig reaksjon, og den tar den tiden den tar. Mange opplever tretthet, uro eller skyldfølelse — det er vanlig. Erfaring viser at det hjelper å snakke med noen: familie, venner, fastlegen, eller et kirkekontor, som ofte tilbyr sorgsamtaler uavhengig av livssyn.',
       groups: [
@@ -763,7 +909,7 @@
       groups: [
         { label: 'Krever handling fra deg', type: 'manual', items: [
           { text: 'Avklare om boet skal skiftes privat eller offentlig.', what: 'Privat skifte betyr at arvingene selv tar hånd om fordelingen. Offentlig skifte betyr at tingretten oppnevner en bostyrer som gjør det for dere. For små bo finnes også forenklede former: bo av liten verdi og summarisk skifte, der arvingene overtar boet mot å dekke gravferdsutgiftene.', how: 'Ta gjerne kontakt med tingretten innen 60 dager etter dødsfallet — de gir råd og veiledning uten kostnad. Er dere usikre eller uenige, spør spesifikt om hvilken skifteform som passer boet deres.', link: { label: 'Domstol.no', url: 'https://www.domstol.no' } },
-          { text: 'Kartlegge eiendeler og gjeld — Skatteetaten kan bistå med en oversikt.', what: 'En fullstendig oversikt over alt avdøde eide — bolig, bil, innbo, bankkonti, verdipapirer — og alt avdøde skyldte, som lån og ubetalte regninger.', how: 'Gå gjennom post og kontoutskrifter, sjekk Skatteetatens oversikt over formue og gjeld fra siste skattemelding, og kontakt bankene direkte. Er dere usikre på om det finnes skjult gjeld, kan dere be tingretten om formuesfullmakt for innsyn, eller utstede proklama slik at eventuelle kreditorer må melde krav innen seks måneder.', link: { label: 'Skatteetaten', url: 'https://www.skatteetaten.no' } }
+          { text: 'Kartlegge eiendeler og gjeld — Skatteetaten kan bistå med en oversikt.', what: 'En fullstendig oversikt over alt avdøde eide — bolig, bil, innbo, bankkonti, verdipapirer — og alt avdøde skyldte, som lån og ubetalte regninger.', how: 'Gå gjennom post og kontoutskrifter, sjekk Skatteetatens oversikt over formue og gjeld fra siste skattemelding, og kontakt bankene direkte. Er dere usikre på om det finnes skjult gjeld, kan dere be tingretten om formuesfullmakt for innsyn, eller be tingretten om proklama, slik at eventuelle kreditorer må melde krav innen seks uker.', link: { label: 'Skatteetaten', url: 'https://www.skatteetaten.no' } }
         ]}
       ]
     },
@@ -796,15 +942,8 @@
     }
   ];
 
-  const RIGHTS = {
-    ektefelle: { title: 'Ektefelle', icon: ICONS.spouse, text: 'Minst 1/4 av arven hvis avdøde hadde barn, minst 1/2 hvis bare søsken eller foreldre lever. Retten er også sikret gjennom en minstesats knyttet til folketrygdens grunnbeløp (G).' },
-    samboer: { title: 'Samboer', icon: ICONS.partner, text: 'Rettighetene avhenger av om dere har felles barn, og av hvor lenge dere har bodd sammen (over eller under fem år). Uten testament eller felles barn er arveretten svært begrenset.' },
-    barn: { title: 'Barn', icon: ICONS.child, text: 'Barn har krav på minst 2/3 av boets verdi som pliktdelsarv — en rett som ikke kan fratas ved testament. Denne retten er likevel begrenset oppad til 15 ganger grunnbeløpet (15 G).' },
-    annet: { title: 'Annen pårørende', icon: ICONS.other, text: 'Uten ektefelle, samboer eller barn kan avdøde testamentere fritt. Er det ikke skrevet testament, arver foreldrene først, deretter søsken, og til sist fjernere slektninger.' }
-  };
-
   const GLOSSARY = [
-    { term: 'Pliktdelsarv', def: 'Den delen av arven som barn (livsarvinger) har krav på, og som ikke kan begrenses ved testament.' },
+    { term: 'Pliktdelsarv', def: 'Den delen av arven barn (livsarvinger) har krav på uansett testament: 2/3 av arven, men høyst 15 G per barn.' },
     { term: 'Livsarving', def: 'Direkte etterkommer — barn, barnebarn og videre nedover — med lovbestemt rett til pliktdelsarv.' },
     { term: 'Skifteattest', def: 'Dokument fra tingretten som gir deg rett til å representere dødsboet overfor banker og andre.' },
     { term: 'Uskifteattest', def: 'Dokument fra tingretten som bekrefter at gjenlevende ektefelle eller samboer sitter i uskiftet bo.' },
@@ -812,9 +951,14 @@
     { term: 'Bostyrer', def: 'Personen, ofte en advokat, som tingretten oppnevner til å styre et offentlig skifte og stå for det praktiske i bobehandlingen.' },
     { term: 'Bo av liten verdi', def: 'Forenklet skifteform for dødsbo der eiendelene knapt dekker gravferdskostnadene og eventuell gjeld.' },
     { term: 'Summarisk skifte', def: 'Forenklet skifteform der arvingene overtar et lite bo mot å dekke gravferdsutgiftene, uten et fullt privat eller offentlig skifte.' },
-    { term: 'Uskifte', def: 'Gjenlevende ektefelle eller samboer kan i visse tilfeller overta boet udelt, fremfor å skifte med de andre arvingene med én gang.' },
+    { term: 'Uskifte', def: 'Gjenlevende ektefelle, eller samboer med felles barn, overtar boet udelt i stedet for å skifte med de andre arvingene nå. Barna arver senere.' },
+    { term: 'Særkullsbarn', def: 'Et barn avdøde har fra et annet forhold – altså ikke et felles barn med gjenlevende ektefelle eller samboer. Særkullsbarn må samtykke til uskifte.' },
+    { term: 'Særeie', def: 'Eiendeler som holdes utenfor delingen mellom ektefeller, fordi det er avtalt i en ektepakt eller bestemt av den som ga en gave eller arv.' },
+    { term: 'Felleseie', def: 'Utgangspunktet i et ekteskap: det ektefellene eier, deles likt når ekteskapet opphører – også ved dødsfall.' },
+    { term: 'Minstearv', def: 'Et minstebeløp ektefelle (4 G eller 6 G) eller samboer med felles barn (4 G) arver, uansett testament.' },
+    { term: 'Forskudd på arv', def: 'En gave til et barn som avdøde sa skulle trekkes fra barnets arv senere (avkorting).' },
     { term: 'Formuesfullmakt', def: 'Fullmakt fra tingretten som gir en arving rett til å innhente opplysninger om avdødes formue og gjeld, som grunnlag for å velge skifteform.' },
-    { term: 'Proklama', def: 'Offentlig kunngjøring som ber avdødes kreditorer melde krav innen seks måneder, slik at boets gjeld blir klarlagt før fordeling.' }
+    { term: 'Proklama', def: 'Offentlig kunngjøring som ber avdødes kreditorer melde krav innen seks uker, slik at boets gjeld blir klarlagt før fordeling.' }
   ];
 
   const RESOURCES = [
@@ -823,8 +967,8 @@
       { name: 'Jusshjelpa i Nord-Norge / Midt-Norge', blurb: 'Gratis rettshjelp for privatpersoner.', url: 'https://jusshjelpa.no' }
     ]},
     { cat: 'Offentlig informasjon', icon: ICONS.building, items: [
-      { name: 'Domstol.no — «Dødsfall, arv og skifte»', blurb: 'Offisiell veiledning gjennom skifteprosessen.', url: 'https://www.domstol.no' },
-      { name: 'Lovdata — Arveloven', blurb: 'Selve lovteksten om arv.', url: 'https://lovdata.no' }
+      { name: 'Domstol.no — «Dødsfall, arv og skifte»', blurb: 'Offisiell veiledning gjennom skifteprosessen.', url: 'https://www.domstol.no/no/dodsfall-arv-og-skifte/' },
+      { name: 'Lovdata — Arveloven', blurb: 'Selve lovteksten om arv og skifte.', url: 'https://lovdata.no/dokument/NL/lov/2019-06-14-21' }
     ]},
     { cat: 'Økonomi', icon: ICONS.coin, items: [
       { name: 'Skatteetaten', blurb: 'Oversikt over gjeld og formue, samt skatteoppgjør ved dødsfall.', url: 'https://www.skatteetaten.no' },
@@ -832,40 +976,6 @@
       { name: 'Norsk Pensjon', blurb: 'Samlet oversikt over pensjon og forsikringer.', url: 'https://norskpensjon.no' }
     ]}
   ];
-
-  let selectedRole = null;
-
-  const roleGrid = document.getElementById('roleGrid');
-  ROLES.forEach(r => {
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'role-btn';
-    btn.setAttribute('aria-pressed', 'false');
-    btn.innerHTML = r.icon + '<span>' + r.label + '</span>';
-    btn.addEventListener('click', () => {
-      selectedRole = (selectedRole === r.id) ? null : r.id;
-      renderRoles();
-      renderRights();
-    });
-    btn.dataset.role = r.id;
-    roleGrid.appendChild(btn);
-  });
-  function renderRoles(){
-    [...roleGrid.children].forEach(btn => {
-      const active = btn.dataset.role === selectedRole;
-      btn.classList.toggle('active', active);
-      btn.setAttribute('aria-pressed', String(active));
-    });
-  }
-
-  const rightsWrap = document.getElementById('rightsWrap');
-  function renderRights(){
-    if(!selectedRole){ rightsWrap.innerHTML = '<div class="rights-empty">Velg en rolle over for å se hvilke arveregler som gjelder deg.</div>'; return; }
-    const r = RIGHTS[selectedRole];
-    rightsWrap.innerHTML = '<div class="rights-card">' + r.icon + '<div><h3>' + r.title + '</h3><p>' + r.text + '</p><span class="law-ref">Etter arveloven — sjekk alltid mot testament og din konkrete situasjon.</span></div></div>' +
-      '<div class="rights-footnote">NB: Hvem som er <em>ansvarlig for selve gravferden</em> følger en egen rekkefølge, uavhengig av hvem som arver — se fase 1 i tidslinjen over.</div>';
-  }
-  renderRights();
 
   const timelineWrap = document.getElementById('timelineWrap');
   PHASES.forEach((p, i) => {
@@ -928,10 +1038,15 @@
     resourcesWrap.appendChild(catEl);
   });
 
+  // The embedding page (GuidePage) decides the button text and handles navigation
+  const ctaParams = new URLSearchParams(window.location.search);
+  if(ctaParams.get('back') === 'home') document.getElementById('ctaLabel').textContent = 'Tilbake til hjemmesiden';
   document.getElementById('ctaBtn').addEventListener('click', () => {
-    window.parent.history.back();
+    if(window.parent !== window) window.parent.postMessage({ type: 'veiviser-back' }, window.location.origin);
+    else window.history.back();
   });
 })();
 </script>
+<script type="module" src="/arveveiviser/ui.js"></script>
 </body>
 </html>
