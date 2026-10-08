@@ -1,7 +1,7 @@
-// Kategorimatching for AI-forslag og parallellkjøringen i «Legg til flere».
+// Kategorimatching for AI-forslag, parallellkjøringen og «Slå sammen gjenstander» i «Legg til flere».
 import { test, describe } from 'node:test'
 import assert from 'node:assert/strict'
-import { matchCategory, runPool } from '../../src/lib/itemAiHelpers.js'
+import { matchCategory, mergeSelectedPhotos, runPool } from '../../src/lib/itemAiHelpers.js'
 
 const categories = [
   { id: 1, label: 'Møbler' },
@@ -54,5 +54,34 @@ describe('runPool', () => {
 
   test('tom liste', async () => {
     await runPool([], 3, async () => { throw new Error('skal ikke kjøres') })
+  })
+})
+
+describe('mergeSelectedPhotos', () => {
+  const photo = (url) => ({ url })
+  const draft = (key, urls, title = '', status = 'idle') => ({ key, photos: urls.map(photo), title, status })
+  const summary = (drafts) => drafts.map(d => `${d.key}:${d.photos.map(p => p.url).join(',')}${d.title ? `(${d.title})` : ''}`)
+
+  test('samler valgte bilder i den første gjenstanden, i valgt rekkefølge', () => {
+    const drafts = [draft(1, ['a']), draft(2, ['b']), draft(3, ['c']), draft(4, ['d'])]
+    assert.deepEqual(summary(mergeSelectedPhotos(drafts, ['c', 'a', 'd'])), ['1:c,a,d', '2:b'])
+  })
+
+  test('gjenstanden med navn beholdes, og bilder som ikke er valgt blir igjen', () => {
+    const drafts = [draft(1, ['a', 'x']), draft(2, ['b'], 'Gyngestol', 'analyzed'), draft(3, ['c'])]
+    const out = mergeSelectedPhotos(drafts, ['a', 'b'])
+    assert.deepEqual(summary(out), ['1:x', '2:a,b(Gyngestol)', '3:c'])
+    assert.equal(out[1].status, 'idle')
+  })
+
+  test('gjenstand med navn som mister alle bildene beholdes', () => {
+    const drafts = [draft(1, ['a'], 'Lampe'), draft(2, ['b'], 'Bord')]
+    assert.deepEqual(summary(mergeSelectedPhotos(drafts, ['b', 'a'])), ['1:b,a(Lampe)', '2:(Bord)'])
+  })
+
+  test('færre enn to bilder endrer ingenting', () => {
+    const drafts = [draft(1, ['a']), draft(2, ['b'])]
+    assert.equal(mergeSelectedPhotos(drafts, ['a']), drafts)
+    assert.equal(mergeSelectedPhotos(drafts, ['a', 'ukjent']), drafts)
   })
 })

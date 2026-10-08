@@ -3,7 +3,7 @@ import { supabase } from './supabase'
 import { downscaleImage, fileToBase64 } from './images'
 import { isEn } from './lang'
 
-export { matchCategory, runPool } from './itemAiHelpers.js'
+export { matchCategory, mergeSelectedPhotos, runPool } from './itemAiHelpers.js'
 
 // Kalles med brukerens innlogging; edge-funksjonene avviser anonyme kall og teller AI-bruken.
 // Feil får med koden fra funksjonen (demo_limit, rate_limit, ai_busy …).

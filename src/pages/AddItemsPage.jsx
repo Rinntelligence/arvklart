@@ -7,7 +7,7 @@ import { downscaleImage, removeImages, uploadEstateImage } from '../lib/images'
 import { hasAiConsent, giveAiConsent } from '../lib/aiConsent'
 import { formatNOK, parseNOK } from '../lib/format'
 import { L } from '../lib/lang'
-import { analyzeItemPhotos, matchCategory, runPool } from '../lib/itemAi'
+import { analyzeItemPhotos, matchCategory, mergeSelectedPhotos, runPool } from '../lib/itemAi'
 import { AiConsent, DemoNotice } from '../components/AiDialogs'
 import CameraCapture from '../components/CameraCapture'
 
@@ -49,6 +49,8 @@ export default function AddItemsPage({ session, profile, onToast, isDemo }) {
   const [demoBlocked, setDemoBlocked] = useState(false)
   const [demoRemaining, setDemoRemaining] = useState(isDemo ? 5 : null)
   const [dragOver, setDragOver] = useState(false)
+  const [merging, setMerging] = useState(false) // «Slå sammen gjenstander»: marker bildene som hører sammen
+  const [mergeSel, setMergeSel] = useState([]) // valgte bilde-URL-er i valgt rekkefølge
   const pickRef = useRef()
   const addToRef = useRef(null) // gjenstanden «+»-knappen legger bilder til
   const addInputRef = useRef()
@@ -151,6 +153,16 @@ export default function AddItemsPage({ session, profile, onToast, isDemo }) {
     const merged = { ...above, photos, status: above.status === 'saved' ? above.status : 'idle' }
     return [...prev.slice(0, i - 1), merged, ...prev.slice(i + 1)]
   })
+
+  const startMerge = () => { setMergeSel([]); setMerging(true); setPendingFiles(null) }
+  const cancelMerge = () => { setMerging(false); setMergeSel([]) }
+  const toggleMergePhoto = (url) => setMergeSel(prev => prev.includes(url) ? prev.filter(u => u !== url) : [...prev, url])
+  const approveMerge = () => {
+    if (mergeSel.length < 2 || mergeSel.length > MAX_PHOTOS) return
+    setDrafts(prev => mergeSelectedPhotos(prev, mergeSel))
+    cancelMerge()
+    onToast(L('Bildene er slått sammen til én gjenstand', 'The photos have been merged into one item'))
+  }
 
   // Kamera: fortsetter på siste gjenstand hvis den er tom, ellers en ny
   const openCamera = () => {
@@ -303,6 +315,7 @@ export default function AddItemsPage({ session, profile, onToast, isDemo }) {
   const cameraIndex = drafts.findIndex(d => d.key === cameraKey)
   const toSave = drafts.filter(d => d.status !== 'saved' && d.title.trim()).length
   const full = drafts.length >= MAX_ITEMS
+  const mergeable = drafts.filter(d => d.status !== 'saved' && d.photos.length > 0)
 
   return (
     <div
@@ -332,14 +345,14 @@ export default function AddItemsPage({ session, profile, onToast, isDemo }) {
 
       {/* Kilder */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '10px', marginBottom: '10px' }}>
-        <SourceButton onClick={openCamera} disabled={full || !!busy}
+        <SourceButton onClick={openCamera} disabled={full || !!busy || merging}
           title={L('Ta bilder', 'Take photos')} hint={L('Kamera med «Neste gjenstand»', 'Camera with «Next item»')} />
-        <SourceButton onClick={() => pickRef.current.click()} disabled={full || !!busy}
+        <SourceButton onClick={() => pickRef.current.click()} disabled={full || !!busy || merging}
           title={L('Velg bilder', 'Choose photos')} hint={L('Kamerarull, filer — eller dra hit', 'Camera roll, files — or drag here')} />
       </div>
       <input ref={pickRef} type="file" accept="image/*" multiple onChange={onPick} style={{ display: 'none' }} />
       <input ref={addInputRef} type="file" accept="image/*" multiple onChange={onAddTo} style={{ display: 'none' }} />
-      <button onClick={addEmpty} disabled={full || !!busy} style={{ background: 'none', border: 'none', color: '#5F6E52', cursor: 'pointer', fontSize: '13px', padding: '4px 0 18px', fontFamily: 'Karla, sans-serif', textDecoration: 'underline' }}>
+      <button onClick={addEmpty} disabled={full || !!busy || merging} style={{ background: 'none', border: 'none', color: '#5F6E52', cursor: 'pointer', fontSize: '13px', padding: '4px 0 18px', fontFamily: 'Karla, sans-serif', textDecoration: 'underline' }}>
         {L('+ Legg til gjenstand uten bilde', '+ Add an item without a photo')}
       </button>
 
@@ -374,11 +387,21 @@ export default function AddItemsPage({ session, profile, onToast, isDemo }) {
 
       {/* Gjenstandene */}
       {drafts.length > 0 && (
-        <div style={{ fontSize: '13px', color: '#9C8267', marginBottom: '8px' }}>
-          {L(`${drafts.length} av maks ${MAX_ITEMS} gjenstander`, `${drafts.length} of max ${MAX_ITEMS} items`)}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', marginBottom: '8px', flexWrap: 'wrap' }}>
+          <span style={{ fontSize: '13px', color: '#9C8267' }}>
+            {L(`${drafts.length} av maks ${MAX_ITEMS} gjenstander`, `${drafts.length} of max ${MAX_ITEMS} items`)}
+          </span>
+          {!merging && mergeable.length >= 2 && (
+            <button onClick={startMerge} disabled={!!busy} style={{ ...smallBtn, padding: '8px 12px', fontSize: '13px', color: '#3A2F26', background: '#fff', opacity: busy ? 0.5 : 1 }}>
+              {L('Slå sammen gjenstander', 'Merge items')}
+            </button>
+          )}
         </div>
       )}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+
+      {merging ? (
+        <MergeGrid drafts={drafts} items={mergeable} selected={mergeSel} onToggle={toggleMergePhoto} />
+      ) : <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
         {drafts.map((d, i) => (
           <DraftCard key={d.key} draft={d} index={i} categories={categories} locked={!!busy}
             onChange={patch => update(d.key, patch)}
@@ -389,7 +412,7 @@ export default function AddItemsPage({ session, profile, onToast, isDemo }) {
             onCamera={() => setCameraKey(d.key)}
           />
         ))}
-      </div>
+      </div>}
 
       {drafts.length === 0 && !pendingFiles && (
         <div style={{ textAlign: 'center', padding: '40px 16px', color: '#9C8267', fontSize: '14px', border: '2px dashed #D9CFC0', borderRadius: '12px' }}>
@@ -406,7 +429,33 @@ export default function AddItemsPage({ session, profile, onToast, isDemo }) {
                 <AiConsent onCancel={() => setAskConsent(false)} onAccept={() => { giveAiConsent(); setAiConsented(true); setAskConsent(false); analyzeAll(true) }} />
               </div>
             )}
-            {busy ? (
+            {merging ? (
+              <div>
+                <div style={{ fontSize: '13px', color: mergeSel.length > MAX_PHOTOS ? '#8A4B2A' : '#5C4530', marginBottom: '10px' }}>
+                  {mergeSel.length > MAX_PHOTOS
+                    ? L('Maks 5 bilder per gjenstand — fjern noen av de markerte', 'Max 5 photos per item — unmark some')
+                    : mergeSel.length < 2
+                      ? L('Marker minst to bilder som viser samme gjenstand', 'Mark at least two photos of the same item')
+                      : L(`${mergeSel.length} bilder blir én gjenstand`, `${mergeSel.length} photos become one item`)}
+                </div>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button onClick={cancelMerge} style={{ flex: 1, padding: '14px 10px', background: '#fff', color: '#5C4530', border: '1px solid #D9CFC0', borderRadius: '10px', cursor: 'pointer', fontSize: '15px', fontFamily: 'Karla, sans-serif' }}>
+                    {L('Avbryt', 'Cancel')}
+                  </button>
+                  {(() => {
+                    const ok = mergeSel.length >= 2 && mergeSel.length <= MAX_PHOTOS
+                    return (
+                      <button onClick={approveMerge} disabled={!ok} style={{
+                        flex: 2, padding: '14px 10px', border: 'none', borderRadius: '10px', fontSize: '15px', fontFamily: 'Karla, sans-serif', fontWeight: '500',
+                        background: ok ? '#5F6E52' : '#D9CFC0', color: '#fff', cursor: ok ? 'pointer' : 'not-allowed',
+                      }}>
+                        {L('Godkjenn sammenslåing', 'Approve merge')}{mergeSel.length ? ` (${mergeSel.length})` : ''}
+                      </button>
+                    )
+                  })()}
+                </div>
+              </div>
+            ) : busy ? (
               <div>
                 <div style={{ fontSize: '14px', color: '#3A2F26', marginBottom: '8px' }}>
                   {busy === 'analyzing' ? L(`AI analyserer… ${progress.done} av ${progress.total}`, `AI is analysing… ${progress.done} of ${progress.total}`) : L(`Lagrer… ${progress.done} av ${progress.total}`, `Saving… ${progress.done} of ${progress.total}`)}
@@ -471,6 +520,43 @@ function SourceButton({ onClick, disabled, title, hint }) {
       <span style={{ display: 'block', fontSize: '15px', color: '#3A2F26', fontWeight: '500' }}>{title}</span>
       <span style={{ display: 'block', fontSize: '12px', color: '#9C8267', lineHeight: 1.4, marginTop: '2px' }}>{hint}</span>
     </button>
+  )
+}
+
+// Alle bildene i ett rutenett, merket med gjenstandsnummeret. Trykk for å markere; tallet oppe til høyre
+// viser rekkefølgen (1 blir hovedbildet).
+function MergeGrid({ drafts, items, selected, onToggle }) {
+  const photos = items.flatMap(d => d.photos.map(p => ({ ...p, itemNo: drafts.indexOf(d) + 1 })))
+  return (
+    <div>
+      <p style={{ fontSize: '14px', color: '#5C4530', lineHeight: 1.5, marginBottom: '14px' }}>
+        {L('Trykk på bildene som viser samme gjenstand, og godkjenn nederst. Bildet du markerer først blir hovedbildet.',
+           'Tap the photos that show the same item, then approve below. The first photo you mark becomes the main photo.')}
+      </p>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))', gap: '8px' }}>
+        {photos.map(p => {
+          const order = selected.indexOf(p.url) + 1
+          return (
+            <button key={p.url} onClick={() => onToggle(p.url)} aria-pressed={order > 0} style={{
+              position: 'relative', aspectRatio: '1', padding: 0, borderRadius: '10px', overflow: 'hidden', cursor: 'pointer',
+              border: order ? '3px solid #5F6E52' : '1px solid #D9CFC0', background: '#E8DFD0',
+            }}>
+              <img src={p.url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+              <span style={{
+                position: 'absolute', top: '6px', right: '6px', width: '24px', height: '24px', borderRadius: '50%',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px', fontWeight: '600',
+                fontFamily: 'Karla, sans-serif', background: order ? '#5F6E52' : 'rgba(255,255,255,0.85)',
+                color: '#fff', border: order ? 'none' : '2px solid #fff', boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
+              }}>{order || ''}</span>
+              <span style={{
+                position: 'absolute', left: '6px', bottom: '6px', padding: '2px 7px', borderRadius: '10px',
+                background: 'rgba(58,47,38,0.75)', color: '#FBF9F5', fontSize: '11px', fontFamily: 'Karla, sans-serif',
+              }}>{L(`Gjenstand ${p.itemNo}`, `Item ${p.itemNo}`)}</span>
+            </button>
+          )
+        })}
+      </div>
+    </div>
   )
 }
 
