@@ -41,7 +41,7 @@ export function JoinPage({ session, onToast }) {
         ) : (
           <>
             <h2 style={h2}>{titles[status]}</h2>
-            <p style={{ color:'#9C8267', marginTop:'8px', lineHeight:'1.5' }}>{texts[status] || errorMsg}</p>
+            <p style={{ color:'#75604B', marginTop:'8px', lineHeight:'1.5' }}>{texts[status] || errorMsg}</p>
             <button onClick={() => navigate('/')} style={{ ...btn, marginTop:'20px' }}>{L('Til mine bo', 'To my estates')}</button>
           </>
         )}
@@ -78,15 +78,15 @@ export function CategoriesPage({ onToast }) {
     onToast(L('Kategori fjernet', 'Category removed')); load()
   }
 
-  const input = { padding:'10px 14px', border:'1px solid #D9CFC0', borderRadius:'8px', fontSize:'15px', background:'#FBF9F5', color:'#3A2F26', outline:'none', fontFamily:'Karla, sans-serif' }
+  const input = { padding:'10px 14px', border:'1px solid #9A8B78', borderRadius:'8px', fontSize:'15px', background:'#FBF9F5', color:'#3A2F26', fontFamily:'Karla, sans-serif' }
 
   return (
     <div style={{ maxWidth:'520px', margin:'0 auto', padding:'28px 16px', fontFamily:'Karla, sans-serif' }}>
-      <button onClick={()=>navigate(`/estate/${id}/admin`)} style={{ background:'none', border:'none', color:'#9C8267', cursor:'pointer', fontSize:'13px', padding:'0 0 20px', fontFamily:'Karla, sans-serif' }}>{L('← Tilbake til administrasjon', '← Back to administration')}</button>
+      <button onClick={()=>navigate(`/estate/${id}/admin`)} style={{ background:'none', border:'none', color:'#75604B', cursor:'pointer', fontSize:'13px', padding:'0 0 20px', fontFamily:'Karla, sans-serif' }}>{L('← Tilbake til administrasjon', '← Back to administration')}</button>
       <h1 style={{ fontFamily:"'Fraunces', serif", fontSize:'24px', fontWeight:'400', color:'#3A2F26', marginBottom:'28px' }}>{L('Kategorier', 'Categories')}</h1>
 
       <div style={{ background:'#fff', border:'1px solid #D9CFC0', borderRadius:'12px', padding:'24px', marginBottom:'16px' }}>
-        <p style={{ fontSize:'13px', color:'#9C8267', marginBottom:'14px' }}>{L('Legg til ny kategori:', 'Add a new category:')}</p>
+        <p style={{ fontSize:'13px', color:'#75604B', marginBottom:'14px' }}>{L('Legg til ny kategori:', 'Add a new category:')}</p>
         <div style={{ display:'flex', gap:'8px', marginBottom: showPicker?'12px':'0' }}>
           <button onClick={()=>setShowPicker(!showPicker)} style={{ ...input, padding:'10px 14px', cursor:'pointer', fontSize:'20px' }}>{newEmoji}</button>
           <input value={newLabel} onChange={e=>setNewLabel(e.target.value)} onKeyDown={e=>e.key==='Enter'&&add()} placeholder={L('Kategorinavn…', 'Category name…')} maxLength={100} style={{ ...input, flex:1, minWidth:0 }} />
@@ -101,13 +101,13 @@ export function CategoriesPage({ onToast }) {
 
       <div style={{ background:'#fff', border:'1px solid #D9CFC0', borderRadius:'12px', overflow:'hidden' }}>
         {categories.length === 0 && (
-          <div style={{ padding:'24px', textAlign:'center', color:'#9C8267', fontSize:'14px' }}>{L('Ingen kategorier ennå. Legg til den første.', 'No categories yet. Add the first one.')}</div>
+          <div style={{ padding:'24px', textAlign:'center', color:'#75604B', fontSize:'14px' }}>{L('Ingen kategorier ennå. Legg til den første.', 'No categories yet. Add the first one.')}</div>
         )}
         {categories.map((c,i)=>(
           <div key={c.id} style={{ display:'flex', alignItems:'center', padding:'14px 20px', borderBottom:i<categories.length-1?'1px solid #E8DFD0':'none' }}>
             <span style={{ fontSize:'20px', marginRight:'14px' }}>{c.emoji}</span>
             <span style={{ flex:1, fontSize:'15px', color:'#3A2F26' }}>{categoryLabel(c.label)}</span>
-            <button onClick={()=>remove(c.id)} title={L('Fjern kategori', 'Remove category')} style={{ background:'none', border:'none', color:'#9C8267', cursor:'pointer', fontSize:'20px' }}>×</button>
+            <button onClick={()=>remove(c.id)} title={L('Fjern kategori', 'Remove category')} style={{ background:'none', border:'none', color:'#75604B', cursor:'pointer', fontSize:'20px' }}>×</button>
           </div>
         ))}
       </div>
@@ -133,7 +133,7 @@ export function PrivacyPage() {
   return (
     <div style={s}>
       <h1 style={{ fontFamily: 'Fraunces, serif', fontSize: '28px', fontWeight: '400', color: '#3A2F26', marginBottom: '6px' }}>{L('Juridisk', 'Legal')}</h1>
-      <p style={{ color: '#9C8267', fontSize: '14px', marginBottom: '28px' }}>{L('Sist oppdatert: september 2026', 'Last updated: September 2026')}</p>
+      <p style={{ color: '#75604B', fontSize: '14px', marginBottom: '28px' }}>{L('Sist oppdatert: september 2026', 'Last updated: September 2026')}</p>
       <div style={{ display: 'flex', gap: '8px', marginBottom: '32px', borderBottom: '1px solid #E8DFD0', paddingBottom: '16px' }}>
         {[['privacy', L('Personvernerklæring', 'Privacy policy')], ['terms', L('Vilkår for bruk', 'Terms of use')]].map(([key, label]) => (
           <button key={key} onClick={() => switchTab(key)} style={{ padding: '8px 18px', borderRadius: '20px', border: 'none', cursor: 'pointer', fontFamily: 'Karla, sans-serif', fontSize: '14px', background: tab === key ? '#3A2F26' : '#E8DFD0', color: tab === key ? '#FBF9F5' : '#5C4530' }}>{label}</button>
@@ -141,7 +141,7 @@ export function PrivacyPage() {
       </div>
 
       {isEn() && (
-        <p style={{ ...ps, fontSize: '13px', color: '#9C8267' }}>This is an English translation. If the Norwegian and English versions differ, the Norwegian version applies.</p>
+        <p style={{ ...ps, fontSize: '13px', color: '#75604B' }}>This is an English translation. If the Norwegian and English versions differ, the Norwegian version applies.</p>
       )}
 
       {tab === 'privacy' && (
@@ -264,7 +264,7 @@ export function AccountPage({ session, onToast }) {
   return (
     <div style={{ maxWidth: '560px', margin: '0 auto', padding: '40px 20px', fontFamily: 'Karla, sans-serif' }}>
       <h1 style={{ fontFamily: 'Fraunces, serif', fontSize: '26px', fontWeight: '400', color: '#3A2F26', marginBottom: '6px' }}>{L('Min konto', 'My account')}</h1>
-      <p style={{ color: '#9C8267', fontSize: '14px', marginBottom: '32px' }}>{session.user.email}</p>
+      <p style={{ color: '#75604B', fontSize: '14px', marginBottom: '32px' }}>{session.user.email}</p>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
 
         <div style={{ background: '#fff', border: '1px solid #D9CFC0', borderRadius: '12px', padding: '24px' }}>

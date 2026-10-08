@@ -59,8 +59,8 @@ export default function ItemDetailPage({ session, profile, onToast, isDemo }) {
 
   useEffect(() => { commentsEndRef.current?.scrollIntoView({ behavior:'smooth' }) }, [comments.length])
 
-  if (loading) return <div style={{ padding:'80px', textAlign:'center', color:'#9C8267', fontFamily:'Karla, sans-serif' }}>{L('Laster…', 'Loading…')}</div>
-  if (!item) return <div style={{ padding:'80px', textAlign:'center', color:'#9C8267', fontFamily:'Karla, sans-serif' }}>{L('Gjenstand ikke funnet.', 'Item not found.')}</div>
+  if (loading) return <div style={{ padding:'80px', textAlign:'center', color:'#75604B', fontFamily:'Karla, sans-serif' }}>{L('Laster…', 'Loading…')}</div>
+  if (!item) return <div style={{ padding:'80px', textAlign:'center', color:'#75604B', fontFamily:'Karla, sans-serif' }}>{L('Gjenstand ikke funnet.', 'Item not found.')}</div>
 
   const cat = item.categories || { emoji:'', label:L('Annet', 'Other') }
   const myInterest = item.interests?.find(x => x.user_id === session.user.id)
@@ -176,7 +176,7 @@ export default function ItemDetailPage({ session, profile, onToast, isDemo }) {
     <div style={{ maxWidth:'700px', margin:'0 auto', padding:'28px 16px', fontFamily:'Karla, sans-serif' }}>
 
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'4px' }}>
-        <button onClick={() => navigate(`/estate/${id}`)} style={{ background:'none', border:'none', color:'#9C8267', cursor:'pointer', fontSize:'13px', padding:'0 0 20px', fontFamily:'Karla, sans-serif' }}>
+        <button onClick={() => navigate(`/estate/${id}`)} style={{ background:'none', border:'none', color:'#75604B', cursor:'pointer', fontSize:'13px', padding:'0 0 20px', fontFamily:'Karla, sans-serif' }}>
           {L('← Tilbake', '← Back')}
         </button>
         {canEdit && <button onClick={() => navigate(`/estate/${id}/item/${itemId}/edit`)} style={{ background:'none', border:'1px solid #D9CFC0', borderRadius:'8px', color:'#5C4530', cursor:'pointer', fontSize:'13px', padding:'6px 14px', fontFamily:'Karla, sans-serif', marginBottom:'16px' }}>
@@ -202,25 +202,27 @@ export default function ItemDetailPage({ session, profile, onToast, isDemo }) {
             )}
           </div>
           {allImages.length > 1 && (
-            <div style={{ display:'flex', justifyContent:'center', gap:'6px', marginTop:'10px' }}>
+            <div style={{ display:'flex', justifyContent:'center', gap:'0', marginTop:'6px' }}>
               {allImages.map((_, i) => (
-                <button key={i} onClick={() => setCurrentImageIndex(i)} style={{ width: i===currentImageIndex?'20px':'8px', height:'8px', borderRadius:'4px', border:'none', background: i===currentImageIndex?'#3A2F26':'#D9CFC0', cursor:'pointer', padding:0, transition:'all 0.2s' }} />
+                <button key={i} onClick={() => setCurrentImageIndex(i)} aria-label={L(`Bilde ${i + 1}`, `Photo ${i + 1}`)} aria-pressed={i===currentImageIndex} style={{ minWidth:'32px', height:'32px', border:'none', background:'none', cursor:'pointer', padding:0, display:'inline-flex', alignItems:'center', justifyContent:'center' }}>
+                  <span style={{ display:'block', width: i===currentImageIndex?'20px':'10px', height:'10px', borderRadius:'5px', background: i===currentImageIndex?'#3A2F26':'#9A8B78', transition:'all 0.2s' }} />
+                </button>
               ))}
             </div>
           )}
         </div>
       ) : (
         <div style={{ background:'#E8DFD0', borderRadius:'14px', height:'280px', display:'flex', alignItems:'center', justifyContent:'center', marginBottom:'24px' }}>
-          <span style={{ fontSize:'48px', color:'#9C8267' }}>{cat.emoji || '·'}</span>
+          <span style={{ fontSize:'48px', color:'#75604B' }}>{cat.emoji || '·'}</span>
         </div>
       )}
 
       <div style={{ background:'#fff', border:'1px solid #D9CFC0', borderRadius:'14px', padding:'28px', marginBottom:'20px' }}>
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:'8px' }}>
           <h1 style={{ fontFamily:'Fraunces, serif', fontSize:'24px', fontWeight:'400', color:'#3A2F26', margin:0 }}>{item.title}</h1>
-          <span style={{ fontSize:'12px', color:'#9C8267', background:'#E8DFD0', padding:'4px 12px', borderRadius:'20px', marginLeft:'12px', whiteSpace:'nowrap' }}>{categoryLabel(cat.label)}</span>
+          <span style={{ fontSize:'12px', color:'#75604B', background:'#E8DFD0', padding:'4px 12px', borderRadius:'20px', marginLeft:'12px', whiteSpace:'nowrap' }}>{categoryLabel(cat.label)}</span>
         </div>
-        <p style={{ color:'#9C8267', fontSize:'13px', marginBottom:'8px' }}>
+        <p style={{ color:'#75604B', fontSize:'13px', marginBottom:'8px' }}>
           {L('Lagt inn av', 'Added by')} {item.added_by_name || L('ukjent', 'unknown')} · {new Date(item.created_at).toLocaleDateString(locale(), { day:'numeric', month:'long', year:'numeric' })}
         </p>
         {item.estimated_value && (() => {
@@ -279,7 +281,7 @@ export default function ItemDetailPage({ session, profile, onToast, isDemo }) {
                         value={suggestedValue}
                         onChange={e => setSuggestedValue(e.target.value)}
                         placeholder={L('Ditt estimat (NOK)', 'Your estimate (NOK)')}
-                        style={{ flex:1, padding:'8px 12px', border:'1px solid #B8C8A8', borderRadius:'7px', fontSize:'14px', background:'#fff', color:'#3A2F26', outline:'none', fontFamily:'Karla, sans-serif' }}
+                        style={{ flex:1, padding:'8px 12px', border:'1px solid #B8C8A8', borderRadius:'7px', fontSize:'14px', background:'#fff', color:'#3A2F26', fontFamily:'Karla, sans-serif' }}
                       />
                       <button onClick={() => { handleEstimateVote('disagree', suggestedValue); setShowSuggestInput(false); setSuggestedValue('') }} style={{
                         padding:'8px 14px', background:'#A97C3F', color:'#fff', border:'none', borderRadius:'7px',
@@ -321,9 +323,9 @@ export default function ItemDetailPage({ session, profile, onToast, isDemo }) {
           </button>
         ) : showReason ? (
           <div style={{ marginBottom:'24px' }}>
-            <label style={{ display:'block', fontSize:'14px', color:'#5C4530', marginBottom:'10px' }}>{L('Hvorfor vil du ha denne?', 'Why do you want this?')} <span style={{ color:'#9C8267' }}>{L('(valgfri)', '(optional)')}</span></label>
-            <textarea value={reason} onChange={e => setReason(e.target.value)} placeholder={L('f.eks. Jeg husker denne fra barndommen…', 'e.g. I remember this from my childhood…')} rows={3} maxLength={1000}
-              style={{ width:'100%', padding:'12px 14px', border:'1px solid #D9CFC0', borderRadius:'8px', fontSize:'14px', fontFamily:'Karla, sans-serif', color:'#3A2F26', background:'#FBF9F5', resize:'vertical', outline:'none', boxSizing:'border-box' }} />
+            <label htmlFor="itemdetail-f1" style={{ display:'block', fontSize:'14px', color:'#5C4530', marginBottom:'10px' }}>{L('Hvorfor vil du ha denne?', 'Why do you want this?')} <span style={{ color:'#75604B' }}>{L('(valgfri)', '(optional)')}</span></label>
+            <textarea id="itemdetail-f1" value={reason} onChange={e => setReason(e.target.value)} placeholder={L('f.eks. Jeg husker denne fra barndommen…', 'e.g. I remember this from my childhood…')} rows={3} maxLength={1000}
+              style={{ width:'100%', padding:'12px 14px', border:'1px solid #9A8B78', borderRadius:'8px', fontSize:'14px', fontFamily:'Karla, sans-serif', color:'#3A2F26', background:'#FBF9F5', resize:'vertical', boxSizing:'border-box' }} />
             <div style={{ display:'flex', gap:'10px', marginTop:'10px' }}>
               <button onClick={() => setShowReason(false)} style={{ flex:1, padding:'11px', background:'none', border:'1px solid #D9CFC0', borderRadius:'8px', cursor:'pointer', color:'#5C4530', fontSize:'14px', fontFamily:'Karla, sans-serif' }}>{L('Avbryt', 'Cancel')}</button>
               <button onClick={handleInterest} disabled={busy} style={{ flex:2, padding:'11px', background:'#3A2F26', color:'#FBF9F5', border:'none', borderRadius:'8px', cursor:'pointer', fontSize:'14px', fontFamily:'Karla, sans-serif' }}>{L('Registrer interesse', 'Register interest')}</button>
@@ -346,7 +348,7 @@ export default function ItemDetailPage({ session, profile, onToast, isDemo }) {
 
         <div style={{ borderTop:'1px solid #E8DFD0', paddingTop:'20px', marginBottom:'16px' }}>
           <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'14px' }}>
-            <h3 style={{ fontSize:'13px', color:'#9C8267', fontWeight:'400', textTransform:'uppercase', letterSpacing:'1px' }}>
+            <h3 style={{ fontSize:'13px', color:'#75604B', fontWeight:'400', textTransform:'uppercase', letterSpacing:'1px' }}>
               {L('Interesserte', 'Interested')} ({item.interests?.length || 0})
             </h3>
             {isAdmin && !isAssigned && item.interests?.length > 0 && (
@@ -371,7 +373,7 @@ export default function ItemDetailPage({ session, profile, onToast, isDemo }) {
           )}
           {!item.interests?.length ? (
             <div>
-              <p style={{ color:'#9C8267', fontSize:'14px', fontStyle:'italic', marginBottom:'16px' }}>Ingen har vist interesse ennå.</p>
+              <p style={{ color:'#75604B', fontSize:'14px', fontStyle:'italic', marginBottom:'16px' }}>Ingen har vist interesse ennå.</p>
             </div>
           ) : (
             <div style={{ display:'flex', flexDirection:'column', gap:'10px' }}>
@@ -383,7 +385,7 @@ export default function ItemDetailPage({ session, profile, onToast, isDemo }) {
                   <div style={{ flex:1 }}>
                     <div style={{ fontSize:'14px', color:'#3A2F26', marginBottom:'4px', fontWeight:'500' }}>
                       {x.profiles?.display_name}
-                      {x.user_id === session.user.id && <span style={{ color:'#9C8267', fontSize:'12px', fontWeight:'400', marginLeft:'6px' }}>{L('(deg)', '(you)')}</span>}
+                      {x.user_id === session.user.id && <span style={{ color:'#75604B', fontSize:'12px', fontWeight:'400', marginLeft:'6px' }}>{L('(deg)', '(you)')}</span>}
                     </div>
                     {x.reason && <div style={{ fontSize:'13px', color:'#5C4530', fontStyle:'italic', lineHeight:1.6 }}>"{x.reason}"</div>}
                   </div>
@@ -416,7 +418,7 @@ export default function ItemDetailPage({ session, profile, onToast, isDemo }) {
         </h3>
         <div style={{ display:'flex', flexDirection:'column', gap:'12px', marginBottom:'16px', maxHeight:'360px', overflowY:'auto' }}>
           {comments.length === 0 ? (
-            <p style={{ color:'#9C8267', fontSize:'14px', fontStyle:'italic' }}>{L('Ingen kommentarer ennå.', 'No comments yet.')}</p>
+            <p style={{ color:'#75604B', fontSize:'14px', fontStyle:'italic' }}>{L('Ingen kommentarer ennå.', 'No comments yet.')}</p>
           ) : comments.map(c => (
             <div key={c.id} style={{ display:'flex', gap:'10px', alignItems:'flex-start' }}>
               <div style={{ width:'32px', height:'32px', borderRadius:'50%', background:c.profiles?.avatar_color||'#DCE3D2', border:tc(c.profiles?.avatar_color||'#DCE3D2')==='#3A2F26'?'1px solid #D9CFC0':'none', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'12px', color:tc(c.profiles?.avatar_color||'#DCE3D2'), fontWeight:'500', flexShrink:0 }}>
@@ -425,7 +427,7 @@ export default function ItemDetailPage({ session, profile, onToast, isDemo }) {
               <div style={{ flex:1, background:'#FBF9F5', border:'1px solid #D9CFC0', borderRadius:'10px', padding:'10px 14px' }}>
                 <div style={{ display:'flex', justifyContent:'space-between', marginBottom:'4px' }}>
                   <span style={{ fontSize:'13px', fontWeight:'500', color:'#3A2F26' }}>{c.profiles?.display_name}</span>
-                  <span style={{ fontSize:'11px', color:'#9C8267' }}>{new Date(c.created_at).toLocaleDateString(locale(), { day:'numeric', month:'short' })}</span>
+                  <span style={{ fontSize:'11px', color:'#75604B' }}>{new Date(c.created_at).toLocaleDateString(locale(), { day:'numeric', month:'short' })}</span>
                 </div>
                 <p style={{ fontSize:'14px', color:'#5C4530', lineHeight:'1.6', margin:0 }}>{c.content}</p>
                 {c.user_id === session.user.id && !isDemo && (
@@ -433,7 +435,7 @@ export default function ItemDetailPage({ session, profile, onToast, isDemo }) {
                     const { error } = await deleteComment(c.id)
                     if (error) onToast(L('Kunne ikke slette kommentaren', 'Could not delete the comment'), 'error')
                     load()
-                  }} style={{ background:'none', border:'none', color:'#9C8267', cursor:'pointer', fontSize:'12px', marginTop:'4px', fontFamily:'Karla, sans-serif' }}>{L('slett', 'delete')}</button>
+                  }} style={{ background:'none', border:'none', color:'#75604B', cursor:'pointer', fontSize:'12px', marginTop:'4px', fontFamily:'Karla, sans-serif' }}>{L('slett', 'delete')}</button>
                 )}
               </div>
             </div>
@@ -441,7 +443,7 @@ export default function ItemDetailPage({ session, profile, onToast, isDemo }) {
           <div ref={commentsEndRef} />
         </div>
         {isDemo ? (
-          <p style={{ color:'#9C8267', fontSize:'13px', fontStyle:'italic' }}>{L('Kommentarer er slått av i demoen.', 'Comments are turned off in the demo.')}</p>
+          <p style={{ color:'#75604B', fontSize:'13px', fontStyle:'italic' }}>{L('Kommentarer er slått av i demoen.', 'Comments are turned off in the demo.')}</p>
         ) : (
         <div style={{ display:'flex', gap:'8px', alignItems:'flex-end' }}>
           <div style={{ width:'32px', height:'32px', borderRadius:'50%', background:profile?.avatar_color||'#DCE3D2', border:tc(profile?.avatar_color||'#DCE3D2')==='#3A2F26'?'1px solid #D9CFC0':'none', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'12px', color:tc(profile?.avatar_color||'#DCE3D2'), fontWeight:'500', flexShrink:0 }}>
@@ -453,7 +455,7 @@ export default function ItemDetailPage({ session, profile, onToast, isDemo }) {
             <textarea className="comment-input" value={commentText} onChange={e => setCommentText(e.target.value)}
               onKeyDown={e => { if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();handleComment()} }}
               placeholder={L('Skriv en kommentar… (Enter for å sende)', 'Write a comment… (Enter to send)')} rows={2} maxLength={2000}
-              style={{ width:'100%', padding:'10px 14px', border:'1px solid #D9CFC0', borderRadius:'8px', fontSize:'14px', fontFamily:'Karla, sans-serif', color:'#3A2F26', background:'#FBF9F5', resize:'none', outline:'none', boxSizing:'border-box' }} />
+              style={{ width:'100%', padding:'10px 14px', border:'1px solid #9A8B78', borderRadius:'8px', fontSize:'14px', fontFamily:'Karla, sans-serif', color:'#3A2F26', background:'#FBF9F5', resize:'none', boxSizing:'border-box' }} />
           </div>
           <button onClick={handleComment} disabled={!commentText.trim()||submittingComment} style={{
             padding:'10px 14px', background:commentText.trim()?'#3A2F26':'#D9CFC0', color:'#FBF9F5',

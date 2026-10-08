@@ -50,7 +50,7 @@ export default function FounderGate({ children }) {
     setStep('ok')
   }
 
-  if (step === 'checking') return <div style={{ padding:'80px', textAlign:'center', color:'#9C8267', fontFamily:'Karla, sans-serif' }}>Sjekker tilgang…</div>
+  if (step === 'checking') return <div style={{ padding:'80px', textAlign:'center', color:'#75604B', fontFamily:'Karla, sans-serif' }}>Sjekker tilgang…</div>
   if (step === 'denied') return <Navigate to="/" replace />
   if (step === 'ok') return children
 
@@ -69,7 +69,7 @@ export default function FounderGate({ children }) {
         {step === 'enroll' && qr && (
           <div style={{ textAlign:'center', marginBottom:'20px' }}>
             <img src={qr} alt="QR-kode for tofaktor" style={{ width:'180px', height:'180px', background:'#FBF9F5', borderRadius:'8px' }} />
-            <div style={{ fontSize:'12px', color:'#9C8267', marginTop:'10px' }}>Kan ikke skanne? Skriv inn nøkkelen manuelt:</div>
+            <div style={{ fontSize:'12px', color:'#75604B', marginTop:'10px' }}>Kan ikke skanne? Skriv inn nøkkelen manuelt:</div>
             <code style={{ display:'inline-block', marginTop:'4px', fontSize:'12px', color:'#3A2F26', background:'#E8DFD0', padding:'4px 8px', borderRadius:'6px', wordBreak:'break-all' }}>{secret}</code>
           </div>
         )}
@@ -83,7 +83,7 @@ export default function FounderGate({ children }) {
               autoComplete="one-time-code"
               autoFocus
               placeholder="123456"
-              style={{ width:'100%', padding:'12px 14px', border:'1px solid #D9CFC0', borderRadius:'8px', fontSize:'20px', letterSpacing:'6px', textAlign:'center', background:'#E8DFD0', color:'#3A2F26', outline:'none', fontFamily:'Karla, sans-serif', boxSizing:'border-box', marginBottom:'14px' }}
+              style={{ width:'100%', padding:'12px 14px', border:'1px solid #D9CFC0', borderRadius:'8px', fontSize:'20px', letterSpacing:'6px', textAlign:'center', background:'#E8DFD0', color:'#3A2F26', fontFamily:'Karla, sans-serif', boxSizing:'border-box', marginBottom:'14px' }}
             />
             <button type="submit" disabled={busy || code.length !== 6} style={{
               width:'100%', padding:'12px', border:'none', borderRadius:'8px', fontSize:'15px', fontFamily:'Karla, sans-serif',

@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase'
 import { L } from '../lib/lang'
 import { isDemoSession } from '../lib/demo'
 
-const inputStyle = { width:'100%', padding:'12px 14px', border:'1px solid #D9CFC0', borderRadius:'8px', fontSize:'15px', background:'#FBF9F5', color:'#3A2F26', outline:'none', fontFamily:'Karla, sans-serif', boxSizing:'border-box' }
+const inputStyle = { width:'100%', padding:'12px 14px', border:'1px solid #9A8B78', borderRadius:'8px', fontSize:'15px', background:'#FBF9F5', color:'#3A2F26', fontFamily:'Karla, sans-serif', boxSizing:'border-box' }
 const linkStyle = { background:'none', border:'none', color:'#5F6E52', cursor:'pointer', fontSize:'13px', fontFamily:'Karla, sans-serif', textDecoration:'underline' }
 
 // Landing page for the reset link from "Forgot password". Supabase signs the user in
@@ -43,26 +43,26 @@ export default function ResetPasswordPage({ session, onToast, onDone }) {
 
         {!session ? (
           <>
-            <p style={{ color:'#9C8267', fontSize:'14px', lineHeight:'1.6', marginBottom:'20px' }}>
+            <p style={{ color:'#75604B', fontSize:'14px', lineHeight:'1.6', marginBottom:'20px' }}>
               {L('Lenken er ugyldig eller utløpt. Be om en ny fra innloggingssiden.', 'The link is invalid or has expired. Request a new one from the log-in page.')}
             </p>
             <button onClick={()=>navigate('/logg-inn')} style={linkStyle}>{L('Tilbake til innlogging', 'Back to log in')}</button>
           </>
         ) : isDemo ? (
-          <p style={{ color:'#9C8267', fontSize:'14px', lineHeight:'1.6' }}>{L('Passordet til demokontoen kan ikke endres.', 'The password of the demo account cannot be changed.')}</p>
+          <p style={{ color:'#75604B', fontSize:'14px', lineHeight:'1.6' }}>{L('Passordet til demokontoen kan ikke endres.', 'The password of the demo account cannot be changed.')}</p>
         ) : (
           <>
-            <p style={{ color:'#9C8267', fontSize:'14px', lineHeight:'1.6', marginBottom:'24px' }}>
+            <p style={{ color:'#75604B', fontSize:'14px', lineHeight:'1.6', marginBottom:'24px' }}>
               For <strong style={{ color:'#5C4530' }}>{session.user.email}</strong>
             </p>
             <div style={{ display:'flex', flexDirection:'column', gap:'14px', marginBottom:'20px' }}>
               <div>
-                <label style={{ display:'block', fontSize:'13px', color:'#9C8267', marginBottom:'6px' }}>{L('Nytt passord *', 'New password *')}</label>
-                <input type="password" autoComplete="new-password" value={password} onChange={e=>setPassword(e.target.value)} placeholder={L('Minst 6 tegn', 'At least 6 characters')} maxLength={128} style={inputStyle} />
+                <label htmlFor="resetpassword-f1" style={{ display:'block', fontSize:'13px', color:'#75604B', marginBottom:'6px' }}>{L('Nytt passord *', 'New password *')}</label>
+                <input id="resetpassword-f1" type="password" autoComplete="new-password" value={password} onChange={e=>setPassword(e.target.value)} placeholder={L('Minst 6 tegn', 'At least 6 characters')} maxLength={128} style={inputStyle} />
               </div>
               <div>
-                <label style={{ display:'block', fontSize:'13px', color:'#9C8267', marginBottom:'6px' }}>{L('Gjenta nytt passord *', 'Repeat new password *')}</label>
-                <input type="password" autoComplete="new-password" value={confirm} onChange={e=>setConfirm(e.target.value)} onKeyDown={e=>e.key==='Enter'&&handleSubmit()} maxLength={128} style={inputStyle} />
+                <label htmlFor="resetpassword-f2" style={{ display:'block', fontSize:'13px', color:'#75604B', marginBottom:'6px' }}>{L('Gjenta nytt passord *', 'Repeat new password *')}</label>
+                <input id="resetpassword-f2" type="password" autoComplete="new-password" value={confirm} onChange={e=>setConfirm(e.target.value)} onKeyDown={e=>e.key==='Enter'&&handleSubmit()} maxLength={128} style={inputStyle} />
                 {mismatch && <p style={{ fontSize:'12px', color:'#c0392b', marginTop:'6px' }}>{L('Passordene er ikke like', 'The passwords do not match')}</p>}
               </div>
             </div>

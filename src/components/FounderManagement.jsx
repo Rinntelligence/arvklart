@@ -47,13 +47,13 @@ export default function FounderManagement({ session, onToast }) {
     load()
   }
 
-  if (loading) return <div style={{ padding:'60px', textAlign:'center', color:'#9C8267' }}>Laster founders…</div>
+  if (loading) return <div style={{ padding:'60px', textAlign:'center', color:'#75604B' }}>Laster founders…</div>
 
   return (
     <div style={{ display:'flex', flexDirection:'column', gap:'20px' }}>
       <form onSubmit={add} style={{ background:'#fff', border:'1px solid #D9CFC0', borderRadius:'12px', padding:'20px' }}>
         <h3 style={{ fontFamily:"'Fraunces', serif", fontSize:'16px', fontWeight:'400', color:'#3A2F26', marginBottom:'6px' }}>Legg til founder</h3>
-        <p style={{ fontSize:'13px', color:'#9C8267', lineHeight:'1.6', marginBottom:'14px' }}>
+        <p style={{ fontSize:'13px', color:'#75604B', lineHeight:'1.6', marginBottom:'14px' }}>
           Personen må ha en ArvKlart-konto. Neste gang de åpner /founder, må de sette opp tofaktor før de ser noe data.
         </p>
         <div style={{ display:'flex', gap:'10px', flexWrap:'wrap' }}>
@@ -62,7 +62,7 @@ export default function FounderManagement({ session, onToast }) {
             value={email}
             onChange={e => setEmail(e.target.value)}
             placeholder="navn@epost.no"
-            style={{ flex:'1 1 220px', padding:'10px 14px', border:'1px solid #D9CFC0', borderRadius:'8px', fontSize:'14px', background:'#E8DFD0', color:'#3A2F26', outline:'none', fontFamily:'Karla, sans-serif' }}
+            style={{ flex:'1 1 220px', padding:'10px 14px', border:'1px solid #D9CFC0', borderRadius:'8px', fontSize:'14px', background:'#E8DFD0', color:'#3A2F26', fontFamily:'Karla, sans-serif' }}
           />
           <button type="submit" disabled={busy || !email.trim()} style={{
             padding:'10px 20px', border:'none', borderRadius:'8px', fontSize:'14px', fontFamily:'Karla, sans-serif',
@@ -77,7 +77,7 @@ export default function FounderManagement({ session, onToast }) {
           <thead>
             <tr style={{ background:'#FBF9F5', borderBottom:'1px solid #D9CFC0' }}>
               {['Founder','Tofaktor','Lagt til',''].map(h=>(
-                <th key={h} style={{ padding:'12px 16px', textAlign:'left', fontSize:'12px', color:'#9C8267', fontWeight:'500', textTransform:'uppercase', letterSpacing:'0.5px' }}>{h}</th>
+                <th key={h} style={{ padding:'12px 16px', textAlign:'left', fontSize:'12px', color:'#75604B', fontWeight:'500', textTransform:'uppercase', letterSpacing:'0.5px' }}>{h}</th>
               ))}
             </tr>
           </thead>
@@ -87,15 +87,15 @@ export default function FounderManagement({ session, onToast }) {
               return (
                 <tr key={f.user_id} style={{ borderBottom: i<founders.length-1?'1px solid #E8DFD0':'none' }}>
                   <td style={{ padding:'12px 16px' }}>
-                    <div style={{ fontSize:'14px', color:'#3A2F26' }}>{f.display_name || '—'}{isMe && <span style={{ color:'#9C8267' }}> (deg)</span>}</div>
-                    <div style={{ fontSize:'12px', color:'#9C8267' }}>{f.email}</div>
+                    <div style={{ fontSize:'14px', color:'#3A2F26' }}>{f.display_name || '—'}{isMe && <span style={{ color:'#75604B' }}> (deg)</span>}</div>
+                    <div style={{ fontSize:'12px', color:'#75604B' }}>{f.email}</div>
                   </td>
                   <td style={{ padding:'12px 16px' }}>
                     <span style={{ fontSize:'11px', padding:'3px 8px', borderRadius:'20px', background:f.has_mfa?'#DCE3D2':'#E8DFD0', color:f.has_mfa?'#5F6E52':'#5C4530' }}>
                       {f.has_mfa ? 'Aktiv' : 'Ikke satt opp'}
                     </span>
                   </td>
-                  <td style={{ padding:'12px 16px', fontSize:'13px', color:'#9C8267' }}>
+                  <td style={{ padding:'12px 16px', fontSize:'13px', color:'#75604B' }}>
                     {fmtDate(f.created_at)}
                     {f.added_by_email && <div style={{ fontSize:'12px' }}>av {f.added_by_email}</div>}
                   </td>

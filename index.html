@@ -17,6 +17,10 @@
       ::-webkit-scrollbar-thumb { background: #D9CFC0; border-radius: 3px; }
       /* iOS zoomer inn på felt med skrift under 16px */
       @media (max-width: 600px) { input, select, textarea { font-size: 16px !important; } }
+      /* Synlig tastaturfokus overalt (WCAG 2.4.7). Mørk sage gir 5,2:1 mot snow; mørke flater setter sin egen farge */
+      :focus-visible { outline: 3px solid #5F6E52; outline-offset: 2px; }
+      /* Tekst utenfor skjermen, for skjermlesere */
+      .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
     </style>
   </head>
   <body>

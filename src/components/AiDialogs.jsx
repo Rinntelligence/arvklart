@@ -1,20 +1,19 @@
 // Dialoger som deles av sidene for å legge til gjenstander: AI-samtykke og demo-melding.
 import { L } from '../lib/lang'
 import { demoFeatureMessage } from '../lib/demo'
+import { Modal } from './UI'
 
 // Demoen kan prøve AI-funksjonene, men ikke lagre eller bruke dem ubegrenset
 export function DemoNotice({ onClose, onSignup }) {
   return (
-    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 300, padding: '20px' }}>
-      <div onClick={e => e.stopPropagation()} role="dialog" style={{ background: '#fff', borderRadius: '14px', padding: '28px', maxWidth: '400px', width: '100%', fontFamily: 'Karla, sans-serif' }}>
-        <h3 style={{ fontFamily: "'Fraunces', serif", fontSize: '19px', fontWeight: '400', color: '#3A2F26', marginBottom: '10px' }}>{L('Dette er en demo', 'This is a demo')}</h3>
+    <Modal onClose={onClose} labelledBy="demo-notice-title" zIndex={300}>
+        <h3 id="demo-notice-title" style={{ fontFamily: "'Fraunces', serif", fontSize: '19px', fontWeight: '400', color: '#3A2F26', marginBottom: '10px' }}>{L('Dette er en demo', 'This is a demo')}</h3>
         <p style={{ fontSize: '14px', color: '#5C4530', lineHeight: 1.6, marginBottom: '22px' }}>{demoFeatureMessage()}</p>
         <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
           <button onClick={onClose} style={{ flex: '1 1 120px', padding: '11px', background: 'none', border: '1px solid #D9CFC0', borderRadius: '8px', cursor: 'pointer', color: '#5C4530', fontSize: '14px', fontFamily: 'Karla, sans-serif' }}>{L('Fortsett demoen', 'Continue the demo')}</button>
           <button onClick={onSignup} style={{ flex: '2 1 180px', padding: '11px', background: '#3A2F26', color: '#FBF9F5', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '14px', fontFamily: 'Karla, sans-serif' }}>{L('Opprett konto', 'Create an account')}</button>
         </div>
-      </div>
-    </div>
+    </Modal>
   )
 }
 

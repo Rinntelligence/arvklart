@@ -66,8 +66,8 @@ export default function LandingPage({ loggedIn = false }) {
         }
         .lp nav a:hover, .lp nav a:focus-visible {
           background: rgba(251,249,245,0.2); border-color: rgba(251,249,245,0.45);
-          outline: none;
         }
+        .lp nav a:focus-visible { outline: 3px solid var(--snow); outline-offset: 2px; }
         .lp nav a.nav-login { border-color: rgba(251,249,245,0.7); margin-left: 8px; }
         .lp nav a.nav-login:hover, .lp nav a.nav-login:focus-visible {
           background: var(--snow); color: var(--espresso); text-shadow: none; border-color: var(--snow);

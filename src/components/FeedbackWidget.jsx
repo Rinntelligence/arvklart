@@ -56,7 +56,7 @@ export default function FeedbackWidget({ session, onToast }) {
               <>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px' }}>
                   <h3 style={{ fontFamily: "'Fraunces', serif", fontSize: '18px', fontWeight: '400', color: '#3A2F26' }}>{L('Tilbakemelding', 'Feedback')}</h3>
-                  <button onClick={() => setOpen(false)} style={{ background: 'none', border: 'none', fontSize: '24px', color: '#9C8267', cursor: 'pointer' }}>×</button>
+                  <button onClick={() => setOpen(false)} style={{ background: 'none', border: 'none', fontSize: '24px', color: '#75604B', cursor: 'pointer' }}>×</button>
                 </div>
                 <div style={{ display: 'flex', gap: '6px', marginBottom: '14px' }}>
                   {[['bug',L('🐛 Feil','🐛 Bug')],['idea',L('💡 Idé','💡 Idea')],['general',L('💬 Generelt','💬 General')]].map(([id,label]) => (
@@ -73,13 +73,13 @@ export default function FeedbackWidget({ session, onToast }) {
                 <textarea value={content} onChange={e => setContent(e.target.value)}
                   placeholder={type==='bug'?L('Hva gikk galt?','What went wrong?'):type==='idea'?L('Hvilken funksjon mangler?','What feature is missing?'):L('Fortell oss hva du synes…','Tell us what you think…')}
                   rows={4} maxLength={2000} style={{
-                    width: '100%', padding: '12px', border: '1px solid #D9CFC0',
+                    width: '100%', padding: '12px', border: '1px solid #9A8B78',
                     borderRadius: '8px', fontSize: '15px', fontFamily: 'Karla, sans-serif',
                     background: '#FBF9F5', color: '#3A2F26', resize: 'none',
-                    outline: 'none', boxSizing: 'border-box', marginBottom: '14px',
+                    boxSizing: 'border-box', marginBottom: '14px',
                   }} />
                 <div style={{ marginBottom: '16px' }}>
-                  <div style={{ fontSize: '12px', color: '#9C8267', marginBottom: '6px' }}>{L('Anbefaler du Arvklart? (1-10)', 'Would you recommend Arvklart? (1-10)')}</div>
+                  <div style={{ fontSize: '12px', color: '#75604B', marginBottom: '6px' }}>{L('Anbefaler du Arvklart? (1-10)', 'Would you recommend Arvklart? (1-10)')}</div>
                   <div style={{ display: 'flex', gap: '3px' }}>
                     {[1,2,3,4,5,6,7,8,9,10].map(n => (
                       <button key={n} onClick={() => setNps(nps===n?null:n)} style={{

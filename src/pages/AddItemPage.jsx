@@ -197,14 +197,14 @@ export default function AddItemPage({ session, profile, onToast, isDemo }) {
 
   return (
     <div style={{ maxWidth: '560px', margin: '0 auto', padding: '20px 16px 100px', fontFamily: 'Karla, sans-serif' }}>
-      <button onClick={() => navigate(`/estate/${id}`)} style={{ background: 'none', border: 'none', color: '#9C8267', cursor: 'pointer', fontSize: '14px', padding: '0 0 16px', fontFamily: 'Karla, sans-serif' }}>
+      <button onClick={() => navigate(`/estate/${id}`)} style={{ background: 'none', border: 'none', color: '#75604B', cursor: 'pointer', fontSize: '14px', padding: '0 0 16px', fontFamily: 'Karla, sans-serif' }}>
         {L('← Tilbake', '← Back')}
       </button>
 
       <h1 style={{ fontFamily: 'Fraunces, serif', fontSize: '24px', fontWeight: '400', color: '#3A2F26', marginBottom: '6px' }}>
         {L('Legg til gjenstand', 'Add item')}
       </h1>
-      <p style={{ color: '#9C8267', fontSize: '14px', marginBottom: '12px' }}>
+      <p style={{ color: '#75604B', fontSize: '14px', marginBottom: '12px' }}>
         {L('Fyll inn navn og ta gjerne bilde — AI kan identifisere og verdsette automatisk', 'Enter a name and add a photo if you can — AI can identify and value it automatically')}
       </p>
       <button onClick={() => navigate(`/estate/${id}/add-many`)} style={{
@@ -228,9 +228,9 @@ export default function AddItemPage({ session, profile, onToast, isDemo }) {
 
         {/* Bilder */}
         <div>
-          <label style={{ display: 'block', fontSize: '13px', color: '#9C8267', marginBottom: '8px' }}>
+          <div style={{ display: 'block', fontSize: '13px', color: '#75604B', marginBottom: '8px' }}>
             {L('Bilder (valgfri, maks 5)', 'Photos (optional, max 5)')}
-          </label>
+          </div>
           <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
             {imagePreviews.map((src, i) => (
               <div key={i} style={{ position: 'relative', width: '80px', height: '80px', borderRadius: '8px', overflow: 'hidden', background: '#E8DFD0' }}>
@@ -267,10 +267,10 @@ export default function AddItemPage({ session, profile, onToast, isDemo }) {
 
         {/* Navn */}
         <div>
-          <label style={{ display: 'block', fontSize: '13px', color: '#9C8267', marginBottom: '6px' }}>
+          <label htmlFor="additem-f1" style={{ display: 'block', fontSize: '13px', color: '#75604B', marginBottom: '6px' }}>
             {L('Navn på gjenstand *', 'Item name *')}
           </label>
-          <input
+          <input id="additem-f1"
             value={title}
             onChange={e => setTitle(e.target.value)}
             placeholder={L('f.eks. Bestemors gyngestol', 'e.g. Grandmother\'s rocking chair')}
@@ -279,7 +279,7 @@ export default function AddItemPage({ session, profile, onToast, isDemo }) {
             style={{
               width: '100%', padding: '14px', border: '1px solid #D9CFC0',
               borderRadius: '10px', fontSize: '16px', background: '#FBF9F5',
-              color: '#3A2F26', outline: 'none', fontFamily: 'Karla, sans-serif',
+              color: '#3A2F26', fontFamily: 'Karla, sans-serif',
               boxSizing: 'border-box',
             }}
           />
@@ -287,9 +287,9 @@ export default function AddItemPage({ session, profile, onToast, isDemo }) {
 
         {/* Kategori */}
         <div>
-          <label style={{ display: 'block', fontSize: '13px', color: '#9C8267', marginBottom: '8px' }}>
+          <div style={{ display: 'block', fontSize: '13px', color: '#75604B', marginBottom: '8px' }}>
             {L('Kategori', 'Category')}
-          </label>
+          </div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
             {categories.map(c => (
               <button key={c.id} onClick={() => setCategoryId(c.id)} style={{
@@ -305,7 +305,7 @@ export default function AddItemPage({ session, profile, onToast, isDemo }) {
             {!isDemo && <button onClick={() => setShowAddCat(!showAddCat)} style={{
               padding: '8px 14px', borderRadius: '20px', cursor: 'pointer', fontSize: '13px',
               fontFamily: 'Karla, sans-serif', border: '2px dashed #D9CFC0',
-              background: 'transparent', color: '#9C8267',
+              background: 'transparent', color: '#75604B',
             }}>
               {L('+ Ny kategori', '+ New category')}
             </button>}
@@ -323,7 +323,7 @@ export default function AddItemPage({ session, profile, onToast, isDemo }) {
                   autoFocus
                   style={{
                     flex: 1, padding: '8px 12px', border: '1px solid #D9CFC0', borderRadius: '8px',
-                    fontSize: '14px', background: '#fff', color: '#3A2F26', outline: 'none', fontFamily: 'Karla, sans-serif',
+                    fontSize: '14px', background: '#fff', color: '#3A2F26', fontFamily: 'Karla, sans-serif',
                   }}
                 />
                 <button onClick={addCategory} disabled={!newCatLabel.trim() || savingCat} style={{
@@ -334,7 +334,7 @@ export default function AddItemPage({ session, profile, onToast, isDemo }) {
                   {savingCat ? '…' : L('Legg til', 'Add')}
                 </button>
                 <button onClick={() => { setShowAddCat(false); setNewCatLabel('') }} style={{
-                  padding: '8px', background: 'none', border: 'none', cursor: 'pointer', color: '#9C8267', fontSize: '16px',
+                  padding: '8px', background: 'none', border: 'none', cursor: 'pointer', color: '#75604B', fontSize: '16px',
                 }}>×</button>
               </div>
             </div>
@@ -343,13 +343,13 @@ export default function AddItemPage({ session, profile, onToast, isDemo }) {
 
         {/* Tilstand */}
         <div>
-          <label style={{ display: 'block', fontSize: '13px', color: '#9C8267', marginBottom: '8px' }}>
+          <div style={{ display: 'block', fontSize: '13px', color: '#75604B', marginBottom: '8px' }}>
             {L('Tilstand', 'Condition')}
-          </label>
+          </div>
           <div style={{ display: 'flex', gap: '8px' }}>
             {[['excellent',L('Utmerket','Excellent')],['good',L('God','Good')],['fair',L('Middels','Fair')],['poor',L('Dårlig','Poor')]].map(([val, label]) => (
-              <button key={val} onClick={() => setCondition(val)} style={{
-                flex: 1, padding: '10px 4px',
+              <button key={val} onClick={() => setCondition(val)} aria-pressed={condition === val} style={{
+                flex: 1, padding: '10px 4px', minHeight: '44px',
                 border: `2px solid ${condition === val ? '#3A2F26' : '#D9CFC0'}`,
                 borderRadius: '8px', cursor: 'pointer', fontSize: '12px',
                 fontFamily: 'Karla, sans-serif',
@@ -362,10 +362,10 @@ export default function AddItemPage({ session, profile, onToast, isDemo }) {
 
         {/* Beskrivelse */}
         <div>
-          <label style={{ display: 'block', fontSize: '13px', color: '#9C8267', marginBottom: '6px' }}>
+          <label htmlFor="additem-f2" style={{ display: 'block', fontSize: '13px', color: '#75604B', marginBottom: '6px' }}>
             {L('Beskrivelse (valgfri)', 'Description (optional)')}
           </label>
-          <textarea
+          <textarea id="additem-f2"
             value={description}
             onChange={e => setDescription(e.target.value)}
             placeholder={L('Materiale, farge, historikk, minner…', 'Material, colour, history, memories…')}
@@ -375,7 +375,7 @@ export default function AddItemPage({ session, profile, onToast, isDemo }) {
               width: '100%', padding: '14px', border: '1px solid #D9CFC0',
               borderRadius: '10px', fontSize: '15px', fontFamily: 'Karla, sans-serif',
               background: '#FBF9F5', color: '#3A2F26', resize: 'none',
-              outline: 'none', boxSizing: 'border-box',
+              boxSizing: 'border-box',
             }}
           />
         </div>
@@ -383,14 +383,14 @@ export default function AddItemPage({ session, profile, onToast, isDemo }) {
         {/* Kjøpspris og -år for verdiestimat */}
         <div style={{ display: 'flex', gap: '10px' }}>
           <div style={{ flex: 1 }}>
-            <label style={{ display: 'block', fontSize: '13px', color: '#9C8267', marginBottom: '6px' }}>{L('Kjøpspris (NOK, valgfri)', 'Purchase price (NOK, optional)')}</label>
-            <input type="number" value={purchasePrice} onChange={e => setPurchasePrice(e.target.value)} placeholder={L('f.eks. 5000', 'e.g. 5000')}
-              style={{ width: '100%', padding: '12px 14px', border: '1px solid #D9CFC0', borderRadius: '10px', fontSize: '15px', background: '#FBF9F5', color: '#3A2F26', outline: 'none', fontFamily: 'Karla, sans-serif', boxSizing: 'border-box' }} />
+            <label htmlFor="additem-f3" style={{ display: 'block', fontSize: '13px', color: '#75604B', marginBottom: '6px' }}>{L('Kjøpspris (NOK, valgfri)', 'Purchase price (NOK, optional)')}</label>
+            <input id="additem-f3" type="number" value={purchasePrice} onChange={e => setPurchasePrice(e.target.value)} placeholder={L('f.eks. 5000', 'e.g. 5000')}
+              style={{ width: '100%', padding: '12px 14px', border: '1px solid #9A8B78', borderRadius: '10px', fontSize: '15px', background: '#FBF9F5', color: '#3A2F26', fontFamily: 'Karla, sans-serif', boxSizing: 'border-box' }} />
           </div>
           <div style={{ flex: 1 }}>
-            <label style={{ display: 'block', fontSize: '13px', color: '#9C8267', marginBottom: '6px' }}>{L('Kjøpsår (valgfri)', 'Year of purchase (optional)')}</label>
-            <input type="number" value={purchaseYear} onChange={e => setPurchaseYear(e.target.value)} placeholder={L('f.eks. 2010', 'e.g. 2010')}
-              style={{ width: '100%', padding: '12px 14px', border: '1px solid #D9CFC0', borderRadius: '10px', fontSize: '15px', background: '#FBF9F5', color: '#3A2F26', outline: 'none', fontFamily: 'Karla, sans-serif', boxSizing: 'border-box' }} />
+            <label htmlFor="additem-f4" style={{ display: 'block', fontSize: '13px', color: '#75604B', marginBottom: '6px' }}>{L('Kjøpsår (valgfri)', 'Year of purchase (optional)')}</label>
+            <input id="additem-f4" type="number" value={purchaseYear} onChange={e => setPurchaseYear(e.target.value)} placeholder={L('f.eks. 2010', 'e.g. 2010')}
+              style={{ width: '100%', padding: '12px 14px', border: '1px solid #9A8B78', borderRadius: '10px', fontSize: '15px', background: '#FBF9F5', color: '#3A2F26', fontFamily: 'Karla, sans-serif', boxSizing: 'border-box' }} />
           </div>
         </div>
 
@@ -413,15 +413,15 @@ export default function AddItemPage({ session, profile, onToast, isDemo }) {
             <div style={{ fontSize: '13px', color: '#3A5A30', fontWeight: '500', marginBottom: '12px' }}>{L('Verdiestimat (NOK)', 'Value estimate (NOK)')}</div>
             <div style={{ display: 'flex', gap: '16px', marginBottom: '12px', flexWrap: 'wrap' }}>
               <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: '11px', color: '#9C8267', marginBottom: '2px' }}>{L('Lavt', 'Low')}</div>
+                <div style={{ fontSize: '11px', color: '#75604B', marginBottom: '2px' }}>{L('Lavt', 'Low')}</div>
                 <div style={{ fontSize: '18px', color: '#3A2F26', fontFamily: 'Fraunces, serif' }}>{formatNOK(aiEstimate.low_nok)}</div>
               </div>
               <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: '11px', color: '#9C8267', marginBottom: '2px' }}>{L('Mest sannsynlig', 'Most likely')}</div>
+                <div style={{ fontSize: '11px', color: '#75604B', marginBottom: '2px' }}>{L('Mest sannsynlig', 'Most likely')}</div>
                 <div style={{ fontSize: '22px', color: '#3A5A30', fontFamily: 'Fraunces, serif', fontWeight: '500' }}>{formatNOK(aiEstimate.likely_nok)}</div>
               </div>
               <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: '11px', color: '#9C8267', marginBottom: '2px' }}>{L('Høyt', 'High')}</div>
+                <div style={{ fontSize: '11px', color: '#75604B', marginBottom: '2px' }}>{L('Høyt', 'High')}</div>
                 <div style={{ fontSize: '18px', color: '#3A2F26', fontFamily: 'Fraunces, serif' }}>{formatNOK(aiEstimate.high_nok)}</div>
               </div>
             </div>
@@ -453,7 +453,7 @@ export default function AddItemPage({ session, profile, onToast, isDemo }) {
               )}
             </div>
 
-            <p style={{ fontSize: '11px', color: '#9C8267', marginTop: '8px', marginBottom: 0 }}>{L('Estimater er kun veiledende — ikke profesjonell takst.', 'Estimates are for guidance only — not a professional appraisal.')}</p>
+            <p style={{ fontSize: '11px', color: '#75604B', marginTop: '8px', marginBottom: 0 }}>{L('Estimater er kun veiledende — ikke profesjonell takst.', 'Estimates are for guidance only — not a professional appraisal.')}</p>
           </div>
         )}
 
@@ -497,8 +497,8 @@ function PhotoTile({ onClick, label }) {
       justifyContent: 'center', cursor: 'pointer', gap: '4px', padding: 0,
       fontFamily: 'Karla, sans-serif',
     }}>
-      <span style={{ fontSize: '20px', color: '#9C8267' }}>+</span>
-      <span style={{ fontSize: '11px', color: '#9C8267' }}>{label}</span>
+      <span style={{ fontSize: '20px', color: '#75604B' }}>+</span>
+      <span style={{ fontSize: '11px', color: '#75604B' }}>{label}</span>
     </button>
   )
 }

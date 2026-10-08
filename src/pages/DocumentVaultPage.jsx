@@ -2,16 +2,17 @@ import { useEffect, useState, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase, getEstateMembers } from '../lib/supabase'
 import { L, locale } from '../lib/lang'
+import { Modal } from '../components/UI'
 
 const FOLDER_TYPES = [
   { id: 'will',      label: L('Testament', 'Will'),                         color: '#5F6E52' },
-  { id: 'death',     label: L('Dødsattest', 'Death certificate'),           color: '#8B9A7D' },
+  { id: 'death',     label: L('Dødsattest', 'Death certificate'),           color: '#5F6E52' },
   { id: 'property',  label: L('Eiendom og skjøter', 'Property and deeds'),  color: '#7A8B6E' },
-  { id: 'insurance', label: L('Forsikring', 'Insurance'),                  color: '#9C8267' },
+  { id: 'insurance', label: L('Forsikring', 'Insurance'),                  color: '#75604B' },
   { id: 'tax',       label: L('Skattemeldinger', 'Tax returns'),           color: '#A97C3F' },
   { id: 'id',        label: L('ID-dokumenter', 'ID documents'),            color: '#6E8B87' },
   { id: 'probate',   label: L('Skifte og juridisk', 'Probate and legal'),  color: '#8B3A3A' },
-  { id: 'other',     label: L('Annet', 'Other'),                           color: '#9C8267' },
+  { id: 'other',     label: L('Annet', 'Other'),                           color: '#75604B' },
 ]
 
 const formatSize = (bytes) => bytes < 1024*1024 ? `${(bytes/1024).toFixed(0)} KB` : `${(bytes/(1024*1024)).toFixed(1)} MB`
@@ -128,12 +129,12 @@ export default function DocumentVaultPage({ session, onToast }) {
 
   return (
     <div style={{ maxWidth:'900px', margin:'0 auto', padding:'28px 16px', fontFamily:'Karla, sans-serif' }}>
-      <button onClick={() => navigate(`/estate/${id}`)} style={{ background:'none', border:'none', color:'#9C8267', cursor:'pointer', fontSize:'13px', padding:'0 0 20px', fontFamily:'Karla, sans-serif' }}>{L('← Tilbake til boet', '← Back to the estate')}</button>
+      <button onClick={() => navigate(`/estate/${id}`)} style={{ background:'none', border:'none', color:'#75604B', cursor:'pointer', fontSize:'13px', padding:'0 0 20px', fontFamily:'Karla, sans-serif' }}>{L('← Tilbake til boet', '← Back to the estate')}</button>
 
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:'28px', flexWrap:'wrap', gap:'12px' }}>
         <div>
           <h1 style={{ fontFamily:'Fraunces, serif', fontSize:'26px', fontWeight:'400', color:'#3A2F26', marginBottom:'4px' }}>{L('Dokumenthvelv', 'Document vault')}</h1>
-          <p style={{ color:'#9C8267', fontSize:'14px' }}>{L('Lagre og del viktige dokumenter trygt', 'Store and share important documents securely')}</p>
+          <p style={{ color:'#75604B', fontSize:'14px' }}>{L('Lagre og del viktige dokumenter trygt', 'Store and share important documents securely')}</p>
         </div>
         <button onClick={() => fileRef.current.click()} style={{ padding:'9px 18px', background:'#3A2F26', color:'#FBF9F5', border:'none', borderRadius:'8px', cursor:'pointer', fontSize:'14px', fontFamily:'Karla, sans-serif' }}>
           {L('Last opp fil', 'Upload file')}
@@ -167,8 +168,8 @@ export default function DocumentVaultPage({ session, onToast }) {
         }}
         onClick={() => fileRef.current.click()}
       >
-        <div style={{ fontSize:'14px', color:'#9C8267', marginBottom:'4px' }}>{L('Slipp filer her eller klikk for å laste opp', 'Drop files here or click to upload')}</div>
-        <div style={{ fontSize:'12px', color:'#D9CFC0' }}>{L('PDF, Word, Excel og bilder støttes', 'PDF, Word, Excel and images are supported')}</div>
+        <div style={{ fontSize:'14px', color:'#75604B', marginBottom:'4px' }}>{L('Slipp filer her eller klikk for å laste opp', 'Drop files here or click to upload')}</div>
+        <div style={{ fontSize:'12px', color:'#75604B' }}>{L('PDF, Word, Excel og bilder støttes', 'PDF, Word, Excel and images are supported')}</div>
       </div>
 
       {/* Mobil: mappene som en vannrett rad i stedet for en høy liste */}
@@ -189,7 +190,7 @@ export default function DocumentVaultPage({ session, onToast }) {
               display:'flex', justifyContent:'space-between', alignItems:'center',
             }}>
               <span>{L('Alle dokumenter', 'All documents')}</span>
-              <span style={{ fontSize:'12px', color:'#9C8267', background:'#FBF9F5', padding:'1px 7px', borderRadius:'20px' }}>{docs.length}</span>
+              <span style={{ fontSize:'12px', color:'#75604B', background:'#FBF9F5', padding:'1px 7px', borderRadius:'20px' }}>{docs.length}</span>
             </button>
             {FOLDER_TYPES.map((folder, i) => (
               <button key={folder.id} className="doc-folder" onClick={() => setActiveFolder(folder.id)} style={{
@@ -201,7 +202,7 @@ export default function DocumentVaultPage({ session, onToast }) {
               }}>
                 <span>{folder.label}</span>
                 {countByFolder[folder.id] > 0 && (
-                  <span style={{ fontSize:'11px', color:'#9C8267', background:'#FBF9F5', padding:'1px 6px', borderRadius:'20px' }}>{countByFolder[folder.id]}</span>
+                  <span style={{ fontSize:'11px', color:'#75604B', background:'#FBF9F5', padding:'1px 6px', borderRadius:'20px' }}>{countByFolder[folder.id]}</span>
                 )}
               </button>
             ))}
@@ -211,7 +212,7 @@ export default function DocumentVaultPage({ session, onToast }) {
         {/* Dokumentliste */}
         <div style={{ flex:'3 1 320px', minWidth:0 }}>
           {filtered.length === 0 ? (
-            <div style={{ textAlign:'center', padding:'60px 20px', color:'#9C8267' }}>
+            <div style={{ textAlign:'center', padding:'60px 20px', color:'#75604B' }}>
               <p>{activeFolder==='all'?L('Ingen dokumenter i hvelvet ennå.','No documents in the vault yet.'):L('Ingen dokumenter i denne mappen ennå.','No documents in this folder yet.')}</p>
             </div>
           ) : (
@@ -230,29 +231,26 @@ export default function DocumentVaultPage({ session, onToast }) {
 
       {/* Bekreft sletting */}
       {confirmDoc && (
-        <div onClick={() => setConfirmDoc(null)} style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.5)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:200, padding:'20px' }}>
-          <div onClick={e => e.stopPropagation()} style={{ background:'#fff', borderRadius:'14px', padding:'28px', maxWidth:'400px', width:'100%' }}>
-            <h3 style={{ fontFamily:'Fraunces, serif', fontSize:'18px', fontWeight:'400', color:'#3A2F26', marginBottom:'8px' }}>{L('Slett dokument', 'Delete document')}</h3>
+        <Modal onClose={() => setConfirmDoc(null)} labelledBy="delete-doc-title">
+            <h3 id="delete-doc-title" style={{ fontFamily:'Fraunces, serif', fontSize:'18px', fontWeight:'400', color:'#3A2F26', marginBottom:'8px' }}>{L('Slett dokument', 'Delete document')}</h3>
             <p style={{ fontSize:'14px', color:'#5C4530', marginBottom:'6px' }}>«{confirmDoc.name}»</p>
-            <p style={{ fontSize:'13px', color:'#9C8267', marginBottom:'24px' }}>{L('Kan ikke angres.', 'This cannot be undone.')}</p>
+            <p style={{ fontSize:'13px', color:'#75604B', marginBottom:'24px' }}>{L('Kan ikke angres.', 'This cannot be undone.')}</p>
             <div style={{ display:'flex', gap:'10px' }}>
               <button onClick={() => setConfirmDoc(null)} style={{ flex:1, padding:'11px', background:'none', border:'1px solid #D9CFC0', borderRadius:'8px', cursor:'pointer', color:'#5C4530', fontSize:'14px', fontFamily:'Karla, sans-serif' }}>{L('Avbryt', 'Cancel')}</button>
               <button onClick={() => deleteDoc(confirmDoc)} style={{ flex:1, padding:'11px', background:'#8B3A3A', color:'#fff', border:'none', borderRadius:'8px', cursor:'pointer', fontSize:'14px', fontFamily:'Karla, sans-serif' }}>{L('Slett', 'Delete')}</button>
             </div>
-          </div>
-        </div>
+        </Modal>
       )}
 
       {/* Forhåndsvisning */}
       {preview && (
-        <div onClick={() => setPreview(null)} style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.6)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:200, padding:'20px' }}>
-          <div onClick={e => e.stopPropagation()} style={{ background:'#fff', borderRadius:'14px', padding:'28px', maxWidth:'560px', width:'100%' }}>
+        <Modal onClose={() => setPreview(null)} labelledBy="preview-doc-title" maxWidth={560} overlay="rgba(0,0,0,0.6)">
             <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:'20px' }}>
               <div>
-                <h3 style={{ fontFamily:'Fraunces, serif', fontSize:'18px', fontWeight:'400', color:'#3A2F26', marginBottom:'4px' }}>{preview.name}</h3>
-                <p style={{ fontSize:'13px', color:'#9C8267' }}>{L('Lastet opp av', 'Uploaded by')} {preview.uploader?.display_name || L('et tidligere medlem', 'a former member')} · {new Date(preview.created_at).toLocaleDateString(locale())}</p>
+                <h3 id="preview-doc-title" style={{ fontFamily:'Fraunces, serif', fontSize:'18px', fontWeight:'400', color:'#3A2F26', marginBottom:'4px', overflowWrap:'anywhere' }}>{preview.name}</h3>
+                <p style={{ fontSize:'13px', color:'#75604B' }}>{L('Lastet opp av', 'Uploaded by')} {preview.uploader?.display_name || L('et tidligere medlem', 'a former member')} · {new Date(preview.created_at).toLocaleDateString(locale())}</p>
               </div>
-              <button onClick={() => setPreview(null)} style={{ background:'none', border:'none', fontSize:'24px', color:'#9C8267', cursor:'pointer' }}>×</button>
+              <button onClick={() => setPreview(null)} aria-label={L('Lukk', 'Close')} style={{ background:'none', border:'none', fontSize:'24px', color:'#75604B', cursor:'pointer', minWidth:'44px', minHeight:'44px' }}>×</button>
             </div>
             {preview.file_type?.startsWith('image/') && previewUrl && (
               <img src={previewUrl} alt={preview.name} style={{ width:'100%', borderRadius:'8px', marginBottom:'16px' }} />
@@ -263,8 +261,7 @@ export default function DocumentVaultPage({ session, onToast }) {
               </button>
               <button onClick={() => setPreview(null)} style={{ flex:1, padding:'11px', background:'none', border:'1px solid #D9CFC0', borderRadius:'8px', cursor:'pointer', color:'#5C4530', fontSize:'14px', fontFamily:'Karla, sans-serif' }}>{L('Lukk', 'Close')}</button>
             </div>
-          </div>
-        </div>
+        </Modal>
       )}
     </div>
   )
@@ -279,7 +276,7 @@ function DocRow({ doc, session, myRole, onDelete, onMove, onPreview, onDownload 
       <div style={{ width:'8px', height:'40px', borderRadius:'4px', background:folder.color, flexShrink:0 }} />
       <div style={{ flex:1, minWidth:0 }}>
         <div style={{ fontSize:'14px', color:'#3A2F26', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{doc.name}</div>
-        <div style={{ fontSize:'12px', color:'#9C8267', marginTop:'2px', display:'flex', gap:'8px', alignItems:'center' }}>
+        <div style={{ fontSize:'12px', color:'#75604B', marginTop:'2px', display:'flex', gap:'8px', alignItems:'center' }}>
           <span>{doc.uploader?.display_name || L('Tidligere medlem', 'Former member')}</span>
           <span>·</span>
           <span>{formatSize(doc.file_size)}</span>
