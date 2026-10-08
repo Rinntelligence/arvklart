@@ -286,27 +286,6 @@ export default function ItemDetailPage({ session, profile, onToast }) {
           {!item.interests?.length ? (
             <div>
               <p style={{ color:'#9C8267', fontSize:'14px', fontStyle:'italic', marginBottom:'16px' }}>Ingen har vist interesse ennå.</p>
-              {!isAssigned && (
-                <div style={{ display:'flex', flexDirection:'column', gap:'8px' }}>
-                  {[
-                    { label:'Legg ut på Finn.no', desc:'Selg gjenstanden på nett', url:`https://www.finn.no/bap/forsale/new?title=${encodeURIComponent(item.title)}` },
-                    { label:'Doner til veldighet', desc:'Gi til Fretex eller lignende', url:'https://www.fretex.no' },
-                    { label:'Bestill tømming', desc:'Hent og fjern fra boet', url:'https://www.google.no/search?q=bestill+boligtømming' },
-                  ].map(({ label, desc, url }) => (
-                    <button key={label} onClick={() => window.open(url, '_blank')} style={{
-                      width:'100%', padding:'13px 16px', background:'#FBF9F5', border:'1px solid #D9CFC0',
-                      borderRadius:'9px', cursor:'pointer', textAlign:'left', fontFamily:'Karla, sans-serif',
-                      display:'flex', justifyContent:'space-between', alignItems:'center',
-                    }}>
-                      <div>
-                        <div style={{ fontSize:'14px', color:'#3A2F26', fontWeight:'500' }}>{label}</div>
-                        <div style={{ fontSize:'12px', color:'#9C8267', marginTop:'2px' }}>{desc}</div>
-                      </div>
-                      <span style={{ color:'#9C8267', fontSize:'16px' }}>›</span>
-                    </button>
-                  ))}
-                </div>
-              )}
             </div>
           ) : (
             <div style={{ display:'flex', flexDirection:'column', gap:'10px' }}>
