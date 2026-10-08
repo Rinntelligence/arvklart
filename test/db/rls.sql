@@ -204,6 +204,27 @@ do $$ begin
 exception when insufficient_privilege then raise notice 'OK   klienten kan ikke kalle claim_ai_call direkte';
 end $$;
 reset role;
+
+-- Kjøreloggen for automatisk sletting kan bare leses og skrives av service_role
+select t_as('eva@test.no'); set role authenticated;
+do $$ begin
+  perform 1 from cleanup_runs;
+  raise exception 'FAIL: innlogget bruker kunne lese cleanup_runs';
+exception when insufficient_privilege then raise notice 'OK   innlogget bruker kan ikke lese cleanup_runs';
+end $$;
+do $$ begin
+  insert into cleanup_runs (job) values ('falsk');
+  raise exception 'FAIL: innlogget bruker kunne skrive cleanup_runs';
+exception when insufficient_privilege then raise notice 'OK   innlogget bruker kan ikke skrive cleanup_runs';
+end $$;
+reset role;
+select t_as(null); set role anon;
+do $$ begin
+  perform 1 from cleanup_runs;
+  raise exception 'FAIL: anon kunne lese cleanup_runs';
+exception when insufficient_privilege then raise notice 'OK   anon kan ikke lese cleanup_runs';
+end $$;
+reset role;
 do $$
 declare r jsonb; i int;
 begin

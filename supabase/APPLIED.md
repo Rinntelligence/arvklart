@@ -23,6 +23,7 @@ Sist verifisert: 2026-10-08, ved å sammenligne prod med en lokal database bygge
 | `migrations/20261007_security_hardening.sql` | ja | alle policies, `guard_item_update`, `is_estate_*`, Storage-policies lik |
 | `migrations/20261008_estimate_reasoning.sql` | **ja, 2026-10-08 16:31 UTC** | kjørt med `lock_timeout` via MCP (`schema_migrations` 20261008163106). 223 eksisterende rader uendret (hash før/etter), røyktest som innlogget bruker rullet tilbake |
 | `migrations/20261008_revoke_cleanup_old_closed_estates.sql` | **ja, 2026-10-08 16:33 UTC** | `schema_migrations` 20261008163341. `anon`/`authenticated` får 42501, `service_role` kan fortsatt |
+| `migrations/20261008_cleanup_runs.sql` | **nei** | må kjøres før `cleanup-closed-estates` / `cleanup-orphan-images` deployes (uten tabellen avbrytes kjøringen før noe slettes) |
 
 ## Finnes bare i produksjon (ikke i repoet)
 
@@ -35,7 +36,7 @@ Sist verifisert: 2026-10-08, ved å sammenligne prod med en lokal database bygge
 | FK `comments_profile_fkey`, `comments_user_id_fkey`, `interests_profile_fkey` → `profiles(user_id)` | repoet har FK til `auth.users` |
 | indekser `items_estate_id_idx`, `interests_item_id_idx` | nyttige, mangler i repoet |
 | `rls_auto_enable()` + event-trigger `ensure_rls` | Supabase-plattformens funksjon, ikke vår |
-| extension `pg_cron` 1.6.4 installert, `pg_net` ikke installert | `cron.job` er tom |
+| extensions: `pg_cron` 1.6.4 og `supabase_vault` 0.3.1 installert, `pg_net` ikke installert | `cron.job` er tom |
 
 ## Edge-funksjoner
 
@@ -43,9 +44,10 @@ Sist verifisert: 2026-10-08, ved å sammenligne prod med en lokal database bygge
 |---|---|---|---|
 | `analyze-item` | v11 | ja | deployet med `verify_jwt: false` (funksjonen sjekker innlogging selv) |
 | `estimate-value` | v10 | ja fra 2026-10-08 | FINN-versjonen ligger i grenen `claude/estimate-value-finn` og er **ikke** deployet |
-| `delete-account` | v4 | ja | |
+| `delete-account` | v4 | nei fra 2026-10-08 | repoet bruker nå `deleteEstate()` (paginering, kontroll av filer, sletter tilbakemeldinger knyttet til boet). Deployet med `verify_jwt: false`, men sjekker innlogging selv |
 | `demo-login` | v3 | ja | |
-| `cleanup-closed-estates` | v3 | ja | ingen cron-jobb kaller den ennå |
+| `cleanup-closed-estates` | v3 | nei fra 2026-10-08 | repoet har ny versjon (paginering, dry_run, kjørelogg, tilbakemeldinger). Ikke deployet; ingen cron-jobb |
+| `cleanup-orphan-images` | – | ny i repoet | ikke deployet |
 
 ## Plan for varig sporing (ikke innført)
 

@@ -99,5 +99,5 @@ Hent verdiene fra Supabase Dashboard → Project Settings → API.
 - Samtykke til AI (bildeanalyse og verdiestimat) spørres om i `AddItemPage.jsx` og kan trekkes tilbake under «Min konto» (`src/lib/aiConsent.js`, localStorage-nøkkel: `aiConsented`)
 - Dataeksport (PDF) er i `AccountPage` + `src/lib/dataExportPdf.js`
 - Slett-konto-funksjon er i `supabase/functions/delete-account/index.ts`: sletter bo brukeren er alene om (med filer), gir admin videre i delte bo og fjerner navnet fra gjenstander
-- Automatisk sletting 12 mnd etter at et bo avsluttes (`estates.closed_at`): edge-funksjonen `cleanup-closed-estates`, kjørt månedlig av Supabase Cron (se `supabase/README.md`)
+- Automatisk sletting 12 mnd etter at et bo avsluttes (`estates.closed_at`): edge-funksjonen `cleanup-closed-estates` (data, filer og tilbakemeldinger knyttet til boet), skal kjøres daglig av Supabase Cron; kjøringer logges i `cleanup_runs`. Foreldreløse bilder ryddes bare manuelt med `cleanup-orphan-images` (dry_run + bekreftelse). Se `supabase/README.md`
 - Behandlingsansvarlig (selskapsnavn og org.nr.) fylles inn i `COMPANY` i `OtherPages.jsx`
