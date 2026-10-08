@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { getItems, supabase } from '../lib/supabase'
 import { getEstatePasses, addPass, addInterestClearingPass } from '../lib/decisions'
 import { L } from '../lib/lang'
+import { categoryLabel } from '../lib/categories'
 import { formatNOK } from '../lib/format'
 
 export default function SwipePage({ session, profile, onToast }) {
@@ -210,7 +211,7 @@ export default function SwipePage({ session, profile, onToast }) {
             <h2 style={{ fontFamily:'Fraunces, serif', fontSize:'20px', fontWeight:'400', color:'#3A2F26', marginBottom:'6px' }}>{currentItem.title}</h2>
             <div style={{ display:'flex', gap:'8px', alignItems:'center', marginBottom:'8px' }}>
               <span style={{ fontSize:'12px', color:'#9C8267', background:'#E8DFD0', padding:'3px 10px', borderRadius:'20px' }}>
-                {currentItem.categories?.emoji} {currentItem.categories?.label || L('Annet', 'Other')}
+                {currentItem.categories?.emoji} {categoryLabel(currentItem.categories?.label) || L('Annet', 'Other')}
               </span>
               {currentItem.estimated_value && (
                 <span style={{ fontSize:'12px', color:'#5F6E52' }}>{formatNOK(currentItem.estimated_value)}</span>

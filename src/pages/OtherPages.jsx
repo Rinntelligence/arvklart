@@ -5,6 +5,7 @@ import { supabase } from '../lib/supabase'
 import { joinEstateByCode } from '../lib/joinEstate'
 import { hasAiConsent, withdrawAiConsent } from '../lib/aiConsent'
 import { L, isEn } from '../lib/lang'
+import { categoryLabel } from '../lib/categories'
 
 const btn = { padding:'10px 20px', background:'#3A2F26', color:'#FBF9F5', border:'none', borderRadius:'8px', cursor:'pointer', fontSize:'14px', fontFamily:'Karla, sans-serif' }
 const h2 = { fontFamily:"'Fraunces', serif", fontSize:'22px', fontWeight:'400', color:'#3A2F26' }
@@ -105,7 +106,7 @@ export function CategoriesPage({ onToast }) {
         {categories.map((c,i)=>(
           <div key={c.id} style={{ display:'flex', alignItems:'center', padding:'14px 20px', borderBottom:i<categories.length-1?'1px solid #E8DFD0':'none' }}>
             <span style={{ fontSize:'20px', marginRight:'14px' }}>{c.emoji}</span>
-            <span style={{ flex:1, fontSize:'15px', color:'#3A2F26' }}>{c.label}</span>
+            <span style={{ flex:1, fontSize:'15px', color:'#3A2F26' }}>{categoryLabel(c.label)}</span>
             <button onClick={()=>remove(c.id)} title={L('Fjern kategori', 'Remove category')} style={{ background:'none', border:'none', color:'#9C8267', cursor:'pointer', fontSize:'20px' }}>×</button>
           </div>
         ))}

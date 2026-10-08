@@ -5,6 +5,7 @@ import { fileToDataUrl, uploadEstateImage } from '../lib/images'
 import { hasAiConsent, giveAiConsent } from '../lib/aiConsent'
 import { formatNOK } from '../lib/format'
 import { L, isEn } from '../lib/lang'
+import { categoryLabel } from '../lib/categories'
 import { analyzeItemPhotos, callEdgeFunction, matchCategory } from '../lib/itemAi'
 import { AiConsent, DemoNotice } from '../components/AiDialogs'
 import CameraCapture from '../components/CameraCapture'
@@ -249,7 +250,7 @@ export default function AddItemPage({ session, profile, onToast, isDemo }) {
           </div>
           {/* Uten capture-attributt: mobilen tilbyr kamerarull, kamera og filer */}
           <input ref={fileRef} type="file" accept="image/*" multiple onChange={handleImages} style={{ display: 'none' }} />
-          {cameraOpen && <CameraCapture photos={imagePreviews} onCapture={addImages} onClose={() => setCameraOpen(false)} />}
+          {cameraOpen && <CameraCapture photos={imagePreviews} onCapture={addImages} onRemovePhoto={removeImage} onClose={() => setCameraOpen(false)} />}
 
           {/* AI-analyseknapp */}
           {imageFiles.length > 0 && !consentFor && (
@@ -298,7 +299,7 @@ export default function AddItemPage({ session, profile, onToast, isDemo }) {
                 color: categoryId === c.id ? '#FBF9F5' : '#5C4530',
                 transition: 'all 0.12s',
               }}>
-                {c.label}
+                {categoryLabel(c.label)}
               </button>
             ))}
             {!isDemo && <button onClick={() => setShowAddCat(!showAddCat)} style={{

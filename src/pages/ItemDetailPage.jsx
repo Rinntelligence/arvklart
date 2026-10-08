@@ -5,6 +5,7 @@ import { getPasses, addPass, removePass, addInterestClearingPass } from '../lib/
 import { formatNOK, parseNOK } from '../lib/format'
 import { removeImages, itemImageUrls } from '../lib/images'
 import { L, locale } from '../lib/lang'
+import { categoryLabel } from '../lib/categories'
 
 const tc = c => { if(!c)return'#FBF9F5'; const r=parseInt(c.slice(1,3),16),g=parseInt(c.slice(3,5),16),b=parseInt(c.slice(5,7),16); return(0.299*r+0.587*g+0.114*b)/255>0.55?'#3A2F26':'#FBF9F5' }
 
@@ -217,7 +218,7 @@ export default function ItemDetailPage({ session, profile, onToast, isDemo }) {
       <div style={{ background:'#fff', border:'1px solid #D9CFC0', borderRadius:'14px', padding:'28px', marginBottom:'20px' }}>
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:'8px' }}>
           <h1 style={{ fontFamily:'Fraunces, serif', fontSize:'24px', fontWeight:'400', color:'#3A2F26', margin:0 }}>{item.title}</h1>
-          <span style={{ fontSize:'12px', color:'#9C8267', background:'#E8DFD0', padding:'4px 12px', borderRadius:'20px', marginLeft:'12px', whiteSpace:'nowrap' }}>{cat.label}</span>
+          <span style={{ fontSize:'12px', color:'#9C8267', background:'#E8DFD0', padding:'4px 12px', borderRadius:'20px', marginLeft:'12px', whiteSpace:'nowrap' }}>{categoryLabel(cat.label)}</span>
         </div>
         <p style={{ color:'#9C8267', fontSize:'13px', marginBottom:'8px' }}>
           {L('Lagt inn av', 'Added by')} {item.added_by_name || L('ukjent', 'unknown')} · {new Date(item.created_at).toLocaleDateString(locale(), { day:'numeric', month:'long', year:'numeric' })}

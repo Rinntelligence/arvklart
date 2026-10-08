@@ -4,6 +4,7 @@ import { getItem, getCategories, supabase } from '../lib/supabase'
 import { fileToDataUrl, uploadEstateImage, removeImages, itemImageUrls } from '../lib/images'
 import { parseNOK } from '../lib/format'
 import { L } from '../lib/lang'
+import { categoryLabel } from '../lib/categories'
 
 export default function EditItemPage({ session, profile, onToast }) {
   const { id, itemId } = useParams()
@@ -187,7 +188,7 @@ export default function EditItemPage({ session, profile, onToast }) {
           <label style={{ display:'block', fontSize:'13px', color:'#9C8267', marginBottom:'6px' }}>{L('Kategori', 'Category')}</label>
           <select value={categoryId} onChange={e => setCategoryId(e.target.value)} style={{ width:'100%', padding:'14px', border:'1px solid #D9CFC0', borderRadius:'10px', fontSize:'16px', background:'#FBF9F5', color:'#3A2F26', outline:'none', fontFamily:'Karla, sans-serif' }}>
             <option value="">{L('— Velg kategori —', '— Choose category —')}</option>
-            {categories.map(c => <option key={c.id} value={c.id}>{c.emoji} {c.label}</option>)}
+            {categories.map(c => <option key={c.id} value={c.id}>{c.emoji} {categoryLabel(c.label)}</option>)}
           </select>
         </div>
 

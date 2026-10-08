@@ -41,3 +41,74 @@ export function mergeSelectedPhotos(drafts, selectedUrls) {
     return rest.length || d.title.trim() ? [{ ...d, photos: rest }] : []
   })
 }
+
+// ── Kamera og gruppering i «Legg til flere» ──────────────────────────────────────────────────────
+// Utkast: { key, photos: [{ url, file }], title, status, … }. makeDraft() lager et tomt utkast med ny key.
+
+// Nye bilder fra kameraet. Som standard blir hvert bilde en ny gjenstand; med sameItem legges bildene til
+// gjenstanden som fotograferes nå (opptil maxPhotos). Et tomt utkast (etter «Neste gjenstand») fylles først.
+// Returnerer nye utkast, hvilken gjenstand som fotograferes nå, om en ny gjenstand ble laget, og hvor
+// mange bilder som ikke fikk plass.
+export function addCapturedPhotos(drafts, { currentKey, sameItem, photos, makeDraft, maxPhotos, maxItems }) {
+  let list = drafts
+  let key = currentKey
+  let created = false
+  let rejected = 0
+  for (const photo of photos) {
+    const current = list.find(d => d.key === key)
+    const fillCurrent = current && current.status !== 'saved' && (current.photos.length === 0 || sameItem)
+    if (fillCurrent) {
+      if (current.photos.length >= maxPhotos) { rejected++; continue }
+      list = list.map(d => (d.key === key ? { ...d, photos: [...d.photos, photo], status: d.status === 'saved' ? d.status : 'idle' } : d))
+      continue
+    }
+    if (list.length >= maxItems) { rejected++; continue }
+    const draft = { ...makeDraft(), photos: [photo] }
+    list = [...list, draft]
+    key = draft.key
+    created = true
+  }
+  return { drafts: list, currentKey: key, created, rejected }
+}
+
+// Fjerner ett bilde. Står gjenstanden da uten bilder og uten navn, fjernes den også.
+// `removed` har det som trengs for å angre (restoreRemoved).
+export function removePhotoAt(drafts, key, index) {
+  const draftIndex = drafts.findIndex(d => d.key === key)
+  const draft = drafts[draftIndex]
+  if (!draft || !draft.photos[index]) return { drafts, removed: null }
+  const photo = draft.photos[index]
+  const photos = draft.photos.filter((_, i) => i !== index)
+  const draftRemoved = photos.length === 0 && !draft.title.trim()
+  const next = draftRemoved
+    ? drafts.filter(d => d.key !== key)
+    : drafts.map(d => (d.key === key ? { ...d, photos } : d))
+  return { drafts: next, removed: { draft, draftIndex, photoIndex: index, photo, draftRemoved } }
+}
+
+// Angrer removePhotoAt: legger bildet tilbake på samme plass, og gjenstanden tilbake hvis den ble fjernet
+export function restoreRemoved(drafts, removed) {
+  if (!removed) return drafts
+  const { draft, draftIndex, photoIndex, photo, draftRemoved } = removed
+  if (draftRemoved || !drafts.some(d => d.key === draft.key)) {
+    const at = Math.min(draftIndex, drafts.length)
+    return [...drafts.slice(0, at), draft, ...drafts.slice(at)]
+  }
+  return drafts.map(d => {
+    if (d.key !== draft.key || d.photos.some(p => p.url === photo.url)) return d
+    const photos = [...d.photos]
+    photos.splice(Math.min(photoIndex, photos.length), 0, photo)
+    return { ...d, photos }
+  })
+}
+
+// «Del opp»: ett bilde per gjenstand. Den første beholder navn og felter; de andre blir nye, tomme utkast
+// rett etter, så rekkefølgen bevares.
+export function splitDraft(drafts, key, makeDraft) {
+  const i = drafts.findIndex(d => d.key === key)
+  const draft = drafts[i]
+  if (!draft || draft.photos.length < 2) return drafts
+  const [first, ...rest] = draft.photos
+  const parts = [{ ...draft, photos: [first], status: draft.status === 'saved' ? draft.status : 'idle' }, ...rest.map(p => ({ ...makeDraft(), photos: [p] }))]
+  return [...drafts.slice(0, i), ...parts, ...drafts.slice(i + 1)]
+}
