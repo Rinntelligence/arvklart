@@ -11,6 +11,7 @@ import EstatesPage from './pages/EstatesPage'
 import EstatePage from './pages/EstatePage'
 import ItemDetailPage from './pages/ItemDetailPage'
 import AddItemPage from './pages/AddItemPage'
+import AddItemsPage from './pages/AddItemsPage'
 import SwipePage from './pages/SwipePage'
 import EditItemPage from './pages/EditItemPage'
 import AdminPage from './pages/AdminPage'
@@ -183,6 +184,7 @@ export default function App() {
           <Route path="/estate/:id/item/:itemId/edit" element={notForDemo(<EditItemPage {...p} />)} />
           {/* Demoen kan prøve AI-funksjonene her (5 forsøk), men ikke lagre */}
           <Route path="/estate/:id/add" element={<AddItemPage {...p} />} />
+          <Route path="/estate/:id/add-many" element={<AddItemsPage {...p} />} />
           <Route path="/estate/:id/admin" element={notForDemo(<AdminPage {...p} />)} />
           <Route path="/estate/:id/categories" element={notForDemo(<CategoriesPage {...p} />)} />
           <Route path="/estate/:id/tasks" element={<TasksPage {...p} />} />

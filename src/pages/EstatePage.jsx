@@ -163,6 +163,7 @@ export default function EstatePage({ session, profile, onToast, isDemo }) {
         <div style={{ display:'flex', gap:'8px', flexWrap:'wrap' }}>
           {myRole === 'admin' && !isDemo && <button onClick={() => navigate(`/estate/${id}/admin`)} style={btn}>{L('Administrer', 'Manage')}</button>}
           <button onClick={() => navigate(`/estate/${id}/swipe`)} style={btn}>{L('Sveip', 'Swipe')}</button>
+          {!isDemo && <button onClick={() => navigate(`/estate/${id}/add-many`)} style={btn}>{L('+ Legg til flere', '+ Add several')}</button>}
           <button onClick={() => navigate(`/estate/${id}/add`)} style={btnPrimary}>{isDemo ? L('Prøv AI-verdivurdering', 'Try AI valuation') : L('+ Legg til', '+ Add')}</button>
         </div>
       </div>
@@ -318,9 +319,14 @@ export default function EstatePage({ session, profile, onToast, isDemo }) {
           {filtered.length === 0 ? (
             <div style={{ textAlign:'center', padding:'80px 20px', color:'#9C8267' }}>
               <p style={{ marginBottom:'20px' }}>{items.length === 0 ? L('Ingen gjenstander ennå.', 'No items yet.') : L('Ingen gjenstander i dette utvalget.', 'No items in this selection.')}</p>
-              {!isDemo && items.length === 0 && <button onClick={() => navigate(`/estate/${id}/add`)} style={{ ...btnPrimary, padding:'11px 24px' }}>
-                {L('Legg til første gjenstand', 'Add the first item')}
-              </button>}
+              {!isDemo && items.length === 0 && <div style={{ display:'flex', gap:'8px', justifyContent:'center', flexWrap:'wrap' }}>
+                <button onClick={() => navigate(`/estate/${id}/add`)} style={{ ...btnPrimary, padding:'11px 24px' }}>
+                  {L('Legg til første gjenstand', 'Add the first item')}
+                </button>
+                <button onClick={() => navigate(`/estate/${id}/add-many`)} style={{ ...btn, padding:'11px 24px' }}>
+                  {L('Legg til mange på en gang', 'Add many at once')}
+                </button>
+              </div>}
             </div>
           ) : (
             <div className="item-grid" style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(200px, 1fr))', gap:'12px' }}>

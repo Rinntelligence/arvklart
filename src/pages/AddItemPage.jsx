@@ -1,23 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { getCategories, supabase, signOut } from '../lib/supabase'
-import { downscaleImage, fileToBase64, fileToDataUrl, uploadEstateImage } from '../lib/images'
+import { fileToDataUrl, uploadEstateImage } from '../lib/images'
 import { hasAiConsent, giveAiConsent } from '../lib/aiConsent'
 import { formatNOK } from '../lib/format'
 import { L, isEn } from '../lib/lang'
-import { demoFeatureMessage } from '../lib/demo'
-
-// Kalles med brukerens innlogging; edge-funksjonene avviser anonyme kall og teller AI-bruken.
-// Feil får med koden fra funksjonen (demo_limit, rate_limit, ai_busy …).
-async function callEdgeFunction(name, body) {
-  const { data, error } = await supabase.functions.invoke(name, { body })
-  if (!error) return data
-  let details = null
-  try { details = await error.context?.json() } catch { /* ikke JSON */ }
-  const err = new Error(details?.error || error.message)
-  err.code = details?.code
-  throw err
-}
+import { analyzeItemPhotos, callEdgeFunction, matchCategory } from '../lib/itemAi'
+import { AiConsent, DemoNotice } from '../components/AiDialogs'
+import CameraCapture from '../components/CameraCapture'
 
 export default function AddItemPage({ session, profile, onToast, isDemo }) {
   const { id } = useParams()
@@ -44,6 +34,7 @@ export default function AddItemPage({ session, profile, onToast, isDemo }) {
   const [savingCat, setSavingCat] = useState(false)
   const [demoBlocked, setDemoBlocked] = useState(false)
   const [demoRemaining, setDemoRemaining] = useState(isDemo ? 5 : null)
+  const [cameraOpen, setCameraOpen] = useState(false)
   const fileRef = useRef()
 
   // Felles håndtering av svar og feil fra AI-funksjonene
@@ -71,12 +62,13 @@ export default function AddItemPage({ session, profile, onToast, isDemo }) {
     if (newCat) setCategoryId(newCat.id)
   }
 
-  const handleImages = (e) => {
+  // Fra filvelgeren (kamerarull/filer) eller kameraet i appen
+  const addImages = (picked) => {
     const MAX_IMAGE_SIZE = 10 * 1024 * 1024 // 10 MB
-    const files = Array.from(e.target.files).filter(f => {
+    const files = picked.filter(f => {
       if (f.size > MAX_IMAGE_SIZE) { onToast(L(`"${f.name}" er for stor (maks 10 MB)`, `"${f.name}" is too large (max 10 MB)`), 'error'); return false }
       return true
-    }).slice(0, 5)
+    })
     if (!files.length) return
     const room = 5 - imageFiles.length
     const added = files.slice(0, room)
@@ -85,6 +77,10 @@ export default function AddItemPage({ session, profile, onToast, isDemo }) {
     setImageFiles(prev => [...prev, ...added])
     // Forhåndsvisningene legges til i samme rekkefølge som filene
     Promise.all(added.map(fileToDataUrl)).then(urls => setImagePreviews(prev => [...prev, ...urls]))
+  }
+
+  const handleImages = (e) => {
+    addImages(Array.from(e.target.files || []))
     e.target.value = ''
   }
 
@@ -98,26 +94,13 @@ export default function AddItemPage({ session, profile, onToast, isDemo }) {
     if (isDemo && demoRemaining === 0) { setDemoBlocked(true); return }
     setAnalyzing(true)
     try {
-      // Forminsket JPEG: mobilbilder er ofte over grensen på 5 MB, og HEIC støttes ikke
-      const image = await downscaleImage(imageFiles[0], 1568)
-      const imageBase64 = await fileToBase64(image)
-      const res = await callEdgeFunction('analyze-item', {
-        imageBase64,
-        mimeType: image.type || 'image/jpeg',
-        lang: isEn() ? 'en' : 'no',
-      })
-      trackQuota(res)
-      const result = res.data || res
+      const { result, quota } = await analyzeItemPhotos(imageFiles, { categories })
+      trackQuota({ quota })
       if (result.title && !title) setTitle(result.title)
       if (result.description && !description) setDescription(result.description)
       if (result.condition) setCondition(result.condition)
-      if (result.category) {
-        const match = categories.find(c =>
-          c.label.toLowerCase().includes(result.category.toLowerCase()) ||
-          result.category.toLowerCase().includes(c.label.toLowerCase())
-        )
-        if (match) setCategoryId(match.id)
-      }
+      const match = matchCategory(categories, result.category)
+      if (match) setCategoryId(match.id)
       onToast(L('AI identifiserte gjenstanden ✓', 'AI identified the item ✓'))
     } catch (e) {
       handleAiError(e, L('AI-analyse feilet — fyll inn manuelt', 'AI analysis failed — fill in manually'))
@@ -217,9 +200,17 @@ export default function AddItemPage({ session, profile, onToast, isDemo }) {
       <h1 style={{ fontFamily: 'Fraunces, serif', fontSize: '24px', fontWeight: '400', color: '#3A2F26', marginBottom: '6px' }}>
         {L('Legg til gjenstand', 'Add item')}
       </h1>
-      <p style={{ color: '#9C8267', fontSize: '14px', marginBottom: '24px' }}>
+      <p style={{ color: '#9C8267', fontSize: '14px', marginBottom: '12px' }}>
         {L('Fyll inn navn og ta gjerne bilde — AI kan identifisere og verdsette automatisk', 'Enter a name and add a photo if you can — AI can identify and value it automatically')}
       </p>
+      <button onClick={() => navigate(`/estate/${id}/add-many`)} style={{
+        width: '100%', textAlign: 'left', marginBottom: '24px', padding: '12px 14px', background: '#DCE3D2',
+        border: '1px solid #B8C8A8', borderRadius: '10px', cursor: 'pointer', fontFamily: 'Karla, sans-serif',
+        fontSize: '14px', color: '#3A5A30', lineHeight: 1.4,
+      }}>
+        <strong>{L('Mange gjenstander?', 'Many items?')}</strong>{' '}
+        {L('Ta bilder av opptil 20 på en gang og la AI legge dem inn →', 'Photograph up to 20 at once and let AI add them →')}
+      </button>
 
       {isDemo && (
         <div style={{ background: '#DCE3D2', border: '1px solid #B8C8A8', borderRadius: '10px', padding: '12px 14px', fontSize: '13px', color: '#3A5A30', lineHeight: 1.5, marginBottom: '20px' }}>
@@ -248,19 +239,14 @@ export default function AddItemPage({ session, profile, onToast, isDemo }) {
                 }}>×</button>
               </div>
             ))}
-            {imagePreviews.length < 5 && (
-              <div onClick={() => fileRef.current.click()} style={{
-                width: '80px', height: '80px', borderRadius: '8px',
-                border: '2px dashed #D9CFC0', background: '#FBF9F5',
-                display: 'flex', flexDirection: 'column', alignItems: 'center',
-                justifyContent: 'center', cursor: 'pointer', gap: '4px',
-              }}>
-                <span style={{ fontSize: '20px', color: '#9C8267' }}>+</span>
-                <span style={{ fontSize: '10px', color: '#9C8267' }}>{L('Legg til', 'Add')}</span>
-              </div>
-            )}
+            {imagePreviews.length < 5 && <>
+              <PhotoTile onClick={() => setCameraOpen(true)} icon="📷" label={L('Ta bilder', 'Take photos')} />
+              <PhotoTile onClick={() => fileRef.current.click()} icon="🖼️" label={L('Velg bilder', 'Choose photos')} />
+            </>}
           </div>
-          <input ref={fileRef} type="file" accept="image/*" capture="environment" multiple onChange={handleImages} style={{ display: 'none' }} />
+          {/* Uten capture-attributt: mobilen tilbyr kamerarull, kamera og filer */}
+          <input ref={fileRef} type="file" accept="image/*" multiple onChange={handleImages} style={{ display: 'none' }} />
+          {cameraOpen && <CameraCapture photos={imagePreviews} onCapture={addImages} onClose={() => setCameraOpen(false)} />}
 
           {/* AI-analyseknapp */}
           {imageFiles.length > 0 && !consentFor && (
@@ -498,34 +484,17 @@ export default function AddItemPage({ session, profile, onToast, isDemo }) {
   )
 }
 
-// Demoen kan prøve AI-funksjonene, men ikke lagre eller bruke dem ubegrenset
-function DemoNotice({ onClose, onSignup }) {
+function PhotoTile({ onClick, icon, label }) {
   return (
-    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 300, padding: '20px' }}>
-      <div onClick={e => e.stopPropagation()} role="dialog" style={{ background: '#fff', borderRadius: '14px', padding: '28px', maxWidth: '400px', width: '100%', fontFamily: 'Karla, sans-serif' }}>
-        <h3 style={{ fontFamily: "'Fraunces', serif", fontSize: '19px', fontWeight: '400', color: '#3A2F26', marginBottom: '10px' }}>{L('Dette er en demo', 'This is a demo')}</h3>
-        <p style={{ fontSize: '14px', color: '#5C4530', lineHeight: 1.6, marginBottom: '22px' }}>{demoFeatureMessage()}</p>
-        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-          <button onClick={onClose} style={{ flex: '1 1 120px', padding: '11px', background: 'none', border: '1px solid #D9CFC0', borderRadius: '8px', cursor: 'pointer', color: '#5C4530', fontSize: '14px', fontFamily: 'Karla, sans-serif' }}>{L('Fortsett demoen', 'Continue the demo')}</button>
-          <button onClick={onSignup} style={{ flex: '2 1 180px', padding: '11px', background: '#3A2F26', color: '#FBF9F5', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '14px', fontFamily: 'Karla, sans-serif' }}>{L('Opprett konto', 'Create an account')}</button>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-// Samtykke før noe sendes til AI-tjenesten (GDPR art. 6 nr. 1 a). Kan trekkes tilbake under «Min konto».
-function AiConsent({ onCancel, onAccept }) {
-  return (
-    <div style={{ marginTop: '10px', background: '#FBF9F5', border: '1px solid #D9CFC0', borderRadius: '10px', padding: '14px' }}>
-      <div style={{ fontSize: '13px', color: '#3A2F26', fontWeight: '500', marginBottom: '6px' }}>{L('Opplysningene sendes til en AI-tjeneste', 'The information is sent to an AI service')}</div>
-      <p style={{ fontSize: '12px', color: '#5C4530', lineHeight: '1.6', marginBottom: '10px' }}>
-        {L('For å identifisere og verdsette gjenstanden sendes bildet og beskrivelsen til Anthropic (USA). De brukes kun til dette og lagres ikke av dem. Du kan trekke samtykket tilbake under «Min konto». Les mer i vår', 'To identify and value the item, the photo and description are sent to Anthropic (USA). They are used only for this and are not stored by them. You can withdraw your consent under «My account». Read more in our')} <a href="/personvern" target="_blank" rel="noreferrer" style={{ color: '#5F6E52' }}>{L('personvernerklæring', 'privacy policy')}</a>.
-      </p>
-      <div style={{ display: 'flex', gap: '8px' }}>
-        <button onClick={onCancel} style={{ flex: 1, padding: '8px', background: 'none', border: '1px solid #D9CFC0', borderRadius: '7px', cursor: 'pointer', fontSize: '13px', fontFamily: 'Karla, sans-serif', color: '#5C4530' }}>{L('Avbryt', 'Cancel')}</button>
-        <button onClick={onAccept} style={{ flex: 2, padding: '8px', background: '#5F6E52', color: '#fff', border: 'none', borderRadius: '7px', cursor: 'pointer', fontSize: '13px', fontFamily: 'Karla, sans-serif' }}>{L('Godta og fortsett', 'Accept and continue')}</button>
-      </div>
-    </div>
+    <button type="button" onClick={onClick} style={{
+      width: '80px', height: '80px', borderRadius: '8px',
+      border: '2px dashed #D9CFC0', background: '#FBF9F5',
+      display: 'flex', flexDirection: 'column', alignItems: 'center',
+      justifyContent: 'center', cursor: 'pointer', gap: '4px', padding: 0,
+      fontFamily: 'Karla, sans-serif',
+    }}>
+      <span style={{ fontSize: '20px' }}>{icon}</span>
+      <span style={{ fontSize: '11px', color: '#9C8267' }}>{label}</span>
+    </button>
   )
 }

@@ -77,6 +77,7 @@ Hent verdiene fra Supabase Dashboard → Project Settings → API.
 | `/` | EstatesPage | Liste over brukerens bo |
 | `/estate/:id` | EstatePage | Bo-oversikt |
 | `/estate/:id/add` | AddItemPage | Legg til gjenstand (inkl. AI-analyse) |
+| `/estate/:id/add-many` | AddItemsPage | Legg til opptil 20 gjenstander: kamera i appen («Neste gjenstand»), kamerarull/filer/dra-og-slipp, AI analyserer alle (ett kall per gjenstand, inkl. verdi) og legger dem inn |
 | `/estate/:id/swipe` | SwipePage | Ta stilling til gjenstander (vil ha / nei takk) |
 | `/estate/:id/conflicts` | ConflictPage | Løsningsmetoder (bare admin fordeler) |
 | `/estate/:id/heirs` | HeirsPage | Arvinger; e-posten styrer hvem som kan bli med |
