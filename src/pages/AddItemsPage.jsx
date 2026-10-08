@@ -332,9 +332,9 @@ export default function AddItemsPage({ session, profile, onToast, isDemo }) {
 
       {/* Kilder */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '10px', marginBottom: '10px' }}>
-        <SourceButton onClick={openCamera} disabled={full || !!busy} icon="📷"
+        <SourceButton onClick={openCamera} disabled={full || !!busy}
           title={L('Ta bilder', 'Take photos')} hint={L('Kamera med «Neste gjenstand»', 'Camera with «Next item»')} />
-        <SourceButton onClick={() => pickRef.current.click()} disabled={full || !!busy} icon="🖼️"
+        <SourceButton onClick={() => pickRef.current.click()} disabled={full || !!busy}
           title={L('Velg bilder', 'Choose photos')} hint={L('Kamerarull, filer — eller dra hit', 'Camera roll, files — or drag here')} />
       </div>
       <input ref={pickRef} type="file" accept="image/*" multiple onChange={onPick} style={{ display: 'none' }} />
@@ -461,18 +461,15 @@ export default function AddItemsPage({ session, profile, onToast, isDemo }) {
   )
 }
 
-function SourceButton({ onClick, disabled, icon, title, hint }) {
+function SourceButton({ onClick, disabled, title, hint }) {
   return (
     <button onClick={onClick} disabled={disabled} style={{
-      display: 'flex', alignItems: 'center', gap: '12px', textAlign: 'left', padding: '14px',
+      display: 'block', textAlign: 'left', padding: '14px',
       background: '#fff', border: '1px solid #D9CFC0', borderRadius: '12px',
       cursor: disabled ? 'not-allowed' : 'pointer', opacity: disabled ? 0.5 : 1, fontFamily: 'Karla, sans-serif',
     }}>
-      <span style={{ fontSize: '26px' }}>{icon}</span>
-      <span>
-        <span style={{ display: 'block', fontSize: '15px', color: '#3A2F26', fontWeight: '500' }}>{title}</span>
-        <span style={{ display: 'block', fontSize: '12px', color: '#9C8267', lineHeight: 1.4, marginTop: '2px' }}>{hint}</span>
-      </span>
+      <span style={{ display: 'block', fontSize: '15px', color: '#3A2F26', fontWeight: '500' }}>{title}</span>
+      <span style={{ display: 'block', fontSize: '12px', color: '#9C8267', lineHeight: 1.4, marginTop: '2px' }}>{hint}</span>
     </button>
   )
 }
@@ -510,8 +507,8 @@ function DraftCard({ draft: d, index, categories, locked, onChange, onRemove, on
           </div>
         ))}
         {!disabled && d.photos.length < MAX_PHOTOS && <>
-          <button onClick={onCamera} aria-label={L('Ta bilde', 'Take photo')} style={tileStyle}>📷</button>
-          <button onClick={onAddPhotos} aria-label={L('Velg bilder', 'Choose photos')} style={tileStyle}>🖼️</button>
+          <button onClick={onCamera} style={tileStyle}>{L('+ Ta bilde', '+ Take photo')}</button>
+          <button onClick={onAddPhotos} style={tileStyle}>{L('+ Velg bilder', '+ Choose photos')}</button>
         </>}
       </div>
 
@@ -556,5 +553,6 @@ function DraftCard({ draft: d, index, categories, locked, onChange, onRemove, on
 
 const tileStyle = {
   width: '64px', height: '64px', borderRadius: '8px', border: '2px dashed #D9CFC0', background: '#FBF9F5',
-  cursor: 'pointer', fontSize: '20px', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+  cursor: 'pointer', fontSize: '11px', color: '#9C8267', fontFamily: 'Karla, sans-serif', lineHeight: 1.3,
+  padding: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center',
 }

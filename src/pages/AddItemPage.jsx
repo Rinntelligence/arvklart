@@ -240,8 +240,8 @@ export default function AddItemPage({ session, profile, onToast, isDemo }) {
               </div>
             ))}
             {imagePreviews.length < 5 && <>
-              <PhotoTile onClick={() => setCameraOpen(true)} icon="📷" label={L('Ta bilder', 'Take photos')} />
-              <PhotoTile onClick={() => fileRef.current.click()} icon="🖼️" label={L('Velg bilder', 'Choose photos')} />
+              <PhotoTile onClick={() => setCameraOpen(true)} label={L('Ta bilder', 'Take photos')} />
+              <PhotoTile onClick={() => fileRef.current.click()} label={L('Velg bilder', 'Choose photos')} />
             </>}
           </div>
           {/* Uten capture-attributt: mobilen tilbyr kamerarull, kamera og filer */}
@@ -484,7 +484,7 @@ export default function AddItemPage({ session, profile, onToast, isDemo }) {
   )
 }
 
-function PhotoTile({ onClick, icon, label }) {
+function PhotoTile({ onClick, label }) {
   return (
     <button type="button" onClick={onClick} style={{
       width: '80px', height: '80px', borderRadius: '8px',
@@ -493,7 +493,7 @@ function PhotoTile({ onClick, icon, label }) {
       justifyContent: 'center', cursor: 'pointer', gap: '4px', padding: 0,
       fontFamily: 'Karla, sans-serif',
     }}>
-      <span style={{ fontSize: '20px' }}>{icon}</span>
+      <span style={{ fontSize: '20px', color: '#9C8267' }}>+</span>
       <span style={{ fontSize: '11px', color: '#9C8267' }}>{label}</span>
     </button>
   )
