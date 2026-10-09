@@ -164,8 +164,15 @@ await check('Veiviser: norsk som standard, engelsk grensesnitt med ?lang=en og m
   await page.getByText('the Norwegian version is the authoritative one', { exact: false }).first().waitFor()
   await page.getByRole('heading', { name: 'Glossary' }).waitFor()
   assert(await page.evaluate(() => document.documentElement.lang) === 'en', 'html lang er ikke en')
+  await page.getByText('Right after the death').waitFor()
+  await page.getByText('Check your chances of a funeral grant').waitFor()
   await page.getByRole('button', { name: 'Start', exact: true }).click()
-  await page.getByRole('button', { name: /Next/ }).waitFor()
+  await page.getByRole('heading', { name: 'Who are you in this inheritance settlement?' }).waitFor()
+  await page.getByRole('button', { name: /Surviving spouse or cohabitant/ }).click()
+  await page.getByRole('heading', { name: 'When did the deceased die?' }).waitFor()
+  // Ingen norske knapper eller spørsmål i veiviseren på engelsk
+  const wizardText = await page.locator('#arvWizard').innerText()
+  assert(!/\b(Neste|Tilbake|Hvorfor spør vi|Steg \d)/.test(wizardText), `norsk tekst i engelsk veiviser: ${wizardText.slice(0, 200)}`)
 }, { loggedIn: false })
 
 await check('Veiviser i appen: uten VITE_GUIDE_EN får engelske brukere den norske veiviseren med forklaring', async page => {

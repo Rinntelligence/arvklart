@@ -4,6 +4,7 @@
 import { QUESTIONS } from './questions.js'
 import { deriveFacts } from './facts.js'
 import { evaluate } from './conditions.js'
+import { tr } from './i18n.js'
 
 export function visibleQuestions(answers = {}) {
   const facts = deriveFacts(answers)
@@ -82,37 +83,37 @@ export function validationError(q, answers) {
   const facts = deriveFacts(answers)
   switch (q.type) {
     case 'single':
-      return v ? null : 'Velg et av alternativene for å gå videre.'
+      return v ? null : tr('Velg et av alternativene for å gå videre.', 'Choose one of the options to continue.')
     case 'multi':
-      return Array.isArray(v) && v.length ? null : 'Velg minst ett alternativ.'
+      return Array.isArray(v) && v.length ? null : tr('Velg minst ett alternativ.', 'Choose at least one option.')
     case 'date': {
-      if (!v || !/^\d{4}-\d{2}-\d{2}$/.test(v)) return 'Skriv inn datoen for dødsfallet.'
-      if (v > localToday()) return 'Datoen kan ikke være frem i tid.'
-      if (v < '1900-01-01') return 'Sjekk at årstallet er riktig.'
+      if (!v || !/^\d{4}-\d{2}-\d{2}$/.test(v)) return tr('Skriv inn datoen for dødsfallet.', 'Enter the date of death.')
+      if (v > localToday()) return tr('Datoen kan ikke være frem i tid.', 'The date cannot be in the future.')
+      if (v < '1900-01-01') return tr('Sjekk at årstallet er riktig.', 'Check that the year is correct.')
       return null
     }
     case 'number':
       if (q.optional && (v === undefined || v === '')) return null
-      return v !== undefined && v !== '' && isAmount(v) ? null : 'Skriv inn et beløp (bruk 0 hvis du ikke vet).'
+      return v !== undefined && v !== '' && isAmount(v) ? null : tr('Skriv inn et beløp (bruk 0 hvis du ikke vet).', 'Enter an amount (use 0 if you do not know).')
     case 'percent': {
       if (q.optional && (v === undefined || v === '')) return null
       const n = Number(String(v ?? '').replace(',', '.'))
-      return v !== undefined && v !== '' && Number.isFinite(n) && n >= 0 && n <= 100 ? null : 'Skriv inn et tall mellom 0 og 100.'
+      return v !== undefined && v !== '' && Number.isFinite(n) && n >= 0 && n <= 100 ? null : tr('Skriv inn et tall mellom 0 og 100.', 'Enter a number between 0 and 100.')
     }
     case 'children': {
-      if (!Array.isArray(v) || !v.length) return 'Legg inn minst ett barn.'
-      if (!v.every(c => validateChild(c, facts.hasPartner, facts.previousUskifte))) return 'Svar på spørsmålene for hvert barn.'
-      if (answers.cohabitantChildren === 'yes' && !v.some(c => c.common === 'yes')) return 'Du har svart at dere hadde barn sammen. Marker minst ett barn som felles barn.'
+      if (!Array.isArray(v) || !v.length) return tr('Legg inn minst ett barn.', 'Add at least one child.')
+      if (!v.every(c => validateChild(c, facts.hasPartner, facts.previousUskifte))) return tr('Svar på spørsmålene for hvert barn.', 'Answer the questions for each child.')
+      if (answers.cohabitantChildren === 'yes' && !v.some(c => c.common === 'yes')) return tr('Du har svart at dere hadde barn sammen. Marker minst ett barn som felles barn.', 'You have answered that there were children together. Mark at least one child as a joint child.')
       return null
     }
     case 'otherChildren': {
-      if (!Array.isArray(v) || !v.length) return 'Legg inn minst ett barn.'
-      return v.every(c => validateChild(c, false)) ? null : 'Svar på spørsmålene for hvert barn.'
+      if (!Array.isArray(v) || !v.length) return tr('Legg inn minst ett barn.', 'Add at least one child.')
+      return v.every(c => validateChild(c, false)) ? null : tr('Svar på spørsmålene for hvert barn.', 'Answer the questions for each child.')
     }
     case 'siblings': {
-      if (!Array.isArray(v) || !v.length) return 'Legg inn minst ett søsken.'
+      if (!Array.isArray(v) || !v.length) return tr('Legg inn minst ett søsken.', 'Add at least one sibling.')
       const ok = v.every(s => ['full', 'halfMother', 'halfFather'].includes(s.type) && isYesNo(s.alive) && (s.alive === 'yes' || isCount(s.children)))
-      return ok ? null : 'Svar på spørsmålene for hvert søsken.'
+      return ok ? null : tr('Svar på spørsmålene for hvert søsken.', 'Answer the questions for each sibling.')
     }
     case 'grandparents': {
       const sides = ['father', 'mother']
@@ -122,15 +123,15 @@ export function validationError(q, answers) {
         const relatives = (g.gp1 === 'no' || g.gp2 === 'no') && Array.isArray(g.relatives) ? g.relatives : []
         return relatives.every(r => ['full', 'half1', 'half2'].includes(r.type) && isYesNo(r.alive) && (r.alive === 'yes' || isCount(r.children)))
       })
-      return ok ? null : 'Svar på spørsmålene for begge sider av familien.'
+      return ok ? null : tr('Svar på spørsmålene for begge sider av familien.', 'Answer the questions for both sides of the family.')
     }
     case 'assets': {
       const vals = Object.values(v || {})
-      return vals.every(isAmount) ? null : 'Beløpene må være tall.'
+      return vals.every(isAmount) ? null : tr('Beløpene må være tall.', 'The amounts must be numbers.')
     }
     case 'amounts':
     case 'advancements':
-      return Object.values(v || {}).every(isAmount) ? null : 'Beløpene må være tall.'
+      return Object.values(v || {}).every(isAmount) ? null : tr('Beløpene må være tall.', 'The amounts must be numbers.')
     default:
       return null
   }

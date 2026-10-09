@@ -182,13 +182,13 @@ export function calculateSkifte(a, f, G) {
 
   const people = []
   if (partnerAmount > 0 || (f.partnerInherits && E === 0)) {
-    people.push({ id: 'partner', label: f.married ? 'Gjenlevende ektefelle' : 'Gjenlevende samboer', relation: f.married ? 'Ektefelle' : 'Samboer', exact: partnerAmount, isPartner: true })
+    people.push({ id: 'partner', label: f.married ? 'Gjenlevende ektefelle' : 'Gjenlevende samboer', label_en: f.married ? 'Surviving spouse' : 'Surviving cohabitant', relation: f.married ? 'Ektefelle' : 'Samboer', relation_en: f.married ? 'Spouse' : 'Cohabitant', exact: partnerAmount, isPartner: true })
   }
   if (testament?.cohabitant > 0) {
-    people.push({ id: 'testament-cohabitant', label: 'Samboeren', relation: 'Etter testament', exact: testament.cohabitant, isTestament: true })
+    people.push({ id: 'testament-cohabitant', label: 'Samboeren', label_en: 'The cohabitant', relation: 'Etter testament', relation_en: 'Under the will', exact: testament.cohabitant, isTestament: true })
   }
   if (testament?.other > 0) {
-    people.push({ id: 'testament', label: 'Mottakere i testamentet', relation: 'Etter testament', exact: testament.other, isTestament: true })
+    people.push({ id: 'testament', label: 'Mottakere i testamentet', label_en: 'Beneficiaries under the will', relation: 'Etter testament', relation_en: 'Under the will', exact: testament.other, isTestament: true })
   }
 
   // Delen til arvingene etter den som døde først, fordelt likt per barn (stamme) hen etterlot seg.
@@ -201,14 +201,14 @@ export function calculateSkifte(a, f, G) {
     for (const l of previous.commonLines) fromFirstByLine[l.id] = perLine
     for (const l of previous.otherLines) {
       if (l.alive === 'yes') {
-        people.push({ id: `first-${l.id}`, label: l.label, relation: 'Barn av den som døde først', exact: perLine, isOther: true, isFirstHeir: true })
+        people.push({ id: `first-${l.id}`, label: l.label, label_en: l.label_en, relation: 'Barn av den som døde først', relation_en: 'Child of the first to die', exact: perLine, isOther: true, isFirstHeir: true })
       } else {
         const n = Number(l.grandchildren)
-        for (let k = 0; k < n; k++) people.push({ id: `first-${l.id}-${k}`, label: n > 1 ? `Barnebarn ${k + 1} (via ${l.label})` : `Barnebarn (via ${l.label})`, relation: 'Barnebarn av den som døde først', exact: perLine / n, isOther: true, isFirstHeir: true })
+        for (let k = 0; k < n; k++) people.push({ id: `first-${l.id}-${k}`, label: n > 1 ? `Barnebarn ${k + 1} (via ${l.label})` : `Barnebarn (via ${l.label})`, label_en: n > 1 ? `Grandchild ${k + 1} (via ${l.label_en})` : `Grandchild (via ${l.label_en})`, relation: 'Barnebarn av den som døde først', relation_en: 'Grandchild of the first to die', exact: perLine / n, isOther: true, isFirstHeir: true })
       }
     }
     if (!firstLines.length && firstDeceasedShare > 0) {
-      people.unshift({ id: 'firstDeceased', label: 'Slekten til den som døde først', relation: 'Foreldre, søsken eller andre slektninger', exact: firstDeceasedShare, isOther: true, isFirstHeir: true })
+      people.unshift({ id: 'firstDeceased', label: 'Slekten til den som døde først', label_en: 'The relatives of the first to die', relation: 'Foreldre, søsken eller andre slektninger', relation_en: 'Parents, siblings or other relatives', exact: firstDeceasedShare, isOther: true, isFirstHeir: true })
     }
   }
 
@@ -225,7 +225,7 @@ export function calculateSkifte(a, f, G) {
         const w = h.share / lineTotal
         const fromFirst = (fromFirstByLine[line.id] || 0) * w
         people.push({
-          id: h.id, label: h.label, relation: h.relation, lineId: line.id,
+          id: h.id, label: h.label, label_en: h.label_en, relation: h.relation, relation_en: h.relation_en, lineId: line.id,
           exact: perLine[line.id] * w + fromFirst, fromFirst: round(fromFirst),
           // Særkullsbarn finnes bare når det er en gjenlevende ektefelle eller samboer. Et svar om
           // felles barn kan bli liggende igjen hvis brukeren senere endrer sivilstand.
@@ -236,7 +236,7 @@ export function calculateSkifte(a, f, G) {
       }
     }
   } else {
-    for (const h of rel.heirs) people.push({ id: h.id, label: h.label, relation: h.relation, side: h.side, exact: pool * h.share })
+    for (const h of rel.heirs) people.push({ id: h.id, label: h.label, label_en: h.label_en, relation: h.relation, relation_en: h.relation_en, side: h.side, side_en: h.side_en, exact: pool * h.share })
   }
   roundAll(people)
   if (previous) Object.assign(previous, { amount: round(firstDeceasedShare), relatives: !previous.commonLines.length && !previous.otherLines.length })
@@ -284,9 +284,9 @@ export function calculateUskifte(a, f, G, skifte) {
 
   // Det som må gjøres opp nå, selv om gjenlevende velger uskifte.
   const refusing = status === 'partial' ? separatePeople : []
-  const paidNow = refusing.map(p => ({ id: p.id, label: p.label, amount: p.amount, reason: 'noConsent' }))
-  const ifRefuse = status === 'unknown' ? separatePeople.map(p => ({ id: p.id, label: p.label, amount: p.amount })) : []
-  if (skifte.testament?.other > 0) paidNow.push({ id: 'testament', label: 'Mottakere i testamentet', amount: round(skifte.testament.other), reason: 'testament' })
+  const paidNow = refusing.map(p => ({ id: p.id, label: p.label, label_en: p.label_en, amount: p.amount, reason: 'noConsent' }))
+  const ifRefuse = status === 'unknown' ? separatePeople.map(p => ({ id: p.id, label: p.label, label_en: p.label_en, amount: p.amount })) : []
+  if (skifte.testament?.other > 0) paidNow.push({ id: 'testament', label: 'Mottakere i testamentet', label_en: 'Beneficiaries under the will', amount: round(skifte.testament.other), reason: 'testament' })
   const paidSum = paidNow.reduce((s, p) => s + p.amount, 0)
 
   if (f.married) {

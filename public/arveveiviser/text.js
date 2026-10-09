@@ -1,9 +1,11 @@
 // Tekst-hjelpere som deles av skjerm, PDF og lagring til boet.
 
 import { TERMS } from './glossary.js'
+import { isEn, field } from './i18n.js'
 
 // Fyller inn plassholdere som avhenger av hvem brukeren er.
 export function fill(text, facts = {}) {
+  if (isEn()) return fillEn(text, facts)
   const partner = facts.married ? 'ektefellen' : facts.cohabitant ? 'samboeren' : 'ektefellen eller samboeren'
   // Ektefellen/samboeren som døde før avdøde, når avdøde satt i uskifte etter hen.
   const first = facts.previousUskifteCohabitant ? 'samboeren som døde først' : facts.previousUskifteMarried ? 'ektefellen som døde først' : 'ektefellen eller samboeren som døde først'
@@ -16,11 +18,25 @@ export function fill(text, facts = {}) {
     .replaceAll('{partner}', partner)
 }
 
+// Samme plassholdere på engelsk. {Partner}/{First} med stor forbokstav brukes først i en setning.
+function fillEn(text, facts = {}) {
+  const partner = facts.married ? 'the spouse' : facts.cohabitant ? 'the cohabitant' : 'the spouse or cohabitant'
+  const first = facts.previousUskifteCohabitant ? 'the cohabitant who died first' : facts.previousUskifteMarried ? 'the spouse who died first' : 'the spouse or cohabitant who died first'
+  return String(text ?? '')
+    .replaceAll('{First}', capFirst(first))
+    .replaceAll('{first}', first)
+    .replaceAll('{couple}', facts.survivor ? 'you' : `the deceased and ${partner}`)
+    .replaceAll('{partnerDu}', facts.survivor ? 'you' : partner)
+    .replaceAll('{partnerDeg}', facts.survivor ? 'you' : partner)
+    .replaceAll('{Partner}', capFirst(facts.survivor ? 'you' : partner))
+    .replaceAll('{partner}', partner)
+}
+
 // Ren tekst uten markering: **fet** og [[fagord|visning]] blir vanlig tekst.
 export function plain(text, facts) {
   return fill(text, facts)
     .replace(/\*\*(.+?)\*\*/g, '$1')
-    .replace(/\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g, (_, key, label) => label || TERMS[key]?.term || key)
+    .replace(/\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g, (_, key, label) => label || field(TERMS[key], 'term') || key)
 }
 
 export const capFirst = s => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s)

@@ -379,7 +379,7 @@ function renderInput(q, facts, a) {
     case 'assets': return renderAssets(v || {}, facts, a)
     case 'advancements': {
       const lines = childLines(a.children || [])
-      return lines.map(l => moneyInput(`${q.id}.${l.id}`, v?.[l.id], l.label)).join('') +
+      return lines.map(l => moneyInput(`${q.id}.${l.id}`, v?.[l.id], field(l, 'label'))).join('') +
         `<p class="aw-hint">${tr('La feltet stå tomt for barn som ikke fikk forskudd.', 'Leave the field empty for children who did not receive an advance.')}</p>`
     }
     default: return ''
@@ -572,7 +572,7 @@ function heirCards(people, E, facts, opts = {}) {
   return `<div class="aw-heirs">${people.map(p => `
     <div class="aw-heir ${p.isPartner ? 'partner' : ''} ${p.isTestament ? 'testament' : ''}">
       <div class="aw-heir-top">
-        <div><div class="aw-heir-name">${esc(p.label)}</div><div class="aw-heir-rel">${esc(p.relation)}${p.side ? ' · ' + esc(p.side) : ''}${p.common === 'no' ? ' · ' + tr('særkullsbarn', 'child from another relationship') : ''}${p.fromFirst ? ' · ' + tr(`inkl. ${kr(p.fromFirst)} etter den som døde først`, `incl. ${kr(p.fromFirst)} from the first to die`) : ''}${p.advance ? ' · ' + tr(`forskudd ${kr(p.advance)} trukket fra`, `advance of ${kr(p.advance)} deducted`) : ''}</div></div>
+        <div><div class="aw-heir-name">${esc(field(p, 'label'))}</div><div class="aw-heir-rel">${esc(field(p, 'relation'))}${p.side ? ' · ' + esc(field(p, 'side')) : ''}${p.common === 'no' ? ' · ' + tr('særkullsbarn', 'child from another relationship') : ''}${p.fromFirst ? ' · ' + tr(`inkl. ${kr(p.fromFirst)} etter den som døde først`, `incl. ${kr(p.fromFirst)} from the first to die`) : ''}${p.advance ? ' · ' + tr(`forskudd ${kr(p.advance)} trukket fra`, `advance of ${kr(p.advance)} deducted`) : ''}</div></div>
         <div class="aw-heir-amount">${kr(p.amount)}<small>${E > 0 ? pct(p.amount / E) + tr(' av arven', ' of the inheritance') : ''}</small></div>
       </div>
       <div class="aw-heir-bar"><span style="width:${Math.max(2, (p.amount / max) * 100)}%"></span></div>
@@ -628,7 +628,7 @@ function renderCompare(r, facts) {
       <div class="aw-compare-col">
         <h4>${tr('Skifte nå', 'Settle now')}</h4>
         <ul class="aw-list">
-          ${s.people.map(p => `<li>${tr(`<strong>${esc(p.label)}</strong> får ${kr(p.amount)} nå.`, `<strong>${esc(p.label)}</strong> gets ${kr(p.amount)} now.`)}</li>`).join('')}
+          ${s.people.map(p => `<li>${tr(`<strong>${esc(p.label)}</strong> får ${kr(p.amount)} nå.`, `<strong>${esc(field(p, 'label'))}</strong> gets ${kr(p.amount)} now.`)}</li>`).join('')}
           <li>${tr('Boet gjøres opp, og hver arving disponerer sin egen arv.', 'The estate is settled, and each heir manages their own inheritance.')}</li>
           <li>${tr('Arvingene som overtar boet, tar ansvar for avdødes gjeld.', 'The heirs who take over the estate take responsibility for the deceased\'s debts.')}</li>
         </ul>
