@@ -13,7 +13,12 @@ ArvKlart er en norsk SaaS-tjeneste for arveoppgjør. React 18 + Vite SPA, Supaba
 - **Design**: Alle komponenter bruker inline `style`-props med palette-tokens (se nedenfor)
 - **Database**: Supabase (PostgreSQL) — se `supabase/README.md` for struktur, rekkefølge og deploy
 - **Auth**: Supabase Auth (e-post/passord, glemt passord). Navnet ved registrering lagres i `user_metadata.display_name`, og profilen opprettes fra det ved første innlogging (`App.jsx`)
-- **Språk**: norsk og engelsk. All tekst skrives som `L('norsk', 'english')` fra `src/lib/lang.js`; datoer og beløp formateres med `locale()` (eller `formatNOK` i `src/lib/format.js`). Verdier som lagres i databasen (kategorier, relasjoner, oppgavekategorier) er alltid norske og oversettes bare ved visning. Arveveiviseren er på norsk. Engelsk er under arbeid: `public/arveveiviser/i18n.js` gir `tr(no, en)` og `field(obj, key)`, der innholdet får `*_en`-felter. Den engelske versjonen vises bare med `?lang=en`, og appen sender det bare når `VITE_GUIDE_EN=true`. Flagget er av i prod til de engelske tekstene er juridisk gjennomgått, og norsk er alltid den gjeldende versjonen
+- **Språk**: norsk og engelsk. All tekst skrives som `L('norsk', 'english')` fra `src/lib/lang.js`; datoer og beløp formateres med `locale()` (eller `formatNOK` i `src/lib/format.js`). Verdier som lagres i databasen (kategorier, relasjoner, oppgavekategorier) er alltid norske og oversettes bare ved visning. Språket følger kontoen: `profiles.preferred_lang` (`no`/`en`/`null`). `null` betyr ikke valgt, og da gjelder norsk.
+  - Ved innlogging tas kontoens språk i bruk med `adoptProfileLang` i `lang.js`.
+  - Byttet lagres med `changeLanguage` i `languagePref.js` fra menyen og fra «Min konto». Det lagres også i `user_metadata.lang` for e-postmalene.
+  - `localStorage` (`hs_lang`) er bare en hurtigbuffer.
+  - Delt innhold i boet skrives aldri om av ett språkvalg. Standardoppgavene lagres på norsk og oversettes ved visning.
+  - Arveveiviseren er på norsk. Engelsk er under arbeid: `public/arveveiviser/i18n.js` gir `tr(no, en)` og `field(obj, key)`, der innholdet får `*_en`-felter. Den engelske versjonen vises bare med `?lang=en`, og appen sender det bare når `VITE_GUIDE_EN=true`. Flagget er av i prod til de engelske tekstene er juridisk gjennomgått, og norsk er alltid den gjeldende versjonen
 - **Deployment**: Vercel, automatisk fra `main`
 
 ## Fargepalett — bruk alltid disse

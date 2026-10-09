@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { signOut } from '../lib/supabase'
-import { getLang, setLang, L } from '../lib/lang'
+import { getLang, L } from '../lib/lang'
+import { changeLanguage } from '../lib/languagePref'
 import { isDemoSession } from '../lib/demo'
 import TextSizeControl from './TextSizeControl'
 
@@ -34,15 +35,15 @@ export default function TopBar({ profile, session, estate }) {
   const brandColor = estate?.branding_color || '#3A2F26'
   const brandName = estate?.name ? `Arvklart · ${estate.name}` : 'Arvklart'
 
+  const isDemo = isDemoSession(session)
+
+  // Språket lagres på kontoen (og i nettleseren), så det følger brukeren til andre enheter
   const toggleLang = () => {
     const next = lang === 'en' ? 'no' : 'en'
-    setLang(next)
     setLangState(next)
     setMenuOpen(false)
-    window.location.reload()
+    changeLanguage(next, { userId: session?.user?.id, isDemo })
   }
-
-  const isDemo = isDemoSession(session)
 
   const goHome = async () => {
     setLogoMenuOpen(false)
