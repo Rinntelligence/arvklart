@@ -6,10 +6,19 @@ import assert from 'node:assert/strict'
 
 const TS = !!process.features?.typescript
 const ai = TS ? await import('../../supabase/functions/_shared/aiCore.ts') : null
+// Bildeanalysen (analysis.ts) brukes som eksempel på validering
+const an = TS ? await import('../../supabase/functions/_shared/analysis.ts') : null
 const skip = !TS && 'Node uten TypeScript-støtte'
 
 const msg = (text, extra = {}) => ({ content: [{ type: 'text', text }], stop_reason: 'end_turn', ...extra })
-const okAnalysis = { title: 'Gyngestol i eik', description: 'Brun, slitt sete.', category: 'møbler', condition: 'fair', confidence: 'medium' }
+const unknownField = { value: '', basis: 'unknown', evidence: '' }
+const okAnalysis = {
+  suggestion: { title: 'Gyngestol i eik', description: 'Brun, slitt sete.', category: 'møbler', category_key: 'furniture', confidence: 'medium' },
+  identification: Object.fromEntries(['object_type', 'brand', 'manufacturer', 'model', 'variant', 'material', 'colour', 'period', 'designer_or_artist', 'model_number'].map(f => [f, unknownField])),
+  marks: [], size_class: 'large', condition_suggestion: 'fair', condition_observations: [], condition_not_visible: [], condition_confidence: 'medium',
+  multiple_items: { detected: false, count: 0, note: '' }, photo_suggestions: [], search_query: 'gyngestol eik',
+}
+const withSuggestion = s => ({ ...okAnalysis, suggestion: { ...okAnalysis.suggestion, ...s } })
 
 describe('modell og parametre', { skip }, () => {
   test('Haiku 5.5 er standard; 4.5 bare når AI_MODEL sier det; ukjent verdi gir standard med varsel', () => {
@@ -35,13 +44,13 @@ describe('modell og parametre', { skip }, () => {
 })
 
 describe('tolking av svaret', { skip }, () => {
-  const validate = ai.validateLegacyAnalysis(['Møbler', 'Kunst'])
+  const validate = TS ? an.normalizeAnalysis(['Møbler', 'Kunst']) : null
 
   test('thinking-blokker før teksten hoppes over', () => {
     const m = { content: [{ type: 'thinking', thinking: '' }, { type: 'text', text: JSON.stringify(okAnalysis) }], stop_reason: 'end_turn' }
     const r = ai.interpretReply(m, validate)
     assert.equal(r.kind, 'ok')
-    assert.equal(r.value.category, 'Møbler', 'kategorien skal skrives som i boets liste')
+    assert.equal(r.value.suggestion.category, 'Møbler', 'kategorien skal skrives som i boets liste')
   })
 
   test('avslag gir refused med kategori, og prøves ikke på nytt', () => {
@@ -51,7 +60,7 @@ describe('tolking av svaret', { skip }, () => {
   })
 
   test('avkuttet svar prøves én gang til med dobbel max_tokens', () => {
-    const r = ai.interpretReply(msg('{"title":"Gyng', { stop_reason: 'max_tokens' }), validate)
+    const r = ai.interpretReply(msg('{"suggestion":{"title":"Gyng', { stop_reason: 'max_tokens' }), validate)
     assert.equal(r.kind, 'truncated')
     assert.deepEqual(ai.nextAttempt(r, 1, 4000), { retry: true, maxTokens: 8000 })
     assert.equal(ai.nextAttempt(r, 2, 8000).retry, false, 'høyst ett nytt forsøk')
@@ -59,21 +68,21 @@ describe('tolking av svaret', { skip }, () => {
 
   test('ugyldig JSON eller feil form gir invalid og ett nytt forsøk', () => {
     assert.equal(ai.interpretReply(msg('Her er svaret: {"title": ...'), validate).kind, 'invalid')
-    const r = ai.interpretReply(msg(JSON.stringify({ ...okAnalysis, condition: 'ok' })), validate)
+    const r = ai.interpretReply(msg(JSON.stringify({ ...okAnalysis, suggestion: 'x' })), validate)
     assert.equal(r.kind, 'invalid')
     assert.deepEqual(ai.nextAttempt(r, 1, 4000), { retry: true, maxTokens: 4000 })
   })
 
   test('kategori som ikke finnes i boet blir null; lange tekster kuttes', () => {
-    const r = ai.interpretReply(msg(JSON.stringify({ ...okAnalysis, category: 'Våpen', title: 'x'.repeat(500), description: 'y'.repeat(900) })), validate)
+    const r = ai.interpretReply(msg(JSON.stringify(withSuggestion({ category: 'Våpen', title: 'x'.repeat(500), description: 'y'.repeat(900) }))), validate)
     assert.equal(r.kind, 'ok')
-    assert.equal(r.value.category, null)
-    assert.equal(r.value.title.length, 120)
-    assert.equal(r.value.description.length, 600)
+    assert.equal(r.value.suggestion.category, null)
+    assert.equal(r.value.suggestion.title.length, 120)
+    assert.equal(r.value.suggestion.description.length, 600)
   })
 
   test('tom tittel godtas ikke', () => {
-    assert.equal(ai.interpretReply(msg(JSON.stringify({ ...okAnalysis, title: '  ' })), validate).kind, 'invalid')
+    assert.equal(ai.interpretReply(msg(JSON.stringify(withSuggestion({ title: '  ' }))), validate).kind, 'invalid')
   })
 })
 

@@ -10,8 +10,11 @@ import { hasAiConsent, giveAiConsent } from '../lib/aiConsent'
 import { formatNOK, parseNOK } from '../lib/format'
 import { L } from '../lib/lang'
 import { categoryLabel } from '../lib/categories'
-import { addCapturedPhotos, aiErrorMessage, analyzeItemPhotos, estimateApplies, matchCategory, mergeSelectedPhotos, removePhotoAt, requestValueEstimate, restoreRemoved, runPool, splitDraft } from '../lib/itemAi'
+import { addCapturedPhotos, aiErrorMessage, analyzeItemPhotos, estimateApplies, mergeSelectedPhotos, removePhotoAt, requestValueEstimate, restoreRemoved, runPool, splitDraft } from '../lib/itemAi'
+import { aiAnalysisRecord, aiSuggestion, applyAiSuggestion } from '../lib/itemAiHelpers'
+import { CONDITION_OPTIONS, identificationSummary, multipleItemsText } from '../lib/analysisView'
 import { AiConsent, DemoNotice } from '../components/AiDialogs'
+import AnalysisDetails from '../components/AnalysisDetails'
 import CameraCapture from '../components/CameraCapture'
 
 const MAX_ITEMS = 20
@@ -21,9 +24,10 @@ const AI_PARALLEL = 3
 
 let nextKey = 1
 const newDraft = () => ({
-  key: nextKey++, photos: [], title: '', categoryId: '', condition: 'good', description: '',
+  key: nextKey++, photos: [], title: '', categoryId: '', condition: 'unknown', description: '', // tilstand er ukjent til noen vurderer den
   value: '', status: 'idle', // idle | analyzing | analyzed | failed | saving | saveFailed | saved
   estimate: null, estimating: false, // AI-verdianslag bare når brukeren ber om det (se estimateApplies)
+  analysis: null, aiFilled: {}, // AI-vurderingen (lagres i ai_analysis) og feltene AI-en har fylt inn
 })
 
 // Sekundærtekst og feltkanter med nok kontrast (WCAG 1.4.3 / 1.4.11)
@@ -352,13 +356,11 @@ export default function AddItemsPage({ session, profile, onToast, isDemo }) {
         // Bare identifikasjon: ingen verdi i bulk (verdien er valgfri og fylles inn av brukeren)
         const { result, quota } = await analyzeItemPhotos(d.photos.map(p => p.file), { categories })
         if (typeof quota?.remaining === 'number') setDemoRemaining(quota.remaining)
-        const match = matchCategory(categories, result.category)
+        // AI fyller bare felt brukeren ikke har endret selv (også ved «Prøv AI igjen»)
         update(d.key, cur => ({
           status: 'analyzed',
-          title: cur.title.trim() ? cur.title : (result.title || ''),
-          description: cur.description.trim() ? cur.description : (result.description || ''),
-          condition: ['excellent', 'good', 'fair', 'poor'].includes(result.condition) ? result.condition : cur.condition,
-          categoryId: match ? match.id : cur.categoryId,
+          analysis: result.analysis || null,
+          ...applyAiSuggestion(cur, aiSuggestion(result, categories)),
         }))
         analyzed++
       } catch (e) {
@@ -435,6 +437,7 @@ export default function AddItemsPage({ session, profile, onToast, isDemo }) {
   const saveOne = async (d) => {
     const urls = []
     for (const p of d.photos) urls.push(await uploadEstateImage(p.file, id))
+    const aiAnalysis = aiAnalysisRecord(d)
     const { error } = await supabase.from('items').insert({
       estate_id: id,
       title: d.title.trim(),
@@ -449,6 +452,8 @@ export default function AddItemsPage({ session, profile, onToast, isDemo }) {
       estimated_value: parseNOK(d.value) ?? null, // 0 er en verdi; tomt felt er ukjent
       // Begrunnelsen følger bare med når verdien fortsatt er AI-anslaget
       ...(estimateApplies(d) ? { estimate_reasoning: d.estimate.reasoning, estimate_confidence: d.estimate.confidence } : {}),
+      // AI-vurderingen og hva brukeren gjorde med forslagene; bare når AI-en har analysert gjenstanden
+      ...(aiAnalysis ? { ai_analysis: aiAnalysis } : {}),
     })
     if (error) {
       await removeImages(urls).catch(() => {})
@@ -894,6 +899,13 @@ function DraftCard({ draft: d, index, categories, locked, onChange, onRemove, on
   const disabled = locked || d.status === 'saved'
   const aiValue = estimateApplies(d)
   const showValueInMore = !d.estimate && !d.estimating
+  // AI-vurderingen: kort oppsummering, advarsel ved flere gjenstander, og hvilke felt som fortsatt er AI-forslag
+  const ai = d.analysis?.ai
+  const summary = ai ? identificationSummary(ai) : ''
+  const multiple = ai ? multipleItemsText(ai) : ''
+  const fieldNames = { title: L('navn', 'name'), categoryId: L('kategori', 'category'), condition: L('tilstand', 'condition'), description: L('beskrivelse', 'description') }
+  const aiFields = Object.keys(fieldNames).filter(f => d.aiFilled?.[f] !== undefined && d[f] === d.aiFilled[f]).map(f => fieldNames[f])
+  const photoTip = !disabled && d.photos.length < MAX_PHOTOS ? ai?.photo_suggestions?.[0]?.reason : null
   const valueField = (
     <div style={{ marginTop: showValueInMore ? 0 : '8px' }}>
       {!showValueInMore && <label htmlFor={`value-${d.key}`} style={{ display: 'block', fontSize: '0.875rem', color: '#5C4530', marginBottom: '4px' }}>{L('Verdi i kroner (valgfri)', 'Value in NOK (optional)')}</label>}
@@ -940,6 +952,7 @@ function DraftCard({ draft: d, index, categories, locked, onChange, onRemove, on
           <button onClick={onAddPhotos} style={tileStyle}>{L('+ Velg bilder', '+ Choose photos')}</button>
         </>}
       </div>
+      {photoTip && <p style={{ fontSize: '0.8125rem', color: MUTED, margin: '-4px 0 10px', lineHeight: 1.5 }}>{L('Tips', 'Tip')}: {photoTip}</p>}
 
       {/* Felter: navn, kategori og tilstand alltid synlig; beskrivelse og verdi under «Mer» */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
@@ -951,12 +964,20 @@ function DraftCard({ draft: d, index, categories, locked, onChange, onRemove, on
           {categories.map(c => <option key={c.id} value={c.id}>{categoryLabel(c.label)}</option>)}
         </select>
         <select value={d.condition} onChange={e => onChange({ condition: e.target.value })} disabled={disabled} style={inputStyle} aria-label={L('Tilstand', 'Condition')}>
-          <option value="excellent">{L('Utmerket', 'Excellent')}</option>
-          <option value="good">{L('God', 'Good')}</option>
-          <option value="fair">{L('Middels', 'Fair')}</option>
-          <option value="poor">{L('Dårlig', 'Poor')}</option>
+          {CONDITION_OPTIONS().map(o => <option key={o.value} value={o.value}>{o.value === 'unknown' ? L('Tilstand: ikke vurdert', 'Condition: not assessed') : o.label}</option>)}
         </select>
       </div>
+      {ai && (aiFields.length > 0 || summary) && (
+        <p style={{ fontSize: '0.8125rem', color: MUTED, margin: '6px 0 0', lineHeight: 1.5 }}>
+          {summary && <>{L('AI', 'AI')}: {summary}. </>}
+          {aiFields.length > 0 && L(`AI-forslag: ${aiFields.join(', ')}. Se over.`, `AI suggestions: ${aiFields.join(', ')}. Please review.`)}
+        </p>
+      )}
+      {multiple && (
+        <p style={{ fontSize: '0.8125rem', color: '#8A4B2A', background: '#F3E3D3', borderRadius: '8px', padding: '8px 10px', margin: '8px 0 0', lineHeight: 1.5 }}>
+          {multiple}{d.photos.length > 1 ? ` ${L('Du kan også dele opp kortet nedenfor.', 'You can also split the card below.')}` : ''}
+        </p>
+      )}
       {(d.estimate || d.estimating) && valueField}
       <details style={{ marginTop: '8px' }}>
         <summary style={{ cursor: 'pointer', fontSize: '0.875rem', color: '#5C4530', padding: '10px 0', minHeight: '44px', boxSizing: 'border-box' }}>
@@ -969,6 +990,7 @@ function DraftCard({ draft: d, index, categories, locked, onChange, onRemove, on
             placeholder={L('Beskrivelse (valgfri)', 'Description (optional)')}
             style={{ ...inputStyle, resize: 'vertical', fontSize: '0.9375rem' }} />
           {showValueInMore && valueField}
+          {ai && <div style={{ borderTop: '1px solid #E8DFD0', paddingTop: '8px' }}><AnalysisDetails analysis={d.analysis} headingLevel={4} /></div>}
         </div>
       </details>
 

@@ -6,7 +6,10 @@ import { hasAiConsent, giveAiConsent } from '../lib/aiConsent'
 import { formatNOK } from '../lib/format'
 import { L, isEn } from '../lib/lang'
 import { categoryLabel } from '../lib/categories'
-import { aiErrorMessage, analyzeItemPhotos, callEdgeFunction, matchCategory } from '../lib/itemAi'
+import { aiErrorMessage, analyzeItemPhotos, callEdgeFunction } from '../lib/itemAi'
+import { aiAnalysisRecord, aiSuggestion, applyAiSuggestion } from '../lib/itemAiHelpers'
+import { CONDITION_OPTIONS, multipleItemsText } from '../lib/analysisView'
+import AnalysisDetails from '../components/AnalysisDetails'
 import { AiConsent, DemoNotice } from '../components/AiDialogs'
 import CameraCapture from '../components/CameraCapture'
 
@@ -17,7 +20,9 @@ export default function AddItemPage({ session, profile, onToast, isDemo }) {
   const [title, setTitle] = useState('')
   const [categoryId, setCategoryId] = useState('')
   const [description, setDescription] = useState('')
-  const [condition, setCondition] = useState('good')
+  const [condition, setCondition] = useState('unknown') // ukjent til noen har vurdert den
+  const [analysis, setAnalysis] = useState(null) // AI-vurderingen (lagres i ai_analysis)
+  const [aiFilled, setAiFilled] = useState({}) // feltene AI-en har fylt inn, så brukerens egne valg ikke overskrives
   const [imageFiles, setImageFiles] = useState([])
   const [imagePreviews, setImagePreviews] = useState([])
   const [saving, setSaving] = useState(false)
@@ -98,11 +103,16 @@ export default function AddItemPage({ session, profile, onToast, isDemo }) {
     try {
       const { result, quota } = await analyzeItemPhotos(imageFiles, { categories })
       trackQuota({ quota })
-      if (result.title && !title) setTitle(result.title)
-      if (result.description && !description) setDescription(result.description)
-      if (result.condition) setCondition(result.condition)
-      const match = matchCategory(categories, result.category)
-      if (match) setCategoryId(match.id)
+      // AI fyller bare felt brukeren ikke har endret selv
+      // Første kategori er forhåndsvalgt når siden lastes; den regnes ikke som brukerens eget valg
+      const cur = { title, description, categoryId: aiFilled.categoryId === undefined && categoryId === categories[0]?.id ? '' : categoryId, condition, aiFilled }
+      const { aiFilled: filled, ...changes } = applyAiSuggestion(cur, aiSuggestion(result, categories))
+      if ('title' in changes) setTitle(changes.title)
+      if ('description' in changes) setDescription(changes.description)
+      if ('condition' in changes) setCondition(changes.condition)
+      if ('categoryId' in changes) setCategoryId(changes.categoryId)
+      setAiFilled(filled)
+      setAnalysis(result.analysis || null)
       onToast(L('AI identifiserte gjenstanden ✓', 'AI identified the item ✓'))
     } catch (e) {
       handleAiError(e, L('AI-analyse feilet — fyll inn manuelt', 'AI analysis failed — fill in manually'))
@@ -146,6 +156,7 @@ export default function AddItemPage({ session, profile, onToast, isDemo }) {
     if (isDemo) { setDemoBlocked(true); return }
     if (!title.trim()) { onToast(L('Legg til navn på gjenstanden', 'Add the item name'), 'error'); return }
     setSaving(true)
+    const aiRecord = aiAnalysisRecord({ analysis, aiFilled, title, description, categoryId, condition })
     try {
       const { data: newItem, error } = await supabase.from('items').insert({
         estate_id: id,
@@ -162,6 +173,8 @@ export default function AddItemPage({ session, profile, onToast, isDemo }) {
         estimate_confidence: aiEstimate?.confidence || null,
         purchase_price: purchasePrice ? parseFloat(purchasePrice) : null,
         purchase_year: purchaseYear ? parseInt(purchaseYear) : null,
+        // AI-vurderingen og hva brukeren gjorde med forslagene; bare når AI-en har analysert gjenstanden
+        ...(aiRecord ? { ai_analysis: aiRecord } : {}),
         value_agree_count: myEstimateVote === 'agree' ? 1 : 0,
         value_disagree_count: myEstimateVote === 'disagree' ? 1 : 0,
         value_voter_ids: myEstimateVote ? [session.user.id] : [],
@@ -264,6 +277,15 @@ export default function AddItemPage({ session, profile, onToast, isDemo }) {
             </button>
           )}
           {consentFor === 'analyze' && <AiConsent onCancel={() => setConsentFor(null)} onAccept={() => { giveAiConsent(); setAiConsented(true); setConsentFor(null); analyzeWithAI() }} />}
+          {analysis?.ai && multipleItemsText(analysis.ai) && (
+            <p style={{ fontSize: '0.8125rem', color: '#8A4B2A', background: '#F3E3D3', borderRadius: '8px', padding: '8px 10px', margin: '10px 0 0', lineHeight: 1.5 }}>{multipleItemsText(analysis.ai)}</p>
+          )}
+          {analysis?.ai && (
+            <details style={{ marginTop: '10px' }}>
+              <summary style={{ cursor: 'pointer', fontSize: '0.875rem', color: '#5C4530', padding: '10px 0', minHeight: '44px', boxSizing: 'border-box' }}>{L('Hva AI-en så', 'What the AI saw')}</summary>
+              <AnalysisDetails analysis={analysis} heading={false} />
+            </details>
+          )}
         </div>
 
         {/* Navn */}
@@ -347,10 +369,10 @@ export default function AddItemPage({ session, profile, onToast, isDemo }) {
           <div style={{ display: 'block', fontSize: '0.8125rem', color: '#75604B', marginBottom: '8px' }}>
             {L('Tilstand', 'Condition')}
           </div>
-          <div style={{ display: 'flex', gap: '8px' }}>
-            {[['excellent',L('Utmerket','Excellent')],['good',L('God','Good')],['fair',L('Middels','Fair')],['poor',L('Dårlig','Poor')]].map(([val, label]) => (
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+            {CONDITION_OPTIONS().map(({ value: val, label }) => (
               <button key={val} onClick={() => setCondition(val)} aria-pressed={condition === val} style={{
-                flex: 1, padding: '10px 4px', minHeight: '44px',
+                flex: '1 1 60px', padding: '10px 4px', minHeight: '44px',
                 border: `2px solid ${condition === val ? '#3A2F26' : '#D9CFC0'}`,
                 borderRadius: '8px', cursor: 'pointer', fontSize: '0.75rem',
                 fontFamily: 'Karla, sans-serif',
