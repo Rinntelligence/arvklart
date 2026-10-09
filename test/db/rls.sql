@@ -231,7 +231,7 @@ select t_eq((select display_name from profiles where email = 'mona.demo@heirspli
 select t_eq((select preferred_lang from profiles where email = 'mona.demo@heirsplit.no'), null::text, 'demo kan ikke endre språket på profilen');
 -- Eksisterende brukere fra før migreringen (standardverdien 'en' i prod) står som «ikke valgt», altså norsk
 select t_eq((select preferred_lang from profiles where user_id = '00000000-0000-0000-0000-0000000000c1'), null::text, 'gamle profiler med standardverdien en er nullstilt');
-select t_eq((select column_default from information_schema.columns where table_name = 'profiles' and column_name = 'preferred_lang'), null::text, 'språk har ingen standardverdi');
+select t_eq((select column_default::text from information_schema.columns where table_name = 'profiles' and column_name = 'preferred_lang'), null::text, 'språk har ingen standardverdi');
 
 -- Nullstilling av demoen
 select reset_demo_estate();
