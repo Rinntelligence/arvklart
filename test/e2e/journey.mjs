@@ -110,6 +110,20 @@ await check('Invitasjon i ett skjermbilde: kortet vises etter «Legg til arving�
   await page.getByRole('heading', { name: 'Send invitasjonen til Kari' }).waitFor()
 })
 
+// Med flere arvinger er siden lang; skjemaet må åpnes der brukeren ser det (feil funnet i manuell test på mobil)
+const manyHeirs = ['Kari', 'Lars', 'Mona', 'Per', 'Eva', 'Ola'].map((name, i) => ({ id: `h${i}`, estate_id: EST, name, email: `${name.toLowerCase()}@test.no`,
+  relationship: 'Barn', percentage: 0, created_at: now }))
+await check('Legg til arving: skjemaet åpnes synlig med fokus i navnefeltet, også når siden er lang', async page => {
+  await page.goto(`${BASE}/estate/${EST}/heirs`)
+  await page.getByRole('button', { name: 'Send invitasjon til Ola' }).waitFor()
+  await page.getByRole('button', { name: '+ Legg til arving' }).click()
+  await page.waitForFunction(() => document.activeElement?.id === 'heirs-f2', null, { timeout: 3000 })
+  await page.waitForTimeout(600) // myk rulling
+  const inView = await page.evaluate(() => { const r = document.activeElement.getBoundingClientRect(); return r.top >= 0 && r.bottom <= innerHeight })
+  assert(inView, 'navnefeltet er utenfor skjermen')
+  assert(await page.getByRole('button', { name: '+ Legg til arving' }).getAttribute('aria-expanded') === 'true', 'knappen sier ikke at skjemaet er åpent')
+}, { fixtures: { heirs: manyHeirs } })
+
 await check('Administrer: «Send invitasjoner» går til arvingene, lenken er en reserve', async page => {
   await page.goto(`${BASE}/estate/${EST}/admin`)
   assert(!(await page.getByRole('button', { name: 'Kopier lenke' }).isVisible()), 'lenken er fortsatt hovedvalget')
