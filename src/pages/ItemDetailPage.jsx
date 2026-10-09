@@ -9,6 +9,7 @@ import { categoryLabel } from '../lib/categories'
 import ReasonEditor from '../components/ReasonEditor'
 import AnalysisDetails from '../components/AnalysisDetails'
 import AiCorrectionsForm from '../components/AiCorrectionsForm'
+import MarketCompare from '../components/MarketCompare'
 import { withCorrections } from '../lib/aiCorrections'
 
 const tc = c => { if(!c)return'#FBF9F5'; const r=parseInt(c.slice(1,3),16),g=parseInt(c.slice(3,5),16),b=parseInt(c.slice(5,7),16); return(0.299*r+0.587*g+0.114*b)/255>0.55?'#3A2F26':'#FBF9F5' }
@@ -337,6 +338,9 @@ export default function ItemDetailPage({ session, profile, onToast, isDemo }) {
             </div>
           </details>
         )}
+
+        {/* Sammenligninger og verdianslag: valgfritt; søkelenker og liste for alle, endringer for admin og den som la inn */}
+        <MarketCompare item={item} userId={session.user.id} canEdit={canCorrect} onChanged={load} onToast={onToast} />
 
         {isAssigned ? (
           <div style={{ padding:'16px', background:'#DCE3D2', border:'1px solid #B8C8A8', borderRadius:'10px', marginBottom:'24px', display:'flex', justifyContent:'space-between', alignItems:'center', gap:'12px', flexWrap:'wrap' }}>
