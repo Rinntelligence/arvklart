@@ -7,6 +7,7 @@ import { formatNOK } from '../lib/format'
 import { removeImages, itemImageUrls } from '../lib/images'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
 import { L, locale } from '../lib/lang'
+import { categoryLabel } from '../lib/categories'
 
 const PALETTE = ['#5F6E52','#8B9A7D','#A97C3F','#7A8B6E','#9C8267','#6E8B87']
 
@@ -111,7 +112,7 @@ export default function EstatePage({ session, profile, onToast, isDemo }) {
   }
 
   const byCat = categories.map(c => ({
-    name: `${c.emoji} ${c.label}`,
+    name: `${c.emoji} ${categoryLabel(c.label)}`,
     count: items.filter(i => i.category_id === c.id).length,
   })).filter(x => x.count > 0).sort((a,b) => b.count - a.count)
 
@@ -295,7 +296,7 @@ export default function EstatePage({ session, profile, onToast, isDemo }) {
               <select value={filterCat} onChange={e => setFilterCat(e.target.value)}
                 style={{ minWidth:'200px', padding:'9px 12px', border:'1px solid #D9CFC0', borderRadius:'8px', fontSize:'14px', background:'#fff', color:'#3A2F26', outline:'none', fontFamily:'Karla, sans-serif' }}>
                 <option value="all">{L('Alle kategorier', 'All categories')}</option>
-                {categories.map(c => <option key={c.id} value={c.id}>{c.emoji} {c.label}</option>)}
+                {categories.map(c => <option key={c.id} value={c.id}>{c.emoji} {categoryLabel(c.label)}</option>)}
               </select>
             </div>
           )}
@@ -388,7 +389,7 @@ function ItemCard({ item, userId, onClick, onDelete, myRole, isDemo }) {
       <div style={{ height:'130px', background:'#E8DFD0', overflow:'hidden', position:'relative' }}>
         {item.image_url
           ? <img src={item.image_url} alt={item.title} style={{ width:'100%', height:'100%', objectFit:'contain' }} />
-          : <span style={{ position:'absolute', left:'10px', bottom:'8px', fontSize:'11px', color:'#9C8267' }}>{cat.emoji} {cat.label}</span>}
+          : <span style={{ position:'absolute', left:'10px', bottom:'8px', fontSize:'11px', color:'#9C8267' }}>{cat.emoji} {categoryLabel(cat.label)}</span>}
         {count > 1 && !isAssigned && <span style={{ position:'absolute', top:'8px', right:'8px', background:'#5F6E52', color:'#fff', fontSize:'11px', padding:'2px 8px', borderRadius:'10px' }}>{L(`${count} vil ha`, `${count} want it`)}</span>}
         {isAssigned && <span style={{ position:'absolute', top:'8px', right:'8px', background:'#8B9A7D', color:'#fff', fontSize:'11px', padding:'2px 8px', borderRadius:'10px' }}>{L('Tildelt', 'Assigned')}</span>}
       </div>

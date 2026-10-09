@@ -62,6 +62,7 @@ npm run build      # bygg for produksjon
 npm run preview    # forhåndsvis bygget lokalt
 npm test           # enhetstester (veiviser, fremdrift, formatering)
 npm run test:db    # tilgangsregler og spørringer mot lokal Postgres + PostgREST (krever Docker)
+npm run test:e2e   # akseptansetester for «Legg til flere» i Chromium med falskt kamera (Supabase simuleres)
 ```
 
 ## Miljøvariabler som trengs lokalt (.env.local)
@@ -77,7 +78,7 @@ Hent verdiene fra Supabase Dashboard → Project Settings → API.
 | `/` | EstatesPage | Liste over brukerens bo |
 | `/estate/:id` | EstatePage | Bo-oversikt |
 | `/estate/:id/add` | AddItemPage | Legg til gjenstand (inkl. AI-analyse) |
-| `/estate/:id/add-many` | AddItemsPage | Legg til opptil 20 gjenstander: kamera i appen («Neste gjenstand»), kamerarull/filer/dra-og-slipp, AI analyserer alle (ett kall per gjenstand, inkl. verdi) og legger dem inn |
+| `/estate/:id/add-many` | AddItemsPage | Legg til opptil 20 gjenstander: kamera i appen (ett bilde = én gjenstand, «Flere bilder av denne» for flere), kamerarull/filer/dra-og-slipp, AI analyserer alle (ett kall per gjenstand). AI lagrer aldri selv: brukeren ser over kortene og trykker «Godkjenn og lagre alle» |
 | `/estate/:id/swipe` | SwipePage | Ta stilling til gjenstander (vil ha / nei takk) |
 | `/estate/:id/conflicts` | ConflictPage | Løsningsmetoder (bare admin fordeler) |
 | `/estate/:id/heirs` | HeirsPage | Arvinger; e-posten styrer hvem som kan bli med |

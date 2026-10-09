@@ -1,13 +1,16 @@
 // Legg til mange gjenstander på en gang (maks 20): ta bilder på stedet eller velg fra kamerarullen/PC-en,
-// la AI fylle inn navn, kategori, tilstand og verdi for alle, og legg dem inn i boet.
-import { useEffect, useRef, useState } from 'react'
+// la AI fylle inn navn, kategori, tilstand og beskrivelse for alle, se over og godkjenn alle samlet.
+// AI-analysen lagrer aldri noe selv; bare «Godkjenn og lagre alle» legger gjenstandene inn i boet.
+// AI fyller ikke inn verdi her: verdien er valgfri og skrives inn av brukeren.
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { getCategories, supabase, signOut } from '../lib/supabase'
 import { downscaleImage, removeImages, uploadEstateImage } from '../lib/images'
 import { hasAiConsent, giveAiConsent } from '../lib/aiConsent'
 import { formatNOK, parseNOK } from '../lib/format'
 import { L } from '../lib/lang'
-import { analyzeItemPhotos, matchCategory, mergeSelectedPhotos, runPool } from '../lib/itemAi'
+import { categoryLabel } from '../lib/categories'
+import { addCapturedPhotos, aiErrorMessage, analyzeItemPhotos, estimateApplies, matchCategory, mergeSelectedPhotos, removePhotoAt, requestValueEstimate, restoreRemoved, runPool, splitDraft } from '../lib/itemAi'
 import { AiConsent, DemoNotice } from '../components/AiDialogs'
 import CameraCapture from '../components/CameraCapture'
 
@@ -20,16 +23,33 @@ let nextKey = 1
 const newDraft = () => ({
   key: nextKey++, photos: [], title: '', categoryId: '', condition: 'good', description: '',
   value: '', status: 'idle', // idle | analyzing | analyzed | failed | saving | saveFailed | saved
+  estimate: null, estimating: false, // AI-verdianslag bare når brukeren ber om det (se estimateApplies)
 })
 
+// Sekundærtekst og feltkanter med nok kontrast (WCAG 1.4.3 / 1.4.11)
+const MUTED = '#75604B'
+const FIELD_BORDER = '#9A8B78'
+
 const inputStyle = {
-  width: '100%', padding: '10px 12px', border: '1px solid #D9CFC0', borderRadius: '8px',
-  fontSize: '16px', background: '#FBF9F5', color: '#3A2F26', outline: 'none',
+  width: '100%', minHeight: '44px', padding: '10px 12px', border: `1px solid ${FIELD_BORDER}`, borderRadius: '8px',
+  fontSize: '16px', background: '#FBF9F5', color: '#3A2F26',
   fontFamily: 'Karla, sans-serif', boxSizing: 'border-box',
 }
+const bigBtn = {
+  minHeight: '48px', padding: '14px 12px', borderRadius: '10px', cursor: 'pointer',
+  fontSize: '15px', fontFamily: 'Karla, sans-serif', fontWeight: '500',
+}
 const smallBtn = {
-  padding: '6px 10px', background: 'none', border: '1px solid #D9CFC0', borderRadius: '7px',
-  cursor: 'pointer', fontSize: '12px', color: '#5C4530', fontFamily: 'Karla, sans-serif',
+  minHeight: '44px', padding: '8px 12px', background: 'none', border: `1px solid ${FIELD_BORDER}`, borderRadius: '8px',
+  cursor: 'pointer', fontSize: '14px', color: '#5C4530', fontFamily: 'Karla, sans-serif',
+}
+
+// Flytter fokus til navnefeltet på et kort (fra oppsummeringen og bunnlinjen)
+const focusDraft = (key) => {
+  const el = document.getElementById(`draft-title-${key}`)
+  if (!el) return
+  el.scrollIntoView({ block: 'center', behavior: 'smooth' })
+  el.focus({ preventScroll: true })
 }
 
 export default function AddItemsPage({ session, profile, onToast, isDemo }) {
@@ -42,10 +62,14 @@ export default function AddItemsPage({ session, profile, onToast, isDemo }) {
   const [preparing, setPreparing] = useState(false)
   const [busy, setBusy] = useState(null) // 'analyzing' | 'saving'
   const [progress, setProgress] = useState({ done: 0, total: 0 })
-  const [saveAfterAi, setSaveAfterAi] = useState(true)
-  const [autoSaveQueued, setAutoSaveQueued] = useState(false)
+  const [cameraSame, setCameraSame] = useState(false) // kameraet: neste bilde til samme gjenstand (ellers ny gjenstand)
+  const [undo, setUndo] = useState(null) // { removed, text } fra sletting til neste sletting, endring av grupperingen eller lagring
+  const [aiReport, setAiReport] = useState(null) // { failedKeys, stoppedCode, notStarted } etter AI-analyse med feil
+  const [done, setDone] = useState(null) // { saved } når alt er lagret
+  const [myRole, setMyRole] = useState(null)
   const [aiConsented, setAiConsented] = useState(hasAiConsent)
-  const [askConsent, setAskConsent] = useState(false)
+  const [askConsent, setAskConsent] = useState(null) // { kind: 'analyze' | 'estimate', key } som venter på samtykke
+  const [estimateReport, setEstimateReport] = useState(null) // { failed, stoppedCode } når verdianslag ikke lyktes for alle
   const [demoBlocked, setDemoBlocked] = useState(false)
   const [demoRemaining, setDemoRemaining] = useState(isDemo ? 5 : null)
   const [dragOver, setDragOver] = useState(false)
@@ -56,11 +80,37 @@ export default function AddItemsPage({ session, profile, onToast, isDemo }) {
   const addInputRef = useRef()
   const draftsRef = useRef(drafts)
   draftsRef.current = drafts
+  const cameraKeyRef = useRef(cameraKey)
+  cameraKeyRef.current = cameraKey
+  const cameraSameRef = useRef(cameraSame)
+  cameraSameRef.current = cameraSame
+  const captureQueue = useRef(Promise.resolve())
+  const undoRef = useRef(undo)
+  undoRef.current = undo
+
+  // Meldinger (toast) legges over bunnlinjen i stedet for oppå knappene
+  const barObserver = useRef(null)
+  const bottomBarRef = useCallback((el) => {
+    barObserver.current?.disconnect()
+    const root = document.documentElement
+    if (!el) { root.style.removeProperty('--toast-offset'); return }
+    const set = () => root.style.setProperty('--toast-offset', `${el.offsetHeight}px`)
+    set()
+    barObserver.current = new ResizeObserver(set)
+    barObserver.current.observe(el)
+  }, [])
 
   useEffect(() => { getCategories(id).then(({ data }) => setCategories(data || [])) }, [id])
+  useEffect(() => {
+    supabase.from('estate_members').select('role').eq('estate_id', id).eq('user_id', session.user.id).maybeSingle()
+      .then(({ data }) => setMyRole(data?.role || null))
+  }, [id, session.user.id])
 
   // Forhåndsvisningene er objekt-URL-er; frigjør dem når siden lukkes
-  useEffect(() => () => draftsRef.current.forEach(d => d.photos.forEach(p => URL.revokeObjectURL(p.url))), [])
+  useEffect(() => () => {
+    draftsRef.current.forEach(d => d.photos.forEach(p => URL.revokeObjectURL(p.url)))
+    releaseRemoved(undoRef.current?.removed)
+  }, [])
 
   // Advar før man forlater siden med ulagrede gjenstander
   const unsaved = drafts.some(d => d.status !== 'saved')
@@ -131,41 +181,103 @@ export default function AddItemsPage({ session, profile, onToast, isDemo }) {
     if (addToRef.current && files.length) addPhotosTo(addToRef.current, files)
   }
 
-  const removeDraft = (key) => {
-    setDrafts(prev => {
-      prev.find(d => d.key === key)?.photos.forEach(p => URL.revokeObjectURL(p.url))
-      return prev.filter(d => d.key !== key)
-    })
+  // Siste sletting kan angres uten tidsfrist (WCAG 2.2.1): til neste sletting, til grupperingen endres
+  // (del opp / slå sammen), til lagring, eller til brukeren lukker meldingen. Forhåndsvisningene (objekt-URL-er)
+  // frigjøres først når angring ikke lenger er mulig. Bildene er ikke lastet opp før lagring.
+  const releaseRemoved = (removed) => {
+    if (!removed) return
+    const urls = removed.photo ? [removed.photo.url] : removed.draft.photos.map(p => p.url)
+    urls.forEach(u => URL.revokeObjectURL(u))
+  }
+  const offerUndo = (removed, text) => {
+    releaseRemoved(undoRef.current?.removed)
+    // atPhotos: i kameraet vises angre bare til neste bilde tas; nederst på siden står den videre
+    undoRef.current = { removed, text, atPhotos: draftsRef.current.reduce((n, d) => n + d.photos.length, 0) }
+    setUndo(undoRef.current)
+  }
+  const dismissUndo = () => {
+    releaseRemoved(undoRef.current?.removed)
+    undoRef.current = null
+    setUndo(null)
+  }
+  const undoRemove = () => {
+    const current = undoRef.current
+    if (!current) return
+    const restored = restoreRemoved(draftsRef.current, current.removed, { maxPhotos: MAX_PHOTOS, maxItems: MAX_ITEMS })
+    if (restored === draftsRef.current) {
+      onToast(current.removed.draftRemoved || !draftsRef.current.some(d => d.key === current.removed.draft.key)
+        ? L('Kan ikke angre: det er allerede 20 gjenstander', 'Cannot undo: there are already 20 items')
+        : L('Kan ikke angre: gjenstanden har allerede 5 bilder', 'Cannot undo: the item already has 5 photos'), 'error')
+      return
+    }
+    draftsRef.current = restored
+    setDrafts(restored)
+    undoRef.current = null
+    setUndo(null)
   }
 
-  const removePhoto = (key, index) => update(key, d => {
-    URL.revokeObjectURL(d.photos[index].url)
-    return { photos: d.photos.filter((_, i) => i !== index) }
-  })
+  const removeDraft = (key) => {
+    const list = draftsRef.current
+    const draftIndex = list.findIndex(d => d.key === key)
+    if (draftIndex === -1) return
+    draftsRef.current = list.filter(d => d.key !== key)
+    setDrafts(draftsRef.current)
+    offerUndo({ draft: list[draftIndex], draftIndex, draftRemoved: true, photo: null }, L('Gjenstand fjernet', 'Item removed'))
+  }
+
+  const removePhoto = (key, index) => {
+    const { drafts: next, removed } = removePhotoAt(draftsRef.current, key, index)
+    if (!removed) return
+    draftsRef.current = next
+    setDrafts(next)
+    offerUndo(removed, L('Bilde slettet', 'Photo deleted'))
+    // Fotograferer vi gjenstanden som forsvant, går kameraet tilbake til forrige gjenstand
+    if (removed.draftRemoved && key === cameraKeyRef.current) {
+      const prev = [...next].reverse().find(d => d.status !== 'saved')
+      if (prev) setCameraKey(prev.key)
+      else { const d = newDraft(); setDrafts(p => [...p, d]); setCameraKey(d.key) }
+      setCameraSame(false)
+    }
+  }
+
+  // «Del opp»: ett bilde per gjenstand
+  const splitUp = (key) => {
+    const d = draftsRef.current.find(x => x.key === key)
+    if (!d) return
+    if (draftsRef.current.length + d.photos.length - 1 > MAX_ITEMS) { onToast(L('Maks 20 gjenstander om gangen', 'Max 20 items at a time'), 'error'); return }
+    dismissUndo()
+    setDrafts(prev => splitDraft(prev, key, newDraft))
+    onToast(L(`Delt opp i ${d.photos.length} gjenstander`, `Split into ${d.photos.length} items`))
+  }
 
   // Slår gjenstanden sammen med den over (når to bilder var av samme ting)
-  const mergeUp = (key) => setDrafts(prev => {
+  const mergeUp = (key) => {
+    const prev = draftsRef.current
     const i = prev.findIndex(d => d.key === key)
-    if (i < 1) return prev
+    if (i < 1) return
     const above = prev[i - 1], cur = prev[i]
     const photos = [...above.photos, ...cur.photos]
-    if (photos.length > MAX_PHOTOS) { onToast(L('Maks 5 bilder per gjenstand', 'Max 5 photos per item'), 'error'); return prev }
+    if (photos.length > MAX_PHOTOS) { onToast(L('Maks 5 bilder per gjenstand', 'Max 5 photos per item'), 'error'); return }
+    dismissUndo()
     const merged = { ...above, photos, status: above.status === 'saved' ? above.status : 'idle' }
-    return [...prev.slice(0, i - 1), merged, ...prev.slice(i + 1)]
-  })
+    setDrafts([...prev.slice(0, i - 1), merged, ...prev.slice(i + 1)])
+  }
 
   const startMerge = () => { setMergeSel([]); setMerging(true); setPendingFiles(null) }
   const cancelMerge = () => { setMerging(false); setMergeSel([]) }
   const toggleMergePhoto = (url) => setMergeSel(prev => prev.includes(url) ? prev.filter(u => u !== url) : [...prev, url])
   const approveMerge = () => {
     if (mergeSel.length < 2 || mergeSel.length > MAX_PHOTOS) return
+    dismissUndo()
     setDrafts(prev => mergeSelectedPhotos(prev, mergeSel))
     cancelMerge()
     onToast(L('Bildene er slått sammen til én gjenstand', 'The photos have been merged into one item'))
   }
 
-  // Kamera: fortsetter på siste gjenstand hvis den er tom, ellers en ny
+  // Kamera: hvert bilde blir en ny gjenstand, med mindre «Flere bilder av denne gjenstanden» er valgt.
+  // Starter på siste gjenstand hvis den er tom, ellers på en ny.
   const openCamera = () => {
+    setCameraSame(false)
     const last = drafts[drafts.length - 1]
     if (last && last.photos.length === 0 && last.status !== 'saved') { setCameraKey(last.key); return }
     if (drafts.length >= MAX_ITEMS) { onToast(L('Maks 20 gjenstander om gangen', 'Max 20 items at a time'), 'error'); return }
@@ -174,16 +286,41 @@ export default function AddItemsPage({ session, profile, onToast, isDemo }) {
     setCameraKey(d.key)
   }
 
+  // Bilder tatt raskt etter hverandre behandles i rekkefølge, så grupperingen blir riktig
+  const captureToCamera = (files) => {
+    captureQueue.current = captureQueue.current.then(async () => {
+      const photos = await prepare(files)
+      if (!photos.length) return
+      const r = addCapturedPhotos(draftsRef.current, {
+        currentKey: cameraKeyRef.current, sameItem: cameraSameRef.current, photos,
+        makeDraft: newDraft, maxPhotos: MAX_PHOTOS, maxItems: MAX_ITEMS,
+      })
+      if (r.rejected) photos.slice(photos.length - r.rejected).forEach(p => URL.revokeObjectURL(p.url))
+      draftsRef.current = r.drafts
+      cameraKeyRef.current = r.currentKey
+      setDrafts(r.drafts)
+      setCameraKey(r.currentKey)
+    })
+  }
+
+  // «Neste gjenstand»: neste bilde starter en ny gjenstand
   const nextCameraItem = () => {
+    setCameraSame(false)
+    const current = draftsRef.current.find(d => d.key === cameraKeyRef.current)
+    if (current && current.photos.length === 0) return
     if (draftsRef.current.length >= MAX_ITEMS) return
     const d = newDraft()
     setDrafts(prev => [...prev, d])
     setCameraKey(d.key)
   }
 
+  // Fra et kort («+ Ta bilde»): bildene hører til akkurat den gjenstanden
+  const openCameraFor = (key) => { setCameraKey(key); setCameraSame(true) }
+
   // Tomme gjenstander fra kameraet fjernes når det lukkes
   const closeCamera = () => {
     setCameraKey(null)
+    setCameraSame(false)
     setDrafts(prev => prev.filter(d => d.photos.length > 0 || d.title.trim() || d.key !== cameraKey))
   }
 
@@ -196,9 +333,9 @@ export default function AddItemsPage({ session, profile, onToast, isDemo }) {
 
   const aiTargets = drafts.filter(d => d.photos.length > 0 && (d.status === 'idle' || d.status === 'failed'))
 
-  const analyzeAll = async (consented = aiConsented) => {
-    if (!consented) { setAskConsent(true); return }
-    let targets = draftsRef.current.filter(d => d.photos.length > 0 && (d.status === 'idle' || d.status === 'failed'))
+  const analyzeAll = async (consented = aiConsented, onlyKey = null) => {
+    if (!consented) { setAskConsent({ kind: 'analyze', key: onlyKey }); return }
+    let targets = draftsRef.current.filter(d => d.photos.length > 0 && (d.status === 'idle' || d.status === 'failed') && (!onlyKey || d.key === onlyKey))
     if (isDemo) {
       if (demoRemaining === 0) { setDemoBlocked(true); return }
       targets = targets.slice(0, demoRemaining)
@@ -207,41 +344,90 @@ export default function AddItemsPage({ session, profile, onToast, isDemo }) {
     setBusy('analyzing')
     setProgress({ done: 0, total: targets.length })
     let stopped = null
-    let failed = 0
+    const failedKeys = []
+    let analyzed = 0
     targets.forEach(d => update(d.key, { status: 'analyzing' }))
     await runPool(targets, AI_PARALLEL, async (d) => {
       try {
-        const { result, quota } = await analyzeItemPhotos(d.photos.map(p => p.file), { categories, estimate: true })
+        // Bare identifikasjon: ingen verdi i bulk (verdien er valgfri og fylles inn av brukeren)
+        const { result, quota } = await analyzeItemPhotos(d.photos.map(p => p.file), { categories })
         if (typeof quota?.remaining === 'number') setDemoRemaining(quota.remaining)
         const match = matchCategory(categories, result.category)
-        const likely = Number(result.likely_nok)
         update(d.key, cur => ({
           status: 'analyzed',
           title: cur.title.trim() ? cur.title : (result.title || ''),
           description: cur.description.trim() ? cur.description : (result.description || ''),
           condition: ['excellent', 'good', 'fair', 'poor'].includes(result.condition) ? result.condition : cur.condition,
           categoryId: match ? match.id : cur.categoryId,
-          value: cur.value || (likely > 0 ? String(Math.round(likely)) : ''),
-          range: result.low_nok && result.high_nok ? [result.low_nok, result.high_nok] : null,
         }))
+        analyzed++
       } catch (e) {
         update(d.key, { status: 'failed' })
-        failed++
+        failedKeys.push(d.key)
         if (['demo_limit', 'rate_limit', 'ai_busy'].includes(e.code)) stopped = stopped || e
       } finally {
         setProgress(p => ({ ...p, done: p.done + 1 }))
       }
     }, () => !!stopped)
     // Gjenstander som ikke ble startet fordi grensen ble nådd
+    const notStarted = targets.length - analyzed - failedKeys.length
     setDrafts(prev => prev.map(d => d.status === 'analyzing' ? { ...d, status: 'idle' } : d))
     setBusy(null)
 
     if (stopped?.code === 'demo_limit') { setDemoRemaining(0); setDemoBlocked(true); return }
-    if (stopped) onToast(stopped.message + ' ' + L('Resten kan fylles inn manuelt.', 'The rest can be filled in manually.'), 'error')
-    else if (failed) onToast(L(`AI klarte ikke ${failed} ${failed === 1 ? 'gjenstand' : 'gjenstander'} — fyll inn navn selv`, `AI could not identify ${failed} ${failed === 1 ? 'item' : 'items'} — add the name yourself`), 'error')
-    // Det AI-en rakk å fylle inn legges inn; resten blir igjen i listen
-    if (saveAfterAi && !isDemo) setAutoSaveQueued(true)
-    else if (!stopped && !failed) onToast(L('AI har fylt inn gjenstandene — se over og lagre', 'AI has filled in the items — review and save'))
+    // Ingenting lagres her: brukeren ser over kortene og trykker «Godkjenn og lagre alle».
+    // Delvise feil vises i en oppsummering som blir stående til de er rettet (ikke i en toast som forsvinner).
+    if (stopped || failedKeys.length) {
+      setAiReport(prev => {
+        // «Prøv AI igjen» på ett kort: behold de andre som fortsatt mangler
+        const earlier = onlyKey && prev ? prev.failedKeys.filter(k => k !== onlyKey) : []
+        return { failedKeys: [...earlier, ...failedKeys], stoppedCode: stopped?.code || null, notStarted }
+      })
+    } else {
+      setAiReport(prev => (onlyKey && prev ? { ...prev, failedKeys: prev.failedKeys.filter(k => k !== onlyKey) } : null))
+      onToast(L('AI har fylt inn gjenstandene. Se over og trykk «Godkjenn og lagre alle».', 'AI has filled in the items. Review them and tap «Approve and save all».'))
+    }
+  }
+
+  // Verdianslag: bare når brukeren ber om det, ett tekstkall per gjenstand (estimate-value), ingen bilder.
+  // Verdien fylles inn synlig og merkes som AI-anslag; brukeren kan endre eller tømme den.
+  const canEstimate = (d) => d.status !== 'saved' && d.title.trim() && !d.estimating
+  const estimateValues = async (consented = aiConsented, onlyKey = null) => {
+    if (!consented) { setAskConsent({ kind: 'estimate', key: onlyKey }); return }
+    let targets = draftsRef.current.filter(d => canEstimate(d) && (onlyKey ? d.key === onlyKey : !d.estimate))
+    if (isDemo) {
+      if (demoRemaining === 0) { setDemoBlocked(true); return }
+      targets = targets.slice(0, demoRemaining)
+    }
+    if (!targets.length) return
+    setEstimateReport(null)
+    if (!onlyKey) { setBusy('estimating'); setProgress({ done: 0, total: targets.length }) }
+    targets.forEach(d => update(d.key, { estimating: true }))
+    let stopped = null
+    let failed = 0
+    await runPool(targets, AI_PARALLEL, async (d) => {
+      try {
+        const cat = categories.find(c => c.id === d.categoryId)
+        const { estimate, quota } = await requestValueEstimate({ title: d.title.trim(), description: d.description.trim(), category: cat?.label || '', condition: d.condition })
+        if (typeof quota?.remaining === 'number') setDemoRemaining(quota.remaining)
+        if (!estimate.likely) throw new Error('no estimate')
+        update(d.key, cur => ({
+          estimating: false,
+          value: String(estimate.likely),
+          estimate: { ...estimate, value: String(estimate.likely), basis: { title: cur.title, condition: cur.condition, categoryId: cur.categoryId } },
+        }))
+      } catch (e) {
+        failed++
+        update(d.key, { estimating: false })
+        if (['demo_limit', 'rate_limit', 'ai_busy'].includes(e.code)) stopped = stopped || e
+      } finally {
+        if (!onlyKey) setProgress(p => ({ ...p, done: p.done + 1 }))
+      }
+    }, () => !!stopped)
+    setDrafts(prev => prev.map(d => d.estimating ? { ...d, estimating: false } : d))
+    if (!onlyKey) setBusy(null)
+    if (stopped?.code === 'demo_limit') { setDemoRemaining(0); setDemoBlocked(true); return }
+    if (failed) setEstimateReport({ failed, stoppedCode: stopped?.code || null })
   }
 
   // ── Lagring ───────────────────────────────────────────────────────────────────
@@ -260,7 +446,9 @@ export default function AddItemsPage({ session, profile, onToast, isDemo }) {
       status: 'active',
       image_url: urls[0] || null,
       extra_images: urls.slice(1),
-      estimated_value: parseNOK(d.value) || null,
+      estimated_value: parseNOK(d.value) ?? null, // 0 er en verdi; tomt felt er ukjent
+      // Begrunnelsen følger bare med når verdien fortsatt er AI-anslaget
+      ...(estimateApplies(d) ? { estimate_reasoning: d.estimate.reasoning, estimate_confidence: d.estimate.confidence } : {}),
     })
     if (error) {
       await removeImages(urls).catch(() => {})
@@ -274,6 +462,7 @@ export default function AddItemsPage({ session, profile, onToast, isDemo }) {
     const ready = pending.filter(d => d.title.trim())
     const missing = pending.length - ready.length
     if (!ready.length) { onToast(L('Gi gjenstandene et navn, eller bruk AI', 'Give the items a name, or use AI'), 'error'); return }
+    dismissUndo()
     setBusy('saving')
     setProgress({ done: 0, total: ready.length })
     let saved = 0
@@ -293,8 +482,11 @@ export default function AddItemsPage({ session, profile, onToast, isDemo }) {
     setBusy(null)
     const notSaved = ready.length - saved
     if (!missing && !notSaved) {
-      onToast(L(`${saved} ${saved === 1 ? 'gjenstand' : 'gjenstander'} lagt til ✓`, `${saved} ${saved === 1 ? 'item' : 'items'} added ✓`))
-      navigate(`/estate/${id}`)
+      draftsRef.current.forEach(d => d.photos.forEach(p => URL.revokeObjectURL(p.url)))
+      setDrafts([])
+      setAiReport(null)
+      setDone({ saved })
+      window.scrollTo(0, 0)
       return
     }
     // Lagrede gjenstander fjernes fra listen; resten blir igjen
@@ -304,10 +496,6 @@ export default function AddItemsPage({ session, profile, onToast, isDemo }) {
     if (notSaved) parts.push(L(`${notSaved} kunne ikke lagres — prøv igjen.`, `${notSaved} could not be saved — try again.`))
     onToast(parts.join(' '), saved ? undefined : 'error')
   }
-
-  useEffect(() => {
-    if (autoSaveQueued && !busy) { setAutoSaveQueued(false); saveAll() }
-  }, [autoSaveQueued, busy])
 
   // ── Visning ───────────────────────────────────────────────────────────────────
 
@@ -322,18 +510,18 @@ export default function AddItemsPage({ session, profile, onToast, isDemo }) {
       onDragOver={e => { e.preventDefault(); setDragOver(true) }}
       onDragLeave={e => { if (e.currentTarget === e.target) setDragOver(false) }}
       onDrop={e => { e.preventDefault(); setDragOver(false); addFiles(Array.from(e.dataTransfer.files || [])) }}
-      style={{ maxWidth: '720px', margin: '0 auto', padding: '20px 16px 200px', fontFamily: 'Karla, sans-serif', minHeight: '100vh' }}
+      style={{ maxWidth: '720px', margin: '0 auto', padding: '20px 16px 260px', fontFamily: 'Karla, sans-serif', minHeight: '100vh' }}
     >
-      <button onClick={() => navigate(`/estate/${id}`)} style={{ background: 'none', border: 'none', color: '#9C8267', cursor: 'pointer', fontSize: '14px', padding: '0 0 16px', fontFamily: 'Karla, sans-serif' }}>
+      <button onClick={() => navigate(`/estate/${id}`)} style={{ background: 'none', border: 'none', color: MUTED, cursor: 'pointer', fontSize: '14px', padding: '0 0 16px', fontFamily: 'Karla, sans-serif' }}>
         {L('← Tilbake', '← Back')}
       </button>
 
       <h1 style={{ fontFamily: 'Fraunces, serif', fontSize: '24px', fontWeight: '400', color: '#3A2F26', marginBottom: '6px' }}>
         {L('Legg til flere gjenstander', 'Add several items')}
       </h1>
-      <p style={{ color: '#9C8267', fontSize: '14px', lineHeight: 1.5, marginBottom: '18px' }}>
-        {L('Ta bilder på stedet eller velg fra bildene dine. Opptil 5 bilder per gjenstand og 20 gjenstander om gangen. AI kan fylle inn navn, kategori, tilstand og verdi for alle.',
-           'Take photos on the spot or choose from your photos. Up to 5 photos per item and 20 items at a time. AI can fill in name, category, condition and value for all of them.')}
+      <p style={{ color: MUTED, fontSize: '14px', lineHeight: 1.5, marginBottom: '18px' }}>
+        {L('Ta ett bilde av hver gjenstand. AI fyller inn navn, kategori og tilstand, du ser over, og så lagrer du alle samlet. Opptil 20 gjenstander om gangen.',
+           'Take one photo of each item. AI fills in name, category and condition, you review, then you save them all at once. Up to 20 items at a time.')}
       </p>
 
       {isDemo && (
@@ -343,10 +531,36 @@ export default function AddItemsPage({ session, profile, onToast, isDemo }) {
         </div>
       )}
 
+      {done && (
+        <div role="status" style={{ background: '#DCE3D2', border: '1px solid #B8C8A8', borderRadius: '12px', padding: '18px', marginBottom: '18px' }}>
+          <div style={{ fontFamily: "'Fraunces', serif", fontSize: '20px', color: '#3A2F26', marginBottom: '6px' }}>
+            {L(`✓ ${done.saved} ${done.saved === 1 ? 'gjenstand' : 'gjenstander'} lagt til i boet`, `✓ ${done.saved} ${done.saved === 1 ? 'item' : 'items'} added to the estate`)}
+          </div>
+          <p style={{ fontSize: '14px', color: '#3A5A30', lineHeight: 1.5, marginBottom: '14px' }}>
+            {myRole === 'admin'
+              ? L('Neste steg: inviter arvingene, så de kan se gjenstandene og vise interesse.', 'Next step: invite the heirs so they can see the items and show interest.')
+              : L('Gjenstandene er nå synlige for alle i boet.', 'The items are now visible to everyone in the estate.')}
+          </p>
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+            {myRole === 'admin' && !isDemo && (
+              <button onClick={() => navigate(`/estate/${id}/admin`)} style={{ ...bigBtn, background: '#3A2F26', color: '#FBF9F5', border: 'none' }}>
+                {L('Inviter arvingene', 'Invite the heirs')}
+              </button>
+            )}
+            <button onClick={() => navigate(`/estate/${id}`)} style={{ ...bigBtn, background: myRole === 'admin' ? '#fff' : '#3A2F26', color: myRole === 'admin' ? '#3A2F26' : '#FBF9F5', border: myRole === 'admin' ? `1px solid ${FIELD_BORDER}` : 'none' }}>
+              {L('Se gjenstandene', 'See the items')}
+            </button>
+            <button onClick={() => { setDone(null); openCamera() }} style={{ ...bigBtn, background: '#fff', color: '#3A2F26', border: `1px solid ${FIELD_BORDER}` }}>
+              {L('Legg til flere', 'Add more')}
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Kilder */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '10px', marginBottom: '10px' }}>
         <SourceButton onClick={openCamera} disabled={full || !!busy || merging}
-          title={L('Ta bilder', 'Take photos')} hint={L('Kamera med «Neste gjenstand»', 'Camera with «Next item»')} />
+          title={L('Ta bilder', 'Take photos')} hint={L('Ett bilde = én gjenstand', 'One photo = one item')} primary cameraReturn />
         <SourceButton onClick={() => pickRef.current.click()} disabled={full || !!busy || merging}
           title={L('Velg bilder', 'Choose photos')} hint={L('Kamerarull, filer — eller dra hit', 'Camera roll, files — or drag here')} />
       </div>
@@ -366,18 +580,18 @@ export default function AddItemsPage({ session, profile, onToast, isDemo }) {
             <button onClick={() => addAsSeparate(pendingFiles)} style={{ flex: '1 1 180px', padding: '12px', background: '#3A2F26', color: '#FBF9F5', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '14px', fontFamily: 'Karla, sans-serif' }}>
               {L(`${pendingFiles.length} ulike gjenstander`, `${pendingFiles.length} different items`)}
             </button>
-            <button onClick={() => addAsOne(pendingFiles)} style={{ flex: '1 1 180px', padding: '12px', background: '#FBF9F5', color: '#3A2F26', border: '1px solid #D9CFC0', borderRadius: '8px', cursor: 'pointer', fontSize: '14px', fontFamily: 'Karla, sans-serif' }}>
+            <button onClick={() => addAsOne(pendingFiles)} style={{ flex: '1 1 180px', padding: '12px', background: '#FBF9F5', color: '#3A2F26', border: `1px solid ${FIELD_BORDER}`, borderRadius: '8px', cursor: 'pointer', fontSize: '14px', fontFamily: 'Karla, sans-serif' }}>
               {L('Samme gjenstand', 'The same item')}{pendingFiles.length > MAX_PHOTOS ? L(' (de 5 første)', ' (first 5)') : ''}
             </button>
             <button onClick={() => setPendingFiles(null)} style={{ ...smallBtn, border: 'none' }}>{L('Avbryt', 'Cancel')}</button>
           </div>
-          <p style={{ fontSize: '12px', color: '#9C8267', marginTop: '10px', marginBottom: 0 }}>
+          <p style={{ fontSize: '12px', color: MUTED, marginTop: '10px', marginBottom: 0 }}>
             {L('Du kan slå sammen eller legge til bilder etterpå.', 'You can merge items or add photos afterwards.')}
           </p>
         </div>
       )}
 
-      {preparing && <p style={{ fontSize: '13px', color: '#9C8267', marginBottom: '12px' }}>{L('Klargjør bilder…', 'Preparing photos…')}</p>}
+      {preparing && <p style={{ fontSize: '13px', color: MUTED, marginBottom: '12px' }}>{L('Klargjør bilder…', 'Preparing photos…')}</p>}
 
       {dragOver && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(95,110,82,0.18)', border: '4px dashed #5F6E52', display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
@@ -388,7 +602,7 @@ export default function AddItemsPage({ session, profile, onToast, isDemo }) {
       {/* Gjenstandene */}
       {drafts.length > 0 && (
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', marginBottom: '8px', flexWrap: 'wrap' }}>
-          <span style={{ fontSize: '13px', color: '#9C8267' }}>
+          <span style={{ fontSize: '13px', color: MUTED }}>
             {L(`${drafts.length} av maks ${MAX_ITEMS} gjenstander`, `${drafts.length} of max ${MAX_ITEMS} items`)}
           </span>
           {!merging && mergeable.length >= 2 && (
@@ -396,6 +610,37 @@ export default function AddItemsPage({ session, profile, onToast, isDemo }) {
               {L('Slå sammen gjenstander', 'Merge items')}
             </button>
           )}
+        </div>
+      )}
+
+      {aiReport && !merging && !busy && (
+        <AiSummary report={aiReport} drafts={drafts} onClose={() => setAiReport(null)} />
+      )}
+
+      {/* Tilbud om verdianslag etter analysen: et synlig, frivillig valg */}
+      {(() => {
+        const n = drafts.filter(d => canEstimate(d) && !d.estimate).length
+        if (merging || busy || !n || !drafts.some(d => d.status === 'analyzed')) return null
+        return (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', background: '#fff', border: '1px solid #D9CFC0', borderRadius: '12px', padding: '12px 14px', marginBottom: '12px', fontSize: '15px', color: '#3A2F26' }}>
+            <span style={{ flex: '1 1 220px', lineHeight: 1.5 }}>
+              {L('Vil du ha et grovt verdianslag? Verdien er valgfri og bare veiledende.', 'Would you like a rough value estimate? The value is optional and for guidance only.')}
+              <span style={{ display: 'block', fontSize: '13px', color: MUTED }}>{L(`Bruker ${n} AI-forsøk.`, `Uses ${n} AI attempts.`)}</span>
+            </span>
+            <button onClick={() => estimateValues()} style={{ ...smallBtn, background: '#fff', color: '#3A2F26', fontWeight: '600' }}>
+              {L(`Anslå verdi for alle (${n})`, `Estimate value for all (${n})`)}
+            </button>
+          </div>
+        )
+      })()}
+
+      {estimateReport && !busy && (
+        <div role="status" style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', background: '#F3E3D3', border: '1px solid #C9AE8E', borderRadius: '12px', padding: '12px 14px', marginBottom: '12px', fontSize: '15px', color: '#3A2F26', lineHeight: 1.5 }}>
+          <span style={{ flex: 1 }}>
+            {estimateReport.stoppedCode ? `${aiErrorMessage(estimateReport.stoppedCode)} ` : ''}
+            {L(`Verdien ble ikke anslått for ${estimateReport.failed} ${estimateReport.failed === 1 ? 'gjenstand' : 'gjenstander'}. Du kan prøve igjen på kortet, eller la feltet stå tomt.`, `The value was not estimated for ${estimateReport.failed} ${estimateReport.failed === 1 ? 'item' : 'items'}. You can try again on the card, or leave the field empty.`)}
+          </span>
+          <button onClick={() => setEstimateReport(null)} aria-label={L('Lukk meldingen', 'Close the message')} style={{ minWidth: '44px', minHeight: '44px', background: 'none', border: 'none', fontSize: '20px', color: '#5C4530', cursor: 'pointer', marginTop: '-10px', marginRight: '-10px' }}>×</button>
         </div>
       )}
 
@@ -408,25 +653,32 @@ export default function AddItemsPage({ session, profile, onToast, isDemo }) {
             onRemove={() => removeDraft(d.key)}
             onRemovePhoto={pi => removePhoto(d.key, pi)}
             onMergeUp={i > 0 ? () => mergeUp(d.key) : null}
+            onSplit={() => splitUp(d.key)}
+            onRetry={() => analyzeAll(aiConsented, d.key)}
+            onEstimate={() => estimateValues(aiConsented, d.key)}
             onAddPhotos={() => { addToRef.current = d.key; addInputRef.current.click() }}
-            onCamera={() => setCameraKey(d.key)}
+            onCamera={() => openCameraFor(d.key)}
           />
         ))}
       </div>}
 
-      {drafts.length === 0 && !pendingFiles && (
-        <div style={{ textAlign: 'center', padding: '40px 16px', color: '#9C8267', fontSize: '14px', border: '2px dashed #D9CFC0', borderRadius: '12px' }}>
+      {drafts.length === 0 && !pendingFiles && !done && (
+        <div style={{ textAlign: 'center', padding: '40px 16px', color: MUTED, fontSize: '14px', border: '2px dashed #D9CFC0', borderRadius: '12px' }}>
           {L('Ingen gjenstander ennå. Start med å ta eller velge bilder.', 'No items yet. Start by taking or choosing photos.')}
         </div>
       )}
 
-      {/* Handlinger nederst */}
-      {drafts.length > 0 && (
-        <div className="bottom-bar" style={{ position: 'fixed', bottom: 0, left: 0, right: 0, padding: '12px 16px max(16px, env(safe-area-inset-bottom))', background: '#fff', borderTop: '1px solid #D9CFC0', boxShadow: '0 -4px 20px rgba(0,0,0,0.08)', zIndex: 100 }}>
+      {/* Handlinger nederst: alltid synlige, også med 20 kort */}
+      {(drafts.length > 0 || undo) && (
+        <div ref={bottomBarRef} className="bottom-bar" role="region" aria-label={L('Lagre gjenstandene', 'Save the items')} style={{ position: 'fixed', bottom: 0, left: 0, right: 0, padding: '12px 16px max(16px, env(safe-area-inset-bottom))', background: '#fff', borderTop: '1px solid #D9CFC0', boxShadow: '0 -4px 20px rgba(0,0,0,0.08)', zIndex: 100 }}>
           <div style={{ maxWidth: '720px', margin: '0 auto' }}>
             {askConsent && (
               <div style={{ marginBottom: '10px' }}>
-                <AiConsent onCancel={() => setAskConsent(false)} onAccept={() => { giveAiConsent(); setAiConsented(true); setAskConsent(false); analyzeAll(true) }} />
+                <AiConsent onCancel={() => setAskConsent(null)} onAccept={() => {
+                  const ask = askConsent
+                  giveAiConsent(); setAiConsented(true); setAskConsent(null)
+                  if (ask.kind === 'estimate') estimateValues(true, ask.key); else analyzeAll(true, ask.key)
+                }} />
               </div>
             )}
             {merging ? (
@@ -439,7 +691,7 @@ export default function AddItemsPage({ session, profile, onToast, isDemo }) {
                       : L(`${mergeSel.length} bilder blir én gjenstand`, `${mergeSel.length} photos become one item`)}
                 </div>
                 <div style={{ display: 'flex', gap: '8px' }}>
-                  <button onClick={cancelMerge} style={{ flex: 1, padding: '14px 10px', background: '#fff', color: '#5C4530', border: '1px solid #D9CFC0', borderRadius: '10px', cursor: 'pointer', fontSize: '15px', fontFamily: 'Karla, sans-serif' }}>
+                  <button onClick={cancelMerge} style={{ flex: 1, padding: '14px 10px', background: '#fff', color: '#5C4530', border: `1px solid ${FIELD_BORDER}`, borderRadius: '10px', cursor: 'pointer', fontSize: '15px', fontFamily: 'Karla, sans-serif' }}>
                     {L('Avbryt', 'Cancel')}
                   </button>
                   {(() => {
@@ -447,7 +699,7 @@ export default function AddItemsPage({ session, profile, onToast, isDemo }) {
                     return (
                       <button onClick={approveMerge} disabled={!ok} style={{
                         flex: 2, padding: '14px 10px', border: 'none', borderRadius: '10px', fontSize: '15px', fontFamily: 'Karla, sans-serif', fontWeight: '500',
-                        background: ok ? '#5F6E52' : '#D9CFC0', color: '#fff', cursor: ok ? 'pointer' : 'not-allowed',
+                        background: ok ? '#5F6E52' : '#E8DFD0', color: ok ? '#fff' : '#5C4530', cursor: ok ? 'pointer' : 'not-allowed',
                       }}>
                         {L('Godkjenn sammenslåing', 'Approve merge')}{mergeSel.length ? ` (${mergeSel.length})` : ''}
                       </button>
@@ -457,8 +709,8 @@ export default function AddItemsPage({ session, profile, onToast, isDemo }) {
               </div>
             ) : busy ? (
               <div>
-                <div style={{ fontSize: '14px', color: '#3A2F26', marginBottom: '8px' }}>
-                  {busy === 'analyzing' ? L(`AI analyserer… ${progress.done} av ${progress.total}`, `AI is analysing… ${progress.done} of ${progress.total}`) : L(`Lagrer… ${progress.done} av ${progress.total}`, `Saving… ${progress.done} of ${progress.total}`)}
+                <div role="status" style={{ fontSize: '14px', color: '#3A2F26', marginBottom: '8px' }}>
+                  {busy === 'analyzing' ? L(`AI analyserer… ${progress.done} av ${progress.total}`, `AI is analysing… ${progress.done} of ${progress.total}`) : busy === 'estimating' ? L(`Anslår verdi… ${progress.done} av ${progress.total}`, `Estimating value… ${progress.done} of ${progress.total}`) : L(`Lagrer… ${progress.done} av ${progress.total}`, `Saving… ${progress.done} of ${progress.total}`)}
                 </div>
                 <div style={{ height: '8px', background: '#E8DFD0', borderRadius: '4px', overflow: 'hidden' }}>
                   <div style={{ height: '100%', width: `${progress.total ? (progress.done / progress.total) * 100 : 0}%`, background: '#5F6E52', transition: 'width 0.3s' }} />
@@ -466,27 +718,47 @@ export default function AddItemsPage({ session, profile, onToast, isDemo }) {
               </div>
             ) : !askConsent && (
               <>
-                {aiTargets.length > 0 && !isDemo && (
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: '#5C4530', marginBottom: '10px', cursor: 'pointer' }}>
-                    <input type="checkbox" checked={saveAfterAi} onChange={e => setSaveAfterAi(e.target.checked)} style={{ width: '18px', height: '18px', accentColor: '#5F6E52' }} />
-                    {L('Legg inn i boet med en gang etter AI-analysen', 'Add to the estate right after the AI analysis')}
-                  </label>
+                {undo && !cameraDraft && (
+                  <div role="status" style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '15px', color: '#3A2F26', marginBottom: '10px' }}>
+                    <span style={{ flex: 1 }}>{undo.text}</span>
+                    <button onClick={undoRemove} style={{ ...smallBtn, fontSize: '15px', color: '#3A2F26', fontWeight: '600', background: '#fff' }}>{L('Angre', 'Undo')}</button>
+                    <button onClick={dismissUndo} aria-label={L('Lukk meldingen', 'Close the message')} style={{ ...smallBtn, minWidth: '44px', border: 'none', fontSize: '18px' }}>×</button>
+                  </div>
                 )}
-                <div style={{ display: 'flex', gap: '8px' }}>
+                {(() => {
+                  // Oversikt før lagring: hvor mange som er klare, og hvilke som mangler navn
+                  const missing = drafts.filter(d => d.status !== 'saved' && !d.title.trim() && !aiTargets.includes(d))
+                  if (!toSave && !missing.length) return null
+                  return (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', fontSize: '14px', color: '#3A2F26', marginBottom: '8px' }}>
+                      <span>{L(`${toSave} klare til lagring`, `${toSave} ready to save`)}</span>
+                      {missing.length > 0 && <>
+                        <span style={{ color: '#8A4B2A' }}>· {L(`${missing.length} mangler navn og lagres ikke`, `${missing.length} without a name will not be saved`)}</span>
+                        <button onClick={() => focusDraft(missing[0].key)} style={{ ...smallBtn, color: '#3A2F26' }}>
+                          {L('Vis', 'Show')}
+                        </button>
+                      </>}
+                    </div>
+                  )
+                })()}
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                   {aiTargets.length > 0 && (
-                    <button onClick={() => analyzeAll()} style={{ flex: 3, padding: '14px 10px', background: '#5F6E52', color: '#fff', border: 'none', borderRadius: '10px', cursor: 'pointer', fontSize: '15px', fontFamily: 'Karla, sans-serif', fontWeight: '500' }}>
-                      {saveAfterAi && !isDemo
-                        ? L(`Analyser og legg inn (${aiTargets.length})`, `Analyse and add (${aiTargets.length})`)
-                        : L(`Analyser med AI (${aiTargets.length})`, `Analyse with AI (${aiTargets.length})`)}
+                    <button onClick={() => analyzeAll()} style={{ ...bigBtn, flex: '3 1 180px', background: '#5F6E52', color: '#fff', border: 'none' }}>
+                      {L(`Analyser med AI (${aiTargets.length})`, `Analyse with AI (${aiTargets.length})`)}
                     </button>
                   )}
                   <button onClick={saveAll} disabled={!toSave} style={{
-                    flex: 2, padding: '14px 10px', border: 'none', borderRadius: '10px', fontSize: '15px', fontFamily: 'Karla, sans-serif', fontWeight: '500',
-                    background: toSave ? '#3A2F26' : '#D9CFC0', color: '#FBF9F5', cursor: toSave ? 'pointer' : 'not-allowed',
+                    ...bigBtn, flex: '2 1 180px', border: 'none',
+                    background: toSave ? '#3A2F26' : '#E8DFD0', color: toSave ? '#FBF9F5' : '#5C4530', cursor: toSave ? 'pointer' : 'not-allowed',
                   }}>
-                    {L(`Lagre ${toSave || ''}`.trim(), `Save ${toSave || ''}`.trim())}
+                    {toSave ? L(`Godkjenn og lagre alle (${toSave})`, `Approve and save all (${toSave})`) : L('Godkjenn og lagre alle', 'Approve and save all')}
                   </button>
                 </div>
+                {aiTargets.length > 0 && toSave > 0 && (
+                  <p style={{ fontSize: '12px', color: MUTED, margin: '8px 0 0' }}>
+                    {L('Ingenting lagres før du trykker «Godkjenn og lagre alle».', 'Nothing is saved until you tap «Approve and save all».')}
+                  </p>
+                )}
               </>
             )}
           </div>
@@ -497,11 +769,20 @@ export default function AddItemsPage({ session, profile, onToast, isDemo }) {
         <CameraCapture
           photos={cameraDraft.photos.map(p => p.url)}
           maxPhotos={MAX_PHOTOS}
-          onCapture={files => addPhotosTo(cameraKey, files)}
-          onNextItem={nextCameraItem}
+          onCapture={captureToCamera}
+          onRemovePhoto={pi => removePhoto(cameraKey, pi)}
           onClose={closeCamera}
-          itemNumber={cameraIndex + 1}
-          maxItems={MAX_ITEMS}
+          undo={undo && undo.atPhotos === drafts.reduce((n, d) => n + d.photos.length, 0) ? { text: undo.text, onUndo: undoRemove } : null}
+          multi={{
+            itemNumber: cameraIndex + 1,
+            itemCount: drafts.filter(d => d.photos.length > 0).length,
+            photoCount: drafts.reduce((n, d) => n + d.photos.length, 0),
+            sameItem: cameraSame,
+            onSameItem: setCameraSame,
+            onNextItem: nextCameraItem,
+            maxItems: MAX_ITEMS,
+            full: drafts.length >= MAX_ITEMS && cameraDraft.photos.length > 0,
+          }}
         />
       )}
 
@@ -510,15 +791,15 @@ export default function AddItemsPage({ session, profile, onToast, isDemo }) {
   )
 }
 
-function SourceButton({ onClick, disabled, title, hint }) {
+function SourceButton({ onClick, disabled, title, hint, primary, cameraReturn }) {
   return (
-    <button onClick={onClick} disabled={disabled} style={{
-      display: 'block', textAlign: 'left', padding: '14px',
-      background: '#fff', border: '1px solid #D9CFC0', borderRadius: '12px',
+    <button onClick={onClick} disabled={disabled} data-camera-return={cameraReturn || undefined} style={{
+      display: 'block', textAlign: 'left', padding: '16px', minHeight: '64px',
+      background: primary ? '#3A2F26' : '#fff', border: primary ? 'none' : `1px solid ${FIELD_BORDER}`, borderRadius: '12px',
       cursor: disabled ? 'not-allowed' : 'pointer', opacity: disabled ? 0.5 : 1, fontFamily: 'Karla, sans-serif',
     }}>
-      <span style={{ display: 'block', fontSize: '15px', color: '#3A2F26', fontWeight: '500' }}>{title}</span>
-      <span style={{ display: 'block', fontSize: '12px', color: '#9C8267', lineHeight: 1.4, marginTop: '2px' }}>{hint}</span>
+      <span style={{ display: 'block', fontSize: '16px', color: primary ? '#FBF9F5' : '#3A2F26', fontWeight: '500' }}>{title}</span>
+      <span style={{ display: 'block', fontSize: '13px', color: primary ? '#E8DFD0' : MUTED, lineHeight: 1.4, marginTop: '2px' }}>{hint}</span>
     </button>
   )
 }
@@ -560,34 +841,96 @@ function MergeGrid({ drafts, items, selected, onToggle }) {
   )
 }
 
+// Oppsummering etter AI-analyse med feil. Blir stående til alt er rettet eller brukeren lukker den,
+// i stedet for en melding som forsvinner etter noen sekunder.
+function AiSummary({ report, drafts, onClose }) {
+  const needs = drafts
+    .map((d, i) => ({ d, no: i + 1 }))
+    .filter(({ d }) => report.failedKeys.includes(d.key) && d.status === 'failed' && !d.title.trim())
+  if (!needs.length && !report.stoppedCode) return null
+  return (
+    <div role="status" style={{ background: '#F3E3D3', border: '1px solid #C9AE8E', borderRadius: '12px', padding: '14px 16px', marginBottom: '14px', color: '#3A2F26', fontSize: '15px', lineHeight: 1.5 }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+        <div style={{ flex: 1 }}>
+          {report.stoppedCode && (
+            <p style={{ margin: '0 0 8px' }}>
+              {aiErrorMessage(report.stoppedCode)}
+              {report.notStarted > 0 && ` ${L(`${report.notStarted} ${report.notStarted === 1 ? 'gjenstand ble' : 'gjenstander ble'} ikke analysert. Prøv igjen med «Analyser med AI» senere, eller fyll inn selv.`, `${report.notStarted} ${report.notStarted === 1 ? 'item was' : 'items were'} not analysed. Try «Analyse with AI» again later, or fill them in yourself.`)}`}
+            </p>
+          )}
+          {needs.length > 0 && (
+            <p style={{ margin: 0 }}>
+              {L(`AI klarte ikke ${needs.length} ${needs.length === 1 ? 'gjenstand' : 'gjenstander'}. Skriv inn navnet selv, eller trykk «Prøv AI igjen» på kortet.`,
+                 `AI could not do ${needs.length} ${needs.length === 1 ? 'item' : 'items'}. Type the name yourself, or tap «Try AI again» on the card.`)}
+            </p>
+          )}
+        </div>
+        <button onClick={onClose} aria-label={L('Lukk oppsummeringen', 'Close the summary')} style={{ minWidth: '44px', minHeight: '44px', background: 'none', border: 'none', fontSize: '20px', color: '#5C4530', cursor: 'pointer', marginTop: '-10px', marginRight: '-10px' }}>×</button>
+      </div>
+      {needs.length > 0 && (
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '10px' }}>
+          {needs.map(({ d, no }) => (
+            <button key={d.key} onClick={() => focusDraft(d.key)} style={{ ...smallBtn, background: '#fff', color: '#3A2F26' }}>
+              {L(`Gå til gjenstand ${no}`, `Go to item ${no}`)}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 const STATUS = {
   analyzing: () => ({ text: L('AI analyserer…', 'AI is analysing…'), color: '#5F6E52', bg: '#DCE3D2' }),
-  analyzed: () => ({ text: L('✓ Fylt inn av AI', '✓ Filled in by AI'), color: '#5F6E52', bg: '#DCE3D2' }),
-  failed: () => ({ text: L('Ikke fullført — prøv igjen eller fyll inn selv', 'Not completed — try again or fill in yourself'), color: '#8A4B2A', bg: '#F3E3D3' }),
+  analyzed: () => ({ text: L('✓ Fylt inn av AI – se over', '✓ Filled in by AI – review'), color: '#5F6E52', bg: '#DCE3D2' }),
+  failed: () => ({ text: L('AI klarte ikke denne', 'AI could not do this one'), color: '#8A4B2A', bg: '#F3E3D3' }),
   saveFailed: () => ({ text: L('Kunne ikke lagres — prøv igjen', 'Could not be saved — try again'), color: '#8A4B2A', bg: '#F3E3D3' }),
   saving: () => ({ text: L('Lagrer…', 'Saving…'), color: '#5C4530', bg: '#E8DFD0' }),
   saved: () => ({ text: L('✓ Lagret', '✓ Saved'), color: '#5F6E52', bg: '#DCE3D2' }),
 }
 
-function DraftCard({ draft: d, index, categories, locked, onChange, onRemove, onRemovePhoto, onMergeUp, onAddPhotos, onCamera }) {
+function DraftCard({ draft: d, index, categories, locked, onChange, onRemove, onRemovePhoto, onMergeUp, onSplit, onRetry, onEstimate, onAddPhotos, onCamera }) {
   const status = STATUS[d.status]?.()
   const disabled = locked || d.status === 'saved'
+  const aiValue = estimateApplies(d)
+  const showValueInMore = !d.estimate && !d.estimating
+  const valueField = (
+    <div style={{ marginTop: showValueInMore ? 0 : '8px' }}>
+      {!showValueInMore && <label htmlFor={`value-${d.key}`} style={{ display: 'block', fontSize: '14px', color: '#5C4530', marginBottom: '4px' }}>{L('Verdi i kroner (valgfri)', 'Value in NOK (optional)')}</label>}
+      <input id={`value-${d.key}`} value={d.value} onChange={e => onChange({ value: e.target.value })} disabled={disabled || d.estimating} inputMode="numeric"
+        aria-label={showValueInMore ? L('Verdi i NOK (valgfri)', 'Value in NOK (optional)') : undefined} aria-describedby={aiValue ? `est-${d.key}` : undefined}
+        placeholder={d.estimating ? L('Anslår verdi…', 'Estimating value…') : L('Verdi i NOK (valgfri)', 'Value in NOK (optional)')} style={inputStyle} />
+      {aiValue && (
+        <div id={`est-${d.key}`} style={{ fontSize: '13px', color: '#5C4530', marginTop: '4px', lineHeight: 1.5 }}>
+          {L('AI-anslag, veiledende', 'AI estimate, for guidance only')}
+          {d.estimate.low && d.estimate.high ? ` (${formatNOK(d.estimate.low)} – ${formatNOK(d.estimate.high)})` : ''}
+          {'. '}{L('Du kan endre eller tømme feltet.', 'You can change or clear the field.')}
+        </div>
+      )}
+    </div>
+  )
   return (
-    <div style={{ background: '#fff', border: `1px solid ${d.status === 'failed' || d.status === 'saveFailed' ? '#C9AE8E' : '#D9CFC0'}`, borderRadius: '12px', padding: '14px', opacity: d.status === 'saved' ? 0.6 : 1 }}>
+    <div id={`draft-${d.key}`} style={{ background: '#fff', border: `1px solid ${d.status === 'failed' || d.status === 'saveFailed' ? '#C9AE8E' : '#D9CFC0'}`, borderRadius: '12px', padding: '14px', opacity: d.status === 'saved' ? 0.6 : 1 }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', marginBottom: '10px', flexWrap: 'wrap' }}>
-        <span style={{ fontSize: '13px', color: '#9C8267' }}>{L(`Gjenstand ${index + 1}`, `Item ${index + 1}`)}</span>
-        {status && <span style={{ fontSize: '12px', color: status.color, background: status.bg, padding: '3px 9px', borderRadius: '12px' }}>{status.text}</span>}
+        <span style={{ fontSize: '13px', color: MUTED }}>{L(`Gjenstand ${index + 1}`, `Item ${index + 1}`)}{d.photos.length > 1 ? L(` · ${d.photos.length} bilder`, ` · ${d.photos.length} photos`) : ''}</span>
+        {status && <span style={{ fontSize: '13px', color: status.color, background: status.bg, padding: '3px 9px', borderRadius: '12px' }}>{status.text}</span>}
       </div>
+      {d.status === 'failed' && !locked && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '10px', fontSize: '13px', color: '#8A4B2A' }}>
+          <span>{L('Fyll inn selv, eller', 'Fill it in yourself, or')}</span>
+          <button onClick={onRetry} style={{ ...smallBtn, minHeight: '40px', fontSize: '13px', color: '#3A2F26' }}>{L('Prøv AI igjen', 'Try AI again')}</button>
+        </div>
+      )}
 
       {/* Bilder */}
       <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '12px' }}>
         {d.photos.map((p, i) => (
-          <div key={p.url} style={{ position: 'relative', width: '64px', height: '64px', borderRadius: '8px', overflow: 'hidden', background: '#E8DFD0' }}>
-            <img src={p.url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          <div key={p.url} style={{ position: 'relative', width: '84px', height: '84px', borderRadius: '8px', overflow: 'hidden', background: '#E8DFD0' }}>
+            <img src={p.url} alt={L(`Gjenstand ${index + 1}, bilde ${i + 1}`, `Item ${index + 1}, photo ${i + 1}`)} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
             {!disabled && (
-              <button onClick={() => onRemovePhoto(i)} aria-label={L('Fjern bilde', 'Remove photo')} style={{
-                position: 'absolute', top: '2px', right: '2px', background: 'rgba(0,0,0,0.6)', color: '#fff', border: 'none',
-                borderRadius: '50%', width: '20px', height: '20px', cursor: 'pointer', fontSize: '12px', lineHeight: '1', padding: 0,
+              <button onClick={() => onRemovePhoto(i)} aria-label={L(`Slett bilde ${i + 1}`, `Delete photo ${i + 1}`)} style={{
+                position: 'absolute', top: '2px', right: '2px', background: 'rgba(0,0,0,0.65)', color: '#fff', border: 'none',
+                borderRadius: '50%', width: '40px', height: '40px', cursor: 'pointer', fontSize: '18px', lineHeight: '1', padding: 0,
               }}>×</button>
             )}
           </div>
@@ -598,37 +941,41 @@ function DraftCard({ draft: d, index, categories, locked, onChange, onRemove, on
         </>}
       </div>
 
-      {/* Felter */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '8px' }}>
-        <input value={d.title} onChange={e => onChange({ title: e.target.value })} disabled={disabled} maxLength={200}
+      {/* Felter: navn, kategori og tilstand alltid synlig; beskrivelse og verdi under «Mer» */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+        <input id={`draft-title-${d.key}`} value={d.title} onChange={e => onChange({ title: e.target.value })} disabled={disabled} maxLength={200} aria-label={L('Navn', 'Name')}
           placeholder={d.photos.length ? L('Navn (AI kan fylle inn)', 'Name (AI can fill in)') : L('Navn på gjenstand', 'Item name')}
           style={{ ...inputStyle, gridColumn: '1 / -1' }} />
-        <select value={d.categoryId} onChange={e => onChange({ categoryId: e.target.value })} disabled={disabled} style={inputStyle}>
-          <option value="">{L('Velg kategori', 'Choose category')}</option>
-          {categories.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
+        <select value={d.categoryId} onChange={e => onChange({ categoryId: e.target.value })} disabled={disabled} style={inputStyle} aria-label={L('Kategori', 'Category')}>
+          <option value="">{L('Kategori', 'Category')}</option>
+          {categories.map(c => <option key={c.id} value={c.id}>{categoryLabel(c.label)}</option>)}
         </select>
-        <select value={d.condition} onChange={e => onChange({ condition: e.target.value })} disabled={disabled} style={inputStyle}>
+        <select value={d.condition} onChange={e => onChange({ condition: e.target.value })} disabled={disabled} style={inputStyle} aria-label={L('Tilstand', 'Condition')}>
           <option value="excellent">{L('Utmerket', 'Excellent')}</option>
           <option value="good">{L('God', 'Good')}</option>
           <option value="fair">{L('Middels', 'Fair')}</option>
           <option value="poor">{L('Dårlig', 'Poor')}</option>
         </select>
-        <textarea value={d.description} onChange={e => onChange({ description: e.target.value })} disabled={disabled} maxLength={2000} rows={2}
-          placeholder={L('Beskrivelse (valgfri)', 'Description (optional)')}
-          style={{ ...inputStyle, gridColumn: '1 / -1', resize: 'vertical', fontSize: '15px' }} />
-        <div style={{ gridColumn: '1 / -1' }}>
-          <input value={d.value} onChange={e => onChange({ value: e.target.value })} disabled={disabled} inputMode="numeric"
-            placeholder={L('Verdi i NOK (valgfri)', 'Value in NOK (optional)')} style={inputStyle} />
-          {d.range && (
-            <div style={{ fontSize: '12px', color: '#9C8267', marginTop: '4px' }}>
-              {L('AI-estimat', 'AI estimate')}: {formatNOK(d.range[0])} – {formatNOK(d.range[1])} · {L('kun veiledende', 'for guidance only')}
-            </div>
-          )}
-        </div>
       </div>
+      {(d.estimate || d.estimating) && valueField}
+      <details style={{ marginTop: '8px' }}>
+        <summary style={{ cursor: 'pointer', fontSize: '14px', color: '#5C4530', padding: '10px 0', minHeight: '44px', boxSizing: 'border-box' }}>
+          {showValueInMore
+            ? <>{L('Mer', 'More')}{d.description.trim() || d.value ? ` · ${[d.description.trim() && L('beskrivelse', 'description'), d.value && formatNOK(d.value)].filter(Boolean).join(' · ')}` : ` · ${L('beskrivelse og verdi (valgfritt)', 'description and value (optional)')}`}</>
+            : <>{L('Mer', 'More')} · {d.description.trim() ? L('beskrivelse', 'description') : L('beskrivelse (valgfritt)', 'description (optional)')}</>}
+        </summary>
+        <div style={{ display: 'grid', gap: '8px', paddingTop: '6px' }}>
+          <textarea value={d.description} onChange={e => onChange({ description: e.target.value })} disabled={disabled} maxLength={2000} rows={2} aria-label={L('Beskrivelse', 'Description')}
+            placeholder={L('Beskrivelse (valgfri)', 'Description (optional)')}
+            style={{ ...inputStyle, resize: 'vertical', fontSize: '15px' }} />
+          {showValueInMore && valueField}
+        </div>
+      </details>
 
       {!disabled && (
         <div style={{ display: 'flex', gap: '8px', marginTop: '10px', flexWrap: 'wrap' }}>
+          {d.title.trim() && !d.estimate && !d.estimating && <button onClick={onEstimate} style={smallBtn}>{L('Anslå verdi (AI)', 'Estimate value (AI)')}</button>}
+          {d.photos.length > 1 && <button onClick={onSplit} style={smallBtn}>{L('Del opp: ett bilde per gjenstand', 'Split: one photo per item')}</button>}
           {onMergeUp && <button onClick={onMergeUp} style={smallBtn}>{L('↑ Samme gjenstand som over', '↑ Same item as above')}</button>}
           <button onClick={onRemove} style={{ ...smallBtn, color: '#8A4B2A' }}>{L('Fjern', 'Remove')}</button>
         </div>
@@ -638,7 +985,7 @@ function DraftCard({ draft: d, index, categories, locked, onChange, onRemove, on
 }
 
 const tileStyle = {
-  width: '64px', height: '64px', borderRadius: '8px', border: '2px dashed #D9CFC0', background: '#FBF9F5',
-  cursor: 'pointer', fontSize: '11px', color: '#9C8267', fontFamily: 'Karla, sans-serif', lineHeight: 1.3,
+  width: '84px', height: '84px', borderRadius: '8px', border: `2px dashed ${FIELD_BORDER}`, background: '#FBF9F5',
+  cursor: 'pointer', fontSize: '13px', color: '#5C4530', fontFamily: 'Karla, sans-serif', lineHeight: 1.3,
   padding: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center',
 }

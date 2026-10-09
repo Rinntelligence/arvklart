@@ -1,9 +1,9 @@
 // AI-hjelp for å legge til gjenstander: kall til edge-funksjonene, bilder til AI og kategorimatching.
 import { supabase } from './supabase'
 import { downscaleImage, fileToBase64 } from './images'
-import { isEn } from './lang'
+import { isEn, L } from './lang'
 
-export { matchCategory, mergeSelectedPhotos, runPool } from './itemAiHelpers.js'
+export { addCapturedPhotos, estimateApplies, matchCategory, mergeSelectedPhotos, removePhotoAt, restoreRemoved, runPool, splitDraft } from './itemAiHelpers.js'
 
 // Kalles med brukerens innlogging; edge-funksjonene avviser anonyme kall og teller AI-bruken.
 // Feil får med koden fra funksjonen (demo_limit, rate_limit, ai_busy …).
@@ -15,6 +15,16 @@ export async function callEdgeFunction(name, body) {
   const err = new Error(details?.error || error.message)
   err.code = details?.code
   throw err
+}
+
+// Forståelig melding på brukerens språk ut fra feilkoden fra edge-funksjonene (serverens tekst er norsk)
+export function aiErrorMessage(code) {
+  switch (code) {
+    case 'rate_limit': return L('Du har brukt AI-hjelpen mye den siste tiden. Prøv igjen om en stund – du kan fylle inn selv i mellomtiden.', 'You have used the AI help a lot recently. Try again in a while – you can fill in the details yourself meanwhile.')
+    case 'ai_busy': return L('AI-tjenesten er opptatt akkurat nå. Prøv igjen om litt.', 'The AI service is busy right now. Please try again shortly.')
+    case 'demo_limit': return L('Du har brukt opp AI-forsøkene i demoen.', 'You have used up the AI attempts in the demo.')
+    default: return L('AI-en klarte ikke dette nå. Prøv igjen, eller fyll inn selv.', 'The AI could not do this right now. Try again, or fill in the details yourself.')
+  }
 }
 
 export const MAX_AI_IMAGES = 3
@@ -36,4 +46,21 @@ export async function analyzeItemPhotos(files, { categories = [], estimate = fal
     lang: isEn() ? 'en' : 'no',
   })
   return { result: res?.data || res, quota: res?.quota }
+}
+
+// Grovt verdianslag ut fra teksten (navn, beskrivelse, kategori, tilstand): ett AI-kall, ingen bilder.
+// Markedet er alltid Norge (NOK). Brukes når brukeren selv ber om det.
+export async function requestValueEstimate({ title, description = '', category = '', condition = '' }) {
+  const res = await callEdgeFunction('estimate-value', { title, description, category, condition, lang: isEn() ? 'en' : 'no' })
+  const d = res?.data || res || {}
+  const s = d.summary || d
+  const num = v => (Number.isFinite(Number(v)) && Number(v) > 0 ? Math.round(Number(v)) : null)
+  return {
+    estimate: {
+      likely: num(s.likely_nok), low: num(s.low_nok), high: num(s.high_nok),
+      reasoning: d.market?.reasoning ?? d.reasoning ?? null,
+      confidence: d.market?.confidence ?? d.confidence ?? null,
+    },
+    quota: res?.quota,
+  }
 }
