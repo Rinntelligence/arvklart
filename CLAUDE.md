@@ -60,6 +60,12 @@ Tilgjengelighet (WCAG 2.2 AA): ikke bruk `outline:'none'`; fokus vises med `:foc
   - Tilstand kan være `unknown` («Ikke vurdert»), som er standard for nye gjenstander.
   - Eldre gjenstander har `null` og skrives ikke om.
   - `ai_analysis` kan bare endres av administrator eller den som la inn gjenstanden.
+- Verdianslag (`estimate-value`, logikk i `_shared/valuation.ts`) er et *veiledende AI-anslag*, ikke en markedsverdi.
+  - Det bygger på bildeanalysen (`analysis` eller `item_id`) uten å sende bildene igjen, og bruker ingen eksterne kilder.
+  - Modellen anslår for den registrerte tilstanden, med veiledning per type gjenstand.
+  - Koden trekker ikke fra noe i tillegg. Den gjør bare intervallet bredere og senker sikkerheten når grunnlaget er usikkert.
+  - For lite grunnlag gir `status: 'insufficient'` med tips og ingen verdi (aldri 0 kr).
+  - AI-ens anslag lagres i `ai_analysis.valuation`, adskilt fra `estimated_value`.
 - Storage: `estate-docs` er privat (`documents/<bo-id>/…`, åpnes med `createSignedUrl`); `item-images` er offentlig, nye filer lagres under `<bo-id>/…` (`src/lib/images.js`)
 
 ## Demokonto

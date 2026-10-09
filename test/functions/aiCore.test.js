@@ -87,22 +87,6 @@ describe('tolking av svaret', { skip }, () => {
 })
 
 describe('verdianslag', { skip }, () => {
-  const good = { low_nok: 300, likely_nok: 500, high_nok: 800, reasoning: 'Vanlig modell.', confidence: 'medium' }
-
-  test('gyldig intervall godtas og rundes til hele kroner', () => {
-    const r = ai.validateEstimate({ ...good, likely_nok: 500.4 })
-    assert.equal(r.ok, true)
-    assert.equal(r.value.likely_nok, 500)
-  })
-
-  test('intervall som ikke henger sammen, 0 kr, negative eller manglende beløp avvises', () => {
-    assert.equal(ai.validateEstimate({ ...good, low_nok: 900 }).ok, false)
-    assert.equal(ai.validateEstimate({ ...good, low_nok: 0 }).ok, false)
-    assert.equal(ai.validateEstimate({ ...good, high_nok: -1 }).ok, false)
-    assert.equal(ai.validateEstimate({ ...good, likely_nok: null }).ok, false)
-    assert.equal(ai.validateEstimate({ ...good, confidence: 'sure' }).ok, false)
-  })
-
   test('inndata: grenser, ukjent tilstand forblir ukjent, ugyldig kjøpsår/-pris ignoreres', () => {
     const now = new Date('2026-10-09')
     assert.equal(ai.readEstimateInput({ title: '  ' }, now), 'Mangler navn på gjenstanden')

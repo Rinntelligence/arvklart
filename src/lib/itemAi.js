@@ -52,11 +52,21 @@ export async function analyzeItemPhotos(files, { categories = [], estimate = fal
   return { result: res?.data || res, quota: res?.quota }
 }
 
-// Grovt verdianslag ut fra teksten (navn, beskrivelse, kategori, tilstand): ett AI-kall, ingen bilder.
-// Markedet er alltid Norge (NOK). Brukes når brukeren selv ber om det.
-export async function requestValueEstimate({ title, description = '', category = '', condition = '' }) {
-  const res = await callEdgeFunction('estimate-value', { title, description, category, condition, lang: isEn() ? 'en' : 'no' })
+// Det som lagres som AI-ens anslag (ai_analysis.valuation), adskilt fra verdien i feltet. Null for eldre svar.
+export const valuationRecord = d => (d?.v ? {
+  v: d.v, price_type: d.price_type, market_area: d.market_area, currency: d.currency, estimate: d.estimate,
+  confidence: d.confidence, uncertainty: d.uncertainty, basis: d.basis, model: d.model, at: new Date().toISOString(),
+} : null)
+
+// Veiledende AI-anslag ut fra det som er registrert og bildeanalysen (analysis), uten å sende bildene igjen:
+// ett tekstkall. Markedet er alltid Norge (NOK). Brukes når brukeren selv ber om det.
+// For lite grunnlag gir insufficient (med tips) og ingen verdi – aldri 0 kr.
+export async function requestValueEstimate({ title, description = '', category = '', condition = '', analysis = null }) {
+  const res = await callEdgeFunction('estimate-value', { title, description, category, condition, analysis, lang: isEn() ? 'en' : 'no' })
   const d = res?.data || res || {}
+  if (d.status === 'insufficient') {
+    return { estimate: null, insufficient: { missing: d.missing || [], reasoning: d.reasoning || '' }, quota: res?.quota }
+  }
   const s = d.summary || d
   const num = v => (Number.isFinite(Number(v)) && Number(v) > 0 ? Math.round(Number(v)) : null)
   return {
@@ -64,7 +74,9 @@ export async function requestValueEstimate({ title, description = '', category =
       likely: num(s.likely_nok), low: num(s.low_nok), high: num(s.high_nok),
       reasoning: d.market?.reasoning ?? d.reasoning ?? null,
       confidence: d.market?.confidence ?? d.confidence ?? null,
+      valuation: valuationRecord(d),
     },
+    insufficient: null,
     quota: res?.quota,
   }
 }
