@@ -3,6 +3,7 @@
 
 import { buildReport } from './report.js'
 import { localToday } from './flow.js'
+import { tr } from './i18n.js'
 
 const JSPDF_URL = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js'
 let loading = null
@@ -185,10 +186,10 @@ export async function downloadPdf(answers) {
   for (let i = 1; i <= pages; i++) {
     doc.setPage(i)
     setFont(8, 'normal', COLOR.faint)
-    doc.text('Arvklart – veiledende beregning, ikke juridisk rådgivning', M, H - 10)
+    doc.text(tr('Arvklart – veiledende beregning, ikke juridisk rådgivning', 'Arvklart – indicative calculation, not legal advice'), M, H - 10)
     doc.text(`Side ${i} av ${pages}`, W - M, H - 10, { align: 'right' })
   }
 
-  doc.save(`arveoppgjor-oversikt-${localToday()}.pdf`)
+  doc.save(`${tr('arveoppgjor-oversikt', 'inheritance-overview')}-${localToday()}.pdf`)
   return report
 }

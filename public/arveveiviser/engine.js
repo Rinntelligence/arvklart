@@ -15,6 +15,8 @@ import { childLines } from './heirs.js'
 import { grunnbelop } from './grunnbelop.js'
 import { NOTICES, NEXT_STEPS } from './rules.js'
 import { ASSET_FIELDS } from './questions.js'
+import { isEn, tr, field } from './i18n.js'
+import * as EN from './engine_en.js'
 
 const kr = n => new Intl.NumberFormat('nb-NO', { maximumFractionDigits: 0 }).format(Math.round(n || 0)) + ' kr'
 const NUM_WORDS = ['null', 'ett', 'to', 'tre', 'fire', 'fem', 'seks', 'sju', 'åtte', 'ni', 'ti', 'elleve', 'tolv']
@@ -62,7 +64,7 @@ export function analyze(rawAnswers = {}) {
     if (e.insolvent || calc.E === 0) facts.smallEstate = false
   }
   const noValues = calc && calc.estate.assets === 0 && calc.estate.debts === 0 && !num(a.assets?.sepDeceasedAssets)
-  if (noValues) blockers.push({ id: 'noValues', title: 'Legg inn formue og gjeld for å se beløpene', text: 'Du har ikke lagt inn hva avdøde eide eller skyldte. Vi kan vise hvem som arver, men ikke hvor mye.', questionId: 'assets' })
+  if (noValues) blockers.push({ id: 'noValues', title: tr('Legg inn formue og gjeld for å se beløpene', 'Enter assets and debts to see the amounts'), text: tr('Du har ikke lagt inn hva avdøde eide eller skyldte. Vi kan vise hvem som arver, men ikke hvor mye.', 'You have not entered what the deceased owned or owed. We can show who inherits, but not how much.'), questionId: 'assets' })
 
   const vars = {
     g3: kr(3 * g), g4: kr(4 * g), g6: kr(6 * g), g15: kr(15 * g),
@@ -72,24 +74,29 @@ export function analyze(rawAnswers = {}) {
     // Det testamentet lovlig kan gi: fridelen, pluss inntil 4 G til samboer etter fem år (§ 13)
     testamentMax: kr((calc?.testament?.cohabitantProtected || 0) + (calc?.freePart || 0)),
     survivorKeeps: kr(calc?.estate.survivorKeeps), firstAmount: kr(calc?.previous?.amount),
-    splitRule: facts.previousUskifteCohabitant ? 'Etter et samboerskap deles uskifteboet etter verdiene da uskiftet startet.' : 'Etter et ekteskap deles uskifteboet i to like deler.',
+    splitRule: facts.previousUskifteCohabitant
+      ? tr('Etter et samboerskap deles uskifteboet etter verdiene da uskiftet startet.', 'After cohabitation, the undivided estate is divided according to the values when it started.')
+      : tr('Etter et ekteskap deles uskifteboet i to like deler.', 'After a marriage, the undivided estate is split into two equal halves.'),
   }
   const fmt = t => String(t ?? '').replace(/\{(\w+)\}/g, (m, k) => (k in vars ? vars[k] : m))
   const ctx = { answers: a, facts }
 
   const hardBlocked = blockers.some(b => b.hard) || Boolean(skifte?.blocked)
-  const notices = hardBlocked ? [] : NOTICES.filter(n => evaluate(n.when, ctx)).map(n => ({ ...n, title: fmt(n.title), text: fmt(n.text), more: fmt(n.more) }))
-  const nextSteps = NEXT_STEPS.filter(s => evaluate(s.when, ctx)).map(s => ({ ...s, title: fmt(s.title), text: fmt(s.text) }))
+  // Tekstene velges på brukerens språk her (field), så *_en fjernes fra resultatet
+  const local = (x, keys) => Object.fromEntries(keys.flatMap(k => [[k, fmt(field(x, k))], [`${k}_en`, undefined]]))
+  const notices = hardBlocked ? [] : NOTICES.filter(n => evaluate(n.when, ctx)).map(n => ({ ...n, ...local(n, ['title', 'text', 'more']) }))
+  const nextSteps = NEXT_STEPS.filter(s => evaluate(s.when, ctx)).map(s => ({ ...s, ...local(s, ['title', 'text']) }))
   if (hardBlocked) {
     // Uten beregning gir bare de generelle stegene mening – ikke fordeling og skifteerklæring.
     const general = ['findTestament', 'overview', 'proklama', 'publicSkifte']
     nextSteps.splice(0, nextSteps.length, ...nextSteps.filter(s => general.includes(s.id)))
     nextSteps.unshift(facts.oldLaw
-      ? { id: 'clarify', title: 'Kontakt tingretten for veiledning', text: 'Fordi dødsfallet skjedde før 2021, gjelder andre regler enn veiviseren regner med. Tingretten i kommunen der avdøde bodde, gir gratis veiledning.', sources: ['domstol_kontakt'] }
-      : { id: 'clarify', title: 'Avklar det som mangler', text: 'Finn svaret på spørsmålene over, og kom tilbake til veiviseren. Tingretten i kommunen der avdøde bodde, gir gratis veiledning.', sources: ['domstol_kontakt'] })
+      ? { id: 'clarify', title: tr('Kontakt tingretten for veiledning', 'Contact the district court for guidance'), text: tr('Fordi dødsfallet skjedde før 2021, gjelder andre regler enn veiviseren regner med. Tingretten i kommunen der avdøde bodde, gir gratis veiledning.', 'Because the death occurred before 2021, other rules apply than the guide calculates with. The district court in the municipality where the deceased lived gives free guidance.'), sources: ['domstol_kontakt'] }
+      : { id: 'clarify', title: tr('Avklar det som mangler', 'Clarify what is missing'), text: tr('Finn svaret på spørsmålene over, og kom tilbake til veiviseren. Tingretten i kommunen der avdøde bodde, gir gratis veiledning.', 'Find the answers to the questions above, and come back to the guide. The district court in the municipality where the deceased lived gives free guidance.'), sources: ['domstol_kontakt'] })
   }
 
   const uskifte = facts.uskifteAvailable && !noValues ? describeUskifte(uskifteCalc, calc, facts, a) : null
+  if (uskifte && isEn()) Object.assign(uskifte, EN.describeUskifte(uskifteCalc, calc, facts))
 
   const sourcesUsed = new Set(['arveloven_ikraft', 'nav_g', 'domstol_hvem_arver', 'domstol_hva_arver', 'domstol_skifteformer'])
   for (const x of [...notices, ...nextSteps, ...blockers]) for (const s of x.sources || []) sourcesUsed.add(s)
@@ -99,18 +106,18 @@ export function analyze(rawAnswers = {}) {
   return {
     answers: a, facts, G, blockers, blocked: blockers.length > 0,
     assumptions: collectAssumptions(a, facts),
-    situation: describeSituation(a, facts, calc),
-    who: describeWho(a, facts, calc),
-    howMuch: calc ? describeHowMuch(calc, facts) : '',
-    howMuchShort: calc ? describeHowMuch(calc, facts, true) : '',
-    firstStep: nextSteps.length > 1 ? `${nextSteps[0].title}. Deretter: ${nextSteps[1].title.charAt(0).toLowerCase()}${nextSteps[1].title.slice(1)}.` : nextSteps[0] ? `${nextSteps[0].title}.` : '',
+    situation: (isEn() ? EN.describeSituation : describeSituation)(a, facts, calc),
+    who: (isEn() ? EN.describeWho : describeWho)(a, facts, calc),
+    howMuch: calc ? (isEn() ? EN.describeHowMuch : describeHowMuch)(calc, facts) : '',
+    howMuchShort: calc ? (isEn() ? EN.describeHowMuch : describeHowMuch)(calc, facts, true) : '',
+    firstStep: nextSteps.length > 1 ? `${nextSteps[0].title}. ${tr('Deretter', 'Then')}: ${nextSteps[1].title.charAt(0).toLowerCase()}${nextSteps[1].title.slice(1)}.` : nextSteps[0] ? `${nextSteps[0].title}.` : '',
     skifte: calc && !noValues ? calc : null,
     uskifte,
     notices: notices.filter(n => n.area === 'meaning'),
     skifteNotices: notices.filter(n => n.area === 'skifte'),
     uskifteNotices: notices.filter(n => n.area === 'uskifte'),
     nextSteps,
-    method: calc ? describeMethod(calc, facts, G, a) : [],
+    method: calc ? (isEn() ? EN.describeMethod : describeMethod)(calc, facts, G, a) : [],
     sourcesUsed: [...sourcesUsed],
     complex: complexList.length > 0 || facts.oldLaw,
     complexReasons: complexList,
@@ -138,20 +145,20 @@ function collectBlockers(a, f) {
   const b = []
   if (f.oldLaw) b.push({
     id: 'oldLaw', hard: true, questionId: 'deathDate',
-    title: 'Dødsfallet skjedde før 1. januar 2021',
-    text: 'Da gjelder den gamle arveloven fra 1972. Reglene ligner, men det er viktige forskjeller – blant annet for pliktdelsarv. Vi beregner derfor ikke fordelingen. Satt gjenlevende i uskifte og skal det skiftes nå, gjelder likevel den nye loven for selve skiftet. Kontakt tingretten for veiledning.',
+    title: 'Dødsfallet skjedde før 1. januar 2021', title_en: 'The death occurred before 1 January 2021',
+    text: 'Da gjelder den gamle arveloven fra 1972. Reglene ligner, men det er viktige forskjeller – blant annet for pliktdelsarv. Vi beregner derfor ikke fordelingen. Satt gjenlevende i uskifte og skal det skiftes nå, gjelder likevel den nye loven for selve skiftet. Kontakt tingretten for veiledning.', text_en: 'Then the old Inheritance Act of 1972 applies. The rules are similar, but there are important differences – for example for the compulsory share. We therefore do not calculate the distribution. If the survivor kept an undivided estate and it is to be divided now, the new act still applies to the division itself. Contact the district court for guidance.',
     sources: ['arveloven_ikraft'],
   })
   if (f.maritalUnknown) b.push({
     id: 'marital', hard: true, questionId: 'maritalStatus',
-    title: 'Vi vet ikke om avdøde var gift eller samboer',
-    text: 'Dette kan påvirke hvordan boet skal behandles og hvem som arver. Vi anbefaler at du undersøker det før du går videre. Sivilstand står i Folkeregisteret, og tingretten kan hjelpe.',
+    title: 'Vi vet ikke om avdøde var gift eller samboer', title_en: 'We do not know whether the deceased was married or cohabiting',
+    text: 'Dette kan påvirke hvordan boet skal behandles og hvem som arver. Vi anbefaler at du undersøker det før du går videre. Sivilstand står i Folkeregisteret, og tingretten kan hjelpe.', text_en: 'This may affect how the estate is to be handled and who inherits. We recommend that you find out before you continue. Marital status is recorded in the National Population Register, and the district court can help.',
     sources: ['arveloven_ektefelle', 'arveloven_samboer_arv'],
   })
   if (f.cohabitantChildrenUnknown) b.push({
     id: 'cohabitantChildren', hard: true, questionId: 'cohabitantChildren',
-    title: 'Vi vet ikke om samboerne hadde felles barn',
-    text: 'Det avgjør om samboeren arver etter loven og kan sitte i uskifte. Vi anbefaler at du undersøker dette før du går videre.',
+    title: 'Vi vet ikke om samboerne hadde felles barn', title_en: 'We do not know whether the cohabitants had children together',
+    text: 'Det avgjør om samboeren arver etter loven og kan sitte i uskifte. Vi anbefaler at du undersøker dette før du går videre.', text_en: 'It decides whether the cohabitant inherits under the law and can keep an undivided estate. We recommend that you find out before you continue.',
     sources: ['arveloven_samboer_arv'],
   })
   if (f.childrenUnknown) b.push(missingBlocker('hasChildren'))
@@ -160,11 +167,11 @@ function collectBlockers(a, f) {
 
 function missingBlocker(key) {
   const map = {
-    hasChildren: { questionId: 'hasChildren', title: 'Vi vet ikke om avdøde hadde barn', text: 'Barn arver før alle andre, så dette avgjør hvem som arver. Vi anbefaler at du undersøker det før du går videre – for eksempel i Folkeregisteret eller med hjelp fra tingretten.', sources: ['arveloven_livsarvinger'] },
-    children: { questionId: 'children', title: 'Vi mangler opplysninger om barna', text: 'Legg inn barna til avdøde for å se fordelingen.' },
-    parents: { questionId: 'parents', title: 'Vi vet ikke om avdødes foreldre lever', text: 'Når avdøde ikke hadde barn, avgjør dette hvem som arver – og hvor mye en eventuell ektefelle arver. Undersøk dette før du går videre.', sources: ['arveloven_andre_arvegang'] },
-    siblings: { questionId: 'hasSiblings', title: 'Vi vet ikke om avdøde hadde søsken', text: 'Søsken arver i stedet for en forelder som er død. Undersøk dette før du går videre.', sources: ['arveloven_andre_arvegang'] },
-    grandparents: { questionId: 'hasGrandparentLine', title: 'Vi vet ikke om det finnes besteforeldre, tanter, onkler eller søskenbarn', text: 'De kan være arvinger når det ikke finnes nærmere familie. Undersøk dette før du går videre – tingretten kan hjelpe med å finne arvinger.', sources: ['arveloven_tredje_arvegang'] },
+    hasChildren: { questionId: 'hasChildren', title: 'Vi vet ikke om avdøde hadde barn', title_en: 'We do not know whether the deceased had children', text: 'Barn arver før alle andre, så dette avgjør hvem som arver. Vi anbefaler at du undersøker det før du går videre – for eksempel i Folkeregisteret eller med hjelp fra tingretten.', text_en: 'Children inherit before everyone else, so this decides who inherits. We recommend that you find out before you continue – for example in the National Population Register or with help from the district court.', sources: ['arveloven_livsarvinger'] },
+    children: { questionId: 'children', title: 'Vi mangler opplysninger om barna', title_en: 'We are missing information about the children', text: 'Legg inn barna til avdøde for å se fordelingen.', text_en: 'Add the deceased\'s children to see the distribution.' },
+    parents: { questionId: 'parents', title: 'Vi vet ikke om avdødes foreldre lever', title_en: 'We do not know whether the deceased\'s parents are alive', text: 'Når avdøde ikke hadde barn, avgjør dette hvem som arver – og hvor mye en eventuell ektefelle arver. Undersøk dette før du går videre.', text_en: 'When the deceased had no children, this decides who inherits – and how much a spouse, if any, inherits. Find this out before you continue.', sources: ['arveloven_andre_arvegang'] },
+    siblings: { questionId: 'hasSiblings', title: 'Vi vet ikke om avdøde hadde søsken', title_en: 'We do not know whether the deceased had siblings', text: 'Søsken arver i stedet for en forelder som er død. Undersøk dette før du går videre.', text_en: 'Siblings inherit in place of a parent who has died. Find this out before you continue.', sources: ['arveloven_andre_arvegang'] },
+    grandparents: { questionId: 'hasGrandparentLine', title: 'Vi vet ikke om det finnes besteforeldre, tanter, onkler eller søskenbarn', title_en: 'We do not know whether there are grandparents, aunts, uncles or cousins', text: 'De kan være arvinger når det ikke finnes nærmere familie. Undersøk dette før du går videre – tingretten kan hjelpe med å finne arvinger.', text_en: 'They may be heirs when there is no closer family. Find this out before you continue – the district court can help find heirs.', sources: ['arveloven_tredje_arvegang'] },
   }
   return { id: key, hard: true, ...map[key] }
 }
@@ -172,18 +179,18 @@ function missingBlocker(key) {
 // ── Forutsetninger: «vet ikke» på spørsmål som bare justerer beregningen ──
 function collectAssumptions(a, f) {
   const list = []
-  if (f.testamentUnknown) list.push({ questionId: 'testament', text: 'Vi har regnet som om det **ikke finnes testament**, fordi du ikke vet. Et testament kan endre fordelingen.' })
-  if (a.residence === 'unknown') list.push({ questionId: 'residence', text: 'Vi har regnet etter **norske regler**. Bodde avdøde fast i et annet land, kan andre regler gjelde.' })
-  if (f.separatePropertyUnknown) list.push({ questionId: 'separateProperty', text: 'Vi har regnet som om **alt var felles formue**, fordi du ikke vet om det finnes en ektepakt.' })
-  if (f.separatePropertyAtDeathUnknown) list.push({ questionId: 'separatePropertyAtDeath', text: 'Vi har regnet som om **særeiet også gjelder ved dødsfall**. Sjekk ektepakten.' })
-  if (f.advancementsUnknown) list.push({ questionId: 'advancements', text: 'Vi har regnet som om **ingen har fått forskudd på arv**.' })
-  if (f.previousUskifteUnknown) list.push({ questionId: 'previousUskifte', text: 'Vi har regnet som om avdøde **ikke satt i uskifte** etter en tidligere ektefelle eller samboer.' })
-  if (f.previousUskifteCohabitant && (a.previousUskifteShare === undefined || a.previousUskifteShare === '')) list.push({ questionId: 'previousUskifteShare', text: 'Vi har regnet som om {first} eide **halvparten** av det som ble holdt i uskifte.' })
-  if (f.firstOtherChildrenUnknown) list.push({ questionId: 'previousSpouseChildren', text: 'Vi har regnet som om {first} **ikke hadde barn med andre**.' })
-  if (f.previousUskifte && !num(a.previousUskifteOutside)) list.push({ questionId: 'previousUskifteOutside', text: 'Vi har regnet som om **alt avdøde eide, hørte til uskifteboet**.' })
-  if (f.testamentLimitsPartner && a.testamentPartnerKnew === 'unknown') list.push({ questionId: 'testamentPartnerKnew', text: 'Vi har regnet som om {partnerDu} **ikke visste om testamentet**, slik at full arv etter loven gjelder.' })
-  if (f.testamentToCohabitant && a.cohabitantFiveYears === 'unknown') list.push({ questionId: 'cohabitantFiveYears', text: 'Vi har regnet som om dere **ikke hadde bodd sammen i fem år**.' })
-  if (f.testamentGiveaway && !num(a.testamentAmount)) list.push({ questionId: 'testamentAmount', text: 'Du har ikke oppgitt hvor mye testamentet gir bort, så det er ikke trukket fra.' })
+  if (f.testamentUnknown) list.push({ questionId: 'testament', text: 'Vi har regnet som om det **ikke finnes testament**, fordi du ikke vet. Et testament kan endre fordelingen.', text_en: 'We have calculated as if there is **no will**, because you do not know. A will can change the distribution.' })
+  if (a.residence === 'unknown') list.push({ questionId: 'residence', text: 'Vi har regnet etter **norske regler**. Bodde avdøde fast i et annet land, kan andre regler gjelde.', text_en: 'We have calculated under **Norwegian rules**. If the deceased was permanently resident in another country, other rules may apply.' })
+  if (f.separatePropertyUnknown) list.push({ questionId: 'separateProperty', text: 'Vi har regnet som om **alt var felles formue**, fordi du ikke vet om det finnes en ektepakt.', text_en: 'We have calculated as if **everything was joint property**, because you do not know whether there is a marital agreement.' })
+  if (f.separatePropertyAtDeathUnknown) list.push({ questionId: 'separatePropertyAtDeath', text: 'Vi har regnet som om **særeiet også gjelder ved dødsfall**. Sjekk ektepakten.', text_en: 'We have calculated as if **the separate property also applies on death**. Check the marital agreement.' })
+  if (f.advancementsUnknown) list.push({ questionId: 'advancements', text: 'Vi har regnet som om **ingen har fått forskudd på arv**.', text_en: 'We have calculated as if **nobody has received an advance on inheritance**.' })
+  if (f.previousUskifteUnknown) list.push({ questionId: 'previousUskifte', text: 'Vi har regnet som om avdøde **ikke satt i uskifte** etter en tidligere ektefelle eller samboer.', text_en: 'We have calculated as if the deceased **did not keep an undivided estate** after an earlier spouse or cohabitant.' })
+  if (f.previousUskifteCohabitant && (a.previousUskifteShare === undefined || a.previousUskifteShare === '')) list.push({ questionId: 'previousUskifteShare', text: 'Vi har regnet som om {first} eide **halvparten** av det som ble holdt i uskifte.', text_en: 'We have calculated as if {first} owned **half** of what was kept undivided.' })
+  if (f.firstOtherChildrenUnknown) list.push({ questionId: 'previousSpouseChildren', text: 'Vi har regnet som om {first} **ikke hadde barn med andre**.', text_en: 'We have calculated as if {first} **had no children with others**.' })
+  if (f.previousUskifte && !num(a.previousUskifteOutside)) list.push({ questionId: 'previousUskifteOutside', text: 'Vi har regnet som om **alt avdøde eide, hørte til uskifteboet**.', text_en: 'We have calculated as if **everything the deceased owned belonged to the undivided estate**.' })
+  if (f.testamentLimitsPartner && a.testamentPartnerKnew === 'unknown') list.push({ questionId: 'testamentPartnerKnew', text: 'Vi har regnet som om {partnerDu} **ikke visste om testamentet**, slik at full arv etter loven gjelder.', text_en: 'We have calculated as if {partnerDu} **did not know about the will**, so the full statutory inheritance applies.' })
+  if (f.testamentToCohabitant && a.cohabitantFiveYears === 'unknown') list.push({ questionId: 'cohabitantFiveYears', text: 'Vi har regnet som om dere **ikke hadde bodd sammen i fem år**.', text_en: 'We have calculated as if you **had not lived together for five years**.' })
+  if (f.testamentGiveaway && !num(a.testamentAmount)) list.push({ questionId: 'testamentAmount', text: 'Du har ikke oppgitt hvor mye testamentet gir bort, så det er ikke trukket fra.', text_en: 'You have not stated how much the will gives away, so nothing has been deducted.' })
   return list
 }
 
@@ -459,58 +466,59 @@ function complexReasons(a, f, calc) {
   if (f.livedAbroad) r.push({
     id: 'livedAbroad', questionId: 'residence',
     title: a.residence === 'unknown' ? 'Du vet ikke om avdøde bodde fast i Norge' : 'Avdøde bodde ikke fast i Norge',
-    text: 'Det er som hovedregel landet der avdøde bodde sist, som bestemmer hvilken arvelov som gjelder. Veiviseren regner bare etter norsk lov, så fordelingen kan bli en helt annen hvis et annet lands regler gjelder.',
+    title_en: a.residence === 'unknown' ? 'You do not know whether the deceased was permanently resident in Norway' : 'The deceased was not permanently resident in Norway',
+    text: 'Det er som hovedregel landet der avdøde bodde sist, som bestemmer hvilken arvelov som gjelder. Veiviseren regner bare etter norsk lov, så fordelingen kan bli en helt annen hvis et annet lands regler gjelder.', text_en: 'As a main rule, the country where the deceased last lived decides which inheritance law applies. The guide only calculates under Norwegian law, so the distribution may be completely different if another country\'s rules apply.',
   })
   if (f.skjevdeling) r.push({
     id: 'skjevdeling', questionId: 'skjevdeling',
-    title: 'Det kan kreves skjevdeling',
-    text: 'Om verdier fra før ekteskapet, arv og gaver kan holdes utenfor delingen, avhenger av om de kan dokumenteres og fortsatt finnes – og av om noen krever det. Det kan vi ikke vurdere, så dødsboet kan bli større eller mindre enn vi viser.',
+    title: 'Det kan kreves skjevdeling', title_en: 'Skjevdeling may be claimed',
+    text: 'Om verdier fra før ekteskapet, arv og gaver kan holdes utenfor delingen, avhenger av om de kan dokumenteres og fortsatt finnes – og av om noen krever det. Det kan vi ikke vurdere, så dødsboet kan bli større eller mindre enn vi viser.', text_en: 'Whether assets from before the marriage, inheritance and gifts can be kept out of the division depends on whether they can be documented and still exist – and on whether someone claims it. We cannot assess that, so the estate may be larger or smaller than we show.',
   })
   if (f.commonNegative || calc?.estate.commonNegative) r.push({
     id: 'commonNegative', questionId: 'assets',
-    title: 'Gjelden er større enn felles formue',
-    text: 'Da kan felles formue ikke bare deles i to. Hvem som må dekke gjelden, avhenger av hvem av ektefellene som sto som låntaker – noe veiviseren ikke spør om.',
+    title: 'Gjelden er større enn felles formue', title_en: 'The debts are larger than the joint property',
+    text: 'Da kan felles formue ikke bare deles i to. Hvem som må dekke gjelden, avhenger av hvem av ektefellene som sto som låntaker – noe veiviseren ikke spør om.', text_en: 'Then the joint property cannot simply be split in two. Who must cover the debts depends on which spouse was the borrower – something the guide does not ask about.',
   })
   if (f.testamentUneven) r.push({
     id: 'testamentUneven', questionId: 'testamentContent',
-    title: 'Testamentet gir noen arvinger mer enn andre, eller bestemte gjenstander',
-    text: 'Vi vet ikke hvem som skal få hva, eller hva gjenstandene er verdt. Fordelingen vi viser, er derfor lovens hovedregel – ikke det testamentet faktisk bestemmer.',
+    title: 'Testamentet gir noen arvinger mer enn andre, eller bestemte gjenstander', title_en: 'The will gives some heirs more than others, or specific items',
+    text: 'Vi vet ikke hvem som skal få hva, eller hva gjenstandene er verdt. Fordelingen vi viser, er derfor lovens hovedregel – ikke det testamentet faktisk bestemmer.', text_en: 'We do not know who is to get what, or what the items are worth. The distribution we show is therefore the main rule of the law – not what the will actually decides.',
   })
   if (f.testamentUskifte) r.push({
     id: 'testamentUskifte', questionId: 'testamentContent',
-    title: 'Testamentet sier noe om uskifte',
-    text: 'Et testament kan begrense retten til uskifte. Hva det betyr for dere, avhenger av ordlyden, som veiviseren ikke kan lese.',
+    title: 'Testamentet sier noe om uskifte', title_en: 'The will says something about an undivided estate',
+    text: 'Et testament kan begrense retten til uskifte. Hva det betyr for dere, avhenger av ordlyden, som veiviseren ikke kan lese.', text_en: 'A will can limit the right to an undivided estate. What it means for you depends on the wording, which the guide cannot read.',
   })
   if (f.testamentOther) r.push({
     id: 'testamentOther', questionId: 'testamentContent',
-    title: 'Testamentet inneholder noe vi ikke kjenner',
-    text: 'Du har svart «Noe annet, eller jeg er usikker». Vi kan ikke ta hensyn til innhold vi ikke vet hva er, så fordelingen bygger bare på loven.',
+    title: 'Testamentet inneholder noe vi ikke kjenner', title_en: 'The will contains something we do not know about',
+    text: 'Du har svart «Noe annet, eller jeg er usikker». Vi kan ikke ta hensyn til innhold vi ikke vet hva er, så fordelingen bygger bare på loven.', text_en: 'You have answered «Something else, or I am not sure». We cannot take into account content we do not know, so the distribution is based on the law only.',
   })
   // Om testamentet gir bort for mye, vet vi først når formuen er lagt inn – derfor varsles det også der.
   if (calc?.testament?.exceeds && a.assets !== undefined && calc.E > 0) r.push({
     id: 'testamentExceeds', questionId: f.testamentGiveaway ? 'testamentAmount' : 'testamentCohabitantAmount', alsoOn: ['assets'],
-    title: 'Testamentet gir bort mer enn loven tillater',
-    text: 'Vi har redusert gavene til det testamentet lovlig kan bestemme over. Hvordan reduksjonen fordeles mellom mottakerne, og om arvingene krever den, kan vi ikke avgjøre.',
+    title: 'Testamentet gir bort mer enn loven tillater', title_en: 'The will gives away more than the law allows',
+    text: 'Vi har redusert gavene til det testamentet lovlig kan bestemme over. Hvordan reduksjonen fordeles mellom mottakerne, og om arvingene krever den, kan vi ikke avgjøre.', text_en: 'We have reduced the gifts to what the will can lawfully decide over. How the reduction is shared between the beneficiaries, and whether the heirs claim it, we cannot decide.',
   })
   if (f.firstHeirsRelatives) r.push({
     id: 'previousUskifteRelatives', questionId: 'previousSpouseChildren',
-    title: 'Vi kan ikke fordele delen som går til slekten til {first}',
-    text: '{First} etterlot seg ingen barn eller barnebarn, så delen av uskifteboet som hører til hen, går til foreldrene, søsknene eller andre slektninger av hen. Veiviseren spør ikke om dem, så vi viser bare hvor mye de skal dele til sammen.',
+    title: 'Vi kan ikke fordele delen som går til slekten til {first}', title_en: 'We cannot distribute the part that goes to the relatives of {first}',
+    text: '{First} etterlot seg ingen barn eller barnebarn, så delen av uskifteboet som hører til hen, går til foreldrene, søsknene eller andre slektninger av hen. Veiviseren spør ikke om dem, så vi viser bare hvor mye de skal dele til sammen.', text_en: '{First} left no children or grandchildren, so the part of the undivided estate that belongs to them goes to their parents, siblings or other relatives. The guide does not ask about them, so we only show how much they share in total.',
   })
   if (calc?.estate.insolvent) r.push({
     id: 'insolvent', questionId: 'assets',
-    title: 'Gjelden er større enn det avdøde eide',
-    text: 'Da er det ingen arv å fordele. Hvilke krav som skal dekkes først, og om arvingene bør overta boet i det hele tatt, må avklares med tingretten.',
+    title: 'Gjelden er større enn det avdøde eide', title_en: 'The debts are larger than what the deceased owned',
+    text: 'Da er det ingen arv å fordele. Hvilke krav som skal dekkes først, og om arvingene bør overta boet i det hele tatt, må avklares med tingretten.', text_en: 'Then there is no inheritance to distribute. Which claims are to be covered first, and whether the heirs should take over the estate at all, must be clarified with the district court.',
   })
   if (f.disagreement) r.push({
     id: 'disagreement', questionId: 'circumstances',
-    title: 'Arvingene er uenige',
-    text: 'Beregningen forutsetter at dere blir enige om et privat skifte. Ved uenighet kan hver arving kreve offentlig skifte, og da blir det bostyreren som avgjør oppgjøret – med kostnader som trekkes fra arven.',
+    title: 'Arvingene er uenige', title_en: 'The heirs disagree',
+    text: 'Beregningen forutsetter at dere blir enige om et privat skifte. Ved uenighet kan hver arving kreve offentlig skifte, og da blir det bostyreren som avgjør oppgjøret – med kostnader som trekkes fra arven.', text_en: 'The calculation assumes that you agree on a private settlement. In case of disagreement, each heir can demand public administration, and the administrator then decides the settlement – with costs deducted from the inheritance.',
   })
   if (f.unreachableHeir) r.push({
     id: 'unreachable', questionId: 'circumstances',
-    title: 'En arving er ukjent eller vanskelig å nå',
-    text: 'Alle arvingene må være med på et privat skifte. Vi vet ikke om det finnes flere arvinger enn de du har lagt inn, eller om boet må skiftes offentlig.',
+    title: 'En arving er ukjent eller vanskelig å nå', title_en: 'An heir is unknown or hard to reach',
+    text: 'Alle arvingene må være med på et privat skifte. Vi vet ikke om det finnes flere arvinger enn de du har lagt inn, eller om boet må skiftes offentlig.', text_en: 'All the heirs must take part in a private settlement. We do not know whether there are more heirs than those you have entered, or whether the estate must be administered publicly.',
   })
   return r
 }

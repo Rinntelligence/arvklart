@@ -6,11 +6,13 @@
 //   3. arvegang: besteforeldre og deres barn (tanter og onkler)
 //
 // Kilder: arveloven §§ 4, 5 og 6 (se sources.js). Finnes ingen arvinger, gjelder § 76.
+//
+// Navn og relasjoner lagres på norsk (de legges inn i boet). *_en er bare for visning i den engelske veiviseren.
 
 export function childLines(children = []) {
   // En «stamme» er et barn som lever, eller et dødt barn som har etterlatt seg barn.
   return children
-    .map((c, i) => ({ ...c, index: i, label: c.name?.trim() || `Barn ${i + 1}` }))
+    .map((c, i) => ({ ...c, index: i, label: c.name?.trim() || `Barn ${i + 1}`, label_en: c.name?.trim() || `Child ${i + 1}` }))
     .filter(c => c.alive === 'yes' || (c.alive === 'no' && (Number(c.grandchildren) || 0) > 0))
 }
 
@@ -22,7 +24,7 @@ function firstOrder(children, notes) {
     const share = 1 / lines.length
     if (line.alive === 'yes') {
       heirs.push({
-        id: `child-${line.id}`, lineId: line.id, label: line.label, relation: 'Barn',
+        id: `child-${line.id}`, lineId: line.id, label: line.label, label_en: line.label_en, relation: 'Barn', relation_en: 'Child',
         common: line.common, share, minor: Boolean(line.minor),
       })
     } else {
@@ -31,7 +33,8 @@ function firstOrder(children, notes) {
         heirs.push({
           id: `grandchild-${line.id}-${k}`, lineId: line.id,
           label: n > 1 ? `Barnebarn ${k + 1} (via ${line.label})` : `Barnebarn (via ${line.label})`,
-          relation: 'Barnebarn', common: line.common, share: share / n,
+          label_en: n > 1 ? `Grandchild ${k + 1} (via ${line.label_en})` : `Grandchild (via ${line.label_en})`,
+          relation: 'Barnebarn', relation_en: 'Grandchild', common: line.common, share: share / n,
         })
       }
       notes.push('representation')
@@ -47,23 +50,24 @@ function firstOrder(children, notes) {
 //   descendants: [{ id, name, type: 'full' | <halfType>, alive, children }]
 function twoParentSplit(parents, descendants, words) {
   const branches = parents.map(p => {
-    if (p.alive) return [{ id: `parent-${p.key}`, label: p.label, relation: p.relation, share: 1 }]
+    if (p.alive) return [{ id: `parent-${p.key}`, label: p.label, label_en: p.label_en, relation: p.relation, relation_en: p.relation_en, share: 1 }]
     const lines = descendants
-      .map((d, i) => ({ ...d, label: d.name?.trim() || `${words.fallback} ${i + 1}` }))
+      .map((d, i) => ({ ...d, label: d.name?.trim() || `${words.fallback} ${i + 1}`, label_en: d.name?.trim() || `${words.fallback_en} ${i + 1}` }))
       .filter(d => d.type === 'full' || d.type === p.halfType)
       .filter(d => d.alive === 'yes' || (Number(d.children) || 0) > 0)
     const heirs = []
     for (const d of lines) {
       const share = 1 / lines.length
       if (d.alive === 'yes') {
-        heirs.push({ id: `${words.idPrefix}-${d.id}`, label: d.label, relation: d.type === 'full' ? words.full : words.half, share })
+        heirs.push({ id: `${words.idPrefix}-${d.id}`, label: d.label, label_en: d.label_en, relation: d.type === 'full' ? words.full : words.half, relation_en: d.type === 'full' ? words.full_en : words.half_en, share })
       } else {
         const n = Number(d.children)
         for (let k = 0; k < n; k++) {
           heirs.push({
             id: `${words.idPrefix}-child-${d.id}-${k}`,
             label: n > 1 ? `${words.child} ${k + 1} (via ${d.label})` : `${words.child} (via ${d.label})`,
-            relation: words.child, share: share / n, viaDeadLine: true,
+            label_en: n > 1 ? `${words.child_en} ${k + 1} (via ${d.label_en})` : `${words.child_en} (via ${d.label_en})`,
+            relation: words.child, relation_en: words.child_en, share: share / n, viaDeadLine: true,
           })
         }
       }
@@ -82,13 +86,15 @@ function twoParentSplit(parents, descendants, words) {
   return heirs
 }
 
-const SIBLING_WORDS = { fallback: 'Søsken', idPrefix: 'sibling', full: 'Søsken', half: 'Halvsøsken', child: 'Nevø/niese' }
-const AUNT_WORDS = { fallback: 'Tante/onkel', idPrefix: 'aunt', full: 'Tante/onkel', half: 'Tante/onkel (halv)', child: 'Søskenbarn' }
+const SIBLING_WORDS = { fallback: 'Søsken', idPrefix: 'sibling', full: 'Søsken', half: 'Halvsøsken', child: 'Nevø/niese',
+  fallback_en: 'Sibling', full_en: 'Sibling', half_en: 'Half-sibling', child_en: 'Nephew/niece' }
+const AUNT_WORDS = { fallback: 'Tante/onkel', idPrefix: 'aunt', full: 'Tante/onkel', half: 'Tante/onkel (halv)', child: 'Søskenbarn',
+  fallback_en: 'Aunt/uncle', full_en: 'Aunt/uncle', half_en: 'Aunt/uncle (half)', child_en: 'Cousin' }
 
 function secondOrder(parents, siblings) {
   const heirs = twoParentSplit([
-    { key: 'father', label: 'Far', relation: 'Forelder', alive: parents === 'both' || parents === 'father', halfType: 'halfFather' },
-    { key: 'mother', label: 'Mor', relation: 'Forelder', alive: parents === 'both' || parents === 'mother', halfType: 'halfMother' },
+    { key: 'father', label: 'Far', label_en: 'Father', relation: 'Forelder', relation_en: 'Parent', alive: parents === 'both' || parents === 'father', halfType: 'halfFather' },
+    { key: 'mother', label: 'Mor', label_en: 'Mother', relation: 'Forelder', relation_en: 'Parent', alive: parents === 'both' || parents === 'mother', halfType: 'halfMother' },
   ], siblings, SIBLING_WORDS)
   return heirs.length ? { order: 2, heirs } : null
 }
@@ -96,8 +102,8 @@ function secondOrder(parents, siblings) {
 // Besteforeldre per side: { father: { gp1, gp2, relatives: [...] }, mother: { ... } }
 // gp1/gp2 = 'yes' | 'no' (lever). relatives = tanter og onkler på den siden.
 export const GRANDPARENT_SIDES = [
-  { key: 'father', label: 'Farssiden', gp1: 'Farfar', gp2: 'Farmor' },
-  { key: 'mother', label: 'Morssiden', gp1: 'Morfar', gp2: 'Mormor' },
+  { key: 'father', label: 'Farssiden', gp1: 'Farfar', gp2: 'Farmor', label_en: "Father's side", gp1_en: 'Paternal grandfather', gp2_en: 'Paternal grandmother' },
+  { key: 'mother', label: 'Morssiden', gp1: 'Morfar', gp2: 'Mormor', label_en: "Mother's side", gp1_en: 'Maternal grandfather', gp2_en: 'Maternal grandmother' },
 ]
 
 function thirdOrder(grandparents = {}) {
@@ -105,10 +111,10 @@ function thirdOrder(grandparents = {}) {
     const g = grandparents[side.key] || {}
     const words = { ...AUNT_WORDS, idPrefix: `aunt-${side.key}` }
     const heirs = twoParentSplit([
-      { key: `${side.key}-gp1`, label: side.gp1, relation: 'Besteforelder', alive: g.gp1 === 'yes', halfType: 'half1' },
-      { key: `${side.key}-gp2`, label: side.gp2, relation: 'Besteforelder', alive: g.gp2 === 'yes', halfType: 'half2' },
+      { key: `${side.key}-gp1`, label: side.gp1, label_en: side.gp1_en, relation: 'Besteforelder', relation_en: 'Grandparent', alive: g.gp1 === 'yes', halfType: 'half1' },
+      { key: `${side.key}-gp2`, label: side.gp2, label_en: side.gp2_en, relation: 'Besteforelder', relation_en: 'Grandparent', alive: g.gp2 === 'yes', halfType: 'half2' },
     ], g.relatives || [], words)
-    return heirs.map(h => ({ ...h, side: side.label.toLowerCase() }))
+    return heirs.map(h => ({ ...h, side: side.label.toLowerCase(), side_en: side.label_en.toLowerCase() }))
   })
   const active = perSide.filter(h => h.length)
   if (!active.length) return null
