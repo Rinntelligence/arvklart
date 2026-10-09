@@ -354,7 +354,7 @@ export default function AddItemsPage({ session, profile, onToast, isDemo }) {
     await runPool(targets, AI_PARALLEL, async (d) => {
       try {
         // Bare identifikasjon: ingen verdi i bulk (verdien er valgfri og fylles inn av brukeren)
-        const { result, quota } = await analyzeItemPhotos(d.photos.map(p => p.file), { categories })
+        const { result, quota } = await analyzeItemPhotos(d.photos.map(p => p.file), { categories, estateId: id })
         if (typeof quota?.remaining === 'number') setDemoRemaining(quota.remaining)
         // AI fyller bare felt brukeren ikke har endret selv (også ved «Prøv AI igjen»)
         update(d.key, cur => ({
@@ -366,7 +366,7 @@ export default function AddItemsPage({ session, profile, onToast, isDemo }) {
       } catch (e) {
         update(d.key, { status: 'failed' })
         failedKeys.push(d.key)
-        if (['demo_limit', 'rate_limit', 'ai_busy', 'ai_unavailable'].includes(e.code)) stopped = stopped || e
+        if (['demo_limit', 'rate_limit', 'estate_limit', 'not_member', 'ai_busy', 'ai_unavailable'].includes(e.code)) stopped = stopped || e
       } finally {
         setProgress(p => ({ ...p, done: p.done + 1 }))
       }
@@ -412,7 +412,7 @@ export default function AddItemsPage({ session, profile, onToast, isDemo }) {
       try {
         const cat = categories.find(c => c.id === d.categoryId)
         // Bildeanalysen sendes med, så anslaget bygger på den uten at bildene sendes igjen
-        const { estimate, insufficient, quota } = await requestValueEstimate({ title: d.title.trim(), description: d.description.trim(), category: cat?.label || '', condition: d.condition, analysis: d.analysis })
+        const { estimate, insufficient, quota } = await requestValueEstimate({ title: d.title.trim(), description: d.description.trim(), category: cat?.label || '', condition: d.condition, analysis: d.analysis, estateId: id })
         if (typeof quota?.remaining === 'number') setDemoRemaining(quota.remaining)
         // For lite grunnlag: ingen verdi (aldri 0 kr), men tips om hva som kan hjelpe
         if (insufficient) { update(d.key, { estimating: false, estimateMissing: insufficient.missing }); return }
@@ -426,7 +426,7 @@ export default function AddItemsPage({ session, profile, onToast, isDemo }) {
       } catch (e) {
         failed++
         update(d.key, { estimating: false })
-        if (['demo_limit', 'rate_limit', 'ai_busy', 'ai_unavailable'].includes(e.code)) stopped = stopped || e
+        if (['demo_limit', 'rate_limit', 'estate_limit', 'not_member', 'ai_busy', 'ai_unavailable'].includes(e.code)) stopped = stopped || e
       } finally {
         if (!onlyKey) setProgress(p => ({ ...p, done: p.done + 1 }))
       }

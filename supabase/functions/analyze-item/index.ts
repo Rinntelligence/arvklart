@@ -6,6 +6,7 @@
 // Krever innlogget bruker og teller mot AI-kvoten (demoen: 5 forsøk per besøk). Modell: se _shared/ai.ts.
 import { getUser, json, preflight } from '../_shared/http.ts'
 import { aiConfigured, aiErrorJson, aiErrorResponse, callStructured, claimAiCall, currentModel } from '../_shared/ai.ts'
+import { readEstateId } from '../_shared/aiCore.ts'
 import { ANALYSIS_SCHEMA, ANALYSIS_VERSION, PROMPT_VERSION, analysisSystem, legacyFields, normalizeAnalysis } from '../_shared/analysis.ts'
 
 const CATEGORIES = [
@@ -58,7 +59,7 @@ Deno.serve(async (req) => {
     if (typeof images === 'string') return json({ success: false, error: images }, images === 'Mangler bilde' ? 400 : 413)
     const categories = readCategories(body.categories)
 
-    const { denied, quota, usageId } = await claimAiCall(req, user, 'analyze-item')
+    const { denied, quota, usageId } = await claimAiCall(req, user, 'analyze-item', readEstateId(body.estate_id))
     if (denied) return denied
 
     const ai = await callStructured({

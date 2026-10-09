@@ -37,6 +37,11 @@ describe('modell og parametre', { skip }, () => {
     assert.equal(p.messages[0].role, 'user', 'siste melding må være fra brukeren (ingen prefill)')
   })
 
+  test('estate_id fra klienten brukes bare når det er en UUID', () => {
+    assert.equal(ai.readEstateId('EEEE0000-0000-0000-0000-000000000001'), 'eeee0000-0000-0000-0000-000000000001')
+    for (const v of [null, undefined, '', 'abc', 42, "x' or 1=1"]) assert.equal(ai.readEstateId(v), null)
+  })
+
   test('4.5 (tilbakerulling): samme skjema, men uten effort (gir feil på 4.5)', () => {
     const p = ai.buildParams({ model: 'claude-haiku-4-5', system: 's', content: 'c', schema: { type: 'object' }, maxTokens: 1000, effort: 'low' })
     assert.deepEqual(p.output_config, { format: { type: 'json_schema', schema: { type: 'object' } } })
