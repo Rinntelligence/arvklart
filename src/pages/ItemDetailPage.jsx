@@ -68,7 +68,8 @@ export default function ItemDetailPage({ session, profile, onToast, isDemo }) {
   const isAssigned = item.status === 'assigned'
   const isAdmin = myRole === 'admin'
   const canEdit = !isDemo
-  const canDelete = !isDemo && (isAdmin || item.added_by === session.user.id)
+  // Den som la inn gjenstanden kan slette den bare før den er tildelt (håndheves også i databasen)
+  const canDelete = !isDemo && (isAdmin || (item.added_by === session.user.id && !item.assigned_to && item.status !== 'assigned'))
   const allImages = itemImageUrls(item)
   const assignedMember = members.find(m => m.user_id === item.assigned_to)
 

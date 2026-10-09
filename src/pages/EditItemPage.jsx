@@ -21,7 +21,15 @@ export default function EditItemPage({ session, profile, onToast }) {
   const [newFiles, setNewFiles] = useState([])
   const [newPreviews, setNewPreviews] = useState([])
   const [saving, setSaving] = useState(false)
+  // Verdien brukes i fordelingen: bare administrator eller den som la inn gjenstanden kan endre den
+  // (håndheves også i databasen, guard_item_update)
+  const [isAdmin, setIsAdmin] = useState(false)
   const fileRef = useRef()
+
+  useEffect(() => {
+    supabase.from('estate_members').select('role').eq('estate_id', id).eq('user_id', session.user.id).maybeSingle()
+      .then(({ data }) => setIsAdmin(data?.role === 'admin'))
+  }, [id, session.user.id])
 
   useEffect(() => {
     Promise.all([getItem(itemId), getCategories(id)]).then(([{ data: it }, { data: cats }]) => {
@@ -83,15 +91,17 @@ export default function EditItemPage({ session, profile, onToast }) {
       const mainImage = allImages[0] || null
       const extraImages = allImages.slice(1)
 
-      const { error } = await supabase.from('items').update({
+      const changes = {
         title: title.trim(),
         category_id: categoryId || null,
         description: description.trim() || null,
         condition,
-        estimated_value: unchanged ? item.estimated_value : value === null ? null : Math.round(value),
         image_url: mainImage,
         extra_images: extraImages,
-      }).eq('id', itemId)
+      }
+      // Verdien sendes bare av dem som kan endre den; andre lagrer resten uten å røre verdien
+      if (canEditValue) changes.estimated_value = unchanged ? item.estimated_value : value === null ? null : Math.round(value)
+      const { error } = await supabase.from('items').update(changes).eq('id', itemId)
 
       if (error) throw error
       // Bilder som ble fjernet, slettes fra lagringen
@@ -106,6 +116,8 @@ export default function EditItemPage({ session, profile, onToast }) {
       setSaving(false)
     }
   }
+
+  const canEditValue = isAdmin || item?.added_by === session.user.id
 
   if (!loaded) return <div style={{ padding:'80px', textAlign:'center', color:'#75604B', fontFamily:'Karla, sans-serif' }}>{L('Laster…', 'Loading…')}</div>
   if (!item) return (
@@ -221,8 +233,14 @@ export default function EditItemPage({ session, profile, onToast }) {
         <div>
           <label htmlFor="edititem-f4" style={{ display:'block', fontSize:'0.8125rem', color:'#75604B', marginBottom:'6px' }}>{L('Estimert verdi i kroner (valgfri)', 'Estimated value in NOK (optional)')}</label>
           <input id="edititem-f4" value={estimatedValue} onChange={e => setEstimatedValue(e.target.value)} maxLength={100} inputMode="decimal"
-            placeholder={L('f.eks. 1500', 'e.g. 1500')}
-            style={{ width:'100%', padding:'14px', border:'1px solid #9A8B78', borderRadius:'10px', fontSize:'0.9375rem', background:'#FBF9F5', color:'#3A2F26', fontFamily:'Karla, sans-serif', boxSizing:'border-box' }} />
+            readOnly={!canEditValue} aria-describedby={canEditValue ? undefined : 'edititem-f4-note'}
+            placeholder={canEditValue ? L('f.eks. 1500', 'e.g. 1500') : ''}
+            style={{ width:'100%', padding:'14px', border:'1px solid #9A8B78', borderRadius:'10px', fontSize:'0.9375rem', background: canEditValue ? '#FBF9F5' : '#E8DFD0', color:'#3A2F26', fontFamily:'Karla, sans-serif', boxSizing:'border-box' }} />
+          {!canEditValue && (
+            <p id="edititem-f4-note" style={{ fontSize:'0.8125rem', color:'#5C4530', margin:'6px 0 0', lineHeight:1.5 }}>
+              {L('Verdien brukes i fordelingen. Bare administrator eller den som la inn gjenstanden kan endre den.', 'The value is used in the distribution. Only the administrator or the person who added the item can change it.')}
+            </p>
+          )}
         </div>
       </div>
 

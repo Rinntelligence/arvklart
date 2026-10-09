@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { getItems, removeInterest, supabase } from '../lib/supabase'
+import { getItems, removeInterest } from '../lib/supabase'
 import { getEstatePasses, addPass, addInterestClearingPass, removePass } from '../lib/decisions'
 import { L } from '../lib/lang'
 import { categoryLabel } from '../lib/categories'
@@ -15,11 +15,13 @@ export default function SwipePage({ session, profile, onToast }) {
   const [done, setDone] = useState(false)
   const [dragging, setDragging] = useState(false)
   const [offset, setOffset] = useState({ x: 0, y: 0 })
-  const [action, setAction] = useState(null) // 'like' | 'pass' | 'trash'
+  const [action, setAction] = useState(null) // 'like' | 'pass'
   const startPos = useRef(null)
   const cardRef = useRef(null)
   const busy = useRef(false) // ett kort om gangen, også ved dobbeltklikk
   const [last, setLast] = useState(null) // { type, item }: siste valg kan angres uten tidsfrist
+  // Sveipingen er bare for ønsker: «Vil ha» eller «Nei takk». Hva som skjer med det ingen vil ha
+  // (selges, gis bort, kastes), bestemmes etter at alle har tatt stilling, ikke underveis her.
 
   useEffect(() => {
     getItems(id).then(async ({ data }) => {
@@ -47,9 +49,6 @@ export default function SwipePage({ session, profile, onToast }) {
       let error
       if (type === 'like') {
         ({ error } = await addInterestClearingPass(item.id, session.user.id, ''))
-      } else if (type === 'trash') {
-        ({ error } = await addPass(item.id, session.user.id))
-        if (!error) ({ error } = await supabase.from('items').update({ marked_for_disposal: true }).eq('id', item.id))
       } else {
         ({ error } = await addPass(item.id, session.user.id))
       }
@@ -74,10 +73,7 @@ export default function SwipePage({ session, profile, onToast }) {
     const { type, item } = last
     let error
     if (type === 'like') ({ error } = await removeInterest(item.id, session.user.id))
-    else {
-      ({ error } = await removePass(item.id, session.user.id))
-      if (!error && type === 'trash') ({ error } = await supabase.from('items').update({ marked_for_disposal: false }).eq('id', item.id))
-    }
+    else ({ error } = await removePass(item.id, session.user.id))
     busy.current = false
     if (error) { onToast(L('Kunne ikke angre. Prøv igjen.', 'Could not undo. Please try again.'), 'error'); return }
     setLast(null)
@@ -87,9 +83,7 @@ export default function SwipePage({ session, profile, onToast }) {
 
   const lastText = last && (last.type === 'like'
     ? L(`Du vil ha «${last.item.title}»`, `You want «${last.item.title}»`)
-    : last.type === 'trash'
-      ? L(`«${last.item.title}» er merket for kast`, `«${last.item.title}» is marked for disposal`)
-      : L(`Nei takk til «${last.item.title}»`, `No thanks to «${last.item.title}»`))
+    : L(`Nei takk til «${last.item.title}»`, `No thanks to «${last.item.title}»`))
   const undoBar = last && (
     <div role="status" style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:'10px', flexWrap:'wrap', padding:'8px 20px', fontSize:'0.875rem', color:'#3A2F26' }}>
       <span>{lastText}</span>
@@ -108,8 +102,7 @@ export default function SwipePage({ session, profile, onToast }) {
     const dy = e.touches[0].clientY - startPos.current.y
     setOffset({ x: dx, y: dy })
 
-    if (dy < -80) setAction('trash')
-    else if (dx > 60) setAction('like')
+    if (dx > 60) setAction('like')
     else if (dx < -60) setAction('pass')
     else setAction(null)
   }
@@ -134,8 +127,7 @@ export default function SwipePage({ session, profile, onToast }) {
     const dx = e.clientX - startPos.current.x
     const dy = e.clientY - startPos.current.y
     setOffset({ x: dx, y: dy })
-    if (dy < -80) setAction('trash')
-    else if (dx > 60) setAction('like')
+    if (dx > 60) setAction('like')
     else if (dx < -60) setAction('pass')
     else setAction(null)
   }
@@ -210,12 +202,7 @@ export default function SwipePage({ session, profile, onToast }) {
         )}
         {action === 'pass' && (
           <div style={{ position:'absolute', top:'30px', right:'30px', background:'#8B3A3A', color:'#fff', padding:'8px 20px', borderRadius:'8px', fontSize:'1.125rem', fontWeight:'700', transform:'rotate(15deg)', zIndex:10, border:'3px solid #6A2A2A' }}>
-            PASS
-          </div>
-        )}
-        {action === 'trash' && (
-          <div style={{ position:'absolute', top:'30px', left:'50%', transform:'translateX(-50%)', background:'#9C6B30', color:'#fff', padding:'8px 20px', borderRadius:'8px', fontSize:'1.125rem', fontWeight:'700', zIndex:10, border:'3px solid #7A5020' }}>
-            {L('KAST', 'DISCARD')}
+            {L('NEI TAKK', 'NO THANKS')}
           </div>
         )}
 
@@ -276,13 +263,6 @@ export default function SwipePage({ session, profile, onToast }) {
           fontSize:'0.8125rem', fontWeight:'600', color:'#8B3A3A', fontFamily:'Karla, sans-serif',
         }}>{L('Nei takk', 'No thanks')}</button>
 
-        <button onClick={() => handleAction('trash')} style={{
-          width:'52px', height:'52px', borderRadius:'50%', border:'2px solid #D9CFC0',
-          background:'#fff', cursor:'pointer',
-          boxShadow:'0 4px 16px rgba(0,0,0,0.08)', display:'flex', alignItems:'center', justifyContent:'center',
-          fontSize:'0.6875rem', fontWeight:'600', color:'#9C6B30', fontFamily:'Karla, sans-serif',
-        }}>{L('Kast', 'Discard')}</button>
-
         <button onClick={() => handleAction('like')} style={{
           width:'80px', height:'80px', borderRadius:'50%', border:'2px solid #B8C8A8',
           background:'#fff', cursor:'pointer',
@@ -293,7 +273,7 @@ export default function SwipePage({ session, profile, onToast }) {
 
       {/* Hint */}
       <div style={{ textAlign:'center', paddingBottom:'16px', fontSize:'0.8125rem', color:'#75604B' }}>
-        {L('Du kan også sveipe: ← nei takk · → vil ha · ↑ kast', 'You can also swipe: ← no thanks · → want · ↑ discard')}
+        {L('Du kan også sveipe: ← nei takk · → vil ha', 'You can also swipe: ← no thanks · → want')}
       </div>
     </div>
   )

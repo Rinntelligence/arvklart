@@ -1,0 +1,49 @@
+# Kjører alle testene på hver PR i et isolert miljø hos GitHub: enhetstester, bygg, e2e i Chromium
+# (Supabase simuleres) og databasetestene mot en midlertidig Postgres + PostgREST i Docker.
+# Ingen hemmeligheter og ingen tilkobling til produksjonen.
+name: Tester
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  enhet-og-bygg:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npx playwright-core install --with-deps chromium
+      - run: |
+          export CHROMIUM_PATH="$(node -e "import('playwright-core').then(p => console.log(p.chromium.executablePath()))")"
+          npm run test:e2e
+
+  database:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run test:db

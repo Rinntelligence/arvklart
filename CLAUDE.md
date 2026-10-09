@@ -47,7 +47,7 @@ Tilgjengelighet (WCAG 2.2 AA): ikke bruk `outline:'none'`; fokus vises med `:foc
 ## Supabase-konvensjoner
 - Alle nye tabeller skal ha RLS aktivert
 - Policies: brukere leser/skriver kun egne data og data for bo de er medlem i. Bruk hjelpefunksjonene `is_estate_member(estate_id)`, `is_estate_admin(estate_id)` og `is_demo_user()` (se `20261007_security_hardening.sql`)
-- Admin-handlinger håndheves i databasen, ikke bare i UI: tildeling (trigger på `items`), arvinger, kategorier og `remove_estate_member()`
+- Admin-handlinger håndheves i databasen, ikke bare i UI: tildeling, kastmerking og verdi (trigger `guard_item_update` på `items`; verdien kan også endres av den som la inn gjenstanden), arvinger, kategorier og `remove_estate_member()`. Den som la inn en gjenstand kan slette den bare før den er tildelt
 - Migrasjoner: lag fil i `supabase/migrations/` med navn `YYYYMMDD_beskrivende_navn.sql`, test med `npm run test:db`
 - Edge Functions: `supabase/functions/<navn>/index.ts` (Deno). Felles kode i `supabase/functions/_shared/`. Funksjoner som koster penger (AI) skal kreve innlogget bruker (`getUser`)
 - AI: alle kall går til Claude Haiku (`claude-haiku-4-5`) via Anthropics SDK i `_shared/ai.ts`, og hvert kall registreres med `claimAiCall()` først (tabellen `ai_usage`). Grenser: 30 kall/time og 150/døgn per bruker; demoen 5 per besøk (økt) og 300/døgn totalt
@@ -66,8 +66,9 @@ npm run build      # bygg for produksjon
 npm run preview    # forhåndsvis bygget lokalt
 npm test           # enhetstester (veiviser, fremdrift, formatering)
 npm run test:db    # tilgangsregler og spørringer mot lokal Postgres + PostgREST (krever Docker)
-npm run test:e2e   # akseptansetester for «Legg til flere» i Chromium med falskt kamera (Supabase simuleres)
+npm run test:e2e   # akseptansetester i Chromium (CHROMIUM_PATH) med simulert Supabase: «Legg til flere», tilgjengelighet, kundereisen, hvem kan kaste/endre verdi/slette
 ```
+Avhengighetene er låst i `package-lock.json` (bruk `npm ci`). GitHub Actions (`.github/workflows/test.yml`) kjører alle testene, også `test:db`, på hver PR.
 
 ## Miljøvariabler som trengs lokalt (.env.local)
 ```

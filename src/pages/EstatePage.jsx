@@ -413,7 +413,8 @@ function ItemCard({ item, userId, onClick, onDelete, myRole, isDemo }) {
   const myInterest = item.interests?.some(x => x.user_id === userId)
   const count = item.interests?.length || 0
   const isAssigned = item.status === 'assigned'
-  const canDelete = !isDemo && (myRole === 'admin' || item.added_by === userId)
+  // Den som la inn gjenstanden kan slette den bare før den er tildelt (håndheves også i databasen)
+  const canDelete = !isDemo && (myRole === 'admin' || (item.added_by === userId && !item.assigned_to && item.status !== 'assigned'))
   const names = interestNames(item.interests || [], userId)
 
   return (
