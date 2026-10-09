@@ -326,6 +326,31 @@ await run('H: bildeanalyse v2: oppsummering, flere gjenstander, bildetips og «H
   await ctx.close()
 })
 
+await run('H3: «Rett opplysningene» på kortet: rettelsen vises, går inn i oppsummeringen og lagres i ai_analysis.corrections', async () => {
+  const { ctx, page, calls } = await setup(browser, { v2: n => v2Reply(n) })
+  await openCamera(page)
+  await shoot(page)
+  await page.getByRole('button', { name: 'Ferdig' }).click()
+  await page.getByRole('button', { name: 'Analyser med AI (1)' }).click()
+  await page.getByRole('button', { name: 'Godkjenn og lagre alle (1)' }).waitFor()
+  await page.locator('summary', { hasText: 'Mer' }).first().click()
+  await page.getByRole('button', { name: 'Rett opplysningene' }).click()
+  await page.getByLabel('Merke', { exact: true }).fill('Porsgrund')
+  await page.getByLabel('Periode', { exact: true }).fill('')
+  await page.getByRole('button', { name: 'Lagre rettelsene' }).click()
+  await page.getByText('Rettet av familien').waitFor()
+  await page.getByText('AI: Porsgrund · Lotte (sannsynlig).').waitFor()
+  await page.getByRole('button', { name: 'Godkjenn og lagre alle (1)' }).click()
+  await page.getByText(/1 gjenstand lagt til i boet/).waitFor()
+  const c = calls.insertBodies[0].ai_analysis.corrections
+  assert.equal(c.brand.value, 'Porsgrund')
+  assert.equal(c.period.value, null)
+  assert.ok(c.brand.by && c.brand.at, 'mangler hvem og når')
+  assert.equal(Object.keys(c).length, 2, 'uendrede felt ble lagret')
+  assert.equal(calls.insertBodies[0].ai_analysis.ai.identification.brand.value, 'Figgjo', 'AI-forslaget ble endret')
+  await ctx.close()
+})
+
 await run('H2: uten AI-analyse lagres ingen ai_analysis, og tilstanden er «ikke vurdert» til noen velger', async () => {
   const { ctx, page, calls } = await setup(browser)
   await openCamera(page)

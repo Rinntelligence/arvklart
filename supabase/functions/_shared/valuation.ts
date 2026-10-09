@@ -90,6 +90,10 @@ const FIELD_NAMES: Record<string, string> = {
   colour: 'Colour', period: 'Period', designer_or_artist: 'Designer/artist', model_number: 'Model number',
 }
 
+const BASIS_TEXT: Record<string, string> = {
+  family: 'confirmed by the family', observed: 'read directly from the item', probable: 'probable, inferred',
+}
+
 export type ItemFacts = {
   title: string; description: string; category: string; condition: string | null
   purchasePrice: number | null; purchaseYear: number | null; identifiedModel: string
@@ -109,9 +113,9 @@ export function describeItem(f: ItemFacts, a: Analysis | null, depreciated: numb
     lines.push(`Bought new for ${f.purchasePrice} NOK in ${f.purchaseYear}` + (depreciated != null ? ` (simple depreciation gives about ${depreciated} NOK; a rough reference point only, not a cap)` : ''))
   }
   if (a) {
-    lines.push('', 'From the photo analysis (AI, may be wrong):')
+    lines.push('', 'From the photo analysis (AI, may be wrong; lines marked "confirmed by the family" are corrections from the family and apply):')
     for (const [field, v] of Object.entries(a.identification)) {
-      if (v) lines.push(`- ${FIELD_NAMES[field] || field}: ${v.value} (${v.basis === 'observed' ? 'read directly from the item' : 'probable, inferred'})`)
+      if (v) lines.push(`- ${FIELD_NAMES[field] || field}: ${v.value} (${BASIS_TEXT[v.basis] || BASIS_TEXT.probable})`)
     }
     for (const m of a.marks) lines.push(`- Mark (${m.kind}): ${[m.text, m.where].filter(Boolean).join(', ')}`)
     if (a.size_class !== 'unknown') lines.push(`- Size: ${a.size_class}`)

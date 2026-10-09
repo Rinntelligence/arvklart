@@ -5,6 +5,7 @@ import { usePlan } from '../hooks/usePlan'
 import { uploadEstateImage } from '../lib/images'
 import { Avatar, Card } from '../components/UI'
 import { L, locale } from '../lib/lang'
+import StoredImage from '../components/StoredImage'
 
 const genCode = () => Math.random().toString(36).substring(2, 8).toUpperCase()
 
@@ -190,7 +191,7 @@ export default function AdminPage({ session, profile, onToast }) {
             <div style={{ display:'block', fontSize:'0.8125rem', color:'#75604B', marginBottom:'8px' }}>{L('Logotype', 'Logo')}</div>
             <div onClick={()=>can('whitelabel')&&logoRef.current.click()} style={{ width:'80px', height:'48px', background:'#E8DFD0', border:'1px dashed #D9CFC0', borderRadius:'8px', display:'flex', alignItems:'center', justifyContent:'center', cursor: can('whitelabel')?'pointer':'not-allowed', overflow:'hidden' }}>
               {logoPreview
-                ? <img src={logoPreview} alt="logo" style={{ width:'100%', height:'100%', objectFit:'contain' }} />
+                ? <StoredImage src={logoPreview} alt="logo" style={{ width:'100%', height:'100%', objectFit:'contain' }} />
                 : <span style={{ fontSize:'0.8125rem', color:'#75604B' }}>Logo</span>}
             </div>
             <input ref={logoRef} type="file" accept="image/*" onChange={handleLogo} style={{ display:'none' }} />
@@ -199,7 +200,7 @@ export default function AdminPage({ session, profile, onToast }) {
 
         <div style={{ background:'#3A2F26', borderRadius:'10px', padding:'14px 18px', display:'flex', alignItems:'center', gap:'12px', marginBottom:'20px' }}>
           {logoPreview
-            ? <img src={logoPreview} alt="" style={{ height:'24px', borderRadius:'4px' }} />
+            ? <StoredImage src={logoPreview} alt="" style={{ height:'24px', borderRadius:'4px' }} />
             : <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FBF9F5" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3v18M7 21h10M5 7h4M15 7h4M5 7L2.5 12a2.5 2.5 0 0 0 5 0L5 7zM19 7l-2.5 5a2.5 2.5 0 0 0 5 0L19 7z"/></svg>}
           <span style={{ fontFamily:'Fraunces, serif', fontSize:'0.9375rem', color:'#FBF9F5' }}>
             {estate.name} · Arvklart
