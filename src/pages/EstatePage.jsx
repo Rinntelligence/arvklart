@@ -21,6 +21,7 @@ export default function EstatePage({ session, profile, onToast, isDemo }) {
   const [myRole, setMyRole] = useState('member')
   const [tab, setTab] = useState('items')
   const [filterCat, setFilterCat] = useState('all')
+  const [query, setQuery] = useState('')
   const [filterStatus, setFilterStatus] = useState('all')
   const [loading, setLoading] = useState(true)
   const [confirmItem, setConfirmItem] = useState(null)
@@ -85,7 +86,12 @@ export default function EstatePage({ session, profile, onToast, isDemo }) {
     return items
   }
 
-  const filtered = getFiltered().filter(i => filterCat === 'all' || i.category_id === filterCat)
+  // Kategori og søk (navn, beskrivelse, kategori) brukes på alle lister
+  const q = query.trim().toLocaleLowerCase('nb')
+  const matches = (i) => (filterCat === 'all' || i.category_id === filterCat) && (!q ||
+    [i.title, i.description, i.categories?.label, i.categories && categoryLabel(i.categories.label)]
+      .some(t => t && String(t).toLocaleLowerCase('nb').includes(q)))
+  const filtered = getFiltered().filter(matches)
 
   const myCount = myItems.length
   const contested = items.filter(isContested).length
@@ -165,7 +171,12 @@ export default function EstatePage({ session, profile, onToast, isDemo }) {
         <div style={{ display:'flex', gap:'8px', flexWrap:'wrap' }}>
           {myRole === 'admin' && !isDemo && <button onClick={() => navigate(`/estate/${id}/admin`)} style={btn}>{L('Administrer', 'Manage')}</button>}
           <button onClick={() => navigate(`/estate/${id}/swipe`)} style={btn}>{L('Sveip', 'Swipe')}</button>
-          <button onClick={() => navigate(`/estate/${id}/add`)} style={btnPrimary}>{isDemo ? L('Prøv AI-verdivurdering', 'Try AI valuation') : L('+ Legg til', '+ Add')}</button>
+          {isDemo
+            ? <button onClick={() => navigate(`/estate/${id}/add`)} style={btnPrimary}>{L('Prøv AI-verdivurdering', 'Try AI valuation')}</button>
+            : <>
+                <button onClick={() => navigate(`/estate/${id}/add`)} style={btn}>{L('Én gjenstand', 'One item')}</button>
+                <button onClick={() => navigate(`/estate/${id}/add-many`)} style={btnPrimary}>{L('+ Legg til gjenstander', '+ Add items')}</button>
+              </>}
         </div>
       </div>
 
@@ -292,13 +303,16 @@ export default function EstatePage({ session, profile, onToast, isDemo }) {
         </div>
       ) : (
         <>
-          {categories.length > 0 && (
-            <div style={{ marginBottom:'20px' }}>
-              <select value={filterCat} onChange={e => setFilterCat(e.target.value)} aria-label={L('Vis kategori', 'Show category')}
-                style={{ minWidth:'200px', padding:'9px 12px', border:'1px solid #9A8B78', borderRadius:'8px', fontSize:'0.875rem', background:'#fff', color:'#3A2F26', fontFamily:'Karla, sans-serif' }}>
+          {items.length > 0 && (
+            <div role="search" style={{ display:'flex', gap:'10px', flexWrap:'wrap', marginBottom:'20px' }}>
+              <input type="search" value={query} onChange={e => setQuery(e.target.value)} aria-label={L('Søk i boet', 'Search the estate')}
+                placeholder={L('Søk etter gjenstand…', 'Search for an item…')}
+                style={{ flex:'1 1 220px', minHeight:'44px', padding:'9px 12px', border:'1px solid #9A8B78', borderRadius:'8px', fontSize:'0.9375rem', background:'#fff', color:'#3A2F26', fontFamily:'Karla, sans-serif' }} />
+              {categories.length > 0 && <select value={filterCat} onChange={e => setFilterCat(e.target.value)} aria-label={L('Vis kategori', 'Show category')}
+                style={{ minWidth:'200px', minHeight:'44px', padding:'9px 12px', border:'1px solid #9A8B78', borderRadius:'8px', fontSize:'0.875rem', background:'#fff', color:'#3A2F26', fontFamily:'Karla, sans-serif' }}>
                 <option value="all">{L('Alle kategorier', 'All categories')}</option>
                 {categories.map(c => <option key={c.id} value={c.id}>{c.emoji} {categoryLabel(c.label)}</option>)}
-              </select>
+              </select>}
             </div>
           )}
 
@@ -306,12 +320,12 @@ export default function EstatePage({ session, profile, onToast, isDemo }) {
             <div style={{ marginBottom:'24px' }}>
               <div style={{ ...sectionLabel, color:'#5F6E52' }}>{L('Mine interesser', 'My interests')} ({myItems.length})</div>
               <div className="item-grid" style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(200px, 1fr))', gap:'12px', marginBottom:'20px' }}>
-                {myItems.filter(i => filterCat === 'all' || i.category_id === filterCat).map(item => (
+                {myItems.filter(matches).map(item => (
                   <ItemCard key={item.id} item={item} userId={session.user.id} myRole={myRole} isDemo={isDemo}
                     onClick={() => openItem(item)} onDelete={e => handleDelete(item, e)} />
                 ))}
               </div>
-              {otherItems.filter(i => filterCat === 'all' || i.category_id === filterCat).length > 0 && (
+              {otherItems.filter(matches).length > 0 && (
                 <div style={{ ...sectionLabel, color:'#75604B' }}>{L('Andre gjenstander', 'Other items')}</div>
               )}
             </div>
@@ -319,14 +333,15 @@ export default function EstatePage({ session, profile, onToast, isDemo }) {
 
           {filtered.length === 0 ? (
             <div style={{ textAlign:'center', padding:'80px 20px', color:'#75604B' }}>
-              <p style={{ marginBottom:'20px' }}>{items.length === 0 ? L('Ingen gjenstander ennå.', 'No items yet.') : L('Ingen gjenstander i dette utvalget.', 'No items in this selection.')}</p>
-              {!isDemo && items.length === 0 && <button onClick={() => navigate(`/estate/${id}/add`)} style={{ ...btnPrimary, padding:'11px 24px' }}>
+              <p role="status" style={{ marginBottom:'20px' }}>{items.length === 0 ? L('Ingen gjenstander ennå.', 'No items yet.') : q ? L(`Ingen gjenstander passer «${query.trim()}».`, `No items match «${query.trim()}».`) : L('Ingen gjenstander i dette utvalget.', 'No items in this selection.')}</p>
+              {q && <button onClick={() => setQuery('')} style={{ ...btn, marginBottom:'12px' }}>{L('Tøm søket', 'Clear the search')}</button>}
+              {!isDemo && items.length === 0 && <button onClick={() => navigate(`/estate/${id}/add-many`)} style={{ ...btnPrimary, padding:'11px 24px' }}>
                 {L('Legg til første gjenstand', 'Add the first item')}
               </button>}
             </div>
           ) : (
             <div className="item-grid" style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(200px, 1fr))', gap:'12px' }}>
-              {(filterStatus === 'all' ? otherItems : filtered).filter(i => filterCat === 'all' || i.category_id === filterCat).map(item => (
+              {(filterStatus === 'all' ? otherItems : filtered).filter(matches).map(item => (
                 <ItemCard key={item.id} item={item} userId={session.user.id} myRole={myRole} isDemo={isDemo}
                   onClick={() => openItem(item)} onDelete={e => handleDelete(item, e)} />
               ))}
@@ -395,7 +410,7 @@ function ItemCard({ item, userId, onClick, onDelete, myRole, isDemo }) {
 
       <div style={{ padding:'10px 12px 12px' }}>
         <button onClick={e => { e.stopPropagation(); onClick() }} style={{ display:'block', width:'100%', textAlign:'left', background:'none', border:'none', padding:0, cursor:'pointer', fontFamily:'Karla, sans-serif', fontSize:'0.875rem', fontWeight:'500', color:'#3A2F26', marginBottom:'2px', lineHeight:'1.3' }}>{item.title}</button>
-        {item.estimated_value && <div style={{ fontSize:'0.75rem', color:'#75604B' }}>{formatNOK(item.estimated_value)}</div>}
+        {item.estimated_value != null && item.estimated_value !== '' && <div style={{ fontSize:'0.75rem', color:'#75604B' }}>{L('ca.', 'approx.')} {formatNOK(item.estimated_value)}</div>}
         <div style={{ marginTop:'8px', fontSize:'0.75rem', color: count ? '#5C4530' : '#75604B', fontStyle: count ? 'normal' : 'italic' }}>
           {count === 0 ? L('Ingen ennå', 'No one yet') : names === L('deg', 'you') ? L('Bare deg', 'Only you') : names.charAt(0).toUpperCase() + names.slice(1)}
         </div>

@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { supabase, getEstateMembers } from '../lib/supabase'
 import { WIZARD_TAG } from '../lib/wizardEstate'
 import { L, locale } from '../lib/lang'
+import { Modal } from '../components/UI'
 
 const RELATIONSHIPS = ['Barn', 'Ektefelle / Partner', 'Søsken', 'Forelder', 'Barnebarn', 'Bobestyrer', 'Advokat', 'Rådgiver', 'Annen']
 // Relasjonen lagres på norsk (også fra arveveiviseren) og oversettes bare ved visning
@@ -28,6 +29,7 @@ export default function HeirsPage({ session, profile, onToast, isDemo }) {
   const [memberEmails, setMemberEmails] = useState([])
   const [copied, setCopied] = useState('')
   const [emailEdit, setEmailEdit] = useState(null)
+  const [confirmHeir, setConfirmHeir] = useState(null)
 
   const load = async () => {
     const [{ data: hs }, { data: mem }, { data: es }, { data: members }] = await Promise.all([
@@ -96,6 +98,7 @@ export default function HeirsPage({ session, profile, onToast, isDemo }) {
   const inviteUrl = inviteCode ? `${window.location.origin}/join/${inviteCode}` : ''
 
   const removeHeir = async (heirId) => {
+    setConfirmHeir(null)
     const { error } = await supabase.from('heirs').delete().eq('id', heirId)
     if (error) onToast?.(L('Kunne ikke fjerne arvingen', 'Could not remove the heir'), 'error')
     load()
@@ -196,7 +199,7 @@ export default function HeirsPage({ session, profile, onToast, isDemo }) {
               { id: 'custom', label: L('Egendefinert %', 'Custom %'), desc: L('Sett prosenter manuelt', 'Set percentages manually') },
               { id: 'assigned', label: L('Per gjenstand', 'Per item'), desc: L('Basert på tildelte gjenstander', 'Based on assigned items') },
             ].map(opt => (
-              <button key={opt.id} onClick={() => setSplitMode(opt.id)} aria-pressed={splitMode===opt.id} style={{
+              <button key={opt.id} onClick={() => canEdit && setSplitMode(opt.id)} disabled={!canEdit && splitMode!==opt.id} aria-pressed={splitMode===opt.id} style={{
                 padding:'10px 16px', border:`2px solid ${splitMode===opt.id?'#3A2F26':'#D9CFC0'}`,
                 borderRadius:'8px', cursor:'pointer', fontSize:'0.8125rem', fontFamily:'Karla, sans-serif',
                 background: splitMode===opt.id?'#3A2F26':'#fff',
@@ -210,6 +213,9 @@ export default function HeirsPage({ session, profile, onToast, isDemo }) {
           </div>
         </div>
 
+        {!canEdit && (
+          <p style={{ fontSize:'0.8125rem', color:'#75604B', marginTop:'-8px', marginBottom:'4px' }}>{L('Det er administratoren som velger fordelingsmåte.', 'The administrator chooses how to split.')}</p>
+        )}
         {canEdit && (
           <button onClick={saveSettings} disabled={saving} style={{ padding:'10px 20px', background:'#3A2F26', color:'#FBF9F5', border:'none', borderRadius:'8px', cursor:'pointer', fontSize:'0.875rem', fontFamily:'Karla, sans-serif' }}>
             {saving ? L('Lagrer…', 'Saving…') : L('Lagre innstillinger', 'Save settings')}
@@ -340,7 +346,7 @@ export default function HeirsPage({ session, profile, onToast, isDemo }) {
                     <div style={{ fontSize:'0.8125rem', color:'#3A2F26', fontWeight:'500' }}>{formatMoney(share)}</div>
                   )}
                   {canEdit && (
-                    <button onClick={() => removeHeir(heir.id)} aria-label={L(`Fjern ${heir.name}`, `Remove ${heir.name}`)} style={{ fontSize:'0.8125rem', color:'#8B3A3A', background:'none', border:'none', cursor:'pointer', marginTop:'4px', minHeight:'44px', padding:'0 8px', fontFamily:'Karla, sans-serif', textDecoration:'underline' }}>{L('Fjern', 'Remove')}</button>
+                    <button onClick={() => setConfirmHeir(heir)} aria-label={L(`Fjern ${heir.name}`, `Remove ${heir.name}`)} style={{ fontSize:'0.8125rem', color:'#8B3A3A', background:'none', border:'none', cursor:'pointer', marginTop:'4px', minHeight:'44px', padding:'0 8px', fontFamily:'Karla, sans-serif', textDecoration:'underline' }}>{L('Fjern', 'Remove')}</button>
                   )}
                 </div>
               </div>
@@ -362,6 +368,16 @@ export default function HeirsPage({ session, profile, onToast, isDemo }) {
           'These calculations are for information only and do not constitute legal or financial advice. Consult a qualified lawyer before making distribution decisions.',
         )}
       </div>
+      {confirmHeir && (
+        <Modal onClose={() => setConfirmHeir(null)} labelledBy="remove-heir-title" maxWidth={400}>
+            <h3 id="remove-heir-title" style={{ fontFamily:'Fraunces, serif', fontSize:'1.125rem', fontWeight:'400', color:'#3A2F26', marginBottom:'8px' }}>{L(`Fjerne ${confirmHeir.name}?`, `Remove ${confirmHeir.name}?`)}</h3>
+            <p style={{ fontSize:'0.875rem', color:'#5C4530', lineHeight:1.6 }}>{L('Arvingen fjernes fra listen. Med en e-post på listen kan arvingen bli med i boet; uten kan de ikke det. Allerede innmeldte medlemmer fjernes under «Administrer».', 'The heir is removed from the list. With an email on the list the heir can join the estate; without it they cannot. Members who have already joined are removed under «Manage».')}</p>
+            <div style={{ display:'flex', gap:'10px', marginTop:'20px' }}>
+              <button onClick={() => setConfirmHeir(null)} style={{ flex:1, minHeight:'44px', padding:'11px', background:'none', border:'1px solid #9A8B78', borderRadius:'8px', cursor:'pointer', color:'#5C4530', fontSize:'0.875rem', fontFamily:'Karla, sans-serif' }}>{L('Avbryt', 'Cancel')}</button>
+              <button onClick={() => removeHeir(confirmHeir.id)} style={{ flex:1, minHeight:'44px', padding:'11px', background:'#8B3A3A', color:'#fff', border:'none', borderRadius:'8px', cursor:'pointer', fontSize:'0.875rem', fontFamily:'Karla, sans-serif' }}>{L('Fjern', 'Remove')}</button>
+            </div>
+        </Modal>
+      )}
     </div>
   )
 }
