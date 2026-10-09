@@ -39,9 +39,13 @@ export default function InviteCard({ heir, estateName, inviteUrl, onClose }) {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 9rem), 1fr))', gap: '8px' }}>
         {canShare && <button type="button" onClick={share} style={primary}>{L('Del …', 'Share …')}</button>}
         <a href={`sms:?&body=${encodeURIComponent(text)}`} style={canShare ? secondary : primary}>{L('Send SMS', 'Send text message')}</a>
-        <a href={`mailto:${encodeURIComponent(heir.email)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(text)}`} style={secondary}>{L('Send e-post', 'Send email')}</a>
+        <a href={`mailto:${encodeURIComponent(heir.email).replace('%40', '@')}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(text)}`} style={secondary}>{L('Send e-post', 'Send email')}</a>
         <button type="button" onClick={copy} style={secondary}>{copied ? L('Kopiert ✓', 'Copied ✓') : L('Kopier meldingen', 'Copy the message')}</button>
       </div>
+      <p style={{ fontSize: '0.8125rem', color: '#75604B', lineHeight: 1.6, marginTop: '10px' }}>
+        {L('Skjer det ingenting når du trykker «Send e-post»? Da er det ikke satt opp et e-postprogram på enheten. Trykk «Kopier meldingen» og lim den inn i e-posten din.',
+          'Nothing happens when you tap «Send email»? Then no email app is set up on this device. Tap «Copy the message» and paste it into your email.')}
+      </p>
       <button type="button" onClick={onClose} style={{ ...btn, background: 'none', border: 'none', color: '#5F6E52', textDecoration: 'underline', marginTop: '8px', padding: '10px 0' }}>{L('Ferdig', 'Done')}</button>
     </section>
   )

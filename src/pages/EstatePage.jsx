@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { getEstate, getItems, getCategories, supabase } from '../lib/supabase'
 import { buildRemainingSteps, getUndecided, getStatusBreakdown, isContested } from '../lib/estateProgress'
@@ -22,6 +22,7 @@ export default function EstatePage({ session, profile, onToast, isDemo }) {
   const [tab, setTab] = useState('items')
   const [filterCat, setFilterCat] = useState('all')
   const [query, setQuery] = useState('')
+  const tabsRef = useRef(null) // faneraden; «Se mine ønsker» flytter hit
   const [filterStatus, setFilterStatus] = useState('all')
   const [loading, setLoading] = useState(true)
   const [confirmItem, setConfirmItem] = useState(null)
@@ -153,6 +154,14 @@ export default function EstatePage({ session, profile, onToast, isDemo }) {
   const btn = { padding:'9px 16px', background:'#fff', border:'1px solid #D9CFC0', borderRadius:'8px', cursor:'pointer', color:'#5C4530', fontSize:'0.875rem', fontFamily:'Karla, sans-serif' }
   const btnPrimary = { ...btn, background:'#3A2F26', border:'1px solid #3A2F26', color:'#FBF9F5' }
   const sectionLabel = { fontSize:'0.8125rem', fontWeight:'500', marginBottom:'10px', textTransform:'uppercase', letterSpacing:'0.5px' }
+  // «Se mine ønsker»: vis listen med bare dine ønsker, og flytt dit (ellers skjer endringen utenfor skjermen)
+  const showMine = () => {
+    setTab('items'); setFilterStatus('mine'); setQuery('')
+    requestAnimationFrame(() => {
+      tabsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      tabsRef.current?.querySelector('[data-tab="mine"]')?.focus({ preventScroll: true })
+    })
+  }
   const openItem = item => { sessionStorage.setItem('estate_scroll_' + id, window.scrollY); navigate(`/estate/${id}/item/${item.id}`) }
 
   return (
@@ -175,7 +184,7 @@ export default function EstatePage({ session, profile, onToast, isDemo }) {
             ? <button onClick={() => navigate(`/estate/${id}/add`)} style={btnPrimary}>{L('Prøv AI-verdivurdering', 'Try AI valuation')}</button>
             : <>
                 <button onClick={() => navigate(`/estate/${id}/add`)} style={btn}>{L('Én gjenstand', 'One item')}</button>
-                <button onClick={() => navigate(`/estate/${id}/add-many`)} style={btnPrimary}>{L('+ Legg til gjenstander', '+ Add items')}</button>
+                <button onClick={() => navigate(`/estate/${id}/add-many`)} style={myRole === 'admin' ? btnPrimary : btn}>{L('+ Legg til gjenstander', '+ Add items')}</button>
               </>}
         </div>
       </div>
@@ -185,6 +194,31 @@ export default function EstatePage({ session, profile, onToast, isDemo }) {
           {L('Boet er avsluttet. Det slettes automatisk, med alle bilder og dokumenter, 12 måneder etter at det ble avsluttet.', 'This estate is closed. It is deleted automatically, with all photos and documents, 12 months after it was closed.')}
           {estate.closed_at && ` (${new Date(estate.closed_at).toLocaleDateString(locale(), { day:'numeric', month:'long', year:'numeric' })})`}
         </div>
+      )}
+
+      {/* Arvingens oversikt: det som venter på deg, og dine ønsker, øverst */}
+      {myRole !== 'admin' && items.length > 0 && (
+        <section aria-labelledby="my-overview-title" style={{ background:'#DCE3D2', borderRadius:'12px', padding:'20px', marginBottom:'20px' }}>
+          <h2 id="my-overview-title" style={{ fontFamily:'Fraunces, serif', fontSize:'1.25rem', fontWeight:'400', color:'#3A2F26', marginBottom:'14px' }}>{L('Dine valg', 'Your choices')}</h2>
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(min(100%, 15rem), 1fr))', gap:'12px' }}>
+            <div style={{ background:'#fff', borderRadius:'10px', padding:'16px', display:'flex', flexDirection:'column', gap:'10px', justifyContent:'space-between' }}>
+              <div>
+                <div aria-hidden={myUndecided === 0} style={{ fontFamily:'Fraunces, serif', fontSize:'2rem', color: myUndecided === 0 ? '#5F6E52' : '#3A2F26', lineHeight:1.1 }}>{myUndecided === 0 ? '✓' : myUndecided}</div>
+                <div style={{ fontSize:'0.9375rem', color:'#3A2F26' }}>{myUndecided === 0 ? L('Du har svart på alle gjenstandene', 'You have answered all the items') : L(`${myUndecided === 1 ? 'gjenstand venter' : 'gjenstander venter'} på svaret ditt`, `${myUndecided === 1 ? 'item is' : 'items are'} waiting for your answer`)}</div>
+              </div>
+              {myUndecided > 0
+                ? <button onClick={() => navigate(`/estate/${id}/swipe`)} style={{ ...btnPrimary, background:'#5F6E52', border:'1px solid #5F6E52', minHeight:'44px' }}>{L('Gå gjennom nå', 'Review now')}</button>
+                : remainingSteps > 0 && <button onClick={() => navigate(`/estate/${id}/status`)} style={{ ...btn, minHeight:'44px' }}>{L('Se hva som gjenstår', 'See what remains')}</button>}
+            </div>
+            <div style={{ background:'#fff', borderRadius:'10px', padding:'16px', display:'flex', flexDirection:'column', gap:'10px', justifyContent:'space-between' }}>
+              <div>
+                <div style={{ fontFamily:'Fraunces, serif', fontSize:'2rem', color:'#3A2F26', lineHeight:1.1 }}>{myCount}</div>
+                <div style={{ fontSize:'0.9375rem', color:'#3A2F26' }}>{myCount === 0 ? L('Du har ikke ønsket noe ennå', 'You have not wished for anything yet') : L(`${myCount === 1 ? 'gjenstand' : 'gjenstander'} du ønsker`, `${myCount === 1 ? 'item' : 'items'} you want`)}</div>
+              </div>
+              {myCount > 0 && <button onClick={showMine} style={{ ...btn, minHeight:'44px' }}>{L('Se mine ønsker', 'See my wishes')}</button>}
+            </div>
+          </div>
+        </section>
       )}
 
       {/* Status for boet */}
@@ -208,8 +242,8 @@ export default function EstatePage({ session, profile, onToast, isDemo }) {
         </div>
       )}
 
-      {/* Neste steg for brukeren */}
-      {myUndecided > 0 ? (
+      {/* Neste steg for admin (arvinger får sin egen oversikt øverst) */}
+      {myRole !== 'admin' ? null : myUndecided > 0 ? (
         <div style={{ background:'#DCE3D2', borderRadius:'10px', padding:'16px 20px', marginBottom:'28px', display:'flex', justifyContent:'space-between', alignItems:'center', gap:'16px', flexWrap:'wrap' }}>
           <div>
             <div style={{ fontSize:'0.9375rem', fontWeight:'600', color:'#3A2F26', marginBottom:'2px' }}>
@@ -233,14 +267,6 @@ export default function EstatePage({ session, profile, onToast, isDemo }) {
       ) : <div style={{ marginBottom:'12px' }} />}
 
       {/* Snarveier */}
-      {/* For arvinger: egne ønsker ett trykk unna */}
-      {myRole !== 'admin' && myCount > 0 && (
-        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:'10px', flexWrap:'wrap', background:'#fff', border:'1px solid #D9CFC0', borderRadius:'10px', padding:'12px 16px', marginBottom:'16px' }}>
-          <span style={{ fontSize:'0.9375rem', color:'#3A2F26' }}>{L(`Du ønsker ${myCount} ${myCount === 1 ? 'gjenstand' : 'gjenstander'}`, `You want ${myCount} ${myCount === 1 ? 'item' : 'items'}`)}</span>
-          <button onClick={() => { setTab('items'); setFilterStatus('mine') }} style={btn}>{L('Se mine ønsker', 'See my wishes')}</button>
-        </div>
-      )}
-
       <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(min(100%, 10rem), 1fr))', gap:'8px', marginBottom:'32px' }}>
         {[
           { path:`/estate/${id}/guide`, label:L('Veiviser', 'Guide'), desc:L('For arveprosessen', 'For the inheritance process') },
@@ -263,11 +289,11 @@ export default function EstatePage({ session, profile, onToast, isDemo }) {
       </div>
 
       {/* Faner: statusfilter + analyse */}
-      <div style={{ display:'flex', gap:'2px', borderBottom:'1px solid #D9CFC0', marginBottom:'16px', overflowX:'auto' }}>
+      <div ref={tabsRef} style={{ display:'flex', gap:'2px', borderBottom:'1px solid #D9CFC0', marginBottom:'16px', overflowX:'auto', scrollMarginTop:'16px' }}>
         {[...statusTabs, { key:'analytics', label:L('Analyse', 'Analytics') }].map(t => {
           const active = t.key === 'analytics' ? tab === 'analytics' : tab === 'items' && filterStatus === t.key
           return (
-            <button key={t.key} onClick={() => {
+            <button key={t.key} data-tab={t.key} aria-pressed={active} onClick={() => {
               if (t.key === 'analytics') { setTab('analytics'); return }
               setTab('items'); setFilterStatus(t.key)
             }} style={{

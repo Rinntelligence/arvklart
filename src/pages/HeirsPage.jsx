@@ -163,27 +163,52 @@ export default function HeirsPage({ session, profile, onToast, isDemo }) {
         <InviteCard heir={invitee} estateName={estateName} inviteUrl={inviteUrl} onClose={() => setInvitee(null)} />
       )}
 
-      {/* Invitasjon */}
-      {inviteCode && canEdit && (
-        <div style={{ background:'#fff', border:'1px solid #D9CFC0', borderRadius:'12px', padding:'24px', marginBottom:'20px' }}>
-          <h2 style={{ fontFamily:'Fraunces, serif', fontSize:'1.125rem', fontWeight:'400', color:'#3A2F26', marginBottom:'6px' }}>{L('Inviter arvinger', 'Invite heirs')}</h2>
-          <p style={{ fontSize:'0.8125rem', color:'#75604B', lineHeight:'1.6', marginBottom:'16px' }}>
-            {L(
-              'For å bli med i boet må arvingen være lagt til nedenfor med e-posten de logger inn med, og skrive inn invitasjonskoden.',
-              'To join the estate, the heir must be added below with the email they log in with, and then enter the invite code.',
+      {/* Invitasjon: én knapp per arving som ikke har blitt med. Lenke og kode er en reserve. */}
+      {inviteCode && canEdit && (() => {
+        const joined = heirs.filter(h => h.email && memberEmails.includes(normEmail(h.email)))
+        const pending = heirs.filter(h => h.email && !memberEmails.includes(normEmail(h.email)))
+        const noEmail = heirs.filter(h => !h.email)
+        const rowStyle = { display:'flex', alignItems:'center', justifyContent:'space-between', gap:'8px 12px', flexWrap:'wrap', padding:'10px 0', borderTop:'1px solid #E8DFD0' }
+        const action = { minHeight:'44px', padding:'10px 16px', background:'#3A2F26', color:'#FBF9F5', border:'none', borderRadius:'8px', cursor:'pointer', fontSize:'0.9375rem', fontFamily:'Karla, sans-serif' }
+        const second = { ...action, background:'#fff', color:'#3A2F26', border:'1px solid #9A8B78' }
+        return (
+          <section aria-labelledby="invite-heirs-title" style={{ background:'#fff', border:'1px solid #D9CFC0', borderRadius:'12px', padding:'24px', marginBottom:'20px' }}>
+            <h2 id="invite-heirs-title" style={{ fontFamily:'Fraunces, serif', fontSize:'1.125rem', fontWeight:'400', color:'#3A2F26', marginBottom:'6px' }}>{L('Inviter arvingene', 'Invite the heirs')}</h2>
+            <p style={{ fontSize:'0.875rem', color:'#5C4530', lineHeight:'1.6', marginBottom:'12px' }}>
+              {L(
+                'Hver arving får en ferdig melding med lenken, som du sender på SMS, e-post eller slik du vil. De blir med ved å logge inn med e-posten som står her.',
+                'Each heir gets a ready-made message with the link, which you send by text message, email or however you like. They join by logging in with the email shown here.',
+              )}
+            </p>
+            {heirs.length === 0 && (
+              <button onClick={() => setShowAdd(true)} style={action}>{L('Legg til den første arvingen', 'Add the first heir')}</button>
             )}
-          </p>
-          <div style={{ display:'flex', alignItems:'center', gap:'10px', flexWrap:'wrap' }}>
-            <span style={{ fontFamily:'Fraunces, serif', fontSize:'1.625rem', letterSpacing:'4px', color:'#3A2F26', background:'#E8DFD0', padding:'8px 16px', borderRadius:'8px' }}>{inviteCode}</span>
-            <button onClick={() => copy('code', inviteCode)} style={{ padding:'9px 16px', background: copied==='code'?'#5F6E52':'#3A2F26', color:'#FBF9F5', border:'none', borderRadius:'8px', cursor:'pointer', fontSize:'0.875rem', fontFamily:'Karla, sans-serif' }}>
-              {copied === 'code' ? L('Kopiert ✓', 'Copied ✓') : L('Kopier kode', 'Copy code')}
-            </button>
-            <button onClick={() => copy('link', inviteUrl)} style={{ padding:'9px 16px', background:'none', color:'#5C4530', border:'1px solid #D9CFC0', borderRadius:'8px', cursor:'pointer', fontSize:'0.875rem', fontFamily:'Karla, sans-serif' }}>
-              {copied === 'link' ? L('Kopiert ✓', 'Copied ✓') : L('Kopier lenke', 'Copy link')}
-            </button>
-          </div>
-        </div>
-      )}
+            {pending.map(h => (
+              <div key={h.id} style={rowStyle}>
+                <span style={{ fontSize:'0.9375rem', color:'#3A2F26', overflowWrap:'anywhere' }}>{h.name} <span style={{ color:'#75604B', fontSize:'0.8125rem' }}>· {L('har ikke blitt med ennå', 'has not joined yet')}</span></span>
+                <button onClick={() => setInvitee({ name: h.name, email: normEmail(h.email) })} style={action}>{L(`Send invitasjon til ${h.name}`, `Send invitation to ${h.name}`)}</button>
+              </div>
+            ))}
+            {noEmail.map(h => (
+              <div key={h.id} style={rowStyle}>
+                <span style={{ fontSize:'0.9375rem', color:'#3A2F26', overflowWrap:'anywhere' }}>{h.name} <span style={{ color:'#75604B', fontSize:'0.8125rem' }}>· {L('mangler e-post', 'no email')}</span></span>
+                <button onClick={() => setEmailEdit({ id: h.id, value: '' })} style={second}>{L(`Legg til e-post for ${h.name}`, `Add email for ${h.name}`)}</button>
+              </div>
+            ))}
+            {joined.length > 0 && (
+              <p style={{ ...rowStyle, margin:0, fontSize:'0.875rem', color:'#3A5A30' }}>✓ {L('Har blitt med:', 'Have joined:')} {joined.map(h => h.name).join(', ')}</p>
+            )}
+            <details style={{ marginTop:'12px' }}>
+              <summary style={{ cursor:'pointer', fontSize:'0.875rem', color:'#5C4530', minHeight:'44px', display:'flex', alignItems:'center' }}>{L('Annen måte: kopier lenke eller kode', 'Another way: copy the link or code')}</summary>
+              <div style={{ display:'flex', alignItems:'center', gap:'10px', flexWrap:'wrap', paddingTop:'8px' }}>
+                <span style={{ fontFamily:'Fraunces, serif', fontSize:'1.375rem', letterSpacing:'4px', color:'#3A2F26', background:'#E8DFD0', padding:'6px 14px', borderRadius:'8px' }}>{inviteCode}</span>
+                <button onClick={() => copy('code', inviteCode)} style={second}>{copied === 'code' ? L('Kopiert ✓', 'Copied ✓') : L('Kopier kode', 'Copy code')}</button>
+                <button onClick={() => copy('link', inviteUrl)} style={second}>{copied === 'link' ? L('Kopiert ✓', 'Copied ✓') : L('Kopier lenke', 'Copy link')}</button>
+              </div>
+            </details>
+          </section>
+        )
+      })()}
 
       {/* Fordelingskalkulator */}
       <div style={{ background:'#fff', border:'1px solid #D9CFC0', borderRadius:'12px', padding:'24px', marginBottom:'20px' }}>

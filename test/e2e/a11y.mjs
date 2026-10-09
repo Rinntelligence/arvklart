@@ -23,7 +23,7 @@ const PAGES = [
   { path: `/estate/${EST}/item/${ITEM}`, ready: 'Gyngestol' },
   { path: `/estate/${EST}/swipe`, ready: 'Gyngestol' },
   { path: `/estate/${EST}/heirs`, ready: 'Kari' },
-  { path: `/estate/${EST}/admin`, ready: 'ABC123' },
+  { path: `/estate/${EST}/admin`, ready: 'Inviter arvingene' },
   { path: `/estate/${EST}/status`, ready: /Hva gjenstår/ },
   { path: '/konto', ready: /Min konto/ },
 ]

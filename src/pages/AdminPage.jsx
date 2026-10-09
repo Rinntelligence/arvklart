@@ -114,24 +114,29 @@ export default function AdminPage({ session, profile, onToast }) {
       <button onClick={()=>navigate(`/estate/${id}`)} style={{ background:'none', border:'none', color:'#75604B', cursor:'pointer', fontSize:'0.8125rem', padding:'0 0 20px', fontFamily:'Karla, sans-serif' }}>{L('← Tilbake til boet', '← Back to the estate')}</button>
       <h1 style={{ fontFamily:'Fraunces, serif', fontSize:'1.5rem', fontWeight:'400', color:'#3A2F26', marginBottom:'28px' }}>{L('Administrer', 'Manage')} — {estate.name}</h1>
 
-      {/* Invite link */}
+      {/* Invitasjon: hovedveien er en ferdig melding per arving under «Arvinger». Lenken er en reserve. */}
       <Card style={{ padding:'28px', marginBottom:'20px' }}>
-        <h2 style={{ fontFamily:'Fraunces, serif', fontSize:'1.125rem', fontWeight:'400', color:'#3A2F26', marginBottom:'6px' }}>{L('Invitasjonslenke', 'Invite link')}</h2>
-        <p style={{ fontSize:'0.8125rem', color:'#75604B', marginBottom:'16px', lineHeight:'1.6' }}>
-          {L('Send lenken til arvingene. For å bli med må de logge inn med e-posten som er lagt inn på dem under', 'Send the link to the heirs. To join, they must log in with the email address added for them under')}{' '}
-          <button onClick={() => navigate(`/estate/${id}/heirs`)} style={{ background:'none', border:'none', padding:0, color:'#5F6E52', cursor:'pointer', fontSize:'0.8125rem', textDecoration:'underline', fontFamily:'Karla, sans-serif' }}>{L('Arvinger', 'Heirs')}</button>.
+        <h2 style={{ fontFamily:'Fraunces, serif', fontSize:'1.125rem', fontWeight:'400', color:'#3A2F26', marginBottom:'6px' }}>{L('Inviter arvingene', 'Invite the heirs')}</h2>
+        <p style={{ fontSize:'0.875rem', color:'#5C4530', marginBottom:'16px', lineHeight:'1.6' }}>
+          {L('Under «Arvinger» får hver arving en ferdig melding med lenken, som du sender på SMS eller e-post. De blir med ved å logge inn med e-posten som er lagt inn på dem.', 'Under «Heirs» each heir gets a ready-made message with the link, which you send by text message or email. They join by logging in with the email added for them.')}
         </p>
-        <div style={{ display:'flex', gap:'8px', marginBottom:'12px' }}>
-          <input value={inviteUrl} readOnly aria-label={L('Invitasjonslenke', 'Invite link')}
-            style={{ flex:1, minWidth:0, padding:'11px 14px', border:'1px solid #9A8B78', borderRadius:'8px', fontSize:'0.8125rem', background:'#FBF9F5', color:'#5C4530', fontFamily:'monospace' }} />
-          <button onClick={copyInvite} style={{ padding:'11px 18px', background: copied?'#5F6E52':'#3A2F26', color:'#fff', border:'none', borderRadius:'8px', cursor:'pointer', fontSize:'0.875rem', fontFamily:'Karla, sans-serif', whiteSpace:'nowrap' }}>
-            {copied ? L('✓ Kopiert!', '✓ Copied!') : L('Kopier lenke', 'Copy link')}
-          </button>
-        </div>
-        <div style={{ display:'flex', alignItems:'center', gap:'4px 12px', flexWrap:'wrap' }}>
-          <span style={{ fontSize:'0.8125rem', color:'#75604B' }}>{L('Invitasjonskode:', 'Invite code:')} <strong style={{ letterSpacing:'2px', color:'#3A2F26' }}>{estate.invite_code}</strong></span>
-          <button onClick={regenerateCode} style={{ fontSize:'0.75rem', color:'#75604B', background:'none', border:'none', cursor:'pointer', textDecoration:'underline', fontFamily:'Karla, sans-serif' }}>{L('Forny kode', 'Renew code')}</button>
-        </div>
+        <button onClick={() => navigate(`/estate/${id}/heirs`)} style={{ minHeight:'44px', padding:'11px 18px', background:'#3A2F26', color:'#FBF9F5', border:'none', borderRadius:'8px', cursor:'pointer', fontSize:'0.9375rem', fontFamily:'Karla, sans-serif', marginBottom:'16px' }}>
+          {L('Send invitasjoner', 'Send invitations')}
+        </button>
+        <details>
+          <summary style={{ cursor:'pointer', fontSize:'0.875rem', color:'#5C4530', minHeight:'44px', display:'flex', alignItems:'center' }}>{L('Annen måte: kopier lenke eller kode', 'Another way: copy the link or code')}</summary>
+          <div style={{ display:'flex', gap:'8px', margin:'8px 0 12px' }}>
+            <input value={inviteUrl} readOnly aria-label={L('Invitasjonslenke', 'Invite link')}
+              style={{ flex:1, minWidth:0, padding:'11px 14px', border:'1px solid #9A8B78', borderRadius:'8px', fontSize:'0.8125rem', background:'#FBF9F5', color:'#5C4530', fontFamily:'monospace' }} />
+            <button onClick={copyInvite} style={{ padding:'11px 18px', background: copied?'#5F6E52':'#fff', color: copied?'#fff':'#3A2F26', border:'1px solid #9A8B78', borderRadius:'8px', cursor:'pointer', fontSize:'0.875rem', fontFamily:'Karla, sans-serif', whiteSpace:'nowrap' }}>
+              {copied ? L('✓ Kopiert!', '✓ Copied!') : L('Kopier lenke', 'Copy link')}
+            </button>
+          </div>
+          <div style={{ display:'flex', alignItems:'center', gap:'4px 12px', flexWrap:'wrap' }}>
+            <span style={{ fontSize:'0.8125rem', color:'#75604B' }}>{L('Invitasjonskode:', 'Invite code:')} <strong style={{ letterSpacing:'2px', color:'#3A2F26' }}>{estate.invite_code}</strong></span>
+            <button onClick={regenerateCode} style={{ fontSize:'0.75rem', color:'#75604B', background:'none', border:'none', cursor:'pointer', textDecoration:'underline', fontFamily:'Karla, sans-serif' }}>{L('Forny kode', 'Renew code')}</button>
+          </div>
+        </details>
       </Card>
 
       {/* Members */}

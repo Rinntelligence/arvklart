@@ -97,15 +97,23 @@ await check('Invitasjon i ett skjermbilde: kortet vises etter «Legg til arving�
   await page.getByRole('heading', { name: 'Send invitasjonen til Lars' }).waitFor()
   await page.getByText(/Hei Lars! Jeg har invitert deg til «Testbo».*lars@test\.no.*\/join\/ABC123/).waitFor()
   const mail = await page.getByRole('link', { name: 'Send e-post' }).getAttribute('href')
-  assert(mail.startsWith('mailto:lars%40test.no?subject='), mail)
+  assert(mail.startsWith('mailto:lars@test.no?subject='), mail)
   assert((await page.getByRole('link', { name: 'Send SMS' }).getAttribute('href')).startsWith('sms:'), 'SMS-lenke mangler')
   await page.getByRole('button', { name: 'English' }).click()
   await page.getByText(/^Hi Lars! I have invited you/).waitFor()
   await page.getByRole('button', { name: 'Ferdig' }).click()
   assert(await page.getByRole('heading', { name: 'Send invitasjonen til Lars' }).count() === 0, 'kortet ble ikke lukket')
-  // Fra raden til en arving som ikke har blitt med
-  await page.getByRole('button', { name: 'Send invitasjon' }).first().click()
+  // Fra «Inviter arvingene»: én tydelig knapp per arving som ikke har blitt med; kode og lenke er lagt bort
+  assert(!(await page.getByRole('button', { name: 'Kopier kode' }).isVisible()), 'koden er fortsatt hovedvalget')
+  await page.getByRole('button', { name: 'Send invitasjon til Kari' }).click()
   await page.getByRole('heading', { name: 'Send invitasjonen til Kari' }).waitFor()
+})
+
+await check('Administrer: «Send invitasjoner» går til arvingene, lenken er en reserve', async page => {
+  await page.goto(`${BASE}/estate/${EST}/admin`)
+  assert(!(await page.getByRole('button', { name: 'Kopier lenke' }).isVisible()), 'lenken er fortsatt hovedvalget')
+  await page.getByRole('button', { name: 'Send invitasjoner' }).click()
+  await page.waitForURL(`**/estate/${EST}/heirs`)
 })
 
 await check('Invitasjon som ikke stemmer: viser innlogget e-post, kopier, prøv igjen og bytt konto', async page => {
@@ -119,8 +127,11 @@ await check('Invitasjon som ikke stemmer: viser innlogget e-post, kopier, prøv 
 
 await check('Arving: ser egne ønsker ett trykk unna, ikke admin-verktøyene', async page => {
   await page.goto(`${BASE}/estate/${EST}`)
-  await page.getByText('Du ønsker 2 gjenstander').waitFor()
+  await page.getByRole('heading', { name: 'Dine valg' }).waitFor()
+  await page.getByText('gjenstander du ønsker').waitFor()
   await page.getByRole('button', { name: 'Se mine ønsker' }).click()
+  await page.waitForFunction(() => document.activeElement?.dataset.tab === 'mine')
+  assert(await page.locator('[data-tab="mine"]').getAttribute('aria-pressed') === 'true', '«Mine» er ikke valgt')
   assert(await page.getByRole('button', { name: /Arvinger\s*Fordelingskalkulator/ }).count() === 0, 'arvingen ser fordelingskalkulatoren')
   assert(await page.getByRole('button', { name: 'Administrer' }).count() === 0, 'arvingen ser «Administrer»')
 }, { fixtures: { ...contested, estate_members: [
