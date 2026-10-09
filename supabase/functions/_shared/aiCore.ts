@@ -9,6 +9,9 @@ export const DEFAULT_MODEL = 'claude-haiku-5-5'
 export const ROLLBACK_MODEL = 'claude-haiku-4-5'
 export type Model = typeof DEFAULT_MODEL | typeof ROLLBACK_MODEL
 export type Effort = 'low' | 'medium' | 'high'
+// Effort for bildeanalysen: low som standard (raskere, kortere svar); hemmeligheten ANALYZE_EFFORT=medium
+// setter den tilbake uten ny deploy hvis kvaliteten faller.
+export const analyzeEffort = (env: string | undefined): Effort => (env === 'medium' || env === 'high' ? env : 'low')
 
 export function resolveModel(value: string | null | undefined): { model: Model; warning: string | null } {
   const v = (value || '').trim()
@@ -49,13 +52,16 @@ export const OUTCOME: Record<AiErrorCode | 'error', string> = {
 // styres med effort; 4.5 kjenner ikke effort. Ingen temperature/top_p/top_k, prefill eller budget_tokens
 // (gir 400 på 5.5).
 export type Schema = Record<string, unknown>
-export function buildParams(p: { model: Model; system: string; content: unknown; schema: Schema; maxTokens: number; effort: Effort }) {
+// cacheSystem: systemprompten (lik for alle kall) caches i 5 minutter, så mange analyser på rad leser den
+// fra hurtigbufferen i stedet for å sende den på nytt. Er den kortere enn modellens minstegrense, caches den
+// bare ikke (ingen feil).
+export function buildParams(p: { model: Model; system: string; content: unknown; schema: Schema; maxTokens: number; effort: Effort; cacheSystem?: boolean }) {
   const output_config: Record<string, unknown> = { format: { type: 'json_schema', schema: p.schema } }
   if (p.model === DEFAULT_MODEL) output_config.effort = p.effort
   return {
     model: p.model,
     max_tokens: p.maxTokens,
-    system: p.system,
+    system: p.cacheSystem ? [{ type: 'text', text: p.system, cache_control: { type: 'ephemeral' } }] : p.system,
     messages: [{ role: 'user', content: p.content }],
     output_config,
   }
