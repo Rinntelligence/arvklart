@@ -22,6 +22,8 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm run build
+      # E-postmalene (supabase/templates) tolkes med Go sine maler, slik Supabase Auth gjør. Go finnes på ubuntu-latest.
+      - run: go run test/emails/render.go
 
   e2e:
     runs-on: ubuntu-latest

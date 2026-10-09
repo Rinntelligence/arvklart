@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
+import { getLang } from './lang'
 
 export const supabase = createClient(
   import.meta.env.VITE_SUPABASE_URL,
@@ -9,7 +10,8 @@ export const supabase = createClient(
 // e-posten må bekreftes først (da finnes det ingen økt rett etter registrering).
 export const signUp = (email, password, displayName) => supabase.auth.signUp({
   email, password,
-  options: { data: { display_name: displayName }, emailRedirectTo: window.location.origin },
+  // lang: e-postmalene (supabase/templates) skriver engelsk når brukeren registrerte seg på engelsk
+  options: { data: { display_name: displayName, lang: getLang() }, emailRedirectTo: window.location.origin },
 })
 export const signIn = (email, password) => supabase.auth.signInWithPassword({ email, password })
 export const signOut = () => supabase.auth.signOut()

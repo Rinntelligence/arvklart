@@ -14,6 +14,7 @@ ArvKlart er en norsk SaaS-tjeneste for arveoppgjør. React 18 + Vite SPA, Supaba
 - **Database**: Supabase (PostgreSQL) — se `supabase/README.md` for struktur, rekkefølge og deploy
 - **Auth**: Supabase Auth (e-post/passord, glemt passord). Navnet ved registrering lagres i `user_metadata.display_name`, og profilen opprettes fra det ved første innlogging (`App.jsx`)
 - **Språk**: norsk og engelsk. All tekst skrives som `L('norsk', 'english')` fra `src/lib/lang.js`; datoer og beløp formateres med `locale()` (eller `formatNOK` i `src/lib/format.js`). Verdier som lagres i databasen (kategorier, relasjoner, oppgavekategorier) er alltid norske og oversettes bare ved visning. Arveveiviseren er bare på norsk
+- **E-post**: malene for Supabase Auth (bekreftelse, nytt passord, magisk lenke, ny e-post) ligger i `supabase/templates/` og er på norsk eller engelsk etter `user_metadata.lang`, som `signUp` setter. De legges inn i dashbordet manuelt, se `supabase/README.md`
 - **Deployment**: Vercel, automatisk fra `main`
 
 ## Fargepalett — bruk alltid disse
