@@ -29,7 +29,7 @@ Sist verifisert: 2026-10-09 (funksjoner, policies, triggere og RLS på `items` l
 | `migrations/20261011_ai_usage_metrics.sql` | **ja, 2026-10-09 15:05 UTC** | `schema_migrations` 20261009150537. Kjørt i samme transaksjon som 20261010, 20261012 og 20261013. Kontroll: 10 målekolonner, `claim_ai_call()` md5 lik repoet (31b03a27…), grensene uendret; etterkontroll ga `usage_id` (rullet tilbake). Tilbakerulling: `rollback/20261011_ai_usage_metrics.down.sql` |
 | `migrations/20261012_items_ai_analysis.sql` | **ja, 2026-10-09 15:05 UTC** | `schema_migrations` 20261009150538. Kjørt i samme transaksjon som 20261010, 20261011 og 20261013. Kontroll: `items.ai_analysis` finnes (alle 224 gjenstander har null, ingen omskriving), `guard_item_update()` md5 lik repoet (c81566e4…, før 487b50fa…); etterkontroll: demokonto kan ikke endre `ai_analysis` på andres gjenstand (rullet tilbake). Tilbakerulling: `rollback/20261012_items_ai_analysis.down.sql` |
 | `migrations/20261013_profiles_preferred_lang.sql` | **ja, 2026-10-09 15:05 UTC** | `schema_migrations` 20261009150539. Kjørt i samme transaksjon som 20261010–20261012, før frontend fra PR C. Lesesjekk før: alle 27 profiler hadde bare standardverdien `'en'` (ingen hadde valgt). Kontroll: standardverdien er fjernet, alle 27 er `null` (= norsk), sjekk `no`/`en`/null. Tilbakerulling: `rollback/20261013_profiles_preferred_lang.down.sql` |
-| `migrations/20261014_item_images_private.sql` | **nei** | ny (S3): `item-images` blir privat (gamle offentlige lenker slutter å virke), og bilder kan bare slettes av administrator eller den som lastet opp filen. **Kjøres etter** at S1 (signerte URL-er) er i produksjon og S2 (`migrate-legacy-images`) er kjørt, ellers vises ikke eldre bilder. Etterkontroll: en gammel offentlig URL gir 400, og bildene vises i appen. Tilbakerulling: `rollback/20261014_item_images_private.down.sql` |
+| `migrations/20261014_item_images_private.sql` | **ja, 2026-10-09 22:32 UTC** | `schema_migrations` 20261009223234 (`item_images_private`). Kjørt etter S2. Før: policyene i prod var lik repoet (rollback-fila gjenskaper dem nøyaktig). Kontroll: `public = false`, ny `item_images_delete` (administrator, eller eier og medlem; ikke demo). Etterkontroll: Storage gir ingen av 301 bilder uten innlogging, signerte URL-er gir 301 av 301, medlemmer i de fire berørte boene ser alle sine bilder, utenforstående 0, opplasting med ekstrabilde og demo virker. **Avvik:** Smart CDN svarer fortsatt fra hurtigbufferen på tidligere hentede offentlige URL-er (299 kopier og 134 originaler 2026-10-09 23:05 UTC) til filen endres eller slettes. Tilbakerulling: `rollback/20261014_item_images_private.down.sql` |
 | `migrations/20261015_ai_estate_budget.sql` | **ja, 2026-10-09** | `schema_migrations` 20261009175442 (`ai_estate_budget`). Kjørt i én transaksjon etter grønn CI. Kontroll: bare 5-parameterversjonen av `claim_ai_call()` finnes (md5 33513465…), `ai_usage.estate_id` er `uuid`, `authenticated`/`anon` kan ikke kalle funksjonen. Etterkontroll i prod med testbo og testkontoer: kallet registreres på boet, utenforstående får `not_member` (403). Tilbakerulling: `rollback/20261015_ai_estate_budget.down.sql` (deploy forrige versjon av AI-funksjonene først) |
 
 ## Finnes bare i produksjon (ikke i repoet)
@@ -44,6 +44,12 @@ Sist verifisert: 2026-10-09 (funksjoner, policies, triggere og RLS på `items` l
 | indekser `items_estate_id_idx`, `interests_item_id_idx` | nyttige, mangler i repoet |
 | `rls_auto_enable()` + event-trigger `ensure_rls` | Supabase-plattformens funksjon, ikke vår |
 | extensions: `pg_cron` 1.6.4 og `supabase_vault` 0.3.1 installert, `pg_net` ikke installert | `cron.job` er tom |
+
+## Engangsjobber
+
+| Jobb | Kjørt | Resultat |
+|---|---|---|
+| S2 `migrate-legacy-images` (copy) | **ja, 2026-10-09 22:16 UTC** | 278 bilder kopiert fra `items/` til `<bo-id>/legacy__…` og 193 gjenstander pekt om (85 ekstrabilder i 67 gjenstander); 0 feil, 0 gamle referanser igjen. Kontroll: alle kopier finnes i riktig bo, like store som originalen; alle 278 lastet over HTTP. Originalene (278) og 63 ubrukte filer i `items/` er **beholdt** til sletting er godkjent (`delete_old`) |
 
 ## Edge-funksjoner
 
