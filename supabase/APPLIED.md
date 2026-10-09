@@ -26,6 +26,7 @@ Sist verifisert: 2026-10-08, ved å sammenligne prod med en lokal database bygge
 | `migrations/20261008_guard_item_value_disposal.sql` | **nei** | ny: verdi og kastmerking håndheves i `guard_item_update`, og sletting av egen gjenstand bare før tildeling. Kjøres etter godkjenning, og etter at frontend uten «Kast» i sveipingen er ute (i dagens prod-frontend kan alle merke for kast ved sveiping, og de ville da fått en feilmelding) |
 | `migrations/20261008_cleanup_runs.sql` | **nei** | må kjøres før `cleanup-closed-estates` / `cleanup-orphan-images` deployes (uten tabellen avbrytes kjøringen før noe slettes) |
 | `migrations/20261011_ai_usage_metrics.sql` | **nei** | ny (PR A): målekolonner i `ai_usage` (modell, tokens, bilder, tid, kostnad, utfall) og `usage_id` fra `claim_ai_call()` (grensene uendret). Kjøres etter godkjenning før de nye AI-funksjonene deployes; funksjonene tåler at den mangler. Tilbakerulling: `rollback/20261011_ai_usage_metrics.down.sql` |
+| `migrations/20261012_items_ai_analysis.sql` | **nei** | ny (PR B): `items.ai_analysis` (jsonb, objekt, maks 20 000 byte) og `guard_item_update` som behandler `ai_analysis` som verdien (administrator eller den som la inn gjenstanden). Kjøres etter godkjenning **før** frontend fra PR B merges (lagring sender `ai_analysis` når AI har analysert). md5 av funksjonen sjekkes før/etter. Tilbakerulling: `rollback/20261012_items_ai_analysis.down.sql` |
 
 ## Finnes bare i produksjon (ikke i repoet)
 

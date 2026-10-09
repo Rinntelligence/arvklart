@@ -1,6 +1,6 @@
 // Automatisk tilgjengelighetssjekk (axe-core, WCAG 2.2 A/AA) av nøkkelsidene, i Chromium med simulert Supabase.
 // Feiler ved brudd med alvorlighet «serious» eller «critical». Kjøres av test/e2e/run.sh.
-import { BASE, EST, ITEM, setup, launch, checker, assert } from './fixtures.mjs'
+import { BASE, EST, ITEM, FIXTURES, setup, launch, checker, assert } from './fixtures.mjs'
 import { createRequire } from 'node:module'
 
 const require = createRequire(import.meta.url)
@@ -41,6 +41,26 @@ for (const p of PAGES) {
   await ctx.close()
 }
 const check = checker(browser, results)
+
+// Gjenstand med AI-vurdering (bildeanalyse v2): «Hva AI-en så» åpnet
+const withAnalysis = { fixtures: { items: [{ ...FIXTURES.items[0], ai_analysis: { v: 2, meta: {}, review: {}, corrections: {}, valuation: null, ai: {
+  suggestion: { title: 'Gyngestol', description: '', category: 'Møbler', category_key: 'furniture', confidence: 'medium' },
+  identification: { brand: { value: 'Hove Møbler', basis: 'observed', evidence: 'Etikett under setet' }, period: { value: '1950-tallet', basis: 'probable', evidence: 'Stilen' } },
+  marks: [{ kind: 'label', text: 'Hove Møbler', where: 'Under setet' }], condition_suggestion: 'good', condition_confidence: 'medium',
+  condition_observations: ['Slitt lakk på armlenene'], condition_not_visible: ['Undersiden'], multiple_items: { detected: false },
+  photo_suggestions: [{ kind: 'label', reason: 'Et tydeligere bilde av etiketten' }],
+} } }] } }
+await check('axe: «Hva AI-en så» på gjenstandssiden', async page => {
+  await page.goto(`${BASE}/estate/${EST}/item/${ITEM}`)
+  await page.locator('summary', { hasText: 'Hva AI-en så' }).click()
+  await page.getByText('Sett på bildet').waitFor()
+  await page.addScriptTag({ path: AXE })
+  const v = await page.evaluate(async () => {
+    const r = await window.axe.run(document, { runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'] } })
+    return r.violations.filter(v => ['serious', 'critical'].includes(v.impact)).map(v => `${v.id}: ${v.nodes.slice(0, 2).map(n => n.target.join(' ')).join(' | ')}`)
+  })
+  assert(!v.length, v.join('; '))
+}, withAnalysis)
 
 await check('Tastatur: bokortet åpnes med Enter (lenken heter det som står på kortet)', async page => {
   await page.goto(`${BASE}/`)

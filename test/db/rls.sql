@@ -94,6 +94,24 @@ do $$ begin
   raise exception 'FAIL: medlem kunne merke egen gjenstand for kast';
 exception when insufficient_privilege then raise notice 'OK   medlem kan ikke merke egen gjenstand for kast heller';
 end $$;
+-- AI-vurderingen behandles som verdien (20261012_items_ai_analysis.sql)
+do $$ begin
+  update items set ai_analysis = '{"v":2,"ai":{"suggestion":{"title":"Søppel"}}}' where id = '11110000-0000-0000-0000-000000000001';
+  raise exception 'FAIL: medlem kunne endre AI-vurderingen på andres gjenstand';
+exception when insufficient_privilege then raise notice 'OK   medlem kan ikke endre AI-vurderingen på andres gjenstand';
+end $$;
+update items set ai_analysis = '{"v":2,"ai":{},"review":{"title":"edited"}}' where id = '11110000-0000-0000-0000-000000000003';
+select t_eq((select ai_analysis->'review'->>'title' from items where id = '11110000-0000-0000-0000-000000000003'), 'edited', 'den som la inn gjenstanden kan lagre AI-vurderingen');
+do $$ begin
+  update items set ai_analysis = '"tekst"' where id = '11110000-0000-0000-0000-000000000003';
+  raise exception 'FAIL: AI-vurdering som ikke er et objekt ble lagret';
+exception when check_violation then raise notice 'OK   AI-vurderingen må være et JSON-objekt';
+end $$;
+do $$ begin
+  update items set ai_analysis = jsonb_build_object('v', 2, 'pad', repeat('x', 21000)) where id = '11110000-0000-0000-0000-000000000003';
+  raise exception 'FAIL: for stor AI-vurdering ble lagret';
+exception when check_violation then raise notice 'OK   AI-vurderingen er begrenset i størrelse';
+end $$;
 -- Poeng kan bare gis via complete_chore
 insert into chores (id, estate_id, title, size, points) values ('cccc0000-0000-0000-0000-000000000001', 'eeee0000-0000-0000-0000-000000000001', 'Rydde', 'small', 9999);
 do $$ begin

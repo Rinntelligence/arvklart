@@ -115,40 +115,9 @@ export const oneOf = <T extends string>(v: unknown, allowed: readonly T[]): T | 
   (typeof v === 'string' && (allowed as readonly string[]).includes(v) ? v as T : null)
 const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v)
 
-// ── Bildeanalyse (dagens felter) ───────────────────────────────────────────────────────────────────
+// ── Felles verdier ─────────────────────────────────────────────────────────────────────────────────
 export const CONDITIONS = ['excellent', 'good', 'fair', 'poor'] as const
 export const CONFIDENCE = ['high', 'medium', 'low'] as const
-
-// Kategorien er fri tekst i skjemaet (boets kategorier varierer, og et nytt skjema per bo ville måttet
-// kompileres på nytt); her godtas bare et navn fra boets liste.
-export const LEGACY_ANALYSIS_SCHEMA: Schema = {
-  type: 'object',
-  additionalProperties: false,
-  required: ['title', 'description', 'category', 'condition', 'confidence'],
-  properties: {
-    title: { type: 'string' },
-    description: { type: 'string' },
-    category: { type: 'string' },
-    condition: { type: 'string', enum: [...CONDITIONS] },
-    confidence: { type: 'string', enum: [...CONFIDENCE] },
-  },
-}
-
-export type LegacyAnalysis = { title: string; description: string; category: string | null; condition: string; confidence: string }
-
-export function validateLegacyAnalysis(categories: string[]) {
-  return (v: unknown): Validation<LegacyAnalysis> => {
-    if (!isObj(v)) return { ok: false, reason: 'ikke et objekt' }
-    const title = clip(v.title, 120)
-    if (!title) return { ok: false, reason: 'mangler tittel' }
-    const condition = oneOf(v.condition, CONDITIONS)
-    const confidence = oneOf(v.confidence, CONFIDENCE)
-    if (!condition || !confidence) return { ok: false, reason: 'ugyldig tilstand eller sikkerhet' }
-    const wanted = clip(v.category, 60).toLocaleLowerCase('nb')
-    const category = categories.find(c => c.toLocaleLowerCase('nb') === wanted) ?? null
-    return { ok: true, value: { title, description: clip(v.description, 600), category, condition, confidence } }
-  }
-}
 
 // ── Verdianslag ────────────────────────────────────────────────────────────────────────────────────
 export const ESTIMATE_SCHEMA: Schema = {

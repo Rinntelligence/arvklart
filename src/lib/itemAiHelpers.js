@@ -126,3 +126,58 @@ export function estimateApplies(draft) {
   return draft.title === e.basis.title && draft.condition === e.basis.condition
     && draft.categoryId === e.basis.categoryId && String(draft.value) === String(e.value)
 }
+
+// ── AI-forslag og brukerens egne valg (bildeanalyse v2) ─────────────────────────────────────────────
+
+export const CONDITION_VALUES = ['excellent', 'good', 'fair', 'poor', 'unknown']
+// Startverdier som regnes som «ikke fylt inn»: tilstand er ukjent til noen har vurdert den
+const UNSET = { title: '', description: '', categoryId: '', condition: 'unknown' }
+
+// Det AI-en foreslår for skjemafeltene. Tilstand bare når AI-en er rimelig sikker; ellers står den som ukjent.
+// Tåler eldre svar uten «analysis».
+export function aiSuggestion(result, categories) {
+  const ai = result?.analysis?.ai
+  const match = matchCategory(categories, ai ? ai.suggestion.category : result?.category)
+  const condition = ai
+    ? (ai.condition_suggestion !== 'unknown' && ai.condition_confidence !== 'low' ? ai.condition_suggestion : null)
+    : (['excellent', 'good', 'fair', 'poor'].includes(result?.condition) ? result.condition : null)
+  return {
+    title: (ai ? ai.suggestion.title : result?.title) || null,
+    description: (ai ? ai.suggestion.description : result?.description) || null,
+    categoryId: match ? match.id : null,
+    condition,
+  }
+}
+
+// AI fyller bare felt brukeren ikke har endret: tomme felt, eller felt som fortsatt har AI-ens forrige forslag.
+// Returnerer endringene og aiFilled (hva AI-en har fylt inn), så det kan vises og lagres som forslag.
+export function applyAiSuggestion(cur, suggestion) {
+  const aiFilled = { ...(cur.aiFilled || {}) }
+  const changes = {}
+  for (const [field, value] of Object.entries(suggestion)) {
+    if (value == null || value === '') continue
+    const now = cur[field] ?? ''
+    const untouched = (typeof now === 'string' ? now.trim() : now) === (UNSET[field] ?? '') || now === aiFilled[field]
+    if (untouched) { changes[field] = value; aiFilled[field] = value }
+  }
+  return { ...changes, aiFilled }
+}
+
+// Om brukeren godtok eller endret hvert AI-forslag (lagres i ai_analysis.review)
+export function aiReview(d) {
+  const filled = d.aiFilled || {}
+  const norm = v => (typeof v === 'string' ? v.trim() : v)
+  const review = {}
+  for (const [field, key] of [['title', 'title'], ['description', 'description'], ['categoryId', 'category'], ['condition', 'condition']]) {
+    review[key] = filled[field] === undefined ? 'not_suggested' : norm(d[field]) === norm(filled[field]) ? 'accepted' : 'edited'
+  }
+  return review
+}
+
+// Det som lagres i items.ai_analysis: AI-vurderingen uendret, og hva brukeren gjorde med forslagene.
+// Brukerens endelige valg står i de vanlige kolonnene. Uten analyse lagres ingenting.
+export function aiAnalysisRecord(d) {
+  const a = d.analysis
+  if (!a?.ai || a.v !== 2) return null
+  return { v: a.v, meta: a.meta || {}, ai: a.ai, review: aiReview(d), corrections: {}, valuation: null }
+}

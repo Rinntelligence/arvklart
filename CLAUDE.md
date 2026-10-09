@@ -51,6 +51,14 @@ Tilgjengelighet (WCAG 2.2 AA): ikke bruk `outline:'none'`; fokus vises med `:foc
 - Migrasjoner: lag fil i `supabase/migrations/` med navn `YYYYMMDD_beskrivende_navn.sql`, test med `npm run test:db`
 - Edge Functions: `supabase/functions/<navn>/index.ts` (Deno). Felles kode i `supabase/functions/_shared/`. Funksjoner som koster penger (AI) skal kreve innlogget bruker (`getUser`)
 - AI: alle kall går til Claude Haiku 5.5 (`claude-haiku-5-5`; manuell tilbakerulling til `claude-haiku-4-5` med hemmeligheten `AI_MODEL`) via `callStructured()` i `_shared/ai.ts`. Kallene bruker strukturert svar (JSON-skjema) med validering i `_shared/aiCore.ts`, og høyst ett nytt forsøk. Ingen `temperature` eller prefill (gir 400 på 5.5); effort er `medium` for bildeanalyse og `low` for verdianslag. Hvert kall registreres med `claimAiCall()` først (tabellen `ai_usage`, som også får målinger) og gir faste feilkoder (`ai_refused`, `ai_busy` …) som appen oversetter i `aiErrorMessage()`. Grenser: 30 kall/time og 150/døgn per bruker; demoen 5 per besøk (økt) og 300/døgn totalt
+- AI-vurdering av bilder (`analyze-item`, skjema i `_shared/analysis.ts`) lagres i `items.ai_analysis` (jsonb, `v: 2`).
+  - Feltet `ai` er AI-forslaget, og det endres aldri etter lagring.
+  - `review` sier om brukeren godtok eller endret hvert forslag.
+  - Det brukeren har valgt, står i de vanlige kolonnene.
+  - AI fyller bare felt brukeren ikke har endret (`applyAiSuggestion` i `src/lib/itemAiHelpers.js`).
+  - Tilstand kan være `unknown` («Ikke vurdert»), som er standard for nye gjenstander.
+  - Eldre gjenstander har `null` og skrives ikke om.
+  - `ai_analysis` kan bare endres av administrator eller den som la inn gjenstanden.
 - Storage: `estate-docs` er privat (`documents/<bo-id>/…`, åpnes med `createSignedUrl`); `item-images` er offentlig, nye filer lagres under `<bo-id>/…` (`src/lib/images.js`)
 
 ## Demokonto

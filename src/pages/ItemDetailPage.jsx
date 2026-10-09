@@ -6,6 +6,7 @@ import { formatNOK, parseNOK } from '../lib/format'
 import { removeImages, itemImageUrls } from '../lib/images'
 import { L, locale } from '../lib/lang'
 import { categoryLabel } from '../lib/categories'
+import AnalysisDetails from '../components/AnalysisDetails'
 
 const tc = c => { if(!c)return'#FBF9F5'; const r=parseInt(c.slice(1,3),16),g=parseInt(c.slice(3,5),16),b=parseInt(c.slice(5,7),16); return(0.299*r+0.587*g+0.114*b)/255>0.55?'#3A2F26':'#FBF9F5' }
 
@@ -298,6 +299,14 @@ export default function ItemDetailPage({ session, profile, onToast, isDemo }) {
           )
         })()}
         {item.description && <p style={{ color:'#5C4530', lineHeight:'1.8', marginBottom:'24px', fontSize:'0.9375rem' }}>{item.description}</p>}
+
+        {/* AI-vurderingen fra da gjenstanden ble lagt inn: bare til opplysning, adskilt fra det som er registrert */}
+        {item.ai_analysis?.ai && (
+          <details style={{ marginBottom:'24px', background:'#FBF9F5', border:'1px solid #E8DFD0', borderRadius:'10px', padding:'0 14px' }}>
+            <summary style={{ cursor:'pointer', fontSize:'0.875rem', color:'#5C4530', padding:'12px 0', minHeight:'44px', boxSizing:'border-box' }}>{L('Hva AI-en så', 'What the AI saw')}</summary>
+            <div style={{ paddingBottom:'14px' }}><AnalysisDetails analysis={item.ai_analysis} heading={false} /></div>
+          </details>
+        )}
 
         {isAssigned ? (
           <div style={{ padding:'16px', background:'#DCE3D2', border:'1px solid #B8C8A8', borderRadius:'10px', marginBottom:'24px', display:'flex', justifyContent:'space-between', alignItems:'center', gap:'12px', flexWrap:'wrap' }}>
