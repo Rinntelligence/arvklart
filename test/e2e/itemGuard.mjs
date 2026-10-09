@@ -1,4 +1,4 @@
-// Akseptansetester for hvem som kan kaste, endre verdi og slette (PR #13, guard_item_update), i Chromium med
+// Akseptansetester for kast i sveipingen, hvem som kan endre verdi og hvem som kan slette (PR #13, guard_item_update), i Chromium med
 // simulert Supabase. Databasen håndhever reglene (test/db/rls.sql); her sjekkes at grensesnittet følger dem,
 // og at «Nei takk» og «Angre» fra kundereisen er beholdt. Kjøres av test/e2e/run.sh.
 import { BASE, EST, UID, FIXTURES, now, category, launch, checker, assert } from './fixtures.mjs'
@@ -36,12 +36,13 @@ const patches = page => {
   return bodies
 }
 
-await check('Sveip, arving: ingen «Kast» (knapp, sveip opp eller hint), men «Nei takk» og «Angre» finnes', async page => {
+// Sveipingen er bare for ønsker. Hva som skjer med det ingen vil ha, bestemmes etter at alle har tatt stilling.
+const noDiscardInSwipe = async page => {
   const sent = patches(page)
   await page.goto(`${BASE}/estate/${EST}/swipe`)
   await page.getByRole('button', { name: 'Nei takk' }).waitFor()
-  await page.waitForTimeout(500) // rollen er hentet
-  assert(await page.getByRole('button', { name: 'Kast' }).count() === 0, 'arvingen ser «Kast»')
+  await page.waitForTimeout(500)
+  assert(await page.getByRole('button', { name: 'Kast' }).count() === 0, '«Kast» vises i sveipingen')
   assert(!/kast/i.test(await page.getByText('Du kan også sveipe').textContent()), 'hintet nevner kast')
   // Sveip opp med mus: skal ikke merke noe for kast
   const box = await page.getByRole('button', { name: 'Nei takk' }).boundingBox()
@@ -51,13 +52,9 @@ await check('Sveip, arving: ingen «Kast» (knapp, sveip opp eller hint), men «
   assert(!sent.some(b => 'marked_for_disposal' in b), 'sveip opp sendte kastmerking')
   await page.getByRole('button', { name: 'Nei takk' }).click()
   await page.getByRole('button', { name: 'Angre' }).waitFor()
-}, asMember)
-
-await check('Sveip, administrator: «Kast» finnes', async page => {
-  await page.goto(`${BASE}/estate/${EST}/swipe`)
-  await page.getByRole('button', { name: 'Kast' }).waitFor({ timeout: 5000 })
-  assert(/kast/i.test(await page.getByText('Du kan også sveipe').textContent()), 'hintet nevner ikke kast for administrator')
-}, asAdmin)
+}
+await check('Sveip, arving: ingen «Kast» (knapp, sveip opp eller hint), men «Nei takk» og «Angre» finnes', noDiscardInSwipe, asMember)
+await check('Sveip, administrator: heller ingen «Kast» underveis', noDiscardInSwipe, asAdmin)
 
 await check('Rediger, arving: verdien på andres gjenstand er låst, forklart og sendes ikke ved lagring', async page => {
   const sent = patches(page)
