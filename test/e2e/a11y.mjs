@@ -62,6 +62,21 @@ await check('axe: «Hva AI-en så» på gjenstandssiden', async page => {
   assert(!v.length, v.join('; '))
 }, withAnalysis)
 
+await check('axe: «Sammenlign med markedet» åpnet, med skjemaet for en ny sammenligning', async page => {
+  await page.goto(`${BASE}/estate/${EST}/item/${ITEM}`)
+  await page.locator('summary', { hasText: 'Sammenlign med markedet' }).click()
+  await page.getByRole('button', { name: 'Legg til en sammenligning' }).click()
+  await page.getByLabel('Hva er det?').waitFor()
+  await page.addScriptTag({ path: AXE })
+  const v = await page.evaluate(async () => {
+    const r = await window.axe.run(document, { runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'] } })
+    return r.violations.filter(v => ['serious', 'critical'].includes(v.impact)).map(v => `${v.id}: ${v.nodes.slice(0, 2).map(n => n.target.join(' ')).join(' | ')}`)
+  })
+  assert(!v.length, v.join('; '))
+}, { fixtures: { items: [{ ...FIXTURES.items[0], ai_analysis: { v: 2, meta: {}, ai: null, review: {}, valuation: null, corrections: { references: [
+  { id: 'r1', title: 'Gyngestol i eik', price: 1200, price_type: 'sold_price', url: 'https://www.finn.no/1', date: '2026-09-14' },
+] } } }] } })
+
 await check('Tastatur: bokortet åpnes med Enter (lenken heter det som står på kortet)', async page => {
   await page.goto(`${BASE}/`)
   const card = page.getByRole('link', { name: 'Testbo', exact: true })

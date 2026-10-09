@@ -67,6 +67,13 @@ export const valuationRecord = d => (d?.v ? {
   at: new Date().toISOString(),
 } : null)
 
+// Verdianslag for en lagret gjenstand: serveren henter opplysningene, analysen og familiens sammenligninger
+// selv (item_id, med brukerens tilgang). Gir hele svaret (estimate-value v3).
+export async function requestItemEstimate(itemId) {
+  const res = await callEdgeFunction('estimate-value', { item_id: itemId, lang: isEn() ? 'en' : 'no' })
+  return res?.data || res
+}
+
 // Veiledende AI-anslag ut fra det som er registrert og bildeanalysen (analysis), uten å sende bildene igjen:
 // ett tekstkall. Markedet er alltid Norge (NOK). Brukes når brukeren selv ber om det.
 // For lite grunnlag gir insufficient (med tips) og ingen verdi – aldri 0 kr.
