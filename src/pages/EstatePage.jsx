@@ -9,6 +9,7 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pi
 import { L, locale } from '../lib/lang'
 import { categoryLabel } from '../lib/categories'
 import { Modal } from '../components/UI'
+import ReasonEditor from '../components/ReasonEditor'
 
 const PALETTE = ['#5F6E52','#8B9A7D','#A97C3F','#7A8B6E','#9C8267','#6E8B87']
 
@@ -356,7 +357,7 @@ export default function EstatePage({ session, profile, onToast, isDemo }) {
               <div className="item-grid" style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(200px, 1fr))', gap:'12px', marginBottom:'20px' }}>
                 {myItems.filter(matches).map(item => (
                   <ItemCard key={item.id} item={item} userId={session.user.id} myRole={myRole} isDemo={isDemo}
-                    onClick={() => openItem(item)} onDelete={e => handleDelete(item, e)} />
+                    onClick={() => openItem(item)} onDelete={e => handleDelete(item, e)} showReason onToast={onToast} onReasonSaved={load} />
                 ))}
               </div>
               {otherItems.filter(matches).length > 0 && (
@@ -377,7 +378,8 @@ export default function EstatePage({ session, profile, onToast, isDemo }) {
             <div className="item-grid" style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(200px, 1fr))', gap:'12px' }}>
               {(filterStatus === 'all' ? otherItems : filtered).filter(matches).map(item => (
                 <ItemCard key={item.id} item={item} userId={session.user.id} myRole={myRole} isDemo={isDemo}
-                  onClick={() => openItem(item)} onDelete={e => handleDelete(item, e)} />
+                  onClick={() => openItem(item)} onDelete={e => handleDelete(item, e)}
+                  showReason={filterStatus === 'mine'} onToast={onToast} onReasonSaved={load} />
               ))}
             </div>
           )}
@@ -408,9 +410,10 @@ const interestNames = (interests, userId) => {
   return L(`${sorted.slice(0, 2).join(', ')} og ${sorted.length - 2} til`, `${sorted.slice(0, 2).join(', ')} and ${sorted.length - 2} more`)
 }
 
-function ItemCard({ item, userId, onClick, onDelete, myRole, isDemo }) {
+function ItemCard({ item, userId, onClick, onDelete, myRole, isDemo, showReason = false, onToast, onReasonSaved }) {
   const cat = item.categories || { emoji:'📦', label:L('Annet', 'Other') }
-  const myInterest = item.interests?.some(x => x.user_id === userId)
+  const mine = item.interests?.find(x => x.user_id === userId)
+  const myInterest = !!mine
   const count = item.interests?.length || 0
   const isAssigned = item.status === 'assigned'
   // Den som la inn gjenstanden kan slette den bare før den er tildelt (håndheves også i databasen)
@@ -449,6 +452,13 @@ function ItemCard({ item, userId, onClick, onDelete, myRole, isDemo }) {
         <div style={{ marginTop:'8px', fontSize:'0.75rem', color: count ? '#5C4530' : '#75604B', fontStyle: count ? 'normal' : 'italic' }}>
           {count === 0 ? L('Ingen ennå', 'No one yet') : names === L('deg', 'you') ? L('Bare deg', 'Only you') : names.charAt(0).toUpperCase() + names.slice(1)}
         </div>
+        {/* «Mine ønsker»: egen begrunnelse kan legges til, endres eller fjernes uten å åpne gjenstanden */}
+        {showReason && mine && (
+          <div style={{ marginTop:'8px', paddingTop:'6px', borderTop:'1px solid #E8DFD0', cursor:'auto' }}>
+            <ReasonEditor key={item.id} itemId={item.id} itemTitle={item.title} userId={userId} savedReason={mine.reason || null}
+              compact onToast={onToast} onSaved={onReasonSaved} />
+          </div>
+        )}
       </div>
     </div>
   )
