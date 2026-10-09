@@ -90,7 +90,8 @@ export function answerText(q, answers, facts) {
 export function answerSummary(answers, facts) {
   return visibleQuestions(answers).map(q => {
     const title = facts.survivor && q.titleSurvivor ? q.titleSurvivor : facts.married && q.titleMarried ? q.titleMarried : q.title
-    return { id: q.id, section: SECTIONS.find(s => s.id === q.section)?.label || '', question: plain(title, facts), answer: answerText(q, answers, facts) }
+    const v = answers[q.id]
+    return { id: q.id, section: SECTIONS.find(s => s.id === q.section)?.label || '', question: plain(title, facts), answer: answerText(q, answers, facts), unanswered: v === undefined || v === '' || v === null }
   })
 }
 

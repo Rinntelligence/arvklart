@@ -739,6 +739,16 @@
 </style>
 </head>
 <body>
+<script>
+  // Engelsk versjon (?lang=en): statisk tekst har engelsk i data-en. Norsk er standard og juridisk gjeldende.
+  if (new URLSearchParams(window.location.search).get('lang') === 'en') {
+    document.documentElement.lang = 'en';
+    document.title = 'Guide — Arvklart';
+    document.addEventListener('DOMContentLoaded', () => {
+      document.querySelectorAll('[data-en]').forEach(el => { el.textContent = el.dataset.en; });
+    });
+  }
+</script>
 
 <div class="page">
 
@@ -750,51 +760,51 @@
   </div>
 
   <div class="intro">
-    <span class="eyebrow">Om arveprosessen</span>
-    <h1>Fra dødsfall til fordelt bo — steg for steg</h1>
-    <p>Finn ut hvem som arver og hvor mye, basert på din situasjon. Under finner du også en oversikt over hele prosessen, ord og ressurser.</p>
+    <span class="eyebrow" data-en="About the inheritance process">Om arveprosessen</span>
+    <h1 data-en="From death to a distributed estate — step by step">Fra dødsfall til fordelt bo — steg for steg</h1>
+    <p data-en="Find out who inherits and how much, based on your situation. Below you will also find an overview of the whole process, terms and resources.">Finn ut hvem som arver og hvor mye, basert på din situasjon. Under finner du også en oversikt over hele prosessen, ord og ressurser.</p>
   </div>
 
   <section id="arv" aria-label="Arveveiviser">
-    <div id="arvWizard"><noscript>Arveveiviseren krever JavaScript.</noscript></div>
+    <div id="arvWizard"><noscript>Arveveiviseren krever JavaScript. / The inheritance guide requires JavaScript.</noscript></div>
   </section>
 
   <section id="timeline">
     <div class="section-head">
-      <h2>Prosessen i fem faser</h2>
-      <p>Klikk på en fase for å se hva som skjer automatisk, og hva som krever handling fra deg.</p>
+      <h2 data-en="The process in five phases">Prosessen i fem faser</h2>
+      <p data-en="Click a phase to see what happens automatically and what requires action from you.">Klikk på en fase for å se hva som skjer automatisk, og hva som krever handling fra deg.</p>
     </div>
     <div class="timeline" id="timelineWrap"></div>
   </section>
 
   <section id="glossary">
     <div class="section-head">
-      <h2>Ordliste</h2>
-      <p>Klikk på et begrep for forklaringen.</p>
+      <h2 data-en="Glossary">Ordliste</h2>
+      <p data-en="Click a term for the explanation.">Klikk på et begrep for forklaringen.</p>
     </div>
     <div class="glossary-grid" id="glossaryWrap"></div>
   </section>
 
   <section id="resources">
     <div class="section-head">
-      <h2>Ressurser</h2>
-      <p>Steder å gå for hjelp, offisiell informasjon og økonomisk oversikt.</p>
+      <h2 data-en="Resources">Ressurser</h2>
+      <p data-en="Places to go for help, official information and a financial overview.">Steder å gå for hjelp, offisiell informasjon og økonomisk oversikt.</p>
     </div>
     <div id="resourcesWrap"></div>
   </section>
 
   <section id="cta">
     <div class="cta-band">
-      <h2>Klar for å fordele eiendelene?</h2>
-      <p>Når boet er kartlagt og verdsatt, gjør Arvklart selve fordelingen ryddig, sporbar og rettferdig for alle arvinger.</p>
+      <h2 data-en="Ready to divide the belongings?">Klar for å fordele eiendelene?</h2>
+      <p data-en="Once the estate has been mapped and valued, Arvklart makes the distribution itself orderly, traceable and fair for all heirs.">Når boet er kartlagt og verdsatt, gjør Arvklart selve fordelingen ryddig, sporbar og rettferdig for alle arvinger.</p>
       <button class="cta-btn" id="ctaBtn" type="button">
-        <span id="ctaLabel">Tilbake til boet</span>
+        <span id="ctaLabel" data-en="Back to the estate">Tilbake til boet</span>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
       </button>
     </div>
   </section>
 
-  <footer class="note">Arvklart er en støttemodul for informasjon — ikke juridisk rådgivning. Ved tvil, kontakt kvalifisert juridisk hjelp.</footer>
+  <footer class="note" data-en="Arvklart provides information only — not legal advice. If in doubt, contact qualified legal help. The Norwegian version of this guide is the authoritative one.">Arvklart er en støttemodul for informasjon — ikke juridisk rådgivning. Ved tvil, kontakt kvalifisert juridisk hjelp.</footer>
 </div>
 
 <script>
@@ -1040,7 +1050,7 @@
 
   // The embedding page (GuidePage) decides the button text and handles navigation
   const ctaParams = new URLSearchParams(window.location.search);
-  if(ctaParams.get('back') === 'home') document.getElementById('ctaLabel').textContent = 'Tilbake til hjemmesiden';
+  if(ctaParams.get('back') === 'home') { const cta = document.getElementById('ctaLabel'); cta.textContent = 'Tilbake til hjemmesiden'; cta.dataset.en = 'Back to the home page'; }
   document.getElementById('ctaBtn').addEventListener('click', () => {
     if(window.parent !== window) window.parent.postMessage({ type: 'veiviser-back' }, window.location.origin);
     else window.history.back();
