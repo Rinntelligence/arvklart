@@ -25,6 +25,7 @@ Sist verifisert: 2026-10-08, ved å sammenligne prod med en lokal database bygge
 | `migrations/20261008_revoke_cleanup_old_closed_estates.sql` | **ja, 2026-10-08 16:33 UTC** | `schema_migrations` 20261008163341. `anon`/`authenticated` får 42501, `service_role` kan fortsatt |
 | `migrations/20261008_guard_item_value_disposal.sql` | **nei** | ny: verdi og kastmerking håndheves i `guard_item_update`, og sletting av egen gjenstand bare før tildeling. Kjøres etter godkjenning, og etter at frontend uten «Kast» i sveipingen er ute (i dagens prod-frontend kan alle merke for kast ved sveiping, og de ville da fått en feilmelding) |
 | `migrations/20261008_cleanup_runs.sql` | **nei** | må kjøres før `cleanup-closed-estates` / `cleanup-orphan-images` deployes (uten tabellen avbrytes kjøringen før noe slettes) |
+| `migrations/20261013_profiles_preferred_lang.sql` | **nei** | ny (PR C): språk per konto. Fjerner standardverdien `'en'` på `profiles.preferred_lang` og nullstiller radene som bare har den (ingen har valgt språk; koden har aldri brukt kolonnen), og legger til en sjekk (`no`/`en`/null). **Må kjøres før frontend fra PR C**: ellers vil appen tolke `'en'` som et valg og bytte alle til engelsk. Lesesjekk før kjøring: fordelingen av verdier (forventet bare `'en'`). Tilbakerulling: `rollback/20261013_profiles_preferred_lang.down.sql` |
 
 ## Finnes bare i produksjon (ikke i repoet)
 

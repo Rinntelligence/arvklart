@@ -22,6 +22,16 @@ select t_eq((select plan from profiles where user_id = auth.uid()), 'free', 'pla
 select t_eq((select email from profiles where user_id = auth.uid()), 'eva@test.no', 'e-post settes fra innloggingen');
 update profiles set is_founder = true, plan = 'business', display_name = 'Eva H' where user_id = auth.uid();
 select t_eq((select is_founder::text || plan || display_name from profiles where user_id = auth.uid()), 'falsefreeEva H', 'update endrer navn, ikke founder/plan');
+-- Språk per konto (20261013_profiles_preferred_lang.sql)
+with u as (update profiles set preferred_lang = 'en' where user_id = auth.uid() returning 1)
+  select t_eq((select count(*)::int from u), 1, 'bruker kan velge språk på egen profil');
+do $$ begin
+  update profiles set preferred_lang = 'de' where user_id = auth.uid();
+  raise exception 'FAIL: ukjent språk ble lagret';
+exception when check_violation then raise notice 'OK   språket må være no eller en';
+end $$;
+with u as (update profiles set preferred_lang = 'en' where user_id <> auth.uid() returning 1)
+  select t_eq((select count(*)::int from u), 0, 'bruker kan ikke endre andres språk');
 insert into estates (id, name, owner_id, invite_code) values ('eeee0000-0000-0000-0000-000000000001', 'Evas bo', auth.uid(), 'EVA123');
 insert into estate_members (estate_id, user_id, role) values ('eeee0000-0000-0000-0000-000000000001', auth.uid(), 'admin');
 insert into heirs (estate_id, name, email, relationship) values ('eeee0000-0000-0000-0000-000000000001', 'Frank', 'frank@test.no', 'Barn');
@@ -214,9 +224,14 @@ exception when insufficient_privilege then raise notice 'OK   demo kan ikke fjer
 end $$;
 update estates set invite_code = 'HACKED';
 update profiles set display_name = 'Hacket' where user_id = auth.uid();
+update profiles set preferred_lang = 'en' where user_id = auth.uid();
 reset role;
 select t_eq((select invite_code from estates where id = 'deed0001-0000-0000-0000-000000000001'), 'HANSEN2025', 'demo kan ikke endre invitasjonskoden');
 select t_eq((select display_name from profiles where email = 'mona.demo@heirsplit.no'), 'Mona Hansen-Dahl', 'demo kan ikke endre profilen');
+select t_eq((select preferred_lang from profiles where email = 'mona.demo@heirsplit.no'), null::text, 'demo kan ikke endre språket på profilen');
+-- Eksisterende brukere fra før migreringen (standardverdien 'en' i prod) står som «ikke valgt», altså norsk
+select t_eq((select preferred_lang from profiles where user_id = '00000000-0000-0000-0000-0000000000c1'), null::text, 'gamle profiler med standardverdien en er nullstilt');
+select t_eq((select column_default from information_schema.columns where table_name = 'profiles' and column_name = 'preferred_lang'), null::text, 'språk har ingen standardverdi');
 
 -- Nullstilling av demoen
 select reset_demo_estate();

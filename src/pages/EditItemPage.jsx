@@ -48,12 +48,12 @@ export default function EditItemPage({ session, profile, onToast }) {
   const handleNewImages = (e) => {
     const MAX_IMAGE_SIZE = 10 * 1024 * 1024 // 10 MB
     const files = Array.from(e.target.files).filter(f => {
-      if (f.size > MAX_IMAGE_SIZE) { onToast(`"${f.name}" er for stor (maks 10 MB)`, 'error'); return false }
+      if (f.size > MAX_IMAGE_SIZE) { onToast(L(`«${f.name}» er for stor (maks 10 MB)`, `«${f.name}» is too large (max 10 MB)`), 'error'); return false }
       return true
     })
     const total = existingImages.length + newFiles.length + files.length
     if (total > 5) {
-      onToast(`Maks 5 bilder totalt (har ${existingImages.length + newFiles.length})`, 'error')
+      onToast(L(`Maks 5 bilder totalt (har ${existingImages.length + newFiles.length})`, `Max 5 photos in total (has ${existingImages.length + newFiles.length})`), 'error')
       return
     }
     setNewFiles(prev => [...prev, ...files])
