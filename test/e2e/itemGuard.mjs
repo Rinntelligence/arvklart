@@ -102,6 +102,48 @@ await check('Slett, arving: egen gjenstand kan slettes før tildeling, ikke ette
   assert(await page.getByRole('button', { name: 'Slett «Gyngestol»' }).count() === 0, 'kortet viser «Slett» på andres gjenstand')
 }, asMember)
 
+// U1: AI-ens identifikasjon kan rettes av administrator og den som la inn gjenstanden (guard_item_update håndhever det)
+const AI = { v: 2, meta: {}, review: {}, corrections: {}, valuation: null, ai: {
+  suggestion: { title: 'Lampe', description: '', category: null, category_key: 'other', confidence: 'medium' },
+  identification: { brand: { value: 'Luxo', basis: 'probable', evidence: 'Formen' }, model: null }, unknown: [], marks: [], size_class: 'small',
+  condition_suggestion: 'good', condition_observations: [], condition_not_visible: [], condition_confidence: 'medium',
+  multiple_items: { detected: false, count: null, note: null }, photo_suggestions: [], search_query: null } }
+const withAi = f => ({ fixtures: { ...f.fixtures, items: f.fixtures.items.map(i => ({ ...i, ai_analysis: AI })) } })
+const openAi = async (page, itemId) => {
+  await page.goto(`${BASE}/estate/${EST}/item/${itemId}`)
+  await page.getByText('Hva AI-en så').click()
+  await page.getByText('Luxo').first().waitFor()
+}
+
+await check('Rett AI-opplysninger, arving: ikke på andres gjenstand', async page => {
+  await openAi(page, OTHERS)
+  assert(await page.getByRole('button', { name: 'Rett opplysningene' }).count() === 0, '«Rett opplysningene» vises på andres gjenstand')
+}, withAi(asMember))
+
+await check('Rett AI-opplysninger, arving: egen gjenstand lagrer rettelsen i ai_analysis.corrections uten å endre AI-forslaget', async page => {
+  const sent = patches(page)
+  await openAi(page, MINE)
+  await page.getByRole('button', { name: 'Rett opplysningene' }).click()
+  const brand = page.getByLabel('Merke', { exact: true })
+  assert(await brand.inputValue() === 'Luxo', 'merket starter ikke med AI-forslaget')
+  await brand.fill('Le Klint')
+  await page.getByLabel('Modell', { exact: true }).fill('Model 101')
+  await page.getByRole('button', { name: 'Lagre rettelsene' }).click()
+  await page.getByText('Rettelsene er lagret').waitFor()
+  assert(sent.length === 1, `forventet én lagring, fikk ${sent.length}`)
+  const a = sent[0].ai_analysis
+  assert(Object.keys(sent[0]).join() === 'ai_analysis', `sendte andre felt: ${Object.keys(sent[0])}`)
+  assert(a.corrections.brand.value === 'Le Klint' && a.corrections.brand.by === UID && a.corrections.brand.at, 'merket ble ikke lagret med hvem og når')
+  assert(a.corrections.model.value === 'Model 101', 'modellen ble ikke lagret')
+  assert(!('period' in a.corrections), 'uendrede felt ble lagret')
+  assert(a.ai.identification.brand.value === 'Luxo', 'AI-forslaget ble endret')
+}, withAi(asMember))
+
+await check('Rett AI-opplysninger, administrator: også på andres gjenstand', async page => {
+  await openAi(page, OTHERS)
+  await page.getByRole('button', { name: 'Rett opplysningene' }).waitFor()
+}, withAi(asAdmin))
+
 await browser.close()
 console.log(results.join('\n'))
 process.exit(results.some(r => r.startsWith('FAIL')) ? 1 : 0)

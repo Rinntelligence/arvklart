@@ -66,6 +66,7 @@ Tilgjengelighet (WCAG 2.2 AA): ikke bruk `outline:'none'`; fokus vises med `:foc
   - Tilstand kan være `unknown` («Ikke vurdert»), som er standard for nye gjenstander.
   - Eldre gjenstander har `null` og skrives ikke om.
   - `ai_analysis` kan bare endres av administrator eller den som la inn gjenstanden.
+  - Familien kan rette identifikasjonen (merke, produsent, modell, modellnummer, designer/kunstner, periode, materiale) med «Rett opplysningene» på gjenstandssiden og på kortet i «Legg til flere» (`src/lib/aiCorrections.js`). Rettelsene lagres i `ai_analysis.corrections` som `{ felt: { value, by, at } }`, der `value: null` betyr ukjent eller ikke aktuelt, og går foran AI-forslaget i `estimate-value` (`applyCorrections` i `_shared/analysis.ts`).
 - Verdianslag (`estimate-value`, logikk i `_shared/valuation.ts`) er et *veiledende AI-anslag*, ikke en markedsverdi.
   - Det bygger på bildeanalysen (`analysis` eller `item_id`) uten å sende bildene igjen, og bruker ingen eksterne kilder.
   - Modellen anslår for den registrerte tilstanden, med veiledning per type gjenstand.
