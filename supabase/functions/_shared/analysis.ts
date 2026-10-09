@@ -36,7 +36,8 @@ export const ANALYSIS_SCHEMA: Schema = obj({
   search_query: str,
 })
 
-export type IdValue = { value: string; basis: typeof BASIS[number]; evidence: string }
+// basis «family»: rettet eller bekreftet av familien (ai_analysis.corrections), aldri fra AI-en
+export type IdValue = { value: string; basis: typeof BASIS[number] | 'family'; evidence: string }
 export type Analysis = {
   suggestion: { title: string; description: string; category: string | null; category_key: CategoryKey; confidence: string }
   identification: Record<IdField, IdValue | null>
@@ -116,6 +117,26 @@ export function legacyFields(a: Analysis) {
     ...(a.condition_suggestion !== 'unknown' ? { condition: a.condition_suggestion } : {}),
     confidence: a.suggestion.confidence,
   }
+}
+
+// Feltene familien kan rette. Lagres i ai_analysis.corrections som { felt: { value, by, at } }; AI-forslaget
+// (ai_analysis.ai) endres aldri. value null betyr at familien har fjernet forslaget (feil, eller finnes ikke).
+export const CORRECTABLE_FIELDS = ['brand', 'manufacturer', 'model', 'model_number', 'designer_or_artist', 'period', 'material'] as const
+
+// Familiens rettelser går foran AI-ens identifikasjon. Ukjente felt og feil form ignoreres.
+export function applyCorrections(a: Analysis, corrections: unknown): { analysis: Analysis; corrected: IdField[] } {
+  if (!isObj(corrections)) return { analysis: a, corrected: [] }
+  const identification = { ...a.identification }
+  const corrected: IdField[] = []
+  for (const f of CORRECTABLE_FIELDS) {
+    const c = corrections[f]
+    if (!isObj(c) || !(c.value === null || typeof c.value === 'string')) continue
+    const value = clip(c.value, 120)
+    identification[f] = value ? { value, basis: 'family', evidence: '' } : null
+    corrected.push(f)
+  }
+  if (!corrected.length) return { analysis: a, corrected }
+  return { analysis: { ...a, identification, unknown: ID_FIELDS.filter(f => !identification[f]) }, corrected }
 }
 
 export const analysisSystem = (english: boolean) => `Du hjelper en familie å registrere gjenstander i et dødsbo ut fra bilder.

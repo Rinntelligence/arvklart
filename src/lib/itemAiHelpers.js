@@ -175,9 +175,10 @@ export function aiReview(d) {
 }
 
 // Det som lagres i items.ai_analysis: AI-vurderingen uendret, og hva brukeren gjorde med forslagene.
-// Brukerens endelige valg står i de vanlige kolonnene. Uten analyse lagres ingenting.
+// Brukerens endelige valg står i de vanlige kolonnene, og familiens rettelser av identifikasjonen i
+// corrections (src/lib/aiCorrections.js). Uten analyse lagres ingenting.
 export function aiAnalysisRecord(d) {
   const a = d.analysis
   if (!a?.ai || a.v !== 2) return null
-  return { v: a.v, meta: a.meta || {}, ai: a.ai, review: aiReview(d), corrections: {}, valuation: null }
+  return { v: a.v, meta: a.meta || {}, ai: a.ai, review: aiReview(d), corrections: a.corrections || {}, valuation: null }
 }

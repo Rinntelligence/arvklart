@@ -202,6 +202,16 @@ for (const [lang, tab, submit] of [['no', 'Opprett konto', 'Opprett konto'], ['e
   }, { loggedIn: false })
 }
 
+// Kontosletting: feiler den, får brukeren en fast melding på sitt språk – aldri råtekst fra serveren
+await check('Slett konto: feil gir en fast melding, ikke råtekst fra serveren', async page => {
+  await page.route('https://test.supabase.co/functions/v1/delete-account', route => route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ success: false, code: 'delete_failed', error: 'violates foreign key constraint xyz on table secret_stuff' }) }))
+  await page.goto(`${BASE}/konto`)
+  await page.getByRole('button', { name: 'Slett min konto' }).click()
+  await page.getByRole('button', { name: 'Ja, slett permanent' }).click()
+  await page.getByText('Kontoen kunne ikke slettes helt. Prøv igjen, eller kontakt oss.').waitFor()
+  assert(await page.getByText(/foreign key|secret_stuff/).count() === 0, 'råtekst fra serveren vises')
+})
+
 await browser.close()
 console.log(results.join('\n'))
 process.exit(results.some(r => r.startsWith('FAIL')) ? 1 : 0)

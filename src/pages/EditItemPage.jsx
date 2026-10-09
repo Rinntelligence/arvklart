@@ -6,6 +6,7 @@ import { parseNOK } from '../lib/format'
 import { L } from '../lib/lang'
 import { CONDITION_OPTIONS } from '../lib/analysisView'
 import { categoryLabel } from '../lib/categories'
+import StoredImage from '../components/StoredImage'
 
 export default function EditItemPage({ session, profile, onToast }) {
   const { id, itemId } = useParams()
@@ -150,7 +151,7 @@ export default function EditItemPage({ session, profile, onToast }) {
           <div style={{ display:'flex', gap:'8px', flexWrap:'wrap' }}>
             {existingImages.map((url, i) => (
               <div key={`ex-${i}`} style={{ position:'relative', width:'80px', height:'80px', borderRadius:'8px', overflow:'hidden', background:'#E8DFD0' }}>
-                <img src={url} alt="" style={{ width:'100%', height:'100%', objectFit:'contain' }} />
+                <StoredImage src={url} alt="" style={{ width:'100%', height:'100%', objectFit:'contain' }} />
                 <button onClick={() => removeExisting(i)} style={{
                   position:'absolute', top:'2px', right:'2px',
                   background:'rgba(139,58,58,0.85)', color:'#fff', border:'none',

@@ -100,3 +100,31 @@ describe('felter for eldre klienter', { skip }, () => {
     assert.ok(!('condition' in an.legacyFields(unknown)))
   })
 })
+
+describe('familiens rettelser (ai_analysis.corrections)', { skip }, () => {
+  const a = () => an.normalizeAnalysis(CATS)(reply()).value
+  test('rettelser går foran AI-forslaget; null fjerner forslaget; AI-forslaget i seg selv endres ikke', () => {
+    const before = a()
+    const { analysis, corrected } = an.applyCorrections(before, {
+      brand: { value: 'Porsgrund', by: 'u1', at: '2026-10-09T12:00:00Z' },
+      model: { value: null, by: 'u1', at: '2026-10-09T12:00:00Z' },
+      period: { value: ' 1960-tallet ', by: 'u1', at: '2026-10-09T12:00:00Z' },
+    })
+    assert.deepEqual(corrected, ['brand', 'model', 'period'])
+    assert.deepEqual(analysis.identification.brand, { value: 'Porsgrund', basis: 'family', evidence: '' })
+    assert.equal(analysis.identification.model, null)
+    assert.equal(analysis.identification.period.value, '1960-tallet')
+    assert.ok(analysis.unknown.includes('model') && !analysis.unknown.includes('period'))
+    assert.equal(before.identification.brand.value, 'Figgjo')
+  })
+  test('ukjente felt, feil form og manglende rettelser ignoreres; lange verdier kortes ned', () => {
+    const before = a()
+    assert.equal(an.applyCorrections(before, null).analysis, before)
+    const { analysis, corrected } = an.applyCorrections(before, {
+      colour: { value: 'Rød' }, title: { value: 'x' }, brand: 'Porsgrund', model: { value: 42 }, material: { value: 'x'.repeat(300) },
+    })
+    assert.deepEqual(corrected, ['material'])
+    assert.equal(analysis.identification.brand.value, 'Figgjo')
+    assert.equal(analysis.identification.material.value.length, 120)
+  })
+})

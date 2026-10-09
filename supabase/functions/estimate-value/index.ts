@@ -6,7 +6,7 @@
 import { getUser, json, preflight, userClient } from '../_shared/http.ts'
 import { aiConfigured, aiErrorJson, aiErrorResponse, callStructured, claimAiCall, currentModel } from '../_shared/ai.ts'
 import { categoryKeyFor, depreciatedValue, readEstimateInput, type EstimateInput } from '../_shared/aiCore.ts'
-import { normalizeAnalysis, type Analysis } from '../_shared/analysis.ts'
+import { applyCorrections, normalizeAnalysis, type Analysis } from '../_shared/analysis.ts'
 import {
   ESTIMATE_SCHEMA_V2, VALUATION_VERSION, conditionGuidance, describeItem, finalizeEstimate, insufficientWithoutCall, validateEstimateV2, valuationSystem,
 } from '../_shared/valuation.ts'
@@ -14,14 +14,16 @@ import {
 const MAX_ANALYSIS_CHARS = 20_000
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
-// Analysen fra klienten valideres på nytt (den kan være endret); feil form gir ingen analyse
-function readAnalysis(value: unknown): Analysis | null {
-  if (!value || typeof value !== 'object') return null
+// Analysen fra klienten valideres på nytt (den kan være endret); feil form gir ingen analyse.
+// Familiens rettelser (ai_analysis.corrections) går foran AI-ens identifikasjon.
+function readAnalysis(value: unknown): { analysis: Analysis | null; corrected: string[] } {
+  const none = { analysis: null, corrected: [] }
+  if (!value || typeof value !== 'object') return none
   const v = value as Record<string, unknown>
   const ai = v.ai ?? v // hele ai_analysis-dokumentet eller bare AI-delen
-  if (JSON.stringify(ai).length > MAX_ANALYSIS_CHARS) return null
+  if (JSON.stringify(ai).length > MAX_ANALYSIS_CHARS || JSON.stringify(v.corrections ?? null).length > MAX_ANALYSIS_CHARS) return none
   const r = normalizeAnalysis([])(ai)
-  return r.ok ? r.value : null
+  return r.ok ? applyCorrections(r.value, v.ai ? v.corrections : null) : none
 }
 
 // Lagret gjenstand: hentes med brukerens egen innlogging, så RLS avgjør om brukeren har tilgang
@@ -59,7 +61,7 @@ Deno.serve(async (req) => {
     }
     const input = readEstimateInput(body)
     if (typeof input === 'string') return json({ success: false, error: input }, 400)
-    const analysis = readAnalysis(rawAnalysis)
+    const { analysis, corrected } = readAnalysis(rawAnalysis)
     const key = analysis?.suggestion.category_key && analysis.suggestion.category_key !== 'other'
       ? analysis.suggestion.category_key : categoryKeyFor(input.category)
     const depreciation = depreciatedValue(key, input.purchasePrice, input.purchaseYear)
@@ -97,7 +99,7 @@ Give status, low_nok, likely_nok and high_nok as whole NOK amounts (low ≤ like
         estimate: { low: final.low, likely: final.likely, high: final.high },
         confidence: final.confidence,
         uncertainty: final.uncertainty,
-        basis: { used_analysis: !!analysis, identified: final.identified, category_key: key },
+        basis: { used_analysis: !!analysis, used_corrections: corrected, identified: final.identified, category_key: key },
         reasoning: est.reasoning,
         missing: est.missing,
         sources: [],
