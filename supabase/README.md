@@ -6,6 +6,7 @@ Database, lagring og edge-funksjoner for ArvKlart.
 supabase/
 ├── legacy/       Opprinnelig oppsett (01–05). Allerede kjørt i produksjon – kjøres bare på en ny, tom database.
 ├── migrations/   Endringer etter oppsettet, kjøres i navnerekkefølge (YYYYMMDD_navn.sql).
+├── rollback/     Tilbakerulling av en migrering (`<migrering>.down.sql`). Kjøres bare ved feil, etter godkjenning.
 ├── seed/         Demo-boet «Fam. Hansen sitt bo».
 └── functions/    Edge-funksjoner (Deno). Felles kode ligger i _shared/.
 ```
@@ -29,8 +30,8 @@ Kjør i SQL Editor, i denne rekkefølgen:
 
 | Funksjon | Brukes til | Hemmeligheter |
 |---|---|---|
-| `analyze-item` | AI-analyse av bilde av en gjenstand (Claude Haiku, teller mot AI-kvoten) | `ANTHROPIC_API_KEY` |
-| `estimate-value` | AI-verdiestimat (Claude Haiku, teller mot AI-kvoten) | `ANTHROPIC_API_KEY` |
+| `analyze-item` | AI-analyse av bilde av en gjenstand (Claude Haiku, teller mot AI-kvoten) | `ANTHROPIC_API_KEY`, valgfri `AI_MODEL` |
+| `estimate-value` | AI-verdiestimat (Claude Haiku, teller mot AI-kvoten) | `ANTHROPIC_API_KEY`, valgfri `AI_MODEL` |
 | `delete-account` | Sletting av egen konto (GDPR) | – |
 | `demo-login` | «Test ut demo»: nullstiller demo-boet og logger inn | `DEMO_PASSWORD`, valgfri `DEMO_USER_ID` |
 | `cleanup-closed-estates` | Sletter bo som har vært avsluttet i over 12 måneder (daglig, cron) | `CRON_SECRET` |
@@ -40,7 +41,8 @@ Kjør i SQL Editor, i denne rekkefølgen:
 
 ```bash
 # --use-api pakker funksjonene hos Supabase; Docker i Codespaces når ikke esm.sh
-supabase functions deploy analyze-item --use-api
+# analyze-item sjekker innloggingen selv (getUser) og kjører i prod med verify_jwt av; behold det
+supabase functions deploy analyze-item --no-verify-jwt --use-api
 supabase functions deploy estimate-value --use-api
 supabase functions deploy delete-account --use-api
 supabase functions deploy demo-login --no-verify-jwt --use-api
@@ -51,7 +53,32 @@ supabase secrets set DEMO_PASSWORD='<passordet til mona.demo@heirsplit.no>'
 supabase secrets set CRON_SECRET="$(openssl rand -hex 32)"
 ```
 
-Funksjonene `analyze-item`, `estimate-value` og `delete-account` krever innlogget bruker. `demo-login` og cleanup-funksjonene kalles uten brukerøkt og har derfor `--no-verify-jwt`. Cleanup-funksjonene sjekker i stedet headeren `x-cron-secret` (minst 32 tegn; mangler `CRON_SECRET` eller er den for kort, avvises alle kall). Hemmeligheten sendes bare som header, aldri i URL-en (URL-er logges av Supabase), og skrives aldri ut i svar eller logg.
+Funksjonene `analyze-item`, `estimate-value` og `delete-account` krever innlogget bruker. Sjekk `verify_jwt` per funksjon med `supabase functions list` før deploy, og behold innstillingen som står i prod. `demo-login` og cleanup-funksjonene kalles uten brukerøkt og har derfor `--no-verify-jwt`. Cleanup-funksjonene sjekker i stedet headeren `x-cron-secret` (minst 32 tegn; mangler `CRON_SECRET` eller er den for kort, avvises alle kall). Hemmeligheten sendes bare som header, aldri i URL-en (URL-er logges av Supabase), og skrives aldri ut i svar eller logg.
+
+### AI-modell
+
+- AI-funksjonene bruker Claude Haiku 5.5 (`claude-haiku-5-5`) med strukturert svar (JSON-skjema) og validering (`_shared/aiCore.ts`, `_shared/ai.ts`).
+- **Tilbakerulling til Haiku 4.5** gjøres manuelt, uten ny deploy:
+  ```bash
+  supabase secrets set AI_MODEL=claude-haiku-4-5
+  ```
+  Fjern hemmeligheten (`supabase secrets unset AI_MODEL`) for å gå tilbake til standard.
+- Det finnes ingen automatisk fallback eller ruting mellom modeller.
+- Hvert kall logges i `ai_usage`: modell, tokens, antall bilder, tid, anslått kostnad og utfall. Innhold lagres ikke. Målingene krever `20261011_ai_usage_metrics.sql`. Uten migreringen står de bare i funksjonsloggen.
+- **Feilkoder til appen:**
+
+  | Kode | HTTP | Betyr |
+  |---|---|---|
+  | `ai_refused` | 422 | modellen avslo |
+  | `ai_invalid` | 502 | ugyldig svar etter ett nytt forsøk |
+  | `ai_timeout` | 504 | tidsavbrudd |
+  | `ai_busy` | 503 | opptatt |
+  | `ai_error` | 502 | annen feil hos AI-tjenesten |
+  | `ai_unavailable` | 503 | nøkkel mangler eller er ugyldig |
+  | `rate_limit`, `demo_limit` | 429 | kvoten er brukt opp |
+  | `error` | 500 | annen feil |
+
+  Råtekst fra feil sendes aldri til appen.
 
 ## E-postmaler (norsk og engelsk)
 

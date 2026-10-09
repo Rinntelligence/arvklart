@@ -20,10 +20,10 @@ const run = async (name, fn) => {
   try { await fn(); results.push(`OK   ${name}`) } catch (e) { results.push(`FAIL ${name}: ${e.message.split('\n').slice(0,6).join(' | ')}`) }
 }
 
-async function setup(browser, { lang = 'no', failCall = null, failEstimate = null, viewport = { width: 390, height: 844 } } = {}) {
+async function setup(browser, { lang = 'no', failCall = null, failEstimate = null, viewport = { width: 390, height: 844 }, v2 = null, estimateReply = null } = {}) {
   const ctx = await browser.newContext({ viewport, deviceScaleFactor: 2, hasTouch: true, permissions: ['camera'] })
   const page = await ctx.newPage()
-  const calls = { analyze: 0, itemInserts: 0, uploads: 0, analyzeLangs: [], analyzeEstimate: [], estimate: 0, insertBodies: [] }
+  const calls = { analyze: 0, itemInserts: 0, uploads: 0, analyzeLangs: [], analyzeEstimate: [], estimate: 0, insertBodies: [], estimateBodies: [] }
   await page.route('https://test.supabase.co/**', async route => {
     const req = route.request()
     const url = new URL(req.url())
@@ -33,8 +33,16 @@ async function setup(browser, { lang = 'no', failCall = null, failEstimate = nul
       const body = JSON.parse(req.postData() || '{}')
       calls.analyzeLangs.push(body.lang)
       calls.analyzeEstimate.push(Boolean(body.estimate))
-      if (failCall && failCall(calls.analyze)) return json({ success: false, code: 'ai_error', error: 'AI-tjenesten svarte med feil (500)' }, 502)
+      // failCall kan gi en feilkode (f.eks. 'ai_refused'); true betyr ai_error
+      const fail = failCall && failCall(calls.analyze)
+      if (fail) {
+        const code = typeof fail === 'string' ? fail : 'ai_error'
+        const status = { ai_refused: 422, ai_unavailable: 503, ai_busy: 503, ai_timeout: 504 }[code] || 502
+        return json({ success: false, code, error: 'Norsk servertekst som ikke skal vises' }, status)
+      }
       const en = body.lang === 'en'
+      // v2: svar med hele AI-vurderingen (bildeanalyse versjon 2), slik analyze-item svarer etter PR B
+      if (v2) return json({ success: true, data: v2(calls.analyze), quota: { ok: true } })
       return json({ success: true, data: {
         title: en ? `Oak chair ${calls.analyze}` : `Eikestol ${calls.analyze}`,
         description: en ? 'Solid oak chair with light wear.' : 'Solid stol i eik med lett slitasje.',
@@ -43,6 +51,8 @@ async function setup(browser, { lang = 'no', failCall = null, failEstimate = nul
     }
     if (url.pathname.startsWith('/functions/v1/estimate-value')) {
       calls.estimate++
+      calls.estimateBodies.push(JSON.parse(req.postData() || '{}'))
+      if (estimateReply) return json({ success: true, data: estimateReply(calls.estimate), quota: { ok: true } })
       if (failEstimate && failEstimate(calls.estimate)) return json({ success: false, code: 'rate_limit', error: 'For mange forespørsler' }, 429)
       const m = { likely_nok: 500, low_nok: 300, high_nok: 800, reasoning: 'Brukt eikestol, vanlig modell', confidence: 'medium' }
       return json({ success: true, data: { market: m, summary: { likely_nok: 500, low_nok: 300, high_nok: 800 } }, quota: { ok: true } })
@@ -236,6 +246,143 @@ await run('F: AI feiler på én av sju: seks kan lagres, den siste kan prøves i
   await ctx.close()
 })
 
+await run('F2: AI avslår én gjenstand (ai_refused): de andre analyseres, og kortet kan fylles inn selv', async () => {
+  const { ctx, page, calls } = await setup(browser, { failCall: n => n === 2 && 'ai_refused' })
+  await openCamera(page)
+  for (let i = 0; i < 3; i++) await shoot(page)
+  await page.getByRole('button', { name: 'Ferdig' }).click()
+  await page.getByRole('button', { name: 'Analyser med AI (3)' }).click()
+  await page.getByRole('button', { name: 'Godkjenn og lagre alle (2)' }).waitFor()
+  assert.equal(calls.analyze, 3, 'analysen skal fortsette etter et avslag')
+  await page.getByText('AI klarte ikke denne').waitFor()
+  assert.equal(await page.getByText('Norsk servertekst som ikke skal vises').count(), 0)
+  await ctx.close()
+})
+
+await run('F3: AI utilgjengelig (ai_unavailable): analysen stopper og sier at man kan fylle inn selv', async () => {
+  const { ctx, page, calls } = await setup(browser, { failCall: () => 'ai_unavailable' })
+  await openCamera(page)
+  for (let i = 0; i < 5; i++) await shoot(page)
+  await page.getByRole('button', { name: 'Ferdig' }).click()
+  await page.getByRole('button', { name: 'Analyser med AI (5)' }).click()
+  await page.getByText(/AI-hjelpen er ikke tilgjengelig akkurat nå\. Du kan fylle inn selv\./).waitFor()
+  assert.ok(calls.analyze <= 3, `forventet at analysen stoppet, men ${calls.analyze} kall ble gjort`)
+  assert.equal(await page.getByText('Norsk servertekst som ikke skal vises').count(), 0)
+  await ctx.close()
+})
+
+// Svar fra analyze-item v2: identifikasjon (sett/sannsynlig/ukjent), merker, tilstand, flere gjenstander, bildetips
+const F = (value, basis, evidence = '') => ({ value, basis, evidence })
+const v2Reply = (n, over = {}) => {
+  const ai = {
+    suggestion: { title: `Figgjo-tallerken ${n}`, description: 'Hvit med blått mønster.', category: 'Møbler', category_key: 'kitchen_porcelain', confidence: 'medium' },
+    identification: { object_type: F('Tallerken', 'observed'), brand: F('Figgjo', 'observed', 'Stempel under'), manufacturer: null, model: F('Lotte', 'probable', 'Mønsteret'),
+      variant: null, material: F('Flint', 'probable'), colour: F('Hvit og blå', 'observed'), period: F('1960-tallet', 'probable', 'Stilen'), designer_or_artist: null, model_number: null },
+    unknown: ['manufacturer', 'variant', 'designer_or_artist', 'model_number'],
+    marks: [{ kind: 'stamp', text: 'Figgjo Flint Norway', where: 'Undersiden' }],
+    size_class: 'small', condition_suggestion: 'fair', condition_observations: ['Små riper i glasuren'], condition_not_visible: ['Baksiden'], condition_confidence: 'medium',
+    multiple_items: n === 2 ? { detected: true, count: 4, note: 'Fire tallerkener' } : { detected: false, count: null, note: null },
+    photo_suggestions: [{ kind: 'underside', reason: 'Et bilde av stempelet under kan gi sikrere vurdering.' }],
+    search_query: 'Figgjo Lotte tallerken', ...over,
+  }
+  return { title: ai.suggestion.title, description: ai.suggestion.description, category: 'Møbler', condition: 'fair', confidence: 'medium',
+    analysis: { v: 2, meta: { model: 'claude-haiku-5-5', prompt_version: 'analyze-2026-10a', analyzed_at: '2026-10-09T12:00:00Z', image_count: 1, lang: 'no' }, ai } }
+}
+
+await run('H: bildeanalyse v2: oppsummering, flere gjenstander, bildetips og «Hva AI-en så», uten ekstra klikk; lagres i ai_analysis', async () => {
+  const { ctx, page, calls } = await setup(browser, { v2: n => v2Reply(n) })
+  await openCamera(page)
+  for (let i = 0; i < 2; i++) await shoot(page)
+  await page.getByRole('button', { name: 'Ferdig' }).click()
+  // Brukeren skriver eget navn på gjenstand 1 før analysen: det skal ikke overskrives
+  await page.getByLabel('Navn').first().fill('Mormors tallerken')
+  await page.getByRole('button', { name: 'Analyser med AI (2)' }).click()
+  await page.getByRole('button', { name: 'Godkjenn og lagre alle (2)' }).waitFor()
+  assert.equal(await page.getByLabel('Navn').first().inputValue(), 'Mormors tallerken', 'brukerens navn ble overskrevet')
+  await page.getByText('AI: Figgjo · Lotte (sannsynlig) · 1960-tallet (sannsynlig).').first().waitFor()
+  await page.getByText(/Bildet ser ut til å vise flere gjenstander \(ca\. 4\)/).waitFor()
+  assert.equal(await page.getByText(/Bildet ser ut til å vise flere gjenstander/).count(), 1, 'advarselen skal bare stå på kortet det gjelder')
+  await page.getByText('Tips: Et bilde av stempelet under kan gi sikrere vurdering.').first().waitFor()
+  // Tilstand fra AI (middels sikker), og «Hva AI-en så» under «Mer»
+  assert.equal(await page.getByLabel('Tilstand').first().inputValue(), 'fair')
+  await page.locator('summary', { hasText: 'Mer' }).first().click()
+  await page.getByRole('heading', { name: 'Hva AI-en så' }).first().waitFor()
+  await page.getByText('Sett på bildet').first().waitFor()
+  await page.getByText(/Ukjent:.*produsent/).first().waitFor()
+  await page.getByText('«Figgjo Flint Norway» – Undersiden').first().waitFor()
+  await page.getByRole('button', { name: 'Godkjenn og lagre alle (2)' }).click()
+  await page.getByText('✓ 2 gjenstander lagt til i boet').waitFor()
+  const own = calls.insertBodies.find(b => b.title === 'Mormors tallerken')
+  assert.ok(own, 'gjenstanden med eget navn ble ikke lagret')
+  assert.equal(own.ai_analysis.v, 2)
+  assert.equal(own.ai_analysis.ai.identification.brand.value, 'Figgjo')
+  assert.equal(own.ai_analysis.review.title, 'not_suggested', 'navnet var brukerens eget')
+  assert.equal(own.ai_analysis.review.condition, 'accepted')
+  assert.equal(own.condition, 'fair')
+  const other = calls.insertBodies.find(b => b !== own)
+  assert.equal(other.ai_analysis.review.title, 'accepted')
+  await ctx.close()
+})
+
+await run('H2: uten AI-analyse lagres ingen ai_analysis, og tilstanden er «ikke vurdert» til noen velger', async () => {
+  const { ctx, page, calls } = await setup(browser)
+  await openCamera(page)
+  await shoot(page)
+  await page.getByRole('button', { name: 'Ferdig' }).click()
+  await page.getByLabel('Navn').first().fill('Lampe')
+  assert.equal(await page.getByLabel('Tilstand').first().inputValue(), 'unknown')
+  await page.getByRole('button', { name: 'Godkjenn og lagre alle (1)' }).click()
+  await page.getByText('✓ 1 gjenstand lagt til i boet').waitFor()
+  assert.ok(!('ai_analysis' in calls.insertBodies[0]), 'ai_analysis ble sendt uten analyse')
+  assert.equal(calls.insertBodies[0].condition, 'unknown')
+  await ctx.close()
+})
+
+// Svar fra estimate-value v2 (bygger på bildeanalysen)
+const estimateV2 = { v: 2, status: 'ok', price_type: 'estimated_price', market_area: 'NO', currency: 'NOK', estimate: { low: 160, likely: 300, high: 540 },
+  confidence: 'medium', uncertainty: { widened: true, reasons: ['condition_unknown'] }, basis: { used_analysis: true, identified: ['brand'], category_key: 'kitchen_porcelain' },
+  reasoning: 'Figgjo-servise selges jevnlig brukt.', missing: [], sources: [], model: 'claude-haiku-5-5',
+  market: { low_nok: 160, likely_nok: 300, high_nok: 540, reasoning: 'Figgjo-servise selges jevnlig brukt.', confidence: 'medium' }, summary: { low_nok: 160, likely_nok: 300, high_nok: 540 } }
+
+await run('E3: verdianslaget bruker bildeanalysen (ingen bilder sendes), og AI-ens anslag lagres for seg', async () => {
+  const { ctx, page, calls } = await setup(browser, { v2: n => v2Reply(n), estimateReply: () => estimateV2 })
+  await openCamera(page)
+  await shoot(page)
+  await page.getByRole('button', { name: 'Ferdig' }).click()
+  await page.getByRole('button', { name: 'Analyser med AI (1)' }).click()
+  await page.getByRole('button', { name: 'Godkjenn og lagre alle (1)' }).waitFor()
+  await page.getByRole('button', { name: 'Anslå verdi for alle (1)' }).click()
+  await page.getByText('Veiledende AI-anslag, ikke en dokumentert markedsverdi', { exact: false }).waitFor()
+  const sent = calls.estimateBodies[0]
+  assert.equal(sent.analysis?.v, 2, 'analysen ble ikke sendt med')
+  assert.ok(!('images' in sent) && !('imageBase64' in sent), 'bilder ble sendt til verdianslaget')
+  await page.getByRole('button', { name: 'Godkjenn og lagre alle (1)' }).click()
+  await page.getByText('✓ 1 gjenstand lagt til i boet').waitFor()
+  const body = calls.insertBodies[0]
+  assert.equal(body.estimated_value, 300)
+  assert.equal(body.ai_analysis.valuation.price_type, 'estimated_price')
+  assert.deepEqual(body.ai_analysis.valuation.estimate, { low: 160, likely: 300, high: 540 })
+  await ctx.close()
+})
+
+await run('E4: for lite informasjon gir ingen verdi (aldri 0 kr), men tips; «Anslå verdi for alle» hopper over kortet etterpå', async () => {
+  const { ctx, page, calls } = await setup(browser, { estimateReply: () => ({ v: 2, status: 'insufficient', estimate: null, missing: ['Et mer presist navn', 'Et bilde av stempelet'], reasoning: '' }) })
+  await openCamera(page)
+  await shoot(page)
+  await page.getByRole('button', { name: 'Ferdig' }).click()
+  await page.getByLabel('Navn').first().fill('Ting')
+  await page.getByRole('button', { name: 'Analyser med AI (1)' }).click()
+  await page.getByRole('button', { name: 'Anslå verdi for alle (1)' }).waitFor()
+  await page.getByRole('button', { name: 'Anslå verdi (AI)' }).click()
+  await page.getByText('For lite informasjon til å anslå verdi. Dette kan hjelpe: Et mer presist navn; Et bilde av stempelet.').waitFor()
+  assert.equal(await page.getByText(/Verdien ble ikke anslått/).count(), 0, 'for lite informasjon er ikke en feil')
+  assert.equal(await page.getByRole('button', { name: /Anslå verdi for alle/ }).count(), 0)
+  await page.getByRole('button', { name: 'Godkjenn og lagre alle (1)' }).click()
+  await page.getByText('✓ 1 gjenstand lagt til i boet').waitFor()
+  assert.equal(calls.insertBodies[0].estimated_value, null, 'ukjent verdi skal lagres som tom, ikke 0')
+  await ctx.close()
+})
+
 await run('G: hele flyten på engelsk, også AI-teksten', async () => {
   const { ctx, page, calls } = await setup(browser, { lang: 'en' })
   await openCamera(page, 'en')
@@ -293,7 +440,7 @@ await run('E2: verdianslag bare når brukeren ber om det, synlig og merket, og l
   await page.getByRole('button', { name: 'Godkjenn og lagre alle (3)' }).waitFor()
   if (calls.estimate !== 0) throw new Error('verdianslag uten klikk')
   await page.getByRole('button', { name: 'Anslå verdi for alle (3)' }).click()
-  await page.getByText('AI-anslag, veiledende', { exact: false }).first().waitFor()
+  await page.getByText('Veiledende AI-anslag, ikke en dokumentert markedsverdi', { exact: false }).first().waitFor()
   assert.equal(calls.estimate, 3)
   const values = page.getByRole('textbox', { name: 'Verdi i kroner (valgfri)' })
   assert.equal(await values.count(), 3, 'verdifeltet er synlig (ikke under «Mer»)')
@@ -301,7 +448,7 @@ await run('E2: verdianslag bare når brukeren ber om det, synlig og merket, og l
   await shot(page, 'E2-verdianslag.png', true)
   // Endret verdi er brukerens egen: lagres uten AI-begrunnelse
   await values.nth(1).fill('750')
-  assert.equal(await page.getByText('AI-anslag, veiledende', { exact: false }).count(), 2)
+  assert.equal(await page.getByText('Veiledende AI-anslag, ikke en dokumentert markedsverdi', { exact: false }).count(), 2)
   await page.getByRole('button', { name: 'Godkjenn og lagre alle (3)' }).click()
   await page.getByText('✓ 3 gjenstander lagt til i boet').waitFor()
   const byValue = Object.fromEntries(calls.insertBodies.map(b => [String(b.estimated_value), b]))

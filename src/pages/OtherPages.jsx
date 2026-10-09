@@ -4,7 +4,9 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { supabase, signOut } from '../lib/supabase'
 import { joinEstateByCode } from '../lib/joinEstate'
 import { hasAiConsent, withdrawAiConsent } from '../lib/aiConsent'
-import { L, isEn } from '../lib/lang'
+import { L, isEn, getLang } from '../lib/lang'
+import { changeLanguage } from '../lib/languagePref'
+import { isDemoSession } from '../lib/demo'
 import { categoryLabel } from '../lib/categories'
 import TextSizeControl from '../components/TextSizeControl'
 
@@ -296,6 +298,21 @@ export function AccountPage({ session, onToast }) {
           <TextSizeControl />
           <p style={{ fontSize: '0.8125rem', color: '#75604B', marginTop: '10px', lineHeight: 1.5 }}>{L('Gjelder på denne enheten. Teksten følger også tekststørrelsen du har valgt på telefonen.', 'Applies on this device. The text also follows the text size you have chosen on your phone.')}</p>
         </div>
+
+        {/* Språk per konto: følger brukeren til andre enheter. Endrer ikke det som er lagret i boet. */}
+        <fieldset style={{ background: '#fff', border: '1px solid #D9CFC0', borderRadius: '12px', padding: '24px', margin: 0 }}>
+          <legend style={{ fontFamily: 'Fraunces, serif', fontSize: '1.0625rem', fontWeight: '400', color: '#3A2F26', padding: '0 4px' }}>{L('Språk', 'Language')}</legend>
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '4px' }}>
+            {[['no', 'Norsk'], ['en', 'English']].map(([code, label]) => (
+              <label key={code} style={{ display: 'flex', alignItems: 'center', gap: '8px', minHeight: '44px', padding: '8px 14px', border: `2px solid ${getLang() === code ? '#3A2F26' : '#D9CFC0'}`, borderRadius: '8px', cursor: 'pointer', fontSize: '0.9375rem', color: '#3A2F26' }}>
+                <input type="radio" name="account-lang" value={code} checked={getLang() === code} lang={code === 'en' ? 'en' : 'no'}
+                  onChange={() => changeLanguage(code, { userId: session.user.id, isDemo: isDemoSession(session) })} />
+                <span lang={code === 'en' ? 'en' : 'no'}>{label}</span>
+              </label>
+            ))}
+          </div>
+          <p style={{ fontSize: '0.8125rem', color: '#75604B', marginTop: '10px', lineHeight: 1.5 }}>{L('Lagres på kontoen din og gjelder på alle enheter. Det dere har skrevet i boet, oversettes ikke.', 'Saved to your account and used on all devices. What has been written in the estate is not translated.')}</p>
+        </fieldset>
 
         <div style={{ background: '#fff', border: '1px solid #D9CFC0', borderRadius: '12px', padding: '24px' }}>
           <h2 style={{ fontFamily: 'Fraunces, serif', fontSize: '1.0625rem', fontWeight: '400', color: '#3A2F26', marginBottom: '6px' }}>{L('Last ned dine data', 'Download your data')}</h2>

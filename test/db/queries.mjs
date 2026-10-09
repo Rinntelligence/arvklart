@@ -43,6 +43,19 @@ test('interesser per bo med inner join og sideinndeling (getEstateInterests)', a
   assert.ok(all.data.length >= 17)
 })
 
+test('begrunnelse på eget ønske via PostgREST (setInterestReason), ikke på andres', async () => {
+  const db = as('mona')
+  const mine = await db.from('interests').select('item_id, reason').eq('user_id', USERS.mona[0]).limit(1).single()
+  assert.equal(mine.error, null)
+  const upd = await db.from('interests').update({ reason: 'Til hytta' }).eq('item_id', mine.data.item_id).eq('user_id', USERS.mona[0]).select('id')
+  assert.equal(upd.error, null)
+  assert.equal(upd.data.length, 1)
+  const others = await db.from('interests').update({ reason: 'Hacket' }).neq('user_id', USERS.mona[0]).select('id')
+  assert.equal(others.error, null)
+  assert.equal(others.data.length, 0)
+  await db.from('interests').update({ reason: mine.data.reason }).eq('item_id', mine.data.item_id).eq('user_id', USERS.mona[0])
+})
+
 test('nei takk per bo (getEstatePasses)', async () => {
   const { data, error } = await fetchAll(() => as('owner').from('item_passes').select('item_id, user_id, items!inner(estate_id)').eq('items.estate_id', DEMO).order('id'), 7)
   assert.equal(error, null)

@@ -154,6 +154,35 @@ await check('Arving: ser egne ønsker ett trykk unna, ikke admin-verktøyene', a
   { estate_id: EST, user_id: U2, role: 'admin', joined_at: now, profiles: kari },
 ] } })
 
+// Arveveiviseren på engelsk (E1): bare med ?lang=en, som appen sender når VITE_GUIDE_EN er slått på
+await check('Veiviser: norsk som standard, engelsk grensesnitt med ?lang=en og merknad om at norsk gjelder', async page => {
+  await page.goto(`${BASE}/veiviser.html`)
+  await page.getByRole('heading', { name: 'Hvem arver – og hvor mye?' }).waitFor()
+  assert(await page.evaluate(() => document.documentElement.lang) === 'no', 'html lang er ikke no')
+  await page.goto(`${BASE}/veiviser.html?lang=en`)
+  await page.getByRole('heading', { name: 'Who inherits – and how much?' }).waitFor()
+  await page.getByText('the Norwegian version is the authoritative one', { exact: false }).first().waitFor()
+  await page.getByRole('heading', { name: 'Glossary' }).waitFor()
+  assert(await page.evaluate(() => document.documentElement.lang) === 'en', 'html lang er ikke en')
+  await page.getByText('Right after the death').waitFor()
+  await page.getByText('Check your chances of a funeral grant').waitFor()
+  await page.getByRole('button', { name: 'Start', exact: true }).click()
+  await page.getByRole('heading', { name: 'Who are you in this inheritance settlement?' }).waitFor()
+  await page.getByRole('button', { name: /Surviving spouse or cohabitant/ }).click()
+  await page.getByRole('heading', { name: 'When did the deceased die?' }).waitFor()
+  // Ingen norske knapper eller spørsmål i veiviseren på engelsk
+  const wizardText = await page.locator('#arvWizard').innerText()
+  assert(!/\b(Neste|Tilbake|Hvorfor spør vi|Steg \d)/.test(wizardText), `norsk tekst i engelsk veiviser: ${wizardText.slice(0, 200)}`)
+}, { loggedIn: false })
+
+await check('Veiviser i appen: uten VITE_GUIDE_EN får engelske brukere den norske veiviseren med forklaring', async page => {
+  await page.addInitScript(() => localStorage.setItem('hs_lang', 'en'))
+  await page.goto(`${BASE}/veiviser`)
+  await page.getByText('The inheritance guide follows Norwegian law and is only available in Norwegian.').waitFor()
+  const src = await page.locator('iframe').getAttribute('src')
+  assert(!src.includes('lang=en'), `iframe ber om engelsk uten at det er slått på: ${src}`)
+}, { loggedIn: false })
+
 // E-postmalene (supabase/templates) velger språk ut fra user_metadata.lang, som settes ved registrering
 for (const [lang, tab, submit] of [['no', 'Opprett konto', 'Opprett konto'], ['en', 'Create account', 'Create account']]) {
   await check(`Registrering: språket (${lang}) sendes med, så bekreftelses-e-posten kommer på riktig språk`, async page => {

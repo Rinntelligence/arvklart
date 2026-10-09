@@ -27,6 +27,8 @@ import ConflictPage from './pages/ConflictPage'
 import StatusPage from './pages/StatusPage'
 import ContactPage from './pages/ContactPage'
 import { getPendingSave, clearPendingSave } from './lib/wizardEstate'
+import { clearAllReasonDrafts } from './lib/reasonDraft'
+import { adoptProfileLang, initialProfileLang } from './lib/lang'
 import TopBar from './components/TopBar'
 import Toasts from './components/Toast'
 import FeedbackWidget from './components/FeedbackWidget'
@@ -74,9 +76,10 @@ export default function App() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, s) => {
       setSession(s)
       if (event === 'SIGNED_OUT') {
-        // Neste person på samme maskin skal ikke arve invitasjoner eller veiviser-lagring
+        // Neste person på samme maskin skal ikke arve invitasjoner, veiviser-lagring eller påbegynte begrunnelser
         pendingJoin.clear()
         clearPendingSave()
+        clearAllReasonDrafts()
       }
       // Fallback in case the reset link landed somewhere other than /nytt-passord
       if (event === 'PASSWORD_RECOVERY') navigate(RESET_PATH)
@@ -119,10 +122,13 @@ export default function App() {
       if (!data && metaName && !isDemo) {
         // Registrert med navn (evt. med e-postbekreftelse): opprett profilen nå
         const color = AVATAR_COLORS[Math.floor(Math.random() * AVATAR_COLORS.length)]
-        const res = await upsertProfile({ user_id: user.id, display_name: metaName.slice(0, 100), avatar_color: color, email: user.email })
+        // Språket brukeren valgte før innlogging følger med (null = ikke valgt, norsk)
+        const res = await upsertProfile({ user_id: user.id, display_name: metaName.slice(0, 100), avatar_color: color, email: user.email, preferred_lang: initialProfileLang() })
         data = res.data
       }
       if (cancelled) return
+      // Kontoens språk gjelder på alle enheter: bytt (én gang) hvis nettleseren står på et annet
+      if (adoptProfileLang(data?.preferred_lang)) { window.location.reload(); return }
       setProfile(data)
 
       if (isDemo) {

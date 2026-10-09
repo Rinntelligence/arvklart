@@ -22,6 +22,16 @@ select t_eq((select plan from profiles where user_id = auth.uid()), 'free', 'pla
 select t_eq((select email from profiles where user_id = auth.uid()), 'eva@test.no', 'e-post settes fra innloggingen');
 update profiles set is_founder = true, plan = 'business', display_name = 'Eva H' where user_id = auth.uid();
 select t_eq((select is_founder::text || plan || display_name from profiles where user_id = auth.uid()), 'falsefreeEva H', 'update endrer navn, ikke founder/plan');
+-- Språk per konto (20261013_profiles_preferred_lang.sql)
+with u as (update profiles set preferred_lang = 'en' where user_id = auth.uid() returning 1)
+  select t_eq((select count(*)::int from u), 1, 'bruker kan velge språk på egen profil');
+do $$ begin
+  update profiles set preferred_lang = 'de' where user_id = auth.uid();
+  raise exception 'FAIL: ukjent språk ble lagret';
+exception when check_violation then raise notice 'OK   språket må være no eller en';
+end $$;
+with u as (update profiles set preferred_lang = 'en' where user_id <> auth.uid() returning 1)
+  select t_eq((select count(*)::int from u), 0, 'bruker kan ikke endre andres språk');
 insert into estates (id, name, owner_id, invite_code) values ('eeee0000-0000-0000-0000-000000000001', 'Evas bo', auth.uid(), 'EVA123');
 insert into estate_members (estate_id, user_id, role) values ('eeee0000-0000-0000-0000-000000000001', auth.uid(), 'admin');
 insert into heirs (estate_id, name, email, relationship) values ('eeee0000-0000-0000-0000-000000000001', 'Frank', 'frank@test.no', 'Barn');
@@ -64,6 +74,27 @@ do $$ begin
 exception when insufficient_privilege then raise notice 'OK   kan ikke opprette en allerede tildelt gjenstand';
 end $$;
 insert into interests (item_id, user_id) values ('11110000-0000-0000-0000-000000000001', auth.uid());
+-- Begrunnelsen på eget ønske kan legges til, endres og fjernes (20261010_interests_reason_update.sql)
+with u as (update interests set reason = 'Husker den fra hytta' where item_id = '11110000-0000-0000-0000-000000000001' and user_id = auth.uid() returning 1)
+  select t_eq((select count(*)::int from u), 1, 'arving kan legge til begrunnelse på eget ønske');
+update interests set reason = null where item_id = '11110000-0000-0000-0000-000000000001' and user_id = auth.uid();
+select t_eq((select reason from interests where item_id = '11110000-0000-0000-0000-000000000001' and user_id = auth.uid()), null::text, 'arving kan fjerne begrunnelsen');
+update interests set reason = 'Husker den fra hytta' where item_id = '11110000-0000-0000-0000-000000000001' and user_id = auth.uid();
+do $$ begin
+  update interests set item_id = '11110000-0000-0000-0000-000000000002' where user_id = auth.uid();
+  raise exception 'FAIL: kunne flytte ønsket til en annen gjenstand';
+exception when insufficient_privilege then raise notice 'OK   kan bare endre begrunnelsen, ikke hvilken gjenstand ønsket gjelder';
+end $$;
+do $$ begin
+  update interests set user_id = '00000000-0000-0000-0000-0000000000f1' where user_id = auth.uid();
+  raise exception 'FAIL: kunne gi ønsket til en annen';
+exception when insufficient_privilege then raise notice 'OK   kan ikke endre hvem ønsket tilhører';
+end $$;
+do $$ begin
+  update interests set reason = repeat('x', 1001) where user_id = auth.uid();
+  raise exception 'FAIL: begrunnelse over 1000 tegn ble lagret';
+exception when check_violation then raise notice 'OK   begrunnelsen er begrenset til 1000 tegn';
+end $$;
 insert into item_passes (item_id, user_id) values ('11110000-0000-0000-0000-000000000002', auth.uid());
 with d as (delete from items where id = '11110000-0000-0000-0000-000000000002' returning 1) select t_eq((select count(*)::int from d), 1, 'den som la inn gjenstanden kan slette den');
 with d as (delete from items where id = '11110000-0000-0000-0000-000000000001' returning 1) select t_eq((select count(*)::int from d), 0, 'medlem kan ikke slette andres gjenstand');
@@ -93,6 +124,24 @@ do $$ begin
   update items set marked_for_disposal = true where id = '11110000-0000-0000-0000-000000000003';
   raise exception 'FAIL: medlem kunne merke egen gjenstand for kast';
 exception when insufficient_privilege then raise notice 'OK   medlem kan ikke merke egen gjenstand for kast heller';
+end $$;
+-- AI-vurderingen behandles som verdien (20261012_items_ai_analysis.sql)
+do $$ begin
+  update items set ai_analysis = '{"v":2,"ai":{"suggestion":{"title":"Søppel"}}}' where id = '11110000-0000-0000-0000-000000000001';
+  raise exception 'FAIL: medlem kunne endre AI-vurderingen på andres gjenstand';
+exception when insufficient_privilege then raise notice 'OK   medlem kan ikke endre AI-vurderingen på andres gjenstand';
+end $$;
+update items set ai_analysis = '{"v":2,"ai":{},"review":{"title":"edited"}}' where id = '11110000-0000-0000-0000-000000000003';
+select t_eq((select ai_analysis->'review'->>'title' from items where id = '11110000-0000-0000-0000-000000000003'), 'edited', 'den som la inn gjenstanden kan lagre AI-vurderingen');
+do $$ begin
+  update items set ai_analysis = '"tekst"' where id = '11110000-0000-0000-0000-000000000003';
+  raise exception 'FAIL: AI-vurdering som ikke er et objekt ble lagret';
+exception when check_violation then raise notice 'OK   AI-vurderingen må være et JSON-objekt';
+end $$;
+do $$ begin
+  update items set ai_analysis = jsonb_build_object('v', 2, 'pad', repeat('x', 21000)) where id = '11110000-0000-0000-0000-000000000003';
+  raise exception 'FAIL: for stor AI-vurdering ble lagret';
+exception when check_violation then raise notice 'OK   AI-vurderingen er begrenset i størrelse';
 end $$;
 -- Poeng kan bare gis via complete_chore
 insert into chores (id, estate_id, title, size, points) values ('cccc0000-0000-0000-0000-000000000001', 'eeee0000-0000-0000-0000-000000000001', 'Rydde', 'small', 9999);
@@ -179,6 +228,8 @@ do $$ begin
   raise exception 'FAIL: eieren ble fjernet';
 exception when others then if sqlerrm like 'FAIL%' then raise; end if; raise notice 'OK   eieren kan ikke fjernes (%)', sqlerrm;
 end $$;
+with u as (update interests set reason = 'Endret av admin' where user_id <> auth.uid() returning 1)
+  select t_eq((select count(*)::int from u), 0, 'admin kan ikke endre andres begrunnelse');
 select remove_estate_member('eeee0000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-0000000000f1'::uuid);
 select t_eq((select count(*)::int from estate_members where estate_id = 'eeee0000-0000-0000-0000-000000000001'), 1, 'admin kan fjerne medlem');
 select t_eq((select count(*)::int from interests), 0, 'det fjernede medlemmets interesser er borte');
@@ -191,6 +242,8 @@ select t_as('mona.demo@heirsplit.no'); set role authenticated;
 select t_eq((select count(*)::int > 0 from items), true, 'demo ser demo-boet');
 delete from interests where user_id = auth.uid() and item_id = 'face0002-0000-0000-0000-000000000002';
 insert into interests (item_id, user_id) values ('face0002-0000-0000-0000-000000000002', auth.uid());
+with u as (update interests set reason = 'Fin til hytta' where item_id = 'face0002-0000-0000-0000-000000000002' and user_id = auth.uid() returning 1)
+  select t_eq((select count(*)::int from u), 1, 'demo kan endre begrunnelsen på eget ønske');
 insert into item_passes (item_id, user_id) values ('face0010-0000-0000-0000-000000000010', auth.uid());
 update items set marked_for_disposal = true where id = 'face0012-0000-0000-0000-000000000012';
 update items set assigned_to = auth.uid(), status = 'assigned' where id = 'face0002-0000-0000-0000-000000000002';
@@ -214,9 +267,14 @@ exception when insufficient_privilege then raise notice 'OK   demo kan ikke fjer
 end $$;
 update estates set invite_code = 'HACKED';
 update profiles set display_name = 'Hacket' where user_id = auth.uid();
+update profiles set preferred_lang = 'en' where user_id = auth.uid();
 reset role;
 select t_eq((select invite_code from estates where id = 'deed0001-0000-0000-0000-000000000001'), 'HANSEN2025', 'demo kan ikke endre invitasjonskoden');
 select t_eq((select display_name from profiles where email = 'mona.demo@heirsplit.no'), 'Mona Hansen-Dahl', 'demo kan ikke endre profilen');
+select t_eq((select preferred_lang from profiles where email = 'mona.demo@heirsplit.no'), null::text, 'demo kan ikke endre språket på profilen');
+-- Eksisterende brukere fra før migreringen (standardverdien 'en' i prod) står som «ikke valgt», altså norsk
+select t_eq((select preferred_lang from profiles where user_id = '00000000-0000-0000-0000-0000000000c1'), null::text, 'gamle profiler med standardverdien en er nullstilt');
+select t_eq((select column_default::text from information_schema.columns where table_name = 'profiles' and column_name = 'preferred_lang'), null::text, 'språk har ingen standardverdi');
 
 -- Nullstilling av demoen
 select reset_demo_estate();
@@ -238,6 +296,17 @@ do $$ begin
 exception when insufficient_privilege then raise notice 'OK   klienten kan ikke kalle claim_ai_call direkte';
 end $$;
 reset role;
+-- Edge-funksjonen (service_role) får usage_id og kan fylle inn målingene etterpå (20261011_ai_usage_metrics.sql)
+-- Frank, ikke Eva: kvotetesten lenger ned teller Evas kall
+select t_eq((claim_ai_call((select id from auth.users where email = 'frank@test.no'), 's-metrics', 'analyze-item', false) ? 'usage_id'), true, 'claim_ai_call returnerer usage_id');
+update ai_usage set model = 'claude-haiku-5-5', input_tokens = 1200, output_tokens = 300, image_count = 2, latency_ms = 900, cost_usd = 0.00027, outcome = 'ok', attempts = 1
+  where session_id = 's-metrics';
+select t_eq((select outcome from ai_usage where session_id = 's-metrics'), 'ok', 'målingene kan lagres på raden');
+do $$ begin
+  update ai_usage set outcome = 'tull' where session_id = 's-metrics';
+  raise exception 'FAIL: ukjent utfall ble lagret';
+exception when check_violation then raise notice 'OK   utfall må være en kjent verdi';
+end $$;
 
 -- Kjøreloggen for automatisk sletting kan bare leses og skrives av service_role
 select t_as('eva@test.no'); set role authenticated;
