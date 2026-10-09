@@ -201,3 +201,16 @@ describe('dele opp feil gruppering (scenario D)', () => {
     assert.equal(splitDraft(drafts, 'g', makeDraft), drafts)
   })
 })
+
+describe('AI-verdianslag gjelder bare med uendret grunnlag', async () => {
+  const { estimateApplies } = await import('../../src/lib/itemAiHelpers.js')
+  const base = { title: 'Stol', condition: 'good', categoryId: 'c1', value: '500' }
+  const withEstimate = { ...base, estimate: { value: '500', basis: { title: 'Stol', condition: 'good', categoryId: 'c1' } } }
+  test('uendret: gjelder', () => assert.equal(estimateApplies(withEstimate), true))
+  test('uten anslag: gjelder ikke', () => assert.equal(estimateApplies(base), false))
+  test('endret navn, tilstand, kategori eller verdi: gjelder ikke', () => {
+    for (const patch of [{ title: 'Gyngestol' }, { condition: 'fair' }, { categoryId: 'c2' }, { value: '700' }]) {
+      assert.equal(estimateApplies({ ...withEstimate, ...patch }), false, JSON.stringify(patch))
+    }
+  })
+})

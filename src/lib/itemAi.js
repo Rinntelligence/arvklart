@@ -3,7 +3,7 @@ import { supabase } from './supabase'
 import { downscaleImage, fileToBase64 } from './images'
 import { isEn, L } from './lang'
 
-export { addCapturedPhotos, matchCategory, mergeSelectedPhotos, removePhotoAt, restoreRemoved, runPool, splitDraft } from './itemAiHelpers.js'
+export { addCapturedPhotos, estimateApplies, matchCategory, mergeSelectedPhotos, removePhotoAt, restoreRemoved, runPool, splitDraft } from './itemAiHelpers.js'
 
 // Kalles med brukerens innlogging; edge-funksjonene avviser anonyme kall og teller AI-bruken.
 // Feil får med koden fra funksjonen (demo_limit, rate_limit, ai_busy …).
@@ -46,4 +46,21 @@ export async function analyzeItemPhotos(files, { categories = [], estimate = fal
     lang: isEn() ? 'en' : 'no',
   })
   return { result: res?.data || res, quota: res?.quota }
+}
+
+// Grovt verdianslag ut fra teksten (navn, beskrivelse, kategori, tilstand): ett AI-kall, ingen bilder.
+// Markedet er alltid Norge (NOK). Brukes når brukeren selv ber om det.
+export async function requestValueEstimate({ title, description = '', category = '', condition = '' }) {
+  const res = await callEdgeFunction('estimate-value', { title, description, category, condition, lang: isEn() ? 'en' : 'no' })
+  const d = res?.data || res || {}
+  const s = d.summary || d
+  const num = v => (Number.isFinite(Number(v)) && Number(v) > 0 ? Math.round(Number(v)) : null)
+  return {
+    estimate: {
+      likely: num(s.likely_nok), low: num(s.low_nok), high: num(s.high_nok),
+      reasoning: d.market?.reasoning ?? d.reasoning ?? null,
+      confidence: d.market?.confidence ?? d.confidence ?? null,
+    },
+    quota: res?.quota,
+  }
 }

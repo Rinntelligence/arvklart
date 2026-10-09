@@ -20,10 +20,10 @@ const run = async (name, fn) => {
   try { await fn(); results.push(`OK   ${name}`) } catch (e) { results.push(`FAIL ${name}: ${e.message.split('\n').slice(0,6).join(' | ')}`) }
 }
 
-async function setup(browser, { lang = 'no', failCall = null, viewport = { width: 390, height: 844 } } = {}) {
+async function setup(browser, { lang = 'no', failCall = null, failEstimate = null, viewport = { width: 390, height: 844 } } = {}) {
   const ctx = await browser.newContext({ viewport, deviceScaleFactor: 2, hasTouch: true, permissions: ['camera'] })
   const page = await ctx.newPage()
-  const calls = { analyze: 0, itemInserts: 0, uploads: 0, analyzeLangs: [], analyzeEstimate: [] }
+  const calls = { analyze: 0, itemInserts: 0, uploads: 0, analyzeLangs: [], analyzeEstimate: [], estimate: 0, insertBodies: [] }
   await page.route('https://test.supabase.co/**', async route => {
     const req = route.request()
     const url = new URL(req.url())
@@ -41,11 +41,17 @@ async function setup(browser, { lang = 'no', failCall = null, viewport = { width
         category: 'Møbler', condition: 'good', confidence: 'medium', low_nok: 300, likely_nok: 500, high_nok: 800,
       }, quota: { ok: true } })
     }
+    if (url.pathname.startsWith('/functions/v1/estimate-value')) {
+      calls.estimate++
+      if (failEstimate && failEstimate(calls.estimate)) return json({ success: false, code: 'rate_limit', error: 'For mange forespørsler' }, 429)
+      const m = { likely_nok: 500, low_nok: 300, high_nok: 800, reasoning: 'Brukt eikestol, vanlig modell', confidence: 'medium' }
+      return json({ success: true, data: { market: m, summary: { likely_nok: 500, low_nok: 300, high_nok: 800 } }, quota: { ok: true } })
+    }
     if (url.pathname.startsWith('/storage/v1/object/')) { calls.uploads++; return json({ Key: 'x' }) }
     if (url.pathname.startsWith('/rest/v1/profiles')) return json({ user_id: UID, display_name: 'Test', avatar_color: '#8c7b6b', email: 'test@test.no' })
     if (url.pathname.startsWith('/rest/v1/estate_members')) return json({ role: 'admin' })
     if (url.pathname.startsWith('/rest/v1/categories')) return json([{ id: 'c1', label: 'Møbler', emoji: '🪑', estate_id: EST }, { id: 'c2', label: 'Kunst og bilder', emoji: '🖼', estate_id: EST }])
-    if (url.pathname.startsWith('/rest/v1/items') && req.method() === 'POST') { calls.itemInserts++; return route.fulfill({ status: 201, body: '' }) }
+    if (url.pathname.startsWith('/rest/v1/items') && req.method() === 'POST') { calls.itemInserts++; calls.insertBodies.push(JSON.parse(req.postData() || '{}')); return route.fulfill({ status: 201, body: '' }) }
     return json([])
   })
   await page.addInitScript(([s, l]) => {
@@ -275,6 +281,49 @@ await run('Tastatur: kameraet kan brukes uten mus (utløser i fokus, Esc lukker)
   await page.keyboard.press('Escape')
   await page.getByText(/^Gjenstand 1$/).waitFor()
   assert.equal(await page.evaluate(() => document.activeElement?.textContent), '+ Ta bilde')
+  await ctx.close()
+})
+
+await run('E2: verdianslag bare når brukeren ber om det, synlig og merket, og lagres med begrunnelse', async () => {
+  const { ctx, page, calls } = await setup(browser)
+  await openCamera(page)
+  for (let i = 0; i < 3; i++) await shoot(page)
+  await page.getByRole('button', { name: 'Ferdig' }).click()
+  await page.getByRole('button', { name: 'Analyser med AI (3)' }).click()
+  await page.getByRole('button', { name: 'Godkjenn og lagre alle (3)' }).waitFor()
+  if (calls.estimate !== 0) throw new Error('verdianslag uten klikk')
+  await page.getByRole('button', { name: 'Anslå verdi for alle (3)' }).click()
+  await page.getByText('AI-anslag, veiledende', { exact: false }).first().waitFor()
+  assert.equal(calls.estimate, 3)
+  const values = page.getByRole('textbox', { name: 'Verdi i kroner (valgfri)' })
+  assert.equal(await values.count(), 3, 'verdifeltet er synlig (ikke under «Mer»)')
+  assert.equal(await values.first().inputValue(), '500')
+  await shot(page, 'E2-verdianslag.png', true)
+  // Endret verdi er brukerens egen: lagres uten AI-begrunnelse
+  await values.nth(1).fill('750')
+  assert.equal(await page.getByText('AI-anslag, veiledende', { exact: false }).count(), 2)
+  await page.getByRole('button', { name: 'Godkjenn og lagre alle (3)' }).click()
+  await page.getByText('✓ 3 gjenstander lagt til i boet').waitFor()
+  const byValue = Object.fromEntries(calls.insertBodies.map(b => [String(b.estimated_value), b]))
+  assert.equal(byValue['500'].estimate_reasoning, 'Brukt eikestol, vanlig modell')
+  assert.equal(byValue['750'].estimate_reasoning, undefined)
+  await ctx.close()
+})
+
+await run('E2b: verdianslag stopper ved grense, og meldingen blir stående', async () => {
+  const { ctx, page, calls } = await setup(browser, { failEstimate: n => n === 2 })
+  await openCamera(page)
+  for (let i = 0; i < 2; i++) await shoot(page)
+  await page.getByRole('button', { name: 'Ferdig' }).click()
+  await page.getByRole('button', { name: 'Analyser med AI (2)' }).click()
+  await page.getByRole('button', { name: 'Godkjenn og lagre alle (2)' }).waitFor()
+  await page.getByRole('button', { name: 'Anslå verdi for alle (2)' }).click()
+  const msg = page.getByText(/Verdien ble ikke anslått for 1 gjenstand/)
+  await msg.waitFor()
+  await page.waitForTimeout(4000)
+  assert.equal(await msg.count(), 1, 'meldingen står fortsatt')
+  await page.getByRole('button', { name: 'Anslå verdi (AI)' }).waitFor()
+  assert.ok(calls.estimate >= 2)
   await ctx.close()
 })
 

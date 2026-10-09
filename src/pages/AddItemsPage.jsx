@@ -10,7 +10,7 @@ import { hasAiConsent, giveAiConsent } from '../lib/aiConsent'
 import { formatNOK, parseNOK } from '../lib/format'
 import { L } from '../lib/lang'
 import { categoryLabel } from '../lib/categories'
-import { addCapturedPhotos, aiErrorMessage, analyzeItemPhotos, matchCategory, mergeSelectedPhotos, removePhotoAt, restoreRemoved, runPool, splitDraft } from '../lib/itemAi'
+import { addCapturedPhotos, aiErrorMessage, analyzeItemPhotos, estimateApplies, matchCategory, mergeSelectedPhotos, removePhotoAt, requestValueEstimate, restoreRemoved, runPool, splitDraft } from '../lib/itemAi'
 import { AiConsent, DemoNotice } from '../components/AiDialogs'
 import CameraCapture from '../components/CameraCapture'
 
@@ -23,6 +23,7 @@ let nextKey = 1
 const newDraft = () => ({
   key: nextKey++, photos: [], title: '', categoryId: '', condition: 'good', description: '',
   value: '', status: 'idle', // idle | analyzing | analyzed | failed | saving | saveFailed | saved
+  estimate: null, estimating: false, // AI-verdianslag bare når brukeren ber om det (se estimateApplies)
 })
 
 // Sekundærtekst og feltkanter med nok kontrast (WCAG 1.4.3 / 1.4.11)
@@ -67,7 +68,8 @@ export default function AddItemsPage({ session, profile, onToast, isDemo }) {
   const [done, setDone] = useState(null) // { saved } når alt er lagret
   const [myRole, setMyRole] = useState(null)
   const [aiConsented, setAiConsented] = useState(hasAiConsent)
-  const [askConsent, setAskConsent] = useState(false)
+  const [askConsent, setAskConsent] = useState(null) // { kind: 'analyze' | 'estimate', key } som venter på samtykke
+  const [estimateReport, setEstimateReport] = useState(null) // { failed, stoppedCode } når verdianslag ikke lyktes for alle
   const [demoBlocked, setDemoBlocked] = useState(false)
   const [demoRemaining, setDemoRemaining] = useState(isDemo ? 5 : null)
   const [dragOver, setDragOver] = useState(false)
@@ -332,7 +334,7 @@ export default function AddItemsPage({ session, profile, onToast, isDemo }) {
   const aiTargets = drafts.filter(d => d.photos.length > 0 && (d.status === 'idle' || d.status === 'failed'))
 
   const analyzeAll = async (consented = aiConsented, onlyKey = null) => {
-    if (!consented) { setAskConsent(true); return }
+    if (!consented) { setAskConsent({ kind: 'analyze', key: onlyKey }); return }
     let targets = draftsRef.current.filter(d => d.photos.length > 0 && (d.status === 'idle' || d.status === 'failed') && (!onlyKey || d.key === onlyKey))
     if (isDemo) {
       if (demoRemaining === 0) { setDemoBlocked(true); return }
@@ -387,6 +389,47 @@ export default function AddItemsPage({ session, profile, onToast, isDemo }) {
     }
   }
 
+  // Verdianslag: bare når brukeren ber om det, ett tekstkall per gjenstand (estimate-value), ingen bilder.
+  // Verdien fylles inn synlig og merkes som AI-anslag; brukeren kan endre eller tømme den.
+  const canEstimate = (d) => d.status !== 'saved' && d.title.trim() && !d.estimating
+  const estimateValues = async (consented = aiConsented, onlyKey = null) => {
+    if (!consented) { setAskConsent({ kind: 'estimate', key: onlyKey }); return }
+    let targets = draftsRef.current.filter(d => canEstimate(d) && (onlyKey ? d.key === onlyKey : !d.estimate))
+    if (isDemo) {
+      if (demoRemaining === 0) { setDemoBlocked(true); return }
+      targets = targets.slice(0, demoRemaining)
+    }
+    if (!targets.length) return
+    setEstimateReport(null)
+    if (!onlyKey) { setBusy('estimating'); setProgress({ done: 0, total: targets.length }) }
+    targets.forEach(d => update(d.key, { estimating: true }))
+    let stopped = null
+    let failed = 0
+    await runPool(targets, AI_PARALLEL, async (d) => {
+      try {
+        const cat = categories.find(c => c.id === d.categoryId)
+        const { estimate, quota } = await requestValueEstimate({ title: d.title.trim(), description: d.description.trim(), category: cat?.label || '', condition: d.condition })
+        if (typeof quota?.remaining === 'number') setDemoRemaining(quota.remaining)
+        if (!estimate.likely) throw new Error('no estimate')
+        update(d.key, cur => ({
+          estimating: false,
+          value: String(estimate.likely),
+          estimate: { ...estimate, value: String(estimate.likely), basis: { title: cur.title, condition: cur.condition, categoryId: cur.categoryId } },
+        }))
+      } catch (e) {
+        failed++
+        update(d.key, { estimating: false })
+        if (['demo_limit', 'rate_limit', 'ai_busy'].includes(e.code)) stopped = stopped || e
+      } finally {
+        if (!onlyKey) setProgress(p => ({ ...p, done: p.done + 1 }))
+      }
+    }, () => !!stopped)
+    setDrafts(prev => prev.map(d => d.estimating ? { ...d, estimating: false } : d))
+    if (!onlyKey) setBusy(null)
+    if (stopped?.code === 'demo_limit') { setDemoRemaining(0); setDemoBlocked(true); return }
+    if (failed) setEstimateReport({ failed, stoppedCode: stopped?.code || null })
+  }
+
   // ── Lagring ───────────────────────────────────────────────────────────────────
 
   const saveOne = async (d) => {
@@ -404,6 +447,8 @@ export default function AddItemsPage({ session, profile, onToast, isDemo }) {
       image_url: urls[0] || null,
       extra_images: urls.slice(1),
       estimated_value: parseNOK(d.value) ?? null, // 0 er en verdi; tomt felt er ukjent
+      // Begrunnelsen følger bare med når verdien fortsatt er AI-anslaget
+      ...(estimateApplies(d) ? { estimate_reasoning: d.estimate.reasoning, estimate_confidence: d.estimate.confidence } : {}),
     })
     if (error) {
       await removeImages(urls).catch(() => {})
@@ -572,6 +617,33 @@ export default function AddItemsPage({ session, profile, onToast, isDemo }) {
         <AiSummary report={aiReport} drafts={drafts} onClose={() => setAiReport(null)} />
       )}
 
+      {/* Tilbud om verdianslag etter analysen: et synlig, frivillig valg */}
+      {(() => {
+        const n = drafts.filter(d => canEstimate(d) && !d.estimate).length
+        if (merging || busy || !n || !drafts.some(d => d.status === 'analyzed')) return null
+        return (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', background: '#fff', border: '1px solid #D9CFC0', borderRadius: '12px', padding: '12px 14px', marginBottom: '12px', fontSize: '15px', color: '#3A2F26' }}>
+            <span style={{ flex: '1 1 220px', lineHeight: 1.5 }}>
+              {L('Vil du ha et grovt verdianslag? Verdien er valgfri og bare veiledende.', 'Would you like a rough value estimate? The value is optional and for guidance only.')}
+              <span style={{ display: 'block', fontSize: '13px', color: MUTED }}>{L(`Bruker ${n} AI-forsøk.`, `Uses ${n} AI attempts.`)}</span>
+            </span>
+            <button onClick={() => estimateValues()} style={{ ...smallBtn, background: '#fff', color: '#3A2F26', fontWeight: '600' }}>
+              {L(`Anslå verdi for alle (${n})`, `Estimate value for all (${n})`)}
+            </button>
+          </div>
+        )
+      })()}
+
+      {estimateReport && !busy && (
+        <div role="status" style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', background: '#F3E3D3', border: '1px solid #C9AE8E', borderRadius: '12px', padding: '12px 14px', marginBottom: '12px', fontSize: '15px', color: '#3A2F26', lineHeight: 1.5 }}>
+          <span style={{ flex: 1 }}>
+            {estimateReport.stoppedCode ? `${aiErrorMessage(estimateReport.stoppedCode)} ` : ''}
+            {L(`Verdien ble ikke anslått for ${estimateReport.failed} ${estimateReport.failed === 1 ? 'gjenstand' : 'gjenstander'}. Du kan prøve igjen på kortet, eller la feltet stå tomt.`, `The value was not estimated for ${estimateReport.failed} ${estimateReport.failed === 1 ? 'item' : 'items'}. You can try again on the card, or leave the field empty.`)}
+          </span>
+          <button onClick={() => setEstimateReport(null)} aria-label={L('Lukk meldingen', 'Close the message')} style={{ minWidth: '44px', minHeight: '44px', background: 'none', border: 'none', fontSize: '20px', color: '#5C4530', cursor: 'pointer', marginTop: '-10px', marginRight: '-10px' }}>×</button>
+        </div>
+      )}
+
       {merging ? (
         <MergeGrid drafts={drafts} items={mergeable} selected={mergeSel} onToggle={toggleMergePhoto} />
       ) : <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
@@ -583,6 +655,7 @@ export default function AddItemsPage({ session, profile, onToast, isDemo }) {
             onMergeUp={i > 0 ? () => mergeUp(d.key) : null}
             onSplit={() => splitUp(d.key)}
             onRetry={() => analyzeAll(aiConsented, d.key)}
+            onEstimate={() => estimateValues(aiConsented, d.key)}
             onAddPhotos={() => { addToRef.current = d.key; addInputRef.current.click() }}
             onCamera={() => openCameraFor(d.key)}
           />
@@ -601,7 +674,11 @@ export default function AddItemsPage({ session, profile, onToast, isDemo }) {
           <div style={{ maxWidth: '720px', margin: '0 auto' }}>
             {askConsent && (
               <div style={{ marginBottom: '10px' }}>
-                <AiConsent onCancel={() => setAskConsent(false)} onAccept={() => { giveAiConsent(); setAiConsented(true); setAskConsent(false); analyzeAll(true) }} />
+                <AiConsent onCancel={() => setAskConsent(null)} onAccept={() => {
+                  const ask = askConsent
+                  giveAiConsent(); setAiConsented(true); setAskConsent(null)
+                  if (ask.kind === 'estimate') estimateValues(true, ask.key); else analyzeAll(true, ask.key)
+                }} />
               </div>
             )}
             {merging ? (
@@ -633,7 +710,7 @@ export default function AddItemsPage({ session, profile, onToast, isDemo }) {
             ) : busy ? (
               <div>
                 <div role="status" style={{ fontSize: '14px', color: '#3A2F26', marginBottom: '8px' }}>
-                  {busy === 'analyzing' ? L(`AI analyserer… ${progress.done} av ${progress.total}`, `AI is analysing… ${progress.done} of ${progress.total}`) : L(`Lagrer… ${progress.done} av ${progress.total}`, `Saving… ${progress.done} of ${progress.total}`)}
+                  {busy === 'analyzing' ? L(`AI analyserer… ${progress.done} av ${progress.total}`, `AI is analysing… ${progress.done} of ${progress.total}`) : busy === 'estimating' ? L(`Anslår verdi… ${progress.done} av ${progress.total}`, `Estimating value… ${progress.done} of ${progress.total}`) : L(`Lagrer… ${progress.done} av ${progress.total}`, `Saving… ${progress.done} of ${progress.total}`)}
                 </div>
                 <div style={{ height: '8px', background: '#E8DFD0', borderRadius: '4px', overflow: 'hidden' }}>
                   <div style={{ height: '100%', width: `${progress.total ? (progress.done / progress.total) * 100 : 0}%`, background: '#5F6E52', transition: 'width 0.3s' }} />
@@ -812,9 +889,26 @@ const STATUS = {
   saved: () => ({ text: L('✓ Lagret', '✓ Saved'), color: '#5F6E52', bg: '#DCE3D2' }),
 }
 
-function DraftCard({ draft: d, index, categories, locked, onChange, onRemove, onRemovePhoto, onMergeUp, onSplit, onRetry, onAddPhotos, onCamera }) {
+function DraftCard({ draft: d, index, categories, locked, onChange, onRemove, onRemovePhoto, onMergeUp, onSplit, onRetry, onEstimate, onAddPhotos, onCamera }) {
   const status = STATUS[d.status]?.()
   const disabled = locked || d.status === 'saved'
+  const aiValue = estimateApplies(d)
+  const showValueInMore = !d.estimate && !d.estimating
+  const valueField = (
+    <div style={{ marginTop: showValueInMore ? 0 : '8px' }}>
+      {!showValueInMore && <label htmlFor={`value-${d.key}`} style={{ display: 'block', fontSize: '14px', color: '#5C4530', marginBottom: '4px' }}>{L('Verdi i kroner (valgfri)', 'Value in NOK (optional)')}</label>}
+      <input id={`value-${d.key}`} value={d.value} onChange={e => onChange({ value: e.target.value })} disabled={disabled || d.estimating} inputMode="numeric"
+        aria-label={showValueInMore ? L('Verdi i NOK (valgfri)', 'Value in NOK (optional)') : undefined} aria-describedby={aiValue ? `est-${d.key}` : undefined}
+        placeholder={d.estimating ? L('Anslår verdi…', 'Estimating value…') : L('Verdi i NOK (valgfri)', 'Value in NOK (optional)')} style={inputStyle} />
+      {aiValue && (
+        <div id={`est-${d.key}`} style={{ fontSize: '13px', color: '#5C4530', marginTop: '4px', lineHeight: 1.5 }}>
+          {L('AI-anslag, veiledende', 'AI estimate, for guidance only')}
+          {d.estimate.low && d.estimate.high ? ` (${formatNOK(d.estimate.low)} – ${formatNOK(d.estimate.high)})` : ''}
+          {'. '}{L('Du kan endre eller tømme feltet.', 'You can change or clear the field.')}
+        </div>
+      )}
+    </div>
+  )
   return (
     <div id={`draft-${d.key}`} style={{ background: '#fff', border: `1px solid ${d.status === 'failed' || d.status === 'saveFailed' ? '#C9AE8E' : '#D9CFC0'}`, borderRadius: '12px', padding: '14px', opacity: d.status === 'saved' ? 0.6 : 1 }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', marginBottom: '10px', flexWrap: 'wrap' }}>
@@ -863,23 +957,24 @@ function DraftCard({ draft: d, index, categories, locked, onChange, onRemove, on
           <option value="poor">{L('Dårlig', 'Poor')}</option>
         </select>
       </div>
+      {(d.estimate || d.estimating) && valueField}
       <details style={{ marginTop: '8px' }}>
         <summary style={{ cursor: 'pointer', fontSize: '14px', color: '#5C4530', padding: '10px 0', minHeight: '44px', boxSizing: 'border-box' }}>
-          {L('Mer', 'More')}{d.description.trim() || d.value ? ` · ${[d.description.trim() && L('beskrivelse', 'description'), d.value && formatNOK(d.value)].filter(Boolean).join(' · ')}` : ` · ${L('beskrivelse og verdi (valgfritt)', 'description and value (optional)')}`}
+          {showValueInMore
+            ? <>{L('Mer', 'More')}{d.description.trim() || d.value ? ` · ${[d.description.trim() && L('beskrivelse', 'description'), d.value && formatNOK(d.value)].filter(Boolean).join(' · ')}` : ` · ${L('beskrivelse og verdi (valgfritt)', 'description and value (optional)')}`}</>
+            : <>{L('Mer', 'More')} · {d.description.trim() ? L('beskrivelse', 'description') : L('beskrivelse (valgfritt)', 'description (optional)')}</>}
         </summary>
         <div style={{ display: 'grid', gap: '8px', paddingTop: '6px' }}>
           <textarea value={d.description} onChange={e => onChange({ description: e.target.value })} disabled={disabled} maxLength={2000} rows={2} aria-label={L('Beskrivelse', 'Description')}
             placeholder={L('Beskrivelse (valgfri)', 'Description (optional)')}
             style={{ ...inputStyle, resize: 'vertical', fontSize: '15px' }} />
-          <div>
-            <input value={d.value} onChange={e => onChange({ value: e.target.value })} disabled={disabled} inputMode="numeric" aria-label={L('Verdi i NOK (valgfri)', 'Value in NOK (optional)')}
-              placeholder={L('Verdi i NOK (valgfri)', 'Value in NOK (optional)')} style={inputStyle} />
-          </div>
+          {showValueInMore && valueField}
         </div>
       </details>
 
       {!disabled && (
         <div style={{ display: 'flex', gap: '8px', marginTop: '10px', flexWrap: 'wrap' }}>
+          {d.title.trim() && !d.estimate && !d.estimating && <button onClick={onEstimate} style={smallBtn}>{L('Anslå verdi (AI)', 'Estimate value (AI)')}</button>}
           {d.photos.length > 1 && <button onClick={onSplit} style={smallBtn}>{L('Del opp: ett bilde per gjenstand', 'Split: one photo per item')}</button>}
           {onMergeUp && <button onClick={onMergeUp} style={smallBtn}>{L('↑ Samme gjenstand som over', '↑ Same item as above')}</button>}
           <button onClick={onRemove} style={{ ...smallBtn, color: '#8A4B2A' }}>{L('Fjern', 'Remove')}</button>

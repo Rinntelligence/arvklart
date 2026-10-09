@@ -117,3 +117,12 @@ export function splitDraft(drafts, key, makeDraft) {
   const parts = [{ ...draft, photos: [first], status: draft.status === 'saved' ? draft.status : 'idle' }, ...rest.map(p => ({ ...makeDraft(), photos: [p] }))]
   return [...drafts.slice(0, i), ...parts, ...drafts.slice(i + 1)]
 }
+
+// Et AI-verdianslag gjelder bare så lenge grunnlaget er uendret: navn, tilstand og kategori, og verdien
+// i feltet er den AI foreslo. Ellers er verdien brukerens egen og vises og lagres ikke som AI-anslag.
+export function estimateApplies(draft) {
+  const e = draft?.estimate
+  if (!e?.basis) return false
+  return draft.title === e.basis.title && draft.condition === e.basis.condition
+    && draft.categoryId === e.basis.categoryId && String(draft.value) === String(e.value)
+}
