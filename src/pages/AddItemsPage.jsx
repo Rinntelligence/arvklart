@@ -364,7 +364,7 @@ export default function AddItemsPage({ session, profile, onToast, isDemo }) {
       } catch (e) {
         update(d.key, { status: 'failed' })
         failedKeys.push(d.key)
-        if (['demo_limit', 'rate_limit', 'ai_busy'].includes(e.code)) stopped = stopped || e
+        if (['demo_limit', 'rate_limit', 'ai_busy', 'ai_unavailable'].includes(e.code)) stopped = stopped || e
       } finally {
         setProgress(p => ({ ...p, done: p.done + 1 }))
       }
@@ -419,7 +419,7 @@ export default function AddItemsPage({ session, profile, onToast, isDemo }) {
       } catch (e) {
         failed++
         update(d.key, { estimating: false })
-        if (['demo_limit', 'rate_limit', 'ai_busy'].includes(e.code)) stopped = stopped || e
+        if (['demo_limit', 'rate_limit', 'ai_busy', 'ai_unavailable'].includes(e.code)) stopped = stopped || e
       } finally {
         if (!onlyKey) setProgress(p => ({ ...p, done: p.done + 1 }))
       }

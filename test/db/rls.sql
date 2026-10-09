@@ -263,6 +263,17 @@ do $$ begin
 exception when insufficient_privilege then raise notice 'OK   klienten kan ikke kalle claim_ai_call direkte';
 end $$;
 reset role;
+-- Edge-funksjonen (service_role) får usage_id og kan fylle inn målingene etterpå (20261011_ai_usage_metrics.sql)
+-- Frank, ikke Eva: kvotetesten lenger ned teller Evas kall
+select t_eq((claim_ai_call((select id from auth.users where email = 'frank@test.no'), 's-metrics', 'analyze-item', false) ? 'usage_id'), true, 'claim_ai_call returnerer usage_id');
+update ai_usage set model = 'claude-haiku-5-5', input_tokens = 1200, output_tokens = 300, image_count = 2, latency_ms = 900, cost_usd = 0.00027, outcome = 'ok', attempts = 1
+  where session_id = 's-metrics';
+select t_eq((select outcome from ai_usage where session_id = 's-metrics'), 'ok', 'målingene kan lagres på raden');
+do $$ begin
+  update ai_usage set outcome = 'tull' where session_id = 's-metrics';
+  raise exception 'FAIL: ukjent utfall ble lagret';
+exception when check_violation then raise notice 'OK   utfall må være en kjent verdi';
+end $$;
 
 -- Kjøreloggen for automatisk sletting kan bare leses og skrives av service_role
 select t_as('eva@test.no'); set role authenticated;

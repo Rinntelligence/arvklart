@@ -33,7 +33,13 @@ async function setup(browser, { lang = 'no', failCall = null, failEstimate = nul
       const body = JSON.parse(req.postData() || '{}')
       calls.analyzeLangs.push(body.lang)
       calls.analyzeEstimate.push(Boolean(body.estimate))
-      if (failCall && failCall(calls.analyze)) return json({ success: false, code: 'ai_error', error: 'AI-tjenesten svarte med feil (500)' }, 502)
+      // failCall kan gi en feilkode (f.eks. 'ai_refused'); true betyr ai_error
+      const fail = failCall && failCall(calls.analyze)
+      if (fail) {
+        const code = typeof fail === 'string' ? fail : 'ai_error'
+        const status = { ai_refused: 422, ai_unavailable: 503, ai_busy: 503, ai_timeout: 504 }[code] || 502
+        return json({ success: false, code, error: 'Norsk servertekst som ikke skal vises' }, status)
+      }
       const en = body.lang === 'en'
       return json({ success: true, data: {
         title: en ? `Oak chair ${calls.analyze}` : `Eikestol ${calls.analyze}`,
@@ -233,6 +239,31 @@ await run('F: AI feiler på én av sju: seks kan lagres, den siste kan prøves i
   await page.getByRole('button', { name: 'Godkjenn og lagre alle (1)' }).click()
   await page.getByText('✓ 1 gjenstand lagt til i boet').waitFor()
   assert.equal(calls.itemInserts, 7)
+  await ctx.close()
+})
+
+await run('F2: AI avslår én gjenstand (ai_refused): de andre analyseres, og kortet kan fylles inn selv', async () => {
+  const { ctx, page, calls } = await setup(browser, { failCall: n => n === 2 && 'ai_refused' })
+  await openCamera(page)
+  for (let i = 0; i < 3; i++) await shoot(page)
+  await page.getByRole('button', { name: 'Ferdig' }).click()
+  await page.getByRole('button', { name: 'Analyser med AI (3)' }).click()
+  await page.getByRole('button', { name: 'Godkjenn og lagre alle (2)' }).waitFor()
+  assert.equal(calls.analyze, 3, 'analysen skal fortsette etter et avslag')
+  await page.getByText('AI klarte ikke denne').waitFor()
+  assert.equal(await page.getByText('Norsk servertekst som ikke skal vises').count(), 0)
+  await ctx.close()
+})
+
+await run('F3: AI utilgjengelig (ai_unavailable): analysen stopper og sier at man kan fylle inn selv', async () => {
+  const { ctx, page, calls } = await setup(browser, { failCall: () => 'ai_unavailable' })
+  await openCamera(page)
+  for (let i = 0; i < 5; i++) await shoot(page)
+  await page.getByRole('button', { name: 'Ferdig' }).click()
+  await page.getByRole('button', { name: 'Analyser med AI (5)' }).click()
+  await page.getByText(/AI-hjelpen er ikke tilgjengelig akkurat nå\. Du kan fylle inn selv\./).waitFor()
+  assert.ok(calls.analyze <= 3, `forventet at analysen stoppet, men ${calls.analyze} kall ble gjort`)
+  assert.equal(await page.getByText('Norsk servertekst som ikke skal vises').count(), 0)
   await ctx.close()
 })
 
