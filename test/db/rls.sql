@@ -64,6 +64,27 @@ do $$ begin
 exception when insufficient_privilege then raise notice 'OK   kan ikke opprette en allerede tildelt gjenstand';
 end $$;
 insert into interests (item_id, user_id) values ('11110000-0000-0000-0000-000000000001', auth.uid());
+-- Begrunnelsen på eget ønske kan legges til, endres og fjernes (20261010_interests_reason_update.sql)
+with u as (update interests set reason = 'Husker den fra hytta' where item_id = '11110000-0000-0000-0000-000000000001' and user_id = auth.uid() returning 1)
+  select t_eq((select count(*)::int from u), 1, 'arving kan legge til begrunnelse på eget ønske');
+update interests set reason = null where item_id = '11110000-0000-0000-0000-000000000001' and user_id = auth.uid();
+select t_eq((select reason from interests where item_id = '11110000-0000-0000-0000-000000000001' and user_id = auth.uid()), null::text, 'arving kan fjerne begrunnelsen');
+update interests set reason = 'Husker den fra hytta' where item_id = '11110000-0000-0000-0000-000000000001' and user_id = auth.uid();
+do $$ begin
+  update interests set item_id = '11110000-0000-0000-0000-000000000002' where user_id = auth.uid();
+  raise exception 'FAIL: kunne flytte ønsket til en annen gjenstand';
+exception when insufficient_privilege then raise notice 'OK   kan bare endre begrunnelsen, ikke hvilken gjenstand ønsket gjelder';
+end $$;
+do $$ begin
+  update interests set user_id = '00000000-0000-0000-0000-0000000000f1' where user_id = auth.uid();
+  raise exception 'FAIL: kunne gi ønsket til en annen';
+exception when insufficient_privilege then raise notice 'OK   kan ikke endre hvem ønsket tilhører';
+end $$;
+do $$ begin
+  update interests set reason = repeat('x', 1001) where user_id = auth.uid();
+  raise exception 'FAIL: begrunnelse over 1000 tegn ble lagret';
+exception when check_violation then raise notice 'OK   begrunnelsen er begrenset til 1000 tegn';
+end $$;
 insert into item_passes (item_id, user_id) values ('11110000-0000-0000-0000-000000000002', auth.uid());
 with d as (delete from items where id = '11110000-0000-0000-0000-000000000002' returning 1) select t_eq((select count(*)::int from d), 1, 'den som la inn gjenstanden kan slette den');
 with d as (delete from items where id = '11110000-0000-0000-0000-000000000001' returning 1) select t_eq((select count(*)::int from d), 0, 'medlem kan ikke slette andres gjenstand');
@@ -179,6 +200,8 @@ do $$ begin
   raise exception 'FAIL: eieren ble fjernet';
 exception when others then if sqlerrm like 'FAIL%' then raise; end if; raise notice 'OK   eieren kan ikke fjernes (%)', sqlerrm;
 end $$;
+with u as (update interests set reason = 'Endret av admin' where user_id <> auth.uid() returning 1)
+  select t_eq((select count(*)::int from u), 0, 'admin kan ikke endre andres begrunnelse');
 select remove_estate_member('eeee0000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-0000000000f1'::uuid);
 select t_eq((select count(*)::int from estate_members where estate_id = 'eeee0000-0000-0000-0000-000000000001'), 1, 'admin kan fjerne medlem');
 select t_eq((select count(*)::int from interests), 0, 'det fjernede medlemmets interesser er borte');
@@ -191,6 +214,8 @@ select t_as('mona.demo@heirsplit.no'); set role authenticated;
 select t_eq((select count(*)::int > 0 from items), true, 'demo ser demo-boet');
 delete from interests where user_id = auth.uid() and item_id = 'face0002-0000-0000-0000-000000000002';
 insert into interests (item_id, user_id) values ('face0002-0000-0000-0000-000000000002', auth.uid());
+with u as (update interests set reason = 'Fin til hytta' where item_id = 'face0002-0000-0000-0000-000000000002' and user_id = auth.uid() returning 1)
+  select t_eq((select count(*)::int from u), 1, 'demo kan endre begrunnelsen på eget ønske');
 insert into item_passes (item_id, user_id) values ('face0010-0000-0000-0000-000000000010', auth.uid());
 update items set marked_for_disposal = true where id = 'face0012-0000-0000-0000-000000000012';
 update items set assigned_to = auth.uid(), status = 'assigned' where id = 'face0002-0000-0000-0000-000000000002';

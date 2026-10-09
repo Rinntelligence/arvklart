@@ -25,6 +25,7 @@ Sist verifisert: 2026-10-09 (funksjoner, policies, triggere og RLS på `items` l
 | `migrations/20261008_revoke_cleanup_old_closed_estates.sql` | **ja, 2026-10-08 16:33 UTC** | `schema_migrations` 20261008163341. `anon`/`authenticated` får 42501, `service_role` kan fortsatt |
 | `migrations/20261008_guard_item_value_disposal.sql` | **ja, 2026-10-09 12:11 UTC** | kjørt i én transaksjon med `lock_timeout` 5 s via `supabase db query --linked` (`schema_migrations` 20261009121126), etter at frontend uten «Kast» var i prod. Før: definisjonene hentet ut og bekreftet lik repoet. Etter: md5 for `guard_item_update` = `487b50fa…` (lik filen), ny `items_delete`, kontroll med demokontoene i en transaksjon som ble rullet tilbake (medlem kan ikke kastmerke, admin kan), røyktest i nettleseren 17/17. Tilbakerulling: `rollback/20261008_guard_item_value_disposal.down.sql` |
 | `migrations/20261008_cleanup_runs.sql` | **nei** | må kjøres før `cleanup-closed-estates` / `cleanup-orphan-images` deployes (uten tabellen avbrytes kjøringen før noe slettes) |
+| `migrations/20261010_interests_reason_update.sql` | **ja, 2026-10-09 15:05 UTC** | `schema_migrations` 20261009150536. Kjørt sammen med 20261011–20261013 i én transaksjon (R4 steg 3). Kontroll: policy `interests_update`, bare `reason` kan oppdateres, lengdesjekk validert (ingen eksisterende over 1000 tegn). Etterkontroll med demokonto (rullet tilbake): egen begrunnelse 1 rad, andres 0, `item_id` låst. Tilbakerulling: `rollback/20261010_interests_reason_update.down.sql` |
 
 ## Finnes bare i produksjon (ikke i repoet)
 
