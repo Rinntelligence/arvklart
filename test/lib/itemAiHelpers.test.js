@@ -1,7 +1,7 @@
 // Kategorimatching for AI-forslag, parallellkjøringen og «Slå sammen gjenstander» i «Legg til flere».
 import { test, describe } from 'node:test'
 import assert from 'node:assert/strict'
-import { addCapturedPhotos, matchCategory, mergeSelectedPhotos, removePhotoAt, restoreRemoved, runPool, splitDraft } from '../../src/lib/itemAiHelpers.js'
+import { addCapturedPhotos, aiAnalysisRecord, aiReview, aiSuggestion, applyAiSuggestion, matchCategory, mergeSelectedPhotos, removePhotoAt, restoreRemoved, runPool, splitDraft } from '../../src/lib/itemAiHelpers.js'
 
 const categories = [
   { id: 1, label: 'Møbler' },
@@ -213,4 +213,58 @@ describe('AI-verdianslag gjelder bare med uendret grunnlag', async () => {
       assert.equal(estimateApplies({ ...withEstimate, ...patch }), false, JSON.stringify(patch))
     }
   })
+})
+
+// ── Bildeanalyse v2: AI-forslag overskriver aldri brukerens egne valg ─────────────────────────────────
+const CATS2 = [{ id: 'c1', label: 'Møbler' }, { id: 'c2', label: 'Kjøkken og porselen' }]
+const v2 = (over = {}) => ({
+  title: 'gammel', category: 'Møbler', condition: 'good',
+  analysis: { v: 2, meta: { model: 'claude-haiku-5-5' }, ai: {
+    suggestion: { title: 'Figgjo-tallerken', description: 'Hvit med blått mønster.', category: 'Kjøkken og porselen', category_key: 'kitchen_porcelain', confidence: 'medium' },
+    condition_suggestion: 'fair', condition_confidence: 'medium', ...over,
+  } },
+})
+const blank = { title: '', description: '', categoryId: '', condition: 'unknown', aiFilled: {} }
+
+test('aiSuggestion bruker v2-analysen; tilstand bare når AI-en er rimelig sikker', () => {
+  assert.deepEqual(aiSuggestion(v2(), CATS2), { title: 'Figgjo-tallerken', description: 'Hvit med blått mønster.', categoryId: 'c2', condition: 'fair' })
+  assert.equal(aiSuggestion(v2({ condition_confidence: 'low' }), CATS2).condition, null)
+  assert.equal(aiSuggestion(v2({ condition_suggestion: 'unknown', condition_confidence: 'high' }), CATS2).condition, null)
+  // Eldre svar uten analysis
+  assert.deepEqual(aiSuggestion({ title: 'Stol', category: 'Møbler', condition: 'good' }, CATS2), { title: 'Stol', description: null, categoryId: 'c1', condition: 'good' })
+  assert.equal(aiSuggestion({ title: 'Stol', condition: 'unknown' }, CATS2).condition, null)
+})
+
+test('applyAiSuggestion fyller tomme felt og husker hva AI-en fylte inn', () => {
+  const r = applyAiSuggestion(blank, { title: 'Tallerken', description: null, categoryId: 'c2', condition: 'fair' })
+  assert.deepEqual(r, { title: 'Tallerken', categoryId: 'c2', condition: 'fair', aiFilled: { title: 'Tallerken', categoryId: 'c2', condition: 'fair' } })
+})
+
+test('applyAiSuggestion overskriver aldri det brukeren har endret, men oppdaterer egne forslag ved ny analyse', () => {
+  const first = { ...blank, ...applyAiSuggestion(blank, { title: 'Tallerken', categoryId: 'c2', condition: 'fair' }) }
+  const edited = { ...first, title: 'Mormors tallerken', condition: 'good' } // brukeren har endret navn og tilstand
+  const again = applyAiSuggestion(edited, { title: 'Figgjo Lotte', categoryId: 'c1', condition: 'poor' })
+  assert.ok(!('title' in again), 'brukerens navn ble overskrevet')
+  assert.ok(!('condition' in again), 'brukerens tilstand ble overskrevet')
+  assert.equal(again.categoryId, 'c1', 'kategorien var fortsatt AI-ens forslag og kan oppdateres')
+  const typed = applyAiSuggestion({ ...blank, title: 'Eget navn' }, { title: 'AI-navn' })
+  assert.ok(!('title' in typed), 'navn brukeren skrev før analysen ble overskrevet')
+})
+
+test('aiReview: godtatt, endret eller ikke foreslått per felt', () => {
+  const d = { title: 'Mormors tallerken ', description: 'Hvit med blått mønster.', categoryId: 'c2', condition: 'good',
+    aiFilled: { title: 'Tallerken', description: 'Hvit med blått mønster.', categoryId: 'c2' } }
+  assert.deepEqual(aiReview(d), { title: 'edited', description: 'accepted', category: 'accepted', condition: 'not_suggested' })
+})
+
+test('aiAnalysisRecord lagrer AI-vurderingen uendret med review, og ingenting uten v2-analyse', () => {
+  const d = { ...blank, title: 'Tallerken', analysis: v2().analysis, aiFilled: { title: 'Tallerken' } }
+  const rec = aiAnalysisRecord(d)
+  assert.equal(rec.v, 2)
+  assert.equal(rec.ai, d.analysis.ai)
+  assert.deepEqual(rec.corrections, {})
+  assert.equal(rec.valuation, null)
+  assert.equal(rec.review.title, 'accepted')
+  assert.equal(aiAnalysisRecord({ ...blank, analysis: null }), null)
+  assert.equal(aiAnalysisRecord({ ...blank, analysis: { v: 1, ai: {} } }), null)
 })
