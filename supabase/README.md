@@ -84,7 +84,7 @@ Funksjonene `analyze-item`, `estimate-value` og `delete-account` krever innlogge
 
 `migrate-legacy-images` flytter eldre bilder under `items/` og `logos/` inn i boets mappe (`<bo-id>/legacy__…`). Det er nødvendig fordi signerte URL-er og tilgangsreglene krever bo-mappe, og bøtten skal gjøres privat (S3).
 
-Jobben krever `x-cron-secret` (`CRON_SECRET`) og deployes med `--no-verify-jwt`. Den kjøres i tre steg, og hvert steg krever bekreftelsestokenet fra forrige svar:
+Jobben krever `x-cron-secret` med verdien av den egne engangshemmeligheten `LEGACY_IMAGES_SECRET` (`CRON_SECRET` røres ikke) og deployes med `--no-verify-jwt`. Funksjonen og hemmeligheten fjernes når flyttingen er ferdig. Den kjøres i tre steg, og hvert steg krever bekreftelsestokenet fra forrige svar:
 
 1. `{"mode":"dry_run"}` teller referansene og filene. Ingenting endres.
 2. `{"mode":"copy","confirm":"<token>"}` kopierer filene, kontrollerer at hver kopi finnes, og peker `items.image_url`, `extra_images` og `estates.branding_logo` om. **Ingenting slettes.** Steget kan kjøres på nytt.

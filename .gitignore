@@ -41,3 +41,5 @@ Thumbs.db
 # Supabase CLI (lokal kobling til prosjektet)
 supabase/.temp/
 supabase/.branches/
+.vercel
+.env*
