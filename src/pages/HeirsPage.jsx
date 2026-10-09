@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase, getEstateMembers } from '../lib/supabase'
 import { WIZARD_TAG } from '../lib/wizardEstate'
@@ -33,6 +33,9 @@ export default function HeirsPage({ session, profile, onToast, isDemo }) {
   const [confirmHeir, setConfirmHeir] = useState(null)
   const [invitee, setInvitee] = useState(null) // arvingen invitasjonskortet gjelder
   const [estateName, setEstateName] = useState('')
+  const nameRef = useRef(null)
+  // Når skjemaet åpnes, havner fokus i navnefeltet (og feltet vises), uansett hvor på siden man trykket
+  useEffect(() => { if (showAdd) { nameRef.current?.focus(); nameRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' }) } }, [showAdd])
 
   const load = async () => {
     const [{ data: hs }, { data: mem }, { data: es }, { data: members }] = await Promise.all([
@@ -140,10 +143,56 @@ export default function HeirsPage({ session, profile, onToast, isDemo }) {
           <h1 style={{ fontFamily:'Fraunces, serif', fontSize:'1.625rem', fontWeight:'400', color:'#3A2F26', marginBottom:'4px' }}>{L('Arvinger og fordeling', 'Heirs and distribution')}</h1>
           <p style={{ color:'#75604B', fontSize:'0.875rem' }}>{L('Administrer arvinger og beregn hvordan boet fordeles', 'Manage heirs and calculate how the estate is distributed')}</p>
         </div>
-        {canEdit && <button onClick={() => setShowAdd(!showAdd)} style={{ padding:'9px 18px', background:'#3A2F26', color:'#FBF9F5', border:'none', borderRadius:'8px', cursor:'pointer', fontSize:'0.875rem', fontFamily:'Karla, sans-serif' }}>
+        {canEdit && <button onClick={() => setShowAdd(!showAdd)} aria-expanded={showAdd} aria-controls={showAdd ? 'add-heir-form' : undefined} style={{ padding:'9px 18px', background:'#3A2F26', color:'#FBF9F5', border:'none', borderRadius:'8px', cursor:'pointer', fontSize:'0.875rem', fontFamily:'Karla, sans-serif' }}>
           {L('+ Legg til arving', '+ Add heir')}
         </button>}
       </div>
+
+      {/* Legg til arving: rett under knappen, så skjemaet ikke åpnes utenfor skjermen */}
+      {showAdd && canEdit && (
+        <div id="add-heir-form" style={{ background:'#fff', border:'1px solid #D9CFC0', borderRadius:'12px', padding:'24px', marginBottom:'20px' }}>
+          <h3 style={{ fontFamily:'Fraunces, serif', fontSize:'1rem', fontWeight:'400', color:'#3A2F26', marginBottom:'16px' }}>{L('Legg til arving', 'Add heir')}</h3>
+          <div style={{ display:'flex', flexDirection:'column', gap:'12px' }}>
+            <div style={{ display:'flex', gap:'10px', flexWrap:'wrap' }}>
+              <div style={{ flex:1, minWidth:'160px' }}>
+                <label htmlFor="heirs-f2" style={{ display:'block', fontSize:'0.75rem', color:'#75604B', marginBottom:'5px' }}>{L('Fullt navn *', 'Full name *')}</label>
+                <input id="heirs-f2" ref={nameRef} value={newHeir.name} onChange={e => setNewHeir(p => ({ ...p, name: e.target.value }))} placeholder={L('f.eks. Kari Hansen', 'e.g. Jane Smith')} maxLength={100}
+                  style={{ width:'100%', padding:'10px 12px', border:'1px solid #9A8B78', borderRadius:'8px', fontSize:'0.875rem', background:'#FBF9F5', color:'#3A2F26', fontFamily:'Karla, sans-serif', boxSizing:'border-box' }} />
+              </div>
+              <div style={{ flex:1, minWidth:'160px' }}>
+                <label htmlFor="heirs-f3" style={{ display:'block', fontSize:'0.75rem', color:'#75604B', marginBottom:'5px' }}>{L('E-post (den arvingen logger inn med)', 'Email (the one the heir logs in with)')}</label>
+                <input id="heirs-f3" type="email" value={newHeir.email} onChange={e => setNewHeir(p => ({ ...p, email: e.target.value }))} placeholder={L('kari@epost.no', 'jane@email.com')} maxLength={254}
+                  style={{ width:'100%', padding:'10px 12px', border:'1px solid #9A8B78', borderRadius:'8px', fontSize:'0.875rem', background:'#FBF9F5', color:'#3A2F26', fontFamily:'Karla, sans-serif', boxSizing:'border-box' }} />
+              </div>
+            </div>
+            <div style={{ display:'flex', gap:'10px', flexWrap:'wrap' }}>
+              <div style={{ flex:1 }}>
+                <label htmlFor="heirs-f4" style={{ display:'block', fontSize:'0.75rem', color:'#75604B', marginBottom:'5px' }}>{L('Relasjon', 'Relationship')}</label>
+                <select id="heirs-f4" value={newHeir.relationship} onChange={e => setNewHeir(p => ({ ...p, relationship: e.target.value }))}
+                  style={{ width:'100%', padding:'10px 12px', border:'1px solid #9A8B78', borderRadius:'8px', fontSize:'0.875rem', background:'#FBF9F5', color:'#3A2F26', fontFamily:'Karla, sans-serif' }}>
+                  {RELATIONSHIPS.map(r => <option key={r} value={r}>{relLabel(r)}</option>)}
+                </select>
+              </div>
+              {splitMode === 'custom' && (
+                <div style={{ width:'120px' }}>
+                  <label htmlFor="heirs-f5" style={{ display:'block', fontSize:'0.75rem', color:'#75604B', marginBottom:'5px' }}>{L('Andel %', 'Share %')}</label>
+                  <input id="heirs-f5" type="number" min="0" max="100" value={newHeir.percentage} onChange={e => setNewHeir(p => ({ ...p, percentage: e.target.value }))} placeholder={L('f.eks. 25', 'e.g. 25')}
+                    style={{ width:'100%', padding:'10px 12px', border:'1px solid #9A8B78', borderRadius:'8px', fontSize:'0.875rem', background:'#FBF9F5', color:'#3A2F26', fontFamily:'Karla, sans-serif', boxSizing:'border-box' }} />
+                </div>
+              )}
+            </div>
+            <div>
+              <label htmlFor="heirs-f6" style={{ display:'block', fontSize:'0.75rem', color:'#75604B', marginBottom:'5px' }}>{L('Notater', 'Notes')}</label>
+              <input id="heirs-f6" value={newHeir.notes} onChange={e => setNewHeir(p => ({ ...p, notes: e.target.value }))} placeholder={L('Relevante notater…', 'Relevant notes…')} maxLength={500}
+                style={{ width:'100%', padding:'10px 12px', border:'1px solid #9A8B78', borderRadius:'8px', fontSize:'0.875rem', background:'#FBF9F5', color:'#3A2F26', fontFamily:'Karla, sans-serif', boxSizing:'border-box' }} />
+            </div>
+            <div style={{ display:'flex', gap:'10px' }}>
+              <button onClick={() => setShowAdd(false)} style={{ flex:1, padding:'10px', background:'none', border:'1px solid #D9CFC0', borderRadius:'8px', cursor:'pointer', color:'#5C4530', fontSize:'0.875rem', fontFamily:'Karla, sans-serif' }}>{L('Avbryt', 'Cancel')}</button>
+              <button onClick={addHeir} disabled={!newHeir.name.trim()} style={{ flex:2, padding:'10px', background:newHeir.name.trim()?'#3A2F26':'#D9CFC0', color:'#FBF9F5', border:'none', borderRadius:'8px', cursor:newHeir.name.trim()?'pointer':'not-allowed', fontSize:'0.875rem', fontFamily:'Karla, sans-serif' }}>{L('Legg til arving', 'Add heir')}</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {heirs.some(h => h.notes?.startsWith(WIZARD_TAG)) && (
         <div style={{ background:'#DCE3D2', border:'1px solid #B8C8A8', borderRadius:'12px', padding:'16px 20px', marginBottom:'20px', display:'flex', justifyContent:'space-between', alignItems:'center', gap:'12px', flexWrap:'wrap' }}>
@@ -255,52 +304,6 @@ export default function HeirsPage({ session, profile, onToast, isDemo }) {
           </button>
         )}
       </div>
-
-      {/* Legg til arving */}
-      {showAdd && canEdit && (
-        <div style={{ background:'#fff', border:'1px solid #D9CFC0', borderRadius:'12px', padding:'24px', marginBottom:'20px' }}>
-          <h3 style={{ fontFamily:'Fraunces, serif', fontSize:'1rem', fontWeight:'400', color:'#3A2F26', marginBottom:'16px' }}>{L('Legg til arving', 'Add heir')}</h3>
-          <div style={{ display:'flex', flexDirection:'column', gap:'12px' }}>
-            <div style={{ display:'flex', gap:'10px', flexWrap:'wrap' }}>
-              <div style={{ flex:1, minWidth:'160px' }}>
-                <label htmlFor="heirs-f2" style={{ display:'block', fontSize:'0.75rem', color:'#75604B', marginBottom:'5px' }}>{L('Fullt navn *', 'Full name *')}</label>
-                <input id="heirs-f2" value={newHeir.name} onChange={e => setNewHeir(p => ({ ...p, name: e.target.value }))} placeholder={L('f.eks. Kari Hansen', 'e.g. Jane Smith')} maxLength={100}
-                  style={{ width:'100%', padding:'10px 12px', border:'1px solid #9A8B78', borderRadius:'8px', fontSize:'0.875rem', background:'#FBF9F5', color:'#3A2F26', fontFamily:'Karla, sans-serif', boxSizing:'border-box' }} />
-              </div>
-              <div style={{ flex:1, minWidth:'160px' }}>
-                <label htmlFor="heirs-f3" style={{ display:'block', fontSize:'0.75rem', color:'#75604B', marginBottom:'5px' }}>{L('E-post (den arvingen logger inn med)', 'Email (the one the heir logs in with)')}</label>
-                <input id="heirs-f3" type="email" value={newHeir.email} onChange={e => setNewHeir(p => ({ ...p, email: e.target.value }))} placeholder={L('kari@epost.no', 'jane@email.com')} maxLength={254}
-                  style={{ width:'100%', padding:'10px 12px', border:'1px solid #9A8B78', borderRadius:'8px', fontSize:'0.875rem', background:'#FBF9F5', color:'#3A2F26', fontFamily:'Karla, sans-serif', boxSizing:'border-box' }} />
-              </div>
-            </div>
-            <div style={{ display:'flex', gap:'10px', flexWrap:'wrap' }}>
-              <div style={{ flex:1 }}>
-                <label htmlFor="heirs-f4" style={{ display:'block', fontSize:'0.75rem', color:'#75604B', marginBottom:'5px' }}>{L('Relasjon', 'Relationship')}</label>
-                <select id="heirs-f4" value={newHeir.relationship} onChange={e => setNewHeir(p => ({ ...p, relationship: e.target.value }))}
-                  style={{ width:'100%', padding:'10px 12px', border:'1px solid #9A8B78', borderRadius:'8px', fontSize:'0.875rem', background:'#FBF9F5', color:'#3A2F26', fontFamily:'Karla, sans-serif' }}>
-                  {RELATIONSHIPS.map(r => <option key={r} value={r}>{relLabel(r)}</option>)}
-                </select>
-              </div>
-              {splitMode === 'custom' && (
-                <div style={{ width:'120px' }}>
-                  <label htmlFor="heirs-f5" style={{ display:'block', fontSize:'0.75rem', color:'#75604B', marginBottom:'5px' }}>{L('Andel %', 'Share %')}</label>
-                  <input id="heirs-f5" type="number" min="0" max="100" value={newHeir.percentage} onChange={e => setNewHeir(p => ({ ...p, percentage: e.target.value }))} placeholder={L('f.eks. 25', 'e.g. 25')}
-                    style={{ width:'100%', padding:'10px 12px', border:'1px solid #9A8B78', borderRadius:'8px', fontSize:'0.875rem', background:'#FBF9F5', color:'#3A2F26', fontFamily:'Karla, sans-serif', boxSizing:'border-box' }} />
-                </div>
-              )}
-            </div>
-            <div>
-              <label htmlFor="heirs-f6" style={{ display:'block', fontSize:'0.75rem', color:'#75604B', marginBottom:'5px' }}>{L('Notater', 'Notes')}</label>
-              <input id="heirs-f6" value={newHeir.notes} onChange={e => setNewHeir(p => ({ ...p, notes: e.target.value }))} placeholder={L('Relevante notater…', 'Relevant notes…')} maxLength={500}
-                style={{ width:'100%', padding:'10px 12px', border:'1px solid #9A8B78', borderRadius:'8px', fontSize:'0.875rem', background:'#FBF9F5', color:'#3A2F26', fontFamily:'Karla, sans-serif', boxSizing:'border-box' }} />
-            </div>
-            <div style={{ display:'flex', gap:'10px' }}>
-              <button onClick={() => setShowAdd(false)} style={{ flex:1, padding:'10px', background:'none', border:'1px solid #D9CFC0', borderRadius:'8px', cursor:'pointer', color:'#5C4530', fontSize:'0.875rem', fontFamily:'Karla, sans-serif' }}>{L('Avbryt', 'Cancel')}</button>
-              <button onClick={addHeir} disabled={!newHeir.name.trim()} style={{ flex:2, padding:'10px', background:newHeir.name.trim()?'#3A2F26':'#D9CFC0', color:'#FBF9F5', border:'none', borderRadius:'8px', cursor:newHeir.name.trim()?'pointer':'not-allowed', fontSize:'0.875rem', fontFamily:'Karla, sans-serif' }}>{L('Legg til arving', 'Add heir')}</button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Valideringsadvarsel */}
       {splitMode === 'custom' && heirs.length > 0 && !customValid && (
