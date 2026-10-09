@@ -6,6 +6,7 @@ import { getUndecided, isContested } from '../lib/estateProgress'
 import { parseNOK, formatNOK as formatAmount } from '../lib/format'
 import { L } from '../lib/lang'
 import { equalValueResolutions, itemsWithoutValue, valueTotal } from '../lib/distribution'
+import StoredImage from '../components/StoredImage'
 
 const PALETTE = ['#5F6E52','#8B9A7D','#A97C3F','#7A8B6E','#9C8267','#6E8B87']
 
@@ -317,7 +318,7 @@ export default function ConflictPage({ session, onToast }) {
                   transition:'border-color 0.3s',
                 }}>
                   {item.image_url && (
-                    <img src={item.image_url} alt={item.title}
+                    <StoredImage src={item.image_url} alt={item.title}
                       style={{ width:'76px', height:'76px', objectFit:'cover', borderRadius:'8px', flexShrink:0, background:'#E8DFD0' }} />
                   )}
                   <div style={{ flex:1, minWidth:'150px' }}>
@@ -450,7 +451,7 @@ export default function ConflictPage({ session, onToast }) {
                     onMouseLeave={e => { e.currentTarget.style.transform='none'; e.currentTarget.style.boxShadow='none' }}>
                     <div style={{ height:'100px', background:'#E8DFD0', overflow:'hidden', display:'flex', alignItems:'center', justifyContent:'center' }}>
                       {item.image_url
-                        ? <img src={item.image_url} alt={item.title} style={{ width:'100%', height:'100%', objectFit:'cover' }} />
+                        ? <StoredImage src={item.image_url} alt={item.title} style={{ width:'100%', height:'100%', objectFit:'cover' }} />
                         : <span style={{ fontSize:'2.25rem', color:'#75604B' }}>·</span>}
                     </div>
                     <div style={{ padding:'10px 12px' }}>

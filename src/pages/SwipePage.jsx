@@ -7,6 +7,7 @@ import ReasonEditor from '../components/ReasonEditor'
 import { L } from '../lib/lang'
 import { categoryLabel } from '../lib/categories'
 import { formatNOK } from '../lib/format'
+import StoredImage from '../components/StoredImage'
 
 export default function SwipePage({ session, profile, onToast }) {
   const { id } = useParams()
@@ -253,7 +254,7 @@ export default function SwipePage({ session, profile, onToast }) {
           {/* Image */}
           <div style={{ height:'320px', background:'#E8DFD0', display:'flex', alignItems:'center', justifyContent:'center', overflow:'hidden' }}>
             {currentItem.image_url
-              ? <img src={currentItem.image_url} alt={currentItem.title} style={{ width:'100%', height:'100%', objectFit:'contain', pointerEvents:'none' }} />
+              ? <StoredImage src={currentItem.image_url} alt={currentItem.title} style={{ width:'100%', height:'100%', objectFit:'contain', pointerEvents:'none' }} />
               : <span style={{ fontSize:'3rem', color:'#75604B' }}>{currentItem.categories?.emoji || '·'}</span>
             }
           </div>
