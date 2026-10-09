@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { getMyEstates, createEstate, ensureDefaultCategories, supabase } from '../lib/supabase'
 import { usePlan } from '../hooks/usePlan'
 import { joinEstateByCode } from '../lib/joinEstate'
@@ -115,9 +115,9 @@ export default function EstatesPage({ session, profile, onToast }) {
           {estates.map(e => {
             const est = e.estates
             return (
-              <div key={e.estate_id} onClick={()=>navigate(`/estate/${e.estate_id}`)} role="link" tabIndex={0}
-                onKeyDown={ev => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); navigate(`/estate/${e.estate_id}`) } }}
-                aria-label={L(`Åpne ${est?.name || 'boet'}`, `Open ${est?.name || 'the estate'}`)} style={{
+              // Hele kortet kan klikkes med mus; for tastatur og skjermleser er bonavnet en vanlig lenke,
+              // slik at lenkens navn er den synlige teksten (WCAG 2.5.3)
+              <div key={e.estate_id} onClick={()=>navigate(`/estate/${e.estate_id}`)} style={{
                 background:'#fff', border:'1px solid #D9CFC0', borderRadius:'12px',
                 padding:'22px', cursor:'pointer', transition:'transform 0.15s, box-shadow 0.15s',
               }}
@@ -134,7 +134,11 @@ export default function EstatesPage({ session, profile, onToast }) {
                     <span style={{ fontSize:'0.6875rem', background: e.role==='admin'?'#E8DFD0':'#DCE3D2', color: e.role==='admin'?'#5C4530':'#3A5A30', padding:'3px 8px', borderRadius:'20px', textTransform:'uppercase', letterSpacing:'0.5px' }}>{e.role === 'admin' ? L('Admin', 'Admin') : L('Medlem', 'Member')}</span>
                   </div>
                 </div>
-                <h3 style={{ fontFamily:'Fraunces, serif', fontSize:'1.0625rem', fontWeight:'400', color:'#3A2F26', marginBottom:'6px' }}>{est?.name}</h3>
+                <h3 style={{ fontFamily:'Fraunces, serif', fontSize:'1.0625rem', fontWeight:'400', color:'#3A2F26', marginBottom:'6px' }}>
+                  <Link to={`/estate/${e.estate_id}`} onClick={ev => ev.stopPropagation()} style={{ color:'inherit', textDecoration:'none' }}>
+                    {est?.name || L('Uten navn', 'Untitled')}
+                  </Link>
+                </h3>
                 {est?.description && <p style={{ fontSize:'0.8125rem', color:'#75604B', marginBottom:'12px', lineHeight:'1.5' }}>{est.description}</p>}
                 <div style={{ fontSize:'0.75rem', color:'#75604B' }}>
                   {L('Opprettet', 'Created')} {new Date(est?.created_at).toLocaleDateString(locale(), { day:'numeric', month:'short', year:'numeric' })}
