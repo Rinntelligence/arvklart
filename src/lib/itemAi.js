@@ -52,10 +52,15 @@ export async function analyzeItemPhotos(files, { categories = [], estimate = fal
   return { result: res?.data || res, quota: res?.quota }
 }
 
-// Det som lagres som AI-ens anslag (ai_analysis.valuation), adskilt fra verdien i feltet. Null for eldre svar.
+// Det som lagres som anslaget (ai_analysis.valuation), adskilt fra verdien i feltet. Null for eldre svar.
+// v3: method sier om det bygger på markedet (market_sold / market_asking) eller er et AI-anslag (model).
+// Sammenligningene lagres uten annet annonseinnhold enn tittel, pris, dato og lenke.
 export const valuationRecord = d => (d?.v ? {
-  v: d.v, price_type: d.price_type, market_area: d.market_area, currency: d.currency, estimate: d.estimate,
-  confidence: d.confidence, uncertainty: d.uncertainty, basis: d.basis, model: d.model, at: new Date().toISOString(),
+  v: d.v, method: d.method ?? 'model', price_type: d.price_type, range_kind: d.range_kind ?? null, market_area: d.market_area, currency: d.currency,
+  estimate: d.estimate, confidence: d.confidence, uncertainty: d.uncertainty, basis: d.basis, model: d.model,
+  stats: d.stats ?? null, explanation: d.explanation ?? null, queries: d.queries ?? [],
+  references: (d.references || []).slice(0, 10).map(r => ({ provider: r.provider, url: r.url, title: r.title, price: r.price, currency: r.currency, price_type: r.price_type, date: r.date, verified: r.verified, used: r.used, flags: r.flags })),
+  at: new Date().toISOString(),
 } : null)
 
 // Veiledende AI-anslag ut fra det som er registrert og bildeanalysen (analysis), uten å sende bildene igjen:
