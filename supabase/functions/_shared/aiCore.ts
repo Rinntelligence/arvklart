@@ -113,40 +113,12 @@ export function estimateCostUsd(model: Model, u: Usage = {}): number {
 export const clip = (v: unknown, max: number) => (typeof v === 'string' ? v.trim().slice(0, max) : '')
 export const oneOf = <T extends string>(v: unknown, allowed: readonly T[]): T | null =>
   (typeof v === 'string' && (allowed as readonly string[]).includes(v) ? v as T : null)
-const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v)
 
 // ── Felles verdier ─────────────────────────────────────────────────────────────────────────────────
 export const CONDITIONS = ['excellent', 'good', 'fair', 'poor'] as const
 export const CONFIDENCE = ['high', 'medium', 'low'] as const
 
 // ── Verdianslag ────────────────────────────────────────────────────────────────────────────────────
-export const ESTIMATE_SCHEMA: Schema = {
-  type: 'object',
-  additionalProperties: false,
-  required: ['low_nok', 'likely_nok', 'high_nok', 'reasoning', 'confidence'],
-  properties: {
-    low_nok: { type: 'integer' },
-    likely_nok: { type: 'integer' },
-    high_nok: { type: 'integer' },
-    reasoning: { type: 'string' },
-    confidence: { type: 'string', enum: [...CONFIDENCE] },
-  },
-}
-
-export type Estimate = { low_nok: number; likely_nok: number; high_nok: number; reasoning: string; confidence: string }
-const MAX_NOK = 50_000_000
-
-export function validateEstimate(v: unknown): Validation<Estimate> {
-  if (!isObj(v)) return { ok: false, reason: 'ikke et objekt' }
-  const n = (x: unknown) => (typeof x === 'number' && Number.isFinite(x) ? Math.round(x) : NaN)
-  const low = n(v.low_nok), likely = n(v.likely_nok), high = n(v.high_nok)
-  if (![low, likely, high].every(x => x > 0 && x <= MAX_NOK)) return { ok: false, reason: 'beløp mangler eller er utenfor gyldig område' }
-  if (!(low <= likely && likely <= high)) return { ok: false, reason: 'intervallet henger ikke sammen' }
-  const confidence = oneOf(v.confidence, CONFIDENCE)
-  if (!confidence) return { ok: false, reason: 'ugyldig sikkerhet' }
-  return { ok: true, value: { low_nok: low, likely_nok: likely, high_nok: high, reasoning: clip(v.reasoning, 600), confidence } }
-}
-
 // Inndata til verdianslaget, med grenser. Ukjent tilstand forblir ukjent (blir ikke «good»).
 export type EstimateInput = { title: string; description: string; category: string; condition: string | null; purchasePrice: number | null; purchaseYear: number | null; identifiedModel: string }
 export function readEstimateInput(body: Record<string, unknown>, now = new Date()): EstimateInput | string {

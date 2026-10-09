@@ -396,7 +396,8 @@ export default function AddItemsPage({ session, profile, onToast, isDemo }) {
   const canEstimate = (d) => d.status !== 'saved' && d.title.trim() && !d.estimating
   const estimateValues = async (consented = aiConsented, onlyKey = null) => {
     if (!consented) { setAskConsent({ kind: 'estimate', key: onlyKey }); return }
-    let targets = draftsRef.current.filter(d => canEstimate(d) && (onlyKey ? d.key === onlyKey : !d.estimate))
+    // «Anslå verdi for alle» hopper over kort som fikk «for lite informasjon»; de kan prøves igjen på kortet
+    let targets = draftsRef.current.filter(d => canEstimate(d) && (onlyKey ? d.key === onlyKey : !d.estimate && !d.estimateMissing))
     if (isDemo) {
       if (demoRemaining === 0) { setDemoBlocked(true); return }
       targets = targets.slice(0, demoRemaining)
@@ -410,11 +411,15 @@ export default function AddItemsPage({ session, profile, onToast, isDemo }) {
     await runPool(targets, AI_PARALLEL, async (d) => {
       try {
         const cat = categories.find(c => c.id === d.categoryId)
-        const { estimate, quota } = await requestValueEstimate({ title: d.title.trim(), description: d.description.trim(), category: cat?.label || '', condition: d.condition })
+        // Bildeanalysen sendes med, så anslaget bygger på den uten at bildene sendes igjen
+        const { estimate, insufficient, quota } = await requestValueEstimate({ title: d.title.trim(), description: d.description.trim(), category: cat?.label || '', condition: d.condition, analysis: d.analysis })
         if (typeof quota?.remaining === 'number') setDemoRemaining(quota.remaining)
+        // For lite grunnlag: ingen verdi (aldri 0 kr), men tips om hva som kan hjelpe
+        if (insufficient) { update(d.key, { estimating: false, estimateMissing: insufficient.missing }); return }
         if (!estimate.likely) throw new Error('no estimate')
         update(d.key, cur => ({
           estimating: false,
+          estimateMissing: null,
           value: String(estimate.likely),
           estimate: { ...estimate, value: String(estimate.likely), basis: { title: cur.title, condition: cur.condition, categoryId: cur.categoryId } },
         }))
@@ -438,6 +443,9 @@ export default function AddItemsPage({ session, profile, onToast, isDemo }) {
     const urls = []
     for (const p of d.photos) urls.push(await uploadEstateImage(p.file, id))
     const aiAnalysis = aiAnalysisRecord(d)
+    // AI-ens anslag lagres for seg (veiledende), så lenge navn, tilstand og kategori er de samme som da det ble laget
+    const b = d.estimate?.basis
+    if (aiAnalysis && d.estimate?.valuation && b && b.title === d.title && b.condition === d.condition && b.categoryId === d.categoryId) aiAnalysis.valuation = d.estimate.valuation
     const { error } = await supabase.from('items').insert({
       estate_id: id,
       title: d.title.trim(),
@@ -624,7 +632,7 @@ export default function AddItemsPage({ session, profile, onToast, isDemo }) {
 
       {/* Tilbud om verdianslag etter analysen: et synlig, frivillig valg */}
       {(() => {
-        const n = drafts.filter(d => canEstimate(d) && !d.estimate).length
+        const n = drafts.filter(d => canEstimate(d) && !d.estimate && !d.estimateMissing).length
         if (merging || busy || !n || !drafts.some(d => d.status === 'analyzed')) return null
         return (
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', background: '#fff', border: '1px solid #D9CFC0', borderRadius: '12px', padding: '12px 14px', marginBottom: '12px', fontSize: '0.9375rem', color: '#3A2F26' }}>
@@ -914,7 +922,7 @@ function DraftCard({ draft: d, index, categories, locked, onChange, onRemove, on
         placeholder={d.estimating ? L('Anslår verdi…', 'Estimating value…') : L('Verdi i NOK (valgfri)', 'Value in NOK (optional)')} style={inputStyle} />
       {aiValue && (
         <div id={`est-${d.key}`} style={{ fontSize: '0.8125rem', color: '#5C4530', marginTop: '4px', lineHeight: 1.5 }}>
-          {L('AI-anslag, veiledende', 'AI estimate, for guidance only')}
+          {L('Veiledende AI-anslag, ikke en dokumentert markedsverdi', 'Indicative AI estimate, not a documented market value')}
           {d.estimate.low && d.estimate.high ? ` (${formatNOK(d.estimate.low)} – ${formatNOK(d.estimate.high)})` : ''}
           {'. '}{L('Du kan endre eller tømme feltet.', 'You can change or clear the field.')}
         </div>
@@ -979,6 +987,12 @@ function DraftCard({ draft: d, index, categories, locked, onChange, onRemove, on
         </p>
       )}
       {(d.estimate || d.estimating) && valueField}
+      {d.estimateMissing && !d.estimate && !d.estimating && (
+        <p style={{ fontSize: '0.8125rem', color: '#5C4530', background: '#FBF9F5', border: '1px solid #E8DFD0', borderRadius: '8px', padding: '8px 10px', margin: '8px 0 0', lineHeight: 1.5 }}>
+          {L('For lite informasjon til å anslå verdi.', 'Too little information to estimate a value.')}
+          {d.estimateMissing.length > 0 && <> {L('Dette kan hjelpe', 'This could help')}: {d.estimateMissing.join('; ')}.</>}
+        </p>
+      )}
       <details style={{ marginTop: '8px' }}>
         <summary style={{ cursor: 'pointer', fontSize: '0.875rem', color: '#5C4530', padding: '10px 0', minHeight: '44px', boxSizing: 'border-box' }}>
           {showValueInMore

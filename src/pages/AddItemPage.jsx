@@ -6,7 +6,7 @@ import { hasAiConsent, giveAiConsent } from '../lib/aiConsent'
 import { formatNOK } from '../lib/format'
 import { L, isEn } from '../lib/lang'
 import { categoryLabel } from '../lib/categories'
-import { aiErrorMessage, analyzeItemPhotos, callEdgeFunction } from '../lib/itemAi'
+import { aiErrorMessage, analyzeItemPhotos, callEdgeFunction, valuationRecord } from '../lib/itemAi'
 import { aiAnalysisRecord, aiSuggestion, applyAiSuggestion } from '../lib/itemAiHelpers'
 import { CONDITION_OPTIONS, multipleItemsText } from '../lib/analysisView'
 import AnalysisDetails from '../components/AnalysisDetails'
@@ -29,6 +29,7 @@ export default function AddItemPage({ session, profile, onToast, isDemo }) {
   const [analyzing, setAnalyzing] = useState(false)
   const [estimating, setEstimating] = useState(false)
   const [aiEstimate, setAiEstimate] = useState(null)
+  const [estimateMissing, setEstimateMissing] = useState(null) // «for lite informasjon»: tips om hva som mangler
   const [purchasePrice, setPurchasePrice] = useState('')
   const [purchaseYear, setPurchaseYear] = useState('')
   const [myEstimateVote, setMyEstimateVote] = useState(null) // 'agree' | 'disagree'
@@ -134,16 +135,21 @@ export default function AddItemPage({ session, profile, onToast, isDemo }) {
         condition,
         purchase_price: purchasePrice ? parseFloat(purchasePrice) : undefined,
         purchase_year: purchaseYear ? parseInt(purchaseYear) : undefined,
+        analysis, // bildeanalysen, så bildene ikke sendes igjen
         lang: isEn() ? 'en' : 'no',
       })
       trackQuota(res)
       const d = res.data || res
+      // For lite grunnlag: ingen verdi (aldri 0 kr), men tips om hva som kan hjelpe
+      if (d.status === 'insufficient') { setAiEstimate(null); setEstimateMissing(d.missing || []); return }
+      setEstimateMissing(null)
       setAiEstimate({
         low_nok: d.summary?.low_nok ?? d.low_nok,
         high_nok: d.summary?.high_nok ?? d.high_nok,
         likely_nok: d.summary?.likely_nok ?? d.likely_nok,
         reasoning: d.market?.reasoning ?? d.reasoning,
         confidence: d.market?.confidence ?? d.confidence,
+        valuation: valuationRecord(d),
       })
     } catch (e) {
       handleAiError(e, L('Verdiestimering feilet', 'Value estimate failed'))
@@ -157,6 +163,8 @@ export default function AddItemPage({ session, profile, onToast, isDemo }) {
     if (!title.trim()) { onToast(L('Legg til navn på gjenstanden', 'Add the item name'), 'error'); return }
     setSaving(true)
     const aiRecord = aiAnalysisRecord({ analysis, aiFilled, title, description, categoryId, condition })
+    // AI-ens anslag lagres for seg (veiledende), adskilt fra verdien
+    if (aiRecord && aiEstimate?.valuation) aiRecord.valuation = aiEstimate.valuation
     try {
       const { data: newItem, error } = await supabase.from('items').insert({
         estate_id: id,
@@ -430,10 +438,17 @@ export default function AddItemPage({ session, profile, onToast, isDemo }) {
           </button>
         )}
 
+        {estimateMissing && !aiEstimate && (
+          <p role="status" style={{ fontSize: '0.8125rem', color: '#5C4530', background: '#FBF9F5', border: '1px solid #E8DFD0', borderRadius: '10px', padding: '10px 12px', margin: 0, lineHeight: 1.5 }}>
+            {L('For lite informasjon til å anslå verdi.', 'Too little information to estimate a value.')}
+            {estimateMissing.length > 0 && <> {L('Dette kan hjelpe', 'This could help')}: {estimateMissing.join('; ')}.</>}
+          </p>
+        )}
+
         {/* Verdiestimat-resultat */}
         {aiEstimate && (
           <div style={{ background: '#DCE3D2', border: '1px solid #B8C8A8', borderRadius: '12px', padding: '20px' }}>
-            <div style={{ fontSize: '0.8125rem', color: '#3A5A30', fontWeight: '500', marginBottom: '12px' }}>{L('Verdiestimat (NOK)', 'Value estimate (NOK)')}</div>
+            <div style={{ fontSize: '0.8125rem', color: '#3A5A30', fontWeight: '500', marginBottom: '12px' }}>{L('Veiledende AI-anslag (NOK)', 'Indicative AI estimate (NOK)')}</div>
             <div style={{ display: 'flex', gap: '16px', marginBottom: '12px', flexWrap: 'wrap' }}>
               <div style={{ textAlign: 'center' }}>
                 <div style={{ fontSize: '0.6875rem', color: '#75604B', marginBottom: '2px' }}>{L('Lavt', 'Low')}</div>
@@ -476,7 +491,7 @@ export default function AddItemPage({ session, profile, onToast, isDemo }) {
               )}
             </div>
 
-            <p style={{ fontSize: '0.6875rem', color: '#75604B', marginTop: '8px', marginBottom: 0 }}>{L('Estimater er kun veiledende — ikke profesjonell takst.', 'Estimates are for guidance only — not a professional appraisal.')}</p>
+            <p style={{ fontSize: '0.6875rem', color: '#75604B', marginTop: '8px', marginBottom: 0 }}>{L('Anslaget er laget av AI ut fra det som er registrert, og er ikke en dokumentert markedsverdi eller takst.', 'The estimate is made by AI from what has been registered, and is not a documented market value or appraisal.')}</p>
           </div>
         )}
 
