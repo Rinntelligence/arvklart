@@ -179,7 +179,7 @@ export function PrivacyPage() {
           <h2 style={h2s}>{L('Hva vi samler inn', 'What we collect')}</h2>
           <ul>
             <li style={lis}><strong>{L('Kontoopplysninger:', 'Account details:')}</strong> {L('navn og e-postadresse ved registrering.', 'name and email address at registration.')}</li>
-            <li style={lis}><strong>{L('Bo-innhold:', 'Estate content:')}</strong> {L('bilder, beskrivelser og anslåtte verdier av gjenstander.', 'photos, descriptions and estimated values of items.')}</li>
+            <li style={lis}><strong>{L('Bo-innhold:', 'Estate content:')}</strong> {L('bilder, beskrivelser og anslåtte verdier av gjenstander, og AI-vurderingen av bildene (hva AI-en så, og rettelser dere gjør). Bildene er private: de vises bare for medlemmer av boet, via lenker som utløper etter kort tid.', 'photos, descriptions and estimated values of items, and the AI assessment of the photos (what the AI saw, and corrections you make). Photos are private: they are only shown to members of the estate, through links that expire after a short time.')}</li>
             <li style={lis}><strong>{L('Interesser, «nei takk» og kommentarer', 'Interests, «no thanks» and comments')}</strong> {L('du registrerer på gjenstander.', 'you register on items.')}</li>
             <li style={lis}><strong>{L('Dokumenter', 'Documents')}</strong> {L('du laster opp i boets dokumenthvelv, og arvinger med e-post som administratoren legger inn.', 'you upload to the estate\'s document vault, and heirs with email addresses added by the administrator.')}</li>
             <li style={lis}><strong>{L('Tekniske data:', 'Technical data:')}</strong> {L('IP-adresse og innloggingstidspunkt, behandlet av infrastrukturleverandøren.', 'IP address and login time, processed by the infrastructure provider.')}</li>
@@ -197,7 +197,7 @@ export function PrivacyPage() {
             <li style={lis}><strong>Anthropic PBC (USA)</strong> — {L('AI-analyse av bilder og verdiestimat, kun ved ditt eksplisitte samtykke. Anthropic bruker ikke API-data til modelltrening. Se', 'AI analysis of photos and value estimates, only with your explicit consent. Anthropic does not use API data for model training. See')} <a href="https://www.anthropic.com/privacy" target="_blank" rel="noreferrer" style={{ color: '#5F6E52' }}>{L('Anthropics personvernerklæring', "Anthropic's privacy policy")}</a>.</li>
           </ul>
           <h2 style={h2s}>{L('Lagringstid', 'Retention period')}</h2>
-          <p style={ps}>{L('Opplysninger lagres så lenge kontoen er aktiv. Ved kontosletting slettes personopplysningene dine med en gang, med unntak av det vi er rettslig forpliktet til å oppbevare. Bo du deler med andre beholdes for dem, men navnet ditt fjernes. Når et bo avsluttes, slettes det med alle bilder og dokumenter etter 12 måneder.', 'Data is stored for as long as the account is active. When you delete your account, your personal data is deleted immediately, except what we are legally obliged to keep. Estates you share with others are kept for them, but your name is removed. When an estate is closed, it is deleted with all photos and documents after 12 months.')}</p>
+          <p style={ps}>{L('Opplysninger lagres så lenge kontoen er aktiv. Ved kontosletting slettes personopplysningene dine med en gang, med unntak av det vi er rettslig forpliktet til å oppbevare. Bo du deler med andre beholdes for dem: gjenstander og bilder du har lagt inn, blir værende som boets innhold, men navnet ditt, verdiforslagene og stemmene dine, ønskene og kommentarene dine fjernes. Bruken av AI registreres bare som antall og kostnad (uten bilder eller tekst) og slettes sammen med kontoen. Når et bo avsluttes, slettes det med alle bilder og dokumenter etter 12 måneder.', 'Data is stored for as long as the account is active. When you delete your account, your personal data is deleted immediately, except what we are legally obliged to keep. Estates you share with others are kept for them: items and photos you added remain as the estate\'s content, but your name, your value suggestions and votes, your wishes and your comments are removed. AI usage is recorded only as counts and cost (without photos or text) and is deleted with the account. When an estate is closed, it is deleted with all photos and documents after 12 months.')}</p>
           <h2 style={h2s}>{L('Dine rettigheter', 'Your rights')}</h2>
           <p style={ps}>{L('Du har rett til innsyn, retting, sletting, dataportabilitet og å protestere mot behandlingen. Utøv disse via «Min konto» i appen, eller kontakt oss på admin@arvklart.no. Du kan klage til', 'You have the right to access, rectification, erasure, data portability and to object to the processing. Exercise these via «My account» in the app, or contact us at admin@arvklart.no. You can complain to')} <a href="https://www.datatilsynet.no" target="_blank" rel="noreferrer" style={{ color: '#5F6E52' }}>{L('Datatilsynet', 'Datatilsynet (the Norwegian Data Protection Authority)')}</a>.</p>
           <h2 style={h2s}>{L('Sikkerhet', 'Security')}</h2>
@@ -256,15 +256,18 @@ export function AccountPage({ session, onToast }) {
         supabase.from('interests').select('*, items(title)').eq('user_id', uid),
         supabase.from('item_passes').select('created_at, items(title)').eq('user_id', uid),
         supabase.from('comments').select('*, items(title)').eq('user_id', uid),
-        supabase.from('items').select('title, description, estimated_value, created_at, estates(name)').eq('added_by', uid),
+        supabase.from('items').select('title, description, estimated_value, created_at, ai_analysis, estates(name)').eq('added_by', uid),
         supabase.from('documents').select('name, folder, created_at, estates(name)').eq('uploaded_by', uid),
         supabase.from('feedback').select('type, content, nps_score, created_at').eq('user_id', uid),
+        // Verdivurderinger brukeren har stemt på (med eventuelle egne verdiforslag), og oppgaver hen har fått eller fullført
+        supabase.from('items').select('title, value_suggestions, estates(name)').contains('value_voter_ids', [uid]),
+        supabase.from('tasks').select('title, completed, completed_at, estates(name)').or(`assigned_to.eq.${uid},completed_by.eq.${uid}`),
       ])
       const failed = results.find(r => r.error)
       if (failed) throw failed.error
-      const [profile, estates, interests, passes, comments, items, documents, feedback] = results.map(r => r.data)
+      const [profile, estates, interests, passes, comments, items, documents, feedback, votes, tasks] = results.map(r => r.data)
       const { buildDataExportPdf } = await import('../lib/dataExportPdf')
-      buildDataExportPdf({ email: session.user.email, profile, estates, interests, passes, comments, items, documents, feedback }).save(L('mine-data-arvklart.pdf', 'my-data-arvklart.pdf'))
+      buildDataExportPdf({ email: session.user.email, userId: uid, profile, estates, interests, passes, comments, items, documents, feedback, votes, tasks }).save(L('mine-data-arvklart.pdf', 'my-data-arvklart.pdf'))
       onToast(L('Data lastet ned', 'Data downloaded'))
     } catch (e) {
       console.error('Eksport feilet:', e)
@@ -278,11 +281,18 @@ export function AccountPage({ session, onToast }) {
     setDeleting(true)
     try {
       const { data, error } = await supabase.functions.invoke('delete-account', { method: 'POST' })
-      if (error || !data?.success) throw new Error(data?.error || error?.message || L('Ukjent feil', 'Unknown error'))
+      if (error || !data?.success) {
+        let code = data?.code
+        try { code = code || (await error?.context?.json())?.code } catch { /* ikke JSON */ }
+        throw Object.assign(new Error('delete-account'), { code })
+      }
       await supabase.auth.signOut()
       navigate('/home')
     } catch (e) {
-      onToast(L('Feil ved sletting: ', 'Error deleting: ') + e.message, 'error')
+      // Fast melding på brukerens språk (serveren sender aldri råtekst); slettingen kan prøves på nytt
+      onToast(e.code === 'delete_failed'
+        ? L('Kontoen kunne ikke slettes helt. Prøv igjen, eller kontakt oss.', 'The account could not be fully deleted. Please try again, or contact us.')
+        : L('Kontoen kunne ikke slettes. Prøv igjen.', 'The account could not be deleted. Please try again.'), 'error')
       setDeleting(false)
     }
   }

@@ -35,8 +35,7 @@ const fmtValue = v => {
 
 export function buildDataExportPdf({
   email, profile, estates = [], interests = [], passes = [], comments = [], items = [], documents = [], feedback = [],
-  exportedAt = new Date(),
-}) {
+  exportedAt = new Date(), userId = null, votes = [], tasks = [] }) {
   const doc = new jsPDF({ unit: 'mm', format: 'a4' })
   const M = 20
   const W = doc.internal.pageSize.getWidth() - M * 2
@@ -63,7 +62,7 @@ export function buildDataExportPdf({
   text(L('Mine data – Arvklart', 'My data – Arvklart'), { size: 20, color: ESPRESSO, bold: true, gap: 2 })
   text(`${L('Eksportert', 'Exported')} ${fmtDate(exportedAt)}`, { color: LATTE, gap: 0.5 })
   if (email) text(`${L('Konto', 'Account')}: ${email}`, { color: LATTE })
-  text(L('Dette dokumentet inneholder personopplysningene Arvklart har lagret om deg: profil, bo du er med i, interesser, nei takk, kommentarer, gjenstander og dokumenter du har lagt inn, og tilbakemeldinger.', 'This document contains the personal data Arvklart has stored about you: profile, estates you belong to, interests, declined items, comments, items and documents you have added, and feedback.'), { size: 9.5, color: LATTE, gap: 2 })
+  text(L('Dette dokumentet inneholder personopplysningene Arvklart har lagret om deg: profil, bo du er med i, interesser, nei takk, kommentarer, gjenstander (med AI-vurdering) og dokumenter du har lagt inn, verdivurderinger du har stemt på, oppgaver og tilbakemeldinger.', 'This document contains the personal data Arvklart has stored about you: profile, estates you belong to, interests, declined items, comments, items (with AI assessment) and documents you have added, value estimates you have voted on, tasks and feedback.'), { size: 9.5, color: LATTE, gap: 2 })
 
   heading(L('Profil', 'Profile'))
   const entries = Object.entries(profile || {}).filter(([, v]) => v !== null && v !== '')
@@ -117,7 +116,18 @@ export function buildDataExportPdf({
   }))
   addEntries(L('Gjenstander du har lagt inn', 'Items you have added'), items, L('Du har ikke lagt inn noen gjenstander.', 'You have not added any items.'), i => ({
     head: i.title, date: i.created_at,
-    body: [i.estates?.name && `${L('Bo', 'Estate')}: ${i.estates.name}`, i.description, i.estimated_value && `${L('Anslått verdi', 'Estimated value')}: ${i.estimated_value} kr`].filter(Boolean).join('\n'),
+    body: [i.estates?.name && `${L('Bo', 'Estate')}: ${i.estates.name}`, i.description, i.estimated_value && `${L('Anslått verdi', 'Estimated value')}: ${i.estimated_value} kr`,
+      i.ai_analysis?.ai && `${L('AI-vurdering av bildene lagret', 'AI assessment of the photos stored')}${i.ai_analysis.meta?.analyzed_at ? ` (${fmtDate(i.ai_analysis.meta.analyzed_at)})` : ''}`,
+      ...Object.entries(i.ai_analysis?.corrections || {}).filter(([, c]) => c?.value).map(([k, c]) => `${L('Rettet', 'Corrected')} ${k}: ${c.value}`),
+    ].filter(Boolean).join('\n'),
+  }))
+  addEntries(L('Verdivurderinger du har stemt på', 'Value estimates you have voted on'), votes, L('Du har ikke stemt på noen verdivurderinger.', 'You have not voted on any value estimates.'), v => {
+    const mine = (Array.isArray(v.value_suggestions) ? v.value_suggestions : []).find(x => x?.user_id === userId)
+    return { head: v.title, body: [v.estates?.name && `${L('Bo', 'Estate')}: ${v.estates.name}`, mine?.value && `${L('Ditt forslag', 'Your suggestion')}: ${mine.value} kr`].filter(Boolean).join('\n') }
+  })
+  addEntries(L('Oppgaver du har fått eller fullført', 'Tasks assigned to or completed by you'), tasks, L('Du har ingen oppgaver.', 'You have no tasks.'), t => ({
+    head: t.title, date: t.completed_at,
+    body: [t.estates?.name && `${L('Bo', 'Estate')}: ${t.estates.name}`, t.completed ? L('Fullført', 'Completed') : L('Ikke fullført', 'Not completed')].filter(Boolean).join('\n'),
   }))
   addEntries(L('Dokumenter du har lastet opp', 'Documents you have uploaded'), documents, L('Du har ikke lastet opp noen dokumenter.', 'You have not uploaded any documents.'), d => ({
     head: d.name, date: d.created_at, body: d.estates?.name && `${L('Bo', 'Estate')}: ${d.estates.name}`,

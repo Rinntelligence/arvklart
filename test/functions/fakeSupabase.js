@@ -2,7 +2,7 @@
 // Støtter bare det de bruker: select/eq/lt/order/range/maybeSingle/single, count (head), insert, update, delete,
 // og Storage list (sider sortert på navn, mapper og filer), copy og remove. Alle endringer logges i `mutations`.
 
-export function fakeSupabase({ tables = {}, storage = {}, failRemove = () => false, failCopy = () => false, onList = () => {}, failInsert = false } = {}) {
+export function fakeSupabase({ tables = {}, storage = {}, failRemove = () => false, failCopy = () => false, onList = () => {}, failInsert = false, failDeleteUser = false } = {}) {
   const db = Object.fromEntries(Object.entries(tables).map(([t, rows]) => [t, rows.map(r => ({ ...r }))]))
   const buckets = Object.fromEntries(Object.entries(storage).map(([b, files]) => [b, new Map(Object.entries(files))]))
   const mutations = []
@@ -54,6 +54,8 @@ export function fakeSupabase({ tables = {}, storage = {}, failRemove = () => fal
       update(patch) { op = 'update'; payload = patch; return b },
       delete() { op = 'delete'; return b },
       eq(col, val) { filters.push(r => r[col] === val); return b },
+      in(col, vals) { filters.push(r => vals.includes(r[col])); return b },
+      not(col, op, val) { if (op === 'is' && val === null) filters.push(r => r[col] != null); return b },
       lt(col, val) { filters.push(r => r[col] != null && r[col] < val); return b },
       order(col) { order = col; return b },
       range(a, z) { range = [a, z]; return b },
@@ -104,7 +106,13 @@ export function fakeSupabase({ tables = {}, storage = {}, failRemove = () => fal
     },
   }
 
-  return { client: { from: query, storage: storageApi }, db, buckets, mutations }
+  const deletedUsers = []
+  const auth = { admin: { async deleteUser(id) {
+    if (failDeleteUser) return { data: null, error: { message: 'deleteUser feilet' } }
+    deletedUsers.push(id); mutations.push({ op: 'deleteUser', id }); return { data: {}, error: null }
+  } } }
+
+  return { client: { from: query, storage: storageApi, auth }, db, buckets, mutations, deletedUsers }
 }
 
 // Mange filer i en mappe: { 'mappe/f0000.jpg': {...}, ... }
