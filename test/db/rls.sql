@@ -341,11 +341,48 @@ begin
   r := claim_ai_call('00000000-0000-0000-0000-00000000000d', 'demo-okt-2', 'analyze-item', true);
   if not (r->>'ok')::boolean or (r->>'remaining')::int <> 4 then raise exception 'FAIL: ny demo-økt ga %', r; end if;
   raise notice 'OK   en ny demo-økt (ny besøkende) får nye forsøk';
-  for i in 1..30 loop
+  for i in 1..80 loop
     r := claim_ai_call('00000000-0000-0000-0000-0000000000e1', 'eva-okt', 'analyze-item', false);
     if not (r->>'ok')::boolean then raise exception 'FAIL: vanlig bruker stoppet etter % kall', i - 1; end if;
   end loop;
   r := claim_ai_call('00000000-0000-0000-0000-0000000000e1', 'eva-okt', 'analyze-item', false);
-  if (r->>'ok')::boolean or r->>'reason' <> 'rate_limit' then raise exception 'FAIL: kall 31 ga %', r; end if;
-  raise notice 'OK   vanlige brukere stoppes etter 30 AI-kall i timen';
+  if (r->>'ok')::boolean or r->>'reason' <> 'rate_limit' then raise exception 'FAIL: kall 81 ga %', r; end if;
+  raise notice 'OK   vanlige brukere stoppes etter 80 AI-kall i timen (20261015_ai_estate_budget.sql)';
+end $$;
+
+-- AI-budsjett per bo (20261015_ai_estate_budget.sql): bare medlemmer kan bruke boets budsjett, og boet
+-- stoppes etter 1 500 kall på 30 dager. Kall uten bo teller bare mot brukerens egne grenser.
+do $$
+declare r jsonb;
+  evas_bo constant uuid := 'eeee0000-0000-0000-0000-000000000001';
+  frank constant uuid := '00000000-0000-0000-0000-0000000000f1';
+begin
+  r := claim_ai_call('00000000-0000-0000-0000-0000000000a9', 'utenfor-okt', 'analyze-item', false, evas_bo);
+  if (r->>'ok')::boolean or r->>'reason' <> 'not_member' then raise exception 'FAIL: ikke-medlem på boets budsjett ga %', r; end if;
+  if exists (select 1 from ai_usage where session_id = 'utenfor-okt') then raise exception 'FAIL: avvist kall ble registrert'; end if;
+  raise notice 'OK   den som ikke er medlem, kan ikke bruke boets AI-budsjett';
+
+  -- Frank ble fjernet fra boet lenger opp; han er utenforstående her og legges inn igjen som medlem
+  r := claim_ai_call(frank, 'frank-ute', 'analyze-item', false, evas_bo);
+  if (r->>'ok')::boolean or r->>'reason' <> 'not_member' then raise exception 'FAIL: fjernet medlem på boets budsjett ga %', r; end if;
+  insert into estate_members (estate_id, user_id, role) values (evas_bo, frank, 'member');
+  r := claim_ai_call(frank, 'frank-bo', 'analyze-item', false, evas_bo);
+  if not (r->>'ok')::boolean then raise exception 'FAIL: medlem ble avvist: %', r; end if;
+  if (select estate_id from ai_usage where id = (r->>'usage_id')::bigint) is distinct from evas_bo then raise exception 'FAIL: estate_id ble ikke lagret'; end if;
+  raise notice 'OK   medlemmets kall registreres på boet';
+
+  insert into ai_usage (user_id, session_id, fn, estate_id, created_at)
+    select frank, 'frank-fylt', 'analyze-item', evas_bo, now() - interval '2 days' from generate_series(1, 1499);
+  r := claim_ai_call(frank, 'frank-bo', 'estimate-value', false, evas_bo);
+  if (r->>'ok')::boolean or r->>'reason' <> 'estate_limit' then raise exception 'FAIL: kall 1501 for boet ga %', r; end if;
+  r := claim_ai_call(frank, 'frank-uten-bo', 'estimate-value', false);
+  if not (r->>'ok')::boolean then raise exception 'FAIL: kall uten bo ble stoppet av bo-grensen: %', r; end if;
+  raise notice 'OK   boet stoppes etter 1 500 AI-kall på 30 dager; kall uten bo teller bare mot brukeren';
+
+  update ai_usage set created_at = now() - interval '31 days' where session_id = 'frank-fylt';
+  r := claim_ai_call(frank, 'frank-bo', 'estimate-value', false, evas_bo);
+  if not (r->>'ok')::boolean then raise exception 'FAIL: kall eldre enn 30 dager telte: %', r; end if;
+  raise notice 'OK   kall eldre enn 30 dager teller ikke mot boet';
+  delete from ai_usage where session_id in ('frank-fylt', 'frank-bo', 'frank-uten-bo');
+  delete from estate_members where estate_id = evas_bo and user_id = frank;
 end $$;

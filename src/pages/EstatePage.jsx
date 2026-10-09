@@ -10,6 +10,7 @@ import { L, locale } from '../lib/lang'
 import { categoryLabel } from '../lib/categories'
 import { Modal } from '../components/UI'
 import ReasonEditor from '../components/ReasonEditor'
+import StoredImage from '../components/StoredImage'
 
 const PALETTE = ['#5F6E52','#8B9A7D','#A97C3F','#7A8B6E','#9C8267','#6E8B87']
 
@@ -440,7 +441,7 @@ function ItemCard({ item, userId, onClick, onDelete, myRole, isDemo, showReason 
 
       <div style={{ height:'130px', background:'#E8DFD0', overflow:'hidden', position:'relative' }}>
         {item.image_url
-          ? <img src={item.image_url} alt={item.title} style={{ width:'100%', height:'100%', objectFit:'contain' }} />
+          ? <StoredImage src={item.image_url} alt={item.title} style={{ width:'100%', height:'100%', objectFit:'contain' }} />
           : <span style={{ position:'absolute', left:'10px', bottom:'8px', fontSize:'0.6875rem', color:'#75604B' }}>{cat.emoji} {categoryLabel(cat.label)}</span>}
         {count > 1 && !isAssigned && <span style={{ position:'absolute', top:'8px', right:'8px', background:'#5F6E52', color:'#fff', fontSize:'0.6875rem', padding:'2px 8px', borderRadius:'10px' }}>{L(`${count} vil ha`, `${count} want it`)}</span>}
         {isAssigned && <span style={{ position:'absolute', top:'8px', right:'8px', background:'#5F6E52', color:'#fff', fontSize:'0.6875rem', padding:'2px 8px', borderRadius:'10px' }}>{L('Tildelt', 'Assigned')}</span>}

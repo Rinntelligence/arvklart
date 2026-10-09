@@ -11,6 +11,7 @@ import AnalysisDetails from '../components/AnalysisDetails'
 import AiCorrectionsForm from '../components/AiCorrectionsForm'
 import MarketCompare from '../components/MarketCompare'
 import { withCorrections } from '../lib/aiCorrections'
+import StoredImage from '../components/StoredImage'
 
 const tc = c => { if(!c)return'#FBF9F5'; const r=parseInt(c.slice(1,3),16),g=parseInt(c.slice(3,5),16),b=parseInt(c.slice(5,7),16); return(0.299*r+0.587*g+0.114*b)/255>0.55?'#3A2F26':'#FBF9F5' }
 
@@ -208,7 +209,7 @@ export default function ItemDetailPage({ session, profile, onToast, isDemo }) {
       {allImages.length > 0 ? (
         <div style={{ marginBottom:'24px', position:'relative' }}>
           <div style={{ background:'#E8DFD0', borderRadius:'14px', height:'280px', display:'flex', alignItems:'center', justifyContent:'center', overflow:'hidden', position:'relative' }}>
-            <img src={allImages[currentImageIndex]} alt={item.title} style={{ width:'100%', height:'100%', objectFit:'contain' }} />
+            <StoredImage src={allImages[currentImageIndex]} alt={item.title} style={{ width:'100%', height:'100%', objectFit:'contain' }} />
             {allImages.length > 1 && currentImageIndex > 0 && (
               <button onClick={() => setCurrentImageIndex(i => i-1)} style={{ position:'absolute', left:'8px', top:'50%', transform:'translateY(-50%)', background:'rgba(0,0,0,0.5)', color:'#fff', border:'none', borderRadius:'50%', width:'40px', height:'40px', fontSize:'1.375rem', cursor:'pointer' }}>‹</button>
             )}
