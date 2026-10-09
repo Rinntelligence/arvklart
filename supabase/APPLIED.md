@@ -25,6 +25,7 @@ Sist verifisert: 2026-10-08, ved å sammenligne prod med en lokal database bygge
 | `migrations/20261008_revoke_cleanup_old_closed_estates.sql` | **ja, 2026-10-08 16:33 UTC** | `schema_migrations` 20261008163341. `anon`/`authenticated` får 42501, `service_role` kan fortsatt |
 | `migrations/20261008_guard_item_value_disposal.sql` | **nei** | ny: verdi og kastmerking håndheves i `guard_item_update`, og sletting av egen gjenstand bare før tildeling. Kjøres etter godkjenning, og etter at frontend uten «Kast» i sveipingen er ute (i dagens prod-frontend kan alle merke for kast ved sveiping, og de ville da fått en feilmelding) |
 | `migrations/20261008_cleanup_runs.sql` | **nei** | må kjøres før `cleanup-closed-estates` / `cleanup-orphan-images` deployes (uten tabellen avbrytes kjøringen før noe slettes) |
+| `migrations/20261010_interests_reason_update.sql` | **nei** | ny (D2): arvingen kan endre og fjerne begrunnelsen på eget ønske (policy `interests_update`, kolonnerettighet bare på `reason`, maks 1000 tegn). Kjøres etter godkjenning og **før** frontend med «+ Si hvorfor» merges; ellers gir lagring av begrunnelse en feilmelding. Tilbakerulling: `rollback/20261010_interests_reason_update.down.sql` |
 
 ## Finnes bare i produksjon (ikke i repoet)
 
