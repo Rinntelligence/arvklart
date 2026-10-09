@@ -73,7 +73,7 @@ Tilgjengelighet (WCAG 2.2 AA): ikke bruk `outline:'none'`; fokus vises med `:foc
   - Koden trekker ikke fra noe i tillegg. Den gjør bare intervallet bredere og senker sikkerheten når grunnlaget er usikkert.
   - For lite grunnlag gir `status: 'insufficient'` med tips og ingen verdi (aldri 0 kr).
   - AI-ens anslag lagres i `ai_analysis.valuation`, adskilt fra `estimated_value`.
-- Storage: `estate-docs` er privat (`documents/<bo-id>/…`, åpnes med `createSignedUrl`); `item-images` er offentlig, nye filer lagres under `<bo-id>/…` (`src/lib/images.js`)
+- Storage: `estate-docs` er privat (`documents/<bo-id>/…`, åpnes med `createSignedUrl`); `item-images` vises med tidsbegrensede, signerte URL-er via `<StoredImage>` (`src/components/StoredImage.jsx`, `src/lib/imageUrls.js`). Databasen lagrer fortsatt den offentlige URL-en som identifikator. Bøtten gjøres privat i S3, så bruk aldri `<img src={item.image_url}>` direkte. Nye filer lagres under `<bo-id>/…` (`src/lib/images.js`)
 
 ## Demokonto
 `mona.demo@heirsplit.no` er en demo-bruker — ikke slett eller endre dennes data i databasen.
@@ -126,6 +126,9 @@ Hent verdiene fra Supabase Dashboard → Project Settings → API.
 ## GDPR og personvern
 - Samtykke til AI (bildeanalyse og verdiestimat) spørres om i `AddItemPage.jsx` og kan trekkes tilbake under «Min konto» (`src/lib/aiConsent.js`, localStorage-nøkkel: `aiConsented`)
 - Dataeksport (PDF) er i `AccountPage` + `src/lib/dataExportPdf.js`
-- Slett-konto-funksjon er i `supabase/functions/delete-account/index.ts`: sletter bo brukeren er alene om (med filer), gir admin videre i delte bo og fjerner navnet fra gjenstander
+- Slett-konto-funksjonen ligger i `supabase/functions/delete-account/index.ts`, med logikken i `_shared/deleteAccount.ts` og tester i `test/functions/deleteAccount.test.js`.
+  - Bo brukeren er alene om, slettes med alle filer.
+  - I delte bo gis administratorrollen videre. Navn, verdiforslag, stemmer og AI-rettelser fjernes fra gjenstandene, mens gjenstandene og bildene blir værende som boets innhold.
+  - Appen får faste feilkoder, aldri råtekst.
 - Automatisk sletting 12 mnd etter at et bo avsluttes (`estates.closed_at`): edge-funksjonen `cleanup-closed-estates` (data, filer og tilbakemeldinger knyttet til boet), skal kjøres daglig av Supabase Cron; kjøringer logges i `cleanup_runs`. Foreldreløse bilder ryddes bare manuelt med `cleanup-orphan-images` (dry_run + bekreftelse). Se `supabase/README.md`
 - Behandlingsansvarlig (selskapsnavn og org.nr.) fylles inn i `COMPANY` i `OtherPages.jsx`
