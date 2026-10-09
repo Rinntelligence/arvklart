@@ -160,7 +160,7 @@ do $$ begin
   raise exception 'FAIL: kunne laste opp i annet bo';
 exception when insufficient_privilege then raise notice 'OK   kan ikke laste opp dokumenter i andres bo';
 end $$;
-insert into storage.objects (bucket_id, name) values ('item-images', 'eeee0000-0000-0000-0000-000000000001/item-1.jpg');
+insert into storage.objects (bucket_id, name, owner) values ('item-images', 'eeee0000-0000-0000-0000-000000000001/item-1.jpg', auth.uid());
 do $$ begin
   insert into storage.objects (bucket_id, name) values ('item-images', 'items/random.jpg');
   raise exception 'FAIL: kunne laste opp bilde utenfor boets mappe';
@@ -169,6 +169,22 @@ end $$;
 insert into documents (estate_id, name, file_url, file_path, uploaded_by) values ('eeee0000-0000-0000-0000-000000000001', 'testament.pdf', 'x', 'documents/eeee0000-0000-0000-0000-000000000001/testament.pdf', auth.uid());
 update documents set folder = 'will';
 select t_eq((select folder from documents), 'will', 'medlem kan flytte dokument til mappe');
+reset role;
+-- Private gjenstandsbilder (20261014_item_images_private.sql)
+select t_eq((select public from storage.buckets where id = 'item-images'), false, 'item-images er privat');
+insert into storage.objects (bucket_id, name, owner) values ('item-images', 'eeee0000-0000-0000-0000-000000000001/eva-bilde.jpg', (select id from auth.users where email = 'eva@test.no'));
+select t_as('frank@test.no'); set role authenticated;
+with d as (delete from storage.objects where name = 'eeee0000-0000-0000-0000-000000000001/eva-bilde.jpg' returning 1)
+  select t_eq((select count(*)::int from d), 0, 'medlem kan ikke slette andres bilde');
+with d as (delete from storage.objects where name = 'eeee0000-0000-0000-0000-000000000001/item-1.jpg' returning 1)
+  select t_eq((select count(*)::int from d), 1, 'medlem kan slette sitt eget bilde');
+reset role;
+select t_as('eva@test.no'); set role authenticated;
+with d as (delete from storage.objects where name = 'eeee0000-0000-0000-0000-000000000001/eva-bilde.jpg' returning 1)
+  select t_eq((select count(*)::int from d), 1, 'administrator kan slette bilder i boet');
+reset role;
+select t_as('outsider@test.no'); set role authenticated;
+select t_eq((select count(*)::int from storage.objects where bucket_id = 'item-images'), 0, 'utenforstående ser ingen gjenstandsbilder');
 reset role;
 
 -- Frank sender en tilbakemelding og kan lese sin egen (dataeksporten), ikke andres
