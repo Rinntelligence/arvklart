@@ -15,6 +15,8 @@ import { aiAnalysisRecord, aiSuggestion, applyAiSuggestion } from '../lib/itemAi
 import { CONDITION_OPTIONS, identificationSummary, multipleItemsText } from '../lib/analysisView'
 import { AiConsent, DemoNotice } from '../components/AiDialogs'
 import AnalysisDetails from '../components/AnalysisDetails'
+import AiCorrectionsForm from '../components/AiCorrectionsForm'
+import { withCorrections } from '../lib/aiCorrections'
 import CameraCapture from '../components/CameraCapture'
 
 const MAX_ITEMS = 20
@@ -661,7 +663,7 @@ export default function AddItemsPage({ session, profile, onToast, isDemo }) {
         <MergeGrid drafts={drafts} items={mergeable} selected={mergeSel} onToggle={toggleMergePhoto} />
       ) : <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
         {drafts.map((d, i) => (
-          <DraftCard key={d.key} draft={d} index={i} categories={categories} locked={!!busy}
+          <DraftCard key={d.key} draft={d} index={i} categories={categories} locked={!!busy} userId={session.user.id}
             onChange={patch => update(d.key, patch)}
             onRemove={() => removeDraft(d.key)}
             onRemovePhoto={pi => removePhoto(d.key, pi)}
@@ -902,14 +904,22 @@ const STATUS = {
   saved: () => ({ text: L('✓ Lagret', '✓ Saved'), color: '#5F6E52', bg: '#DCE3D2' }),
 }
 
-function DraftCard({ draft: d, index, categories, locked, onChange, onRemove, onRemovePhoto, onMergeUp, onSplit, onRetry, onEstimate, onAddPhotos, onCamera }) {
+function DraftCard({ draft: d, index, categories, locked, userId, onChange, onRemove, onRemovePhoto, onMergeUp, onSplit, onRetry, onEstimate, onAddPhotos, onCamera }) {
   const status = STATUS[d.status]?.()
   const disabled = locked || d.status === 'saved'
   const aiValue = estimateApplies(d)
   const showValueInMore = !d.estimate && !d.estimating
   // AI-vurderingen: kort oppsummering, advarsel ved flere gjenstander, og hvilke felt som fortsatt er AI-forslag
   const ai = d.analysis?.ai
-  const summary = ai ? identificationSummary(ai) : ''
+  const summary = ai ? identificationSummary(ai, d.analysis.corrections) : ''
+  const [fixing, setFixing] = useState(false)
+  // Rettet identifikasjon gjør et AI-anslag utdatert: anslaget fjernes, så «Anslå verdi» kan brukes på nytt.
+  // Står AI-ens verdi fortsatt i feltet, tømmes det også (tomt er ukjent verdi, ikke 0 kr).
+  const saveFix = values => {
+    setFixing(false)
+    const next = withCorrections(d.analysis, values, userId)
+    if (next) onChange(aiValue ? { analysis: next, estimate: null, estimateMissing: null, value: '' } : { analysis: next, estimate: null, estimateMissing: null })
+  }
   const multiple = ai ? multipleItemsText(ai) : ''
   const fieldNames = { title: L('navn', 'name'), categoryId: L('kategori', 'category'), condition: L('tilstand', 'condition'), description: L('beskrivelse', 'description') }
   const aiFields = Object.keys(fieldNames).filter(f => d.aiFilled?.[f] !== undefined && d[f] === d.aiFilled[f]).map(f => fieldNames[f])
@@ -1004,7 +1014,18 @@ function DraftCard({ draft: d, index, categories, locked, onChange, onRemove, on
             placeholder={L('Beskrivelse (valgfri)', 'Description (optional)')}
             style={{ ...inputStyle, resize: 'vertical', fontSize: '0.9375rem' }} />
           {showValueInMore && valueField}
-          {ai && <div style={{ borderTop: '1px solid #E8DFD0', paddingTop: '8px' }}><AnalysisDetails analysis={d.analysis} headingLevel={4} /></div>}
+          {ai && (
+            <div style={{ borderTop: '1px solid #E8DFD0', paddingTop: '8px' }}>
+              {fixing && !disabled ? (
+                <AiCorrectionsForm record={d.analysis} idPrefix={`fix-${d.key}`} onSave={saveFix} onCancel={() => setFixing(false)} />
+              ) : (
+                <>
+                  <AnalysisDetails analysis={d.analysis} headingLevel={4} />
+                  {!disabled && <button type="button" onClick={() => setFixing(true)} style={{ ...smallBtn, marginTop: '8px' }}>{L('Rett opplysningene', 'Correct the details')}</button>}
+                </>
+              )}
+            </div>
+          )}
         </div>
       </details>
 
