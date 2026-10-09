@@ -6,9 +6,10 @@ import { joinEstateByCode } from '../lib/joinEstate'
 import { hasAiConsent, withdrawAiConsent } from '../lib/aiConsent'
 import { L, isEn } from '../lib/lang'
 import { categoryLabel } from '../lib/categories'
+import TextSizeControl from '../components/TextSizeControl'
 
-const btn = { padding:'10px 20px', background:'#3A2F26', color:'#FBF9F5', border:'none', borderRadius:'8px', cursor:'pointer', fontSize:'14px', fontFamily:'Karla, sans-serif' }
-const h2 = { fontFamily:"'Fraunces', serif", fontSize:'22px', fontWeight:'400', color:'#3A2F26' }
+const btn = { padding:'10px 20px', background:'#3A2F26', color:'#FBF9F5', border:'none', borderRadius:'8px', cursor:'pointer', fontSize:'0.875rem', fontFamily:'Karla, sans-serif' }
+const h2 = { fontFamily:"'Fraunces', serif", fontSize:'1.375rem', fontWeight:'400', color:'#3A2F26' }
 
 export function JoinPage({ session, onToast }) {
   const { code } = useParams()
@@ -78,36 +79,36 @@ export function CategoriesPage({ onToast }) {
     onToast(L('Kategori fjernet', 'Category removed')); load()
   }
 
-  const input = { padding:'10px 14px', border:'1px solid #9A8B78', borderRadius:'8px', fontSize:'15px', background:'#FBF9F5', color:'#3A2F26', fontFamily:'Karla, sans-serif' }
+  const input = { padding:'10px 14px', border:'1px solid #9A8B78', borderRadius:'8px', fontSize:'0.9375rem', background:'#FBF9F5', color:'#3A2F26', fontFamily:'Karla, sans-serif' }
 
   return (
     <div style={{ maxWidth:'520px', margin:'0 auto', padding:'28px 16px', fontFamily:'Karla, sans-serif' }}>
-      <button onClick={()=>navigate(`/estate/${id}/admin`)} style={{ background:'none', border:'none', color:'#75604B', cursor:'pointer', fontSize:'13px', padding:'0 0 20px', fontFamily:'Karla, sans-serif' }}>{L('← Tilbake til administrasjon', '← Back to administration')}</button>
-      <h1 style={{ fontFamily:"'Fraunces', serif", fontSize:'24px', fontWeight:'400', color:'#3A2F26', marginBottom:'28px' }}>{L('Kategorier', 'Categories')}</h1>
+      <button onClick={()=>navigate(`/estate/${id}/admin`)} style={{ background:'none', border:'none', color:'#75604B', cursor:'pointer', fontSize:'0.8125rem', padding:'0 0 20px', fontFamily:'Karla, sans-serif' }}>{L('← Tilbake til administrasjon', '← Back to administration')}</button>
+      <h1 style={{ fontFamily:"'Fraunces', serif", fontSize:'1.5rem', fontWeight:'400', color:'#3A2F26', marginBottom:'28px' }}>{L('Kategorier', 'Categories')}</h1>
 
       <div style={{ background:'#fff', border:'1px solid #D9CFC0', borderRadius:'12px', padding:'24px', marginBottom:'16px' }}>
-        <p style={{ fontSize:'13px', color:'#75604B', marginBottom:'14px' }}>{L('Legg til ny kategori:', 'Add a new category:')}</p>
+        <p style={{ fontSize:'0.8125rem', color:'#75604B', marginBottom:'14px' }}>{L('Legg til ny kategori:', 'Add a new category:')}</p>
         <div style={{ display:'flex', gap:'8px', marginBottom: showPicker?'12px':'0' }}>
-          <button onClick={()=>setShowPicker(!showPicker)} style={{ ...input, padding:'10px 14px', cursor:'pointer', fontSize:'20px' }}>{newEmoji}</button>
+          <button onClick={()=>setShowPicker(!showPicker)} style={{ ...input, padding:'10px 14px', cursor:'pointer', fontSize:'1.25rem' }}>{newEmoji}</button>
           <input value={newLabel} onChange={e=>setNewLabel(e.target.value)} onKeyDown={e=>e.key==='Enter'&&add()} placeholder={L('Kategorinavn…', 'Category name…')} maxLength={100} style={{ ...input, flex:1, minWidth:0 }} />
-          <button onClick={add} disabled={!newLabel.trim()} style={{ padding:'10px 18px', background:newLabel.trim()?'#3A2F26':'#D9CFC0', color:'#FBF9F5', border:'none', borderRadius:'8px', cursor:newLabel.trim()?'pointer':'not-allowed', fontSize:'14px', fontFamily:'Karla, sans-serif' }}>+</button>
+          <button onClick={add} disabled={!newLabel.trim()} style={{ padding:'10px 18px', background:newLabel.trim()?'#3A2F26':'#D9CFC0', color:'#FBF9F5', border:'none', borderRadius:'8px', cursor:newLabel.trim()?'pointer':'not-allowed', fontSize:'0.875rem', fontFamily:'Karla, sans-serif' }}>+</button>
         </div>
         {showPicker && (
           <div style={{ display:'flex', flexWrap:'wrap', gap:'6px', padding:'12px', background:'#E8DFD0', borderRadius:'8px' }}>
-            {EMOJIS.map(e=>(<button key={e} onClick={()=>{setNewEmoji(e);setShowPicker(false)}} style={{ fontSize:'20px', background:newEmoji===e?'#D9CFC0':'none', border:'none', cursor:'pointer', padding:'5px', borderRadius:'6px' }}>{e}</button>))}
+            {EMOJIS.map(e=>(<button key={e} onClick={()=>{setNewEmoji(e);setShowPicker(false)}} style={{ fontSize:'1.25rem', background:newEmoji===e?'#D9CFC0':'none', border:'none', cursor:'pointer', padding:'5px', borderRadius:'6px' }}>{e}</button>))}
           </div>
         )}
       </div>
 
       <div style={{ background:'#fff', border:'1px solid #D9CFC0', borderRadius:'12px', overflow:'hidden' }}>
         {categories.length === 0 && (
-          <div style={{ padding:'24px', textAlign:'center', color:'#75604B', fontSize:'14px' }}>{L('Ingen kategorier ennå. Legg til den første.', 'No categories yet. Add the first one.')}</div>
+          <div style={{ padding:'24px', textAlign:'center', color:'#75604B', fontSize:'0.875rem' }}>{L('Ingen kategorier ennå. Legg til den første.', 'No categories yet. Add the first one.')}</div>
         )}
         {categories.map((c,i)=>(
           <div key={c.id} style={{ display:'flex', alignItems:'center', padding:'14px 20px', borderBottom:i<categories.length-1?'1px solid #E8DFD0':'none' }}>
-            <span style={{ fontSize:'20px', marginRight:'14px' }}>{c.emoji}</span>
-            <span style={{ flex:1, fontSize:'15px', color:'#3A2F26' }}>{categoryLabel(c.label)}</span>
-            <button onClick={()=>remove(c.id)} title={L('Fjern kategori', 'Remove category')} style={{ background:'none', border:'none', color:'#75604B', cursor:'pointer', fontSize:'20px' }}>×</button>
+            <span style={{ fontSize:'1.25rem', marginRight:'14px' }}>{c.emoji}</span>
+            <span style={{ flex:1, fontSize:'0.9375rem', color:'#3A2F26' }}>{categoryLabel(c.label)}</span>
+            <button onClick={()=>remove(c.id)} title={L('Fjern kategori', 'Remove category')} style={{ background:'none', border:'none', color:'#75604B', cursor:'pointer', fontSize:'1.25rem' }}>×</button>
           </div>
         ))}
       </div>
@@ -127,21 +128,21 @@ export function PrivacyPage() {
     window.history.replaceState(null, '', key === 'terms' ? '#vilkar' : '#')
   }
   const s = { fontFamily: 'Karla, sans-serif', maxWidth: '720px', margin: '0 auto', padding: '40px 20px 80px', color: '#3A2F26', lineHeight: '1.8' }
-  const h2s = { fontFamily: 'Fraunces, serif', fontSize: '20px', fontWeight: '400', marginTop: '32px', marginBottom: '8px', color: '#3A2F26' }
-  const ps = { fontSize: '15px', color: '#5C4530', marginBottom: '12px' }
-  const lis = { fontSize: '15px', color: '#5C4530', marginBottom: '6px' }
+  const h2s = { fontFamily: 'Fraunces, serif', fontSize: '1.25rem', fontWeight: '400', marginTop: '32px', marginBottom: '8px', color: '#3A2F26' }
+  const ps = { fontSize: '0.9375rem', color: '#5C4530', marginBottom: '12px' }
+  const lis = { fontSize: '0.9375rem', color: '#5C4530', marginBottom: '6px' }
   return (
     <div style={s}>
-      <h1 style={{ fontFamily: 'Fraunces, serif', fontSize: '28px', fontWeight: '400', color: '#3A2F26', marginBottom: '6px' }}>{L('Juridisk', 'Legal')}</h1>
-      <p style={{ color: '#75604B', fontSize: '14px', marginBottom: '28px' }}>{L('Sist oppdatert: september 2026', 'Last updated: September 2026')}</p>
+      <h1 style={{ fontFamily: 'Fraunces, serif', fontSize: '1.75rem', fontWeight: '400', color: '#3A2F26', marginBottom: '6px' }}>{L('Juridisk', 'Legal')}</h1>
+      <p style={{ color: '#75604B', fontSize: '0.875rem', marginBottom: '28px' }}>{L('Sist oppdatert: september 2026', 'Last updated: September 2026')}</p>
       <div style={{ display: 'flex', gap: '8px', marginBottom: '32px', borderBottom: '1px solid #E8DFD0', paddingBottom: '16px' }}>
         {[['privacy', L('Personvernerklæring', 'Privacy policy')], ['terms', L('Vilkår for bruk', 'Terms of use')]].map(([key, label]) => (
-          <button key={key} onClick={() => switchTab(key)} style={{ padding: '8px 18px', borderRadius: '20px', border: 'none', cursor: 'pointer', fontFamily: 'Karla, sans-serif', fontSize: '14px', background: tab === key ? '#3A2F26' : '#E8DFD0', color: tab === key ? '#FBF9F5' : '#5C4530' }}>{label}</button>
+          <button key={key} onClick={() => switchTab(key)} style={{ padding: '8px 18px', borderRadius: '20px', border: 'none', cursor: 'pointer', fontFamily: 'Karla, sans-serif', fontSize: '0.875rem', background: tab === key ? '#3A2F26' : '#E8DFD0', color: tab === key ? '#FBF9F5' : '#5C4530' }}>{label}</button>
         ))}
       </div>
 
       {isEn() && (
-        <p style={{ ...ps, fontSize: '13px', color: '#75604B' }}>This is an English translation. If the Norwegian and English versions differ, the Norwegian version applies.</p>
+        <p style={{ ...ps, fontSize: '0.8125rem', color: '#75604B' }}>This is an English translation. If the Norwegian and English versions differ, the Norwegian version applies.</p>
       )}
 
       {tab === 'privacy' && (
@@ -263,47 +264,53 @@ export function AccountPage({ session, onToast }) {
 
   return (
     <div style={{ maxWidth: '560px', margin: '0 auto', padding: '40px 20px', fontFamily: 'Karla, sans-serif' }}>
-      <h1 style={{ fontFamily: 'Fraunces, serif', fontSize: '26px', fontWeight: '400', color: '#3A2F26', marginBottom: '6px' }}>{L('Min konto', 'My account')}</h1>
-      <p style={{ color: '#75604B', fontSize: '14px', marginBottom: '32px' }}>{session.user.email}</p>
+      <h1 style={{ fontFamily: 'Fraunces, serif', fontSize: '1.625rem', fontWeight: '400', color: '#3A2F26', marginBottom: '6px' }}>{L('Min konto', 'My account')}</h1>
+      <p style={{ color: '#75604B', fontSize: '0.875rem', marginBottom: '32px' }}>{session.user.email}</p>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
 
         <div style={{ background: '#fff', border: '1px solid #D9CFC0', borderRadius: '12px', padding: '24px' }}>
-          <h2 style={{ fontFamily: 'Fraunces, serif', fontSize: '17px', fontWeight: '400', color: '#3A2F26', marginBottom: '6px' }}>{L('Last ned dine data', 'Download your data')}</h2>
-          <p style={{ fontSize: '14px', color: '#5C4530', marginBottom: '16px', lineHeight: '1.6' }}>{L('Last ned personopplysningene vi har om deg som PDF: profil, bo du er med i, interesser, kommentarer, gjenstander og dokumenter du har lagt inn, og tilbakemeldinger.', 'Download the personal data we hold about you as a PDF: profile, estates you belong to, interests, comments, items and documents you have added, and feedback.')}</p>
-          <button onClick={exportData} disabled={exporting} style={{ padding: '10px 20px', background: '#5F6E52', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '14px', fontFamily: 'Karla, sans-serif' }}>
+          <h2 style={{ fontFamily: 'Fraunces, serif', fontSize: '1.0625rem', fontWeight: '400', color: '#3A2F26', marginBottom: '12px' }}>{L('Visning', 'Display')}</h2>
+          <TextSizeControl />
+          <p style={{ fontSize: '0.8125rem', color: '#75604B', marginTop: '10px', lineHeight: 1.5 }}>{L('Gjelder på denne enheten. Teksten følger også tekststørrelsen du har valgt på telefonen.', 'Applies on this device. The text also follows the text size you have chosen on your phone.')}</p>
+        </div>
+
+        <div style={{ background: '#fff', border: '1px solid #D9CFC0', borderRadius: '12px', padding: '24px' }}>
+          <h2 style={{ fontFamily: 'Fraunces, serif', fontSize: '1.0625rem', fontWeight: '400', color: '#3A2F26', marginBottom: '6px' }}>{L('Last ned dine data', 'Download your data')}</h2>
+          <p style={{ fontSize: '0.875rem', color: '#5C4530', marginBottom: '16px', lineHeight: '1.6' }}>{L('Last ned personopplysningene vi har om deg som PDF: profil, bo du er med i, interesser, kommentarer, gjenstander og dokumenter du har lagt inn, og tilbakemeldinger.', 'Download the personal data we hold about you as a PDF: profile, estates you belong to, interests, comments, items and documents you have added, and feedback.')}</p>
+          <button onClick={exportData} disabled={exporting} style={{ padding: '10px 20px', background: '#5F6E52', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '0.875rem', fontFamily: 'Karla, sans-serif' }}>
             {exporting ? L('Eksporterer…', 'Exporting…') : L('Last ned mine data', 'Download my data')}
           </button>
         </div>
 
         <div style={{ background: '#fff', border: '1px solid #D9CFC0', borderRadius: '12px', padding: '24px' }}>
-          <h2 style={{ fontFamily: 'Fraunces, serif', fontSize: '17px', fontWeight: '400', color: '#3A2F26', marginBottom: '6px' }}>{L('Samtykke til AI-analyse', 'Consent to AI analysis')}</h2>
-          <p style={{ fontSize: '14px', color: '#5C4530', marginBottom: '12px', lineHeight: '1.6' }}>
+          <h2 style={{ fontFamily: 'Fraunces, serif', fontSize: '1.0625rem', fontWeight: '400', color: '#3A2F26', marginBottom: '6px' }}>{L('Samtykke til AI-analyse', 'Consent to AI analysis')}</h2>
+          <p style={{ fontSize: '0.875rem', color: '#5C4530', marginBottom: '12px', lineHeight: '1.6' }}>
             {aiConsent
               ? L('Du har samtykket til at bilder og beskrivelser sendes til Anthropic når du bruker AI-analyse eller verdiestimat i denne nettleseren.', 'You have consented to photos and descriptions being sent to Anthropic when you use AI analysis or value estimates in this browser.')
               : L('Du har ikke gitt samtykke til AI-analyse i denne nettleseren. Du blir spurt første gang du bruker funksjonen.', 'You have not consented to AI analysis in this browser. You will be asked the first time you use the feature.')}
           </p>
           {aiConsent && (
-            <button onClick={() => { withdrawAiConsent(); setAiConsent(false); onToast(L('Samtykket er trukket tilbake', 'Your consent has been withdrawn')) }} style={{ padding: '9px 18px', background: 'none', border: '1px solid #D9CFC0', borderRadius: '8px', cursor: 'pointer', fontSize: '14px', fontFamily: 'Karla, sans-serif', color: '#5C4530' }}>{L('Trekk tilbake samtykket', 'Withdraw consent')}</button>
+            <button onClick={() => { withdrawAiConsent(); setAiConsent(false); onToast(L('Samtykket er trukket tilbake', 'Your consent has been withdrawn')) }} style={{ padding: '9px 18px', background: 'none', border: '1px solid #D9CFC0', borderRadius: '8px', cursor: 'pointer', fontSize: '0.875rem', fontFamily: 'Karla, sans-serif', color: '#5C4530' }}>{L('Trekk tilbake samtykket', 'Withdraw consent')}</button>
           )}
         </div>
 
         <div style={{ background: '#fff', border: '1px solid #D9CFC0', borderRadius: '12px', padding: '24px' }}>
-          <h2 style={{ fontFamily: 'Fraunces, serif', fontSize: '17px', fontWeight: '400', color: '#3A2F26', marginBottom: '6px' }}>{L('Personvern og vilkår', 'Privacy and terms')}</h2>
-          <p style={{ fontSize: '14px', color: '#5C4530', marginBottom: '12px', lineHeight: '1.6' }}>{L('Les vår personvernerklæring og vilkår for bruk av tjenesten.', 'Read our privacy policy and terms of use for the service.')}</p>
-          <a href="/personvern" style={{ fontSize: '14px', color: '#5F6E52' }}>{L('Åpne personvernerklæring →', 'Open privacy policy →')}</a>
+          <h2 style={{ fontFamily: 'Fraunces, serif', fontSize: '1.0625rem', fontWeight: '400', color: '#3A2F26', marginBottom: '6px' }}>{L('Personvern og vilkår', 'Privacy and terms')}</h2>
+          <p style={{ fontSize: '0.875rem', color: '#5C4530', marginBottom: '12px', lineHeight: '1.6' }}>{L('Les vår personvernerklæring og vilkår for bruk av tjenesten.', 'Read our privacy policy and terms of use for the service.')}</p>
+          <a href="/personvern" style={{ fontSize: '0.875rem', color: '#5F6E52' }}>{L('Åpne personvernerklæring →', 'Open privacy policy →')}</a>
         </div>
 
         <div style={{ background: '#fff', border: '1px solid #F0D4D4', borderRadius: '12px', padding: '24px' }}>
-          <h2 style={{ fontFamily: 'Fraunces, serif', fontSize: '17px', fontWeight: '400', color: '#8B3A3A', marginBottom: '6px' }}>{L('Slett konto', 'Delete account')}</h2>
-          <p style={{ fontSize: '14px', color: '#5C4530', marginBottom: '16px', lineHeight: '1.6' }}>{L('Sletter kontoen og personopplysningene dine permanent. Bo du er alene om, slettes med bilder og dokumenter. Bo du deler med andre, beholdes for dem uten navnet ditt; er du eneste administrator, overtar den som har vært lengst med.', 'Permanently deletes your account and personal data. Estates where you are the only member are deleted with photos and documents. Estates you share with others are kept for them without your name; if you are the only administrator, the longest-standing member takes over.')}</p>
+          <h2 style={{ fontFamily: 'Fraunces, serif', fontSize: '1.0625rem', fontWeight: '400', color: '#8B3A3A', marginBottom: '6px' }}>{L('Slett konto', 'Delete account')}</h2>
+          <p style={{ fontSize: '0.875rem', color: '#5C4530', marginBottom: '16px', lineHeight: '1.6' }}>{L('Sletter kontoen og personopplysningene dine permanent. Bo du er alene om, slettes med bilder og dokumenter. Bo du deler med andre, beholdes for dem uten navnet ditt; er du eneste administrator, overtar den som har vært lengst med.', 'Permanently deletes your account and personal data. Estates where you are the only member are deleted with photos and documents. Estates you share with others are kept for them without your name; if you are the only administrator, the longest-standing member takes over.')}</p>
           {!confirmDelete ? (
-            <button onClick={() => setConfirmDelete(true)} style={{ padding: '10px 20px', background: 'none', border: '1px solid #8B3A3A', color: '#8B3A3A', borderRadius: '8px', cursor: 'pointer', fontSize: '14px', fontFamily: 'Karla, sans-serif' }}>{L('Slett min konto', 'Delete my account')}</button>
+            <button onClick={() => setConfirmDelete(true)} style={{ padding: '10px 20px', background: 'none', border: '1px solid #8B3A3A', color: '#8B3A3A', borderRadius: '8px', cursor: 'pointer', fontSize: '0.875rem', fontFamily: 'Karla, sans-serif' }}>{L('Slett min konto', 'Delete my account')}</button>
           ) : (
             <div>
-              <p style={{ fontSize: '14px', color: '#8B3A3A', marginBottom: '12px', fontWeight: '500' }}>{L('Er du helt sikker? Dette kan ikke angres.', 'Are you absolutely sure? This cannot be undone.')}</p>
+              <p style={{ fontSize: '0.875rem', color: '#8B3A3A', marginBottom: '12px', fontWeight: '500' }}>{L('Er du helt sikker? Dette kan ikke angres.', 'Are you absolutely sure? This cannot be undone.')}</p>
               <div style={{ display: 'flex', gap: '10px' }}>
-                <button onClick={() => setConfirmDelete(false)} style={{ flex: 1, padding: '10px', background: 'none', border: '1px solid #D9CFC0', borderRadius: '8px', cursor: 'pointer', fontSize: '14px', fontFamily: 'Karla, sans-serif', color: '#5C4530' }}>{L('Avbryt', 'Cancel')}</button>
-                <button onClick={deleteAccount} disabled={deleting} style={{ flex: 1, padding: '10px', background: '#8B3A3A', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '14px', fontFamily: 'Karla, sans-serif' }}>
+                <button onClick={() => setConfirmDelete(false)} style={{ flex: 1, padding: '10px', background: 'none', border: '1px solid #D9CFC0', borderRadius: '8px', cursor: 'pointer', fontSize: '0.875rem', fontFamily: 'Karla, sans-serif', color: '#5C4530' }}>{L('Avbryt', 'Cancel')}</button>
+                <button onClick={deleteAccount} disabled={deleting} style={{ flex: 1, padding: '10px', background: '#8B3A3A', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '0.875rem', fontFamily: 'Karla, sans-serif' }}>
                   {deleting ? L('Sletter…', 'Deleting…') : L('Ja, slett permanent', 'Yes, delete permanently')}
                 </button>
               </div>

@@ -29,8 +29,8 @@ const FIXTURES = {
   heirs: [{ id: 'h1', estate_id: EST, name: 'Kari', email: 'kari@test.no', relationship: 'Barn', percentage: 0, created_at: now }],
 }
 
-async function setup(browser, { loggedIn = true } = {}) {
-  const ctx = await browser.newContext({ viewport: { width: 390, height: 844 } })
+async function setup(browser, { loggedIn = true, viewport = { width: 390, height: 844 }, textSize = null } = {}) {
+  const ctx = await browser.newContext({ viewport })
   const page = await ctx.newPage()
   await page.route('https://test.supabase.co/**', async route => {
     const req = route.request()
@@ -42,10 +42,11 @@ async function setup(browser, { loggedIn = true } = {}) {
     const body = single ? (rows[0] ?? null) : rows
     return route.fulfill({ status: single && !rows.length ? 406 : 200, contentType: 'application/json', body: JSON.stringify(body) })
   })
-  await page.addInitScript(([s, on]) => {
+  await page.addInitScript(([s, on, ts]) => {
     localStorage.removeItem('hs_lang')
+    if (ts) localStorage.setItem('hs_text_size', ts)
     if (on) localStorage.setItem('sb-test-auth-token', JSON.stringify(s)); else localStorage.removeItem('sb-test-auth-token')
-  }, [session, loggedIn])
+  }, [session, loggedIn, textSize])
   return { ctx, page }
 }
 
@@ -126,6 +127,46 @@ await check('Feilmelding blir stående til den lukkes (role=alert)', async page 
   assert(await alert.count() === 1, 'feilmeldingen forsvant av seg selv')
   await page.getByRole('button', { name: 'Lukk feilmeldingen' }).click()
   assert(await alert.count() === 0, 'feilmeldingen ble ikke lukket')
+})
+
+// Ekstra stor tekst (135 %) på liten skjerm: ingen horisontal rulling, og ingen tekst som kuttes
+for (const p of PAGES) {
+  const { ctx, page } = await setup(browser, { loggedIn: p.loggedIn !== false, viewport: { width: 360, height: 740 }, textSize: 'xlarge' })
+  try {
+    await page.goto(`${BASE}${p.path}`)
+    await page.getByText(p.ready).first().waitFor({ timeout: 15000 })
+    const r = await page.evaluate(() => {
+      const root = parseFloat(getComputedStyle(document.documentElement).fontSize)
+      const wide = document.documentElement.scrollWidth > window.innerWidth + 1
+      const cut = [...document.querySelectorAll('button, a, label, p, span, h1, h2, h3, li')]
+        .filter(el => el.offsetParent && el.textContent.trim() && el.clientWidth > 0 && el.scrollWidth > el.clientWidth + 2
+          && !['auto', 'scroll'].includes(getComputedStyle(el).overflowX))
+        .slice(0, 3).map(el => el.textContent.trim().slice(0, 30))
+      return { root, wide, cut }
+    })
+    if (r.root < 21) throw new Error(`grunnstørrelsen er ${r.root}px, ventet ca. 21,6px`)
+    if (r.wide) throw new Error('horisontal rulling')
+    if (r.cut.length) throw new Error(`kuttet tekst: ${r.cut.join(' | ')}`)
+    if (process.env.SHOTS) await page.screenshot({ path: `${process.env.SHOTS}/xl${p.path.replace(/[^a-z]+/gi, '-')}.png`, fullPage: true })
+    results.push(`OK   135 % ${p.path}`)
+  } catch (e) {
+    results.push(`FAIL 135 % ${p.path}: ${e.message.split('\n')[0]}`)
+  }
+  await ctx.close()
+}
+
+await check('Tekststørrelse: «Ekstra stor» i profilmenyen gjør teksten større og huskes', async page => {
+  await page.goto(`${BASE}/`)
+  await page.getByText('Testbo').first().waitFor()
+  const before = await page.evaluate(() => parseFloat(getComputedStyle(document.documentElement).fontSize))
+  await page.getByRole('button', { name: /Meny for/ }).click()
+  await page.getByRole('button', { name: 'Ekstra stor', exact: true }).click()
+  const after = await page.evaluate(() => parseFloat(getComputedStyle(document.documentElement).fontSize))
+  assert(Math.abs(after / before - 1.35) < 0.02, `skala ${after / before}`)
+  await page.reload()
+  await page.getByText('Testbo').first().waitFor()
+  const reloaded = await page.evaluate(() => parseFloat(getComputedStyle(document.documentElement).fontSize))
+  assert(Math.abs(reloaded - after) < 0.1, 'valget ble ikke husket')
 })
 
 await browser.close()

@@ -177,11 +177,11 @@ export default function GuidePage({ standalone = false, session = null, onToast 
       {/* Mobilnettlesere regner adresselinjen med i vh; dvh er den synlige høyden (lik vh på PC) */}
       <style>{`@supports (height: 100dvh) { .guide-shell { height: calc(100dvh - 56px) !important; } .guide-shell.standalone { height: 100dvh !important; } }`}</style>
       <div style={{ padding: '12px 20px', background: '#FBF9F5', borderBottom: '1px solid #D9CFC0', display: 'flex', alignItems: 'center', gap: '12px' }}>
-        <button onClick={() => navigate(backPath)} style={{ background: 'none', border: 'none', color: '#75604B', cursor: 'pointer', fontSize: '14px', fontFamily: 'Karla, sans-serif' }}>
+        <button onClick={() => navigate(backPath)} style={{ background: 'none', border: 'none', color: '#75604B', cursor: 'pointer', fontSize: '0.875rem', fontFamily: 'Karla, sans-serif' }}>
           {id ? L('← Tilbake til boet', '← Back to the estate') : L('← Tilbake til hjemmesiden', '← Back to the home page')}
         </button>
-        {busy && <span style={{ fontSize: '13px', color: '#5F6E52', fontFamily: 'Karla, sans-serif' }}>{L('Lagrer i boet …', 'Saving to the estate …')}</span>}
-        {isEn() && <span style={{ fontSize: '13px', color: '#75604B', fontFamily: 'Karla, sans-serif', marginLeft: 'auto' }}>The inheritance guide follows Norwegian law and is only available in Norwegian.</span>}
+        {busy && <span style={{ fontSize: '0.8125rem', color: '#5F6E52', fontFamily: 'Karla, sans-serif' }}>{L('Lagrer i boet …', 'Saving to the estate …')}</span>}
+        {isEn() && <span style={{ fontSize: '0.8125rem', color: '#75604B', fontFamily: 'Karla, sans-serif', marginLeft: 'auto' }}>The inheritance guide follows Norwegian law and is only available in Norwegian.</span>}
       </div>
       <iframe
         ref={frameRef}
@@ -201,8 +201,8 @@ export default function GuidePage({ standalone = false, session = null, onToast 
 
 // ── Dialoger ─────────────────────────────────────────────────
 const font = 'Karla, sans-serif'
-const inputStyle = { width: '100%', padding: '11px 14px', border: '1px solid #9A8B78', borderRadius: '8px', fontSize: '15px', background: '#FBF9F5', color: '#3A2F26', fontFamily: font, boxSizing: 'border-box' }
-const labelStyle = { display: 'block', fontSize: '13px', color: '#5C4530', marginBottom: '6px' }
+const inputStyle = { width: '100%', padding: '11px 14px', border: '1px solid #9A8B78', borderRadius: '8px', fontSize: '0.9375rem', background: '#FBF9F5', color: '#3A2F26', fontFamily: font, boxSizing: 'border-box' }
+const labelStyle = { display: 'block', fontSize: '0.8125rem', color: '#5C4530', marginBottom: '6px' }
 
 function Overlay({ title, intro, onClose, children }) {
   const boxRef = useRef(null)
@@ -221,10 +221,10 @@ function Overlay({ title, intro, onClose, children }) {
       style={{ position: 'fixed', inset: 0, background: 'rgba(58,47,38,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px', zIndex: 1000, fontFamily: font }}>
       <div ref={boxRef} tabIndex={-1} style={{ background: '#fff', borderRadius: '14px', padding: '28px', width: '100%', maxWidth: '440px', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 12px 48px rgba(0,0,0,0.18)', boxSizing: 'border-box' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px', marginBottom: '8px' }}>
-          <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: '22px', fontWeight: '400', color: '#3A2F26', margin: 0 }}>{title}</h2>
-          <button onClick={onClose} data-close aria-label={L('Lukk', 'Close')} style={{ background: 'none', border: 'none', fontSize: '22px', lineHeight: 1, color: '#75604B', cursor: 'pointer' }}>×</button>
+          <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: '1.375rem', fontWeight: '400', color: '#3A2F26', margin: 0 }}>{title}</h2>
+          <button onClick={onClose} data-close aria-label={L('Lukk', 'Close')} style={{ background: 'none', border: 'none', fontSize: '1.375rem', lineHeight: 1, color: '#75604B', cursor: 'pointer' }}>×</button>
         </div>
-        {intro && <p style={{ fontSize: '14px', color: '#75604B', lineHeight: 1.6, margin: '0 0 20px' }}>{intro}</p>}
+        {intro && <p style={{ fontSize: '0.875rem', color: '#75604B', lineHeight: 1.6, margin: '0 0 20px' }}>{intro}</p>}
         {children}
       </div>
     </div>
@@ -233,7 +233,7 @@ function Overlay({ title, intro, onClose, children }) {
 
 function PrimaryButton({ children, disabled, onClick }) {
   return (
-    <button onClick={onClick} disabled={disabled} style={{ width: '100%', padding: '13px', background: disabled ? '#D9CFC0' : '#3A2F26', color: '#FBF9F5', border: 'none', borderRadius: '8px', cursor: disabled ? 'not-allowed' : 'pointer', fontSize: '15px', fontFamily: font }}>
+    <button onClick={onClick} disabled={disabled} style={{ width: '100%', padding: '13px', background: disabled ? '#D9CFC0' : '#3A2F26', color: '#FBF9F5', border: 'none', borderRadius: '8px', cursor: disabled ? 'not-allowed' : 'pointer', fontSize: '0.9375rem', fontFamily: font }}>
       {children}
     </button>
   )
@@ -305,13 +305,13 @@ function AuthModal({ startInLogin, request, onClose }) {
       )}
       onClose={close}>
       {info ? (
-        <p style={{ background: '#DCE3D2', color: '#3A5A30', padding: '14px', borderRadius: '8px', fontSize: '14px', lineHeight: 1.6 }}>{info}</p>
+        <p style={{ background: '#DCE3D2', color: '#3A5A30', padding: '14px', borderRadius: '8px', fontSize: '0.875rem', lineHeight: 1.6 }}>{info}</p>
       ) : (
         <>
           <div style={{ display: 'flex', background: '#E8DFD0', borderRadius: '8px', padding: '4px', marginBottom: '20px' }}>
             {[['signup', L('Ny bruker', 'New user')], ['login', L('Har bruker', 'Have an account')]].map(([m, l]) => (
               <button key={m} onClick={() => { setMode(m); setError(null) }} style={{
-                flex: 1, padding: '9px', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '14px', fontFamily: font,
+                flex: 1, padding: '9px', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '0.875rem', fontFamily: font,
                 background: mode === m ? '#fff' : 'transparent', color: mode === m ? '#3A2F26' : '#75604B',
                 boxShadow: mode === m ? '0 1px 4px rgba(0,0,0,0.08)' : 'none',
               }}>{l}</button>
@@ -329,14 +329,14 @@ function AuthModal({ startInLogin, request, onClose }) {
                 autoComplete={mode === 'signup' ? 'new-password' : 'current-password'} placeholder={mode === 'signup' ? L('Minst 6 tegn', 'At least 6 characters') : ''} style={inputStyle} /></div>
             <div><label style={labelStyle} htmlFor="wz-estate">{L('Navn på boet', 'Estate name')}</label>
               <input id="wz-estate" value={estateName} onChange={e => setEstateName(e.target.value)} onKeyDown={onKey} maxLength={200} placeholder={L('f.eks. Boet etter Kari Hansen', 'e.g. The estate of Jane Smith')} style={inputStyle} />
-              <p style={{ fontSize: '12px', color: '#75604B', margin: '6px 0 0' }}>{L('Du kan endre navnet senere.', 'You can change the name later.')}</p></div>
+              <p style={{ fontSize: '0.75rem', color: '#75604B', margin: '6px 0 0' }}>{L('Du kan endre navnet senere.', 'You can change the name later.')}</p></div>
           </div>
-          {error && <p role="alert" style={{ color: '#9B3B2E', fontSize: '14px', margin: '0 0 14px' }}>{error}</p>}
+          {error && <p role="alert" style={{ color: '#9B3B2E', fontSize: '0.875rem', margin: '0 0 14px' }}>{error}</p>}
           <PrimaryButton onClick={submit} disabled={!canSubmit || loading}>
             {loading ? L('Vent litt …', 'Please wait …') : mode === 'signup' ? L('Opprett bruker og lagre', 'Create account and save') : L('Logg inn og lagre', 'Log in and save')}
           </PrimaryButton>
           {mode === 'signup' && (
-            <p style={{ textAlign: 'center', marginTop: '12px', fontSize: '12px', color: '#75604B', lineHeight: 1.6 }}>
+            <p style={{ textAlign: 'center', marginTop: '12px', fontSize: '0.75rem', color: '#75604B', lineHeight: 1.6 }}>
               {L('Ved å opprette bruker godtar du våre', 'By creating an account you accept our')} <a href="/personvern" target="_blank" rel="noopener noreferrer" style={{ color: '#5F6E52' }}>{L('vilkår og personvernerklæring', 'terms and privacy policy')}</a>.
             </p>
           )}
@@ -359,12 +359,12 @@ function ChooseEstateModal({ userId, busy, onClose, onChoose, onCreate }) {
         'Choose which estate to save the result in, or create a new one. Heirs and steps from the guide are added – what you entered yourself is not changed.',
       )}
       onClose={onClose}>
-      {estates === null ? <p style={{ color: '#75604B', fontSize: '14px' }}>{L('Laster …', 'Loading …')}</p> : (
+      {estates === null ? <p style={{ color: '#75604B', fontSize: '0.875rem' }}>{L('Laster …', 'Loading …')}</p> : (
         <>
           {estates.length > 0 && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '20px' }}>
               {estates.map(e => (
-                <button key={e.id} disabled={busy} onClick={() => onChoose(e.id, e.name)} style={{ textAlign: 'left', padding: '13px 14px', background: '#FBF9F5', border: '1px solid #D9CFC0', borderRadius: '8px', cursor: 'pointer', fontSize: '15px', color: '#3A2F26', fontFamily: font }}>
+                <button key={e.id} disabled={busy} onClick={() => onChoose(e.id, e.name)} style={{ textAlign: 'left', padding: '13px 14px', background: '#FBF9F5', border: '1px solid #D9CFC0', borderRadius: '8px', cursor: 'pointer', fontSize: '0.9375rem', color: '#3A2F26', fontFamily: font }}>
                   {e.name}
                 </button>
               ))}

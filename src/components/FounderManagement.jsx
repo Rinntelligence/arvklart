@@ -52,8 +52,8 @@ export default function FounderManagement({ session, onToast }) {
   return (
     <div style={{ display:'flex', flexDirection:'column', gap:'20px' }}>
       <form onSubmit={add} style={{ background:'#fff', border:'1px solid #D9CFC0', borderRadius:'12px', padding:'20px' }}>
-        <h3 style={{ fontFamily:"'Fraunces', serif", fontSize:'16px', fontWeight:'400', color:'#3A2F26', marginBottom:'6px' }}>Legg til founder</h3>
-        <p style={{ fontSize:'13px', color:'#75604B', lineHeight:'1.6', marginBottom:'14px' }}>
+        <h3 style={{ fontFamily:"'Fraunces', serif", fontSize:'1rem', fontWeight:'400', color:'#3A2F26', marginBottom:'6px' }}>Legg til founder</h3>
+        <p style={{ fontSize:'0.8125rem', color:'#75604B', lineHeight:'1.6', marginBottom:'14px' }}>
           Personen må ha en ArvKlart-konto. Neste gang de åpner /founder, må de sette opp tofaktor før de ser noe data.
         </p>
         <div style={{ display:'flex', gap:'10px', flexWrap:'wrap' }}>
@@ -62,10 +62,10 @@ export default function FounderManagement({ session, onToast }) {
             value={email}
             onChange={e => setEmail(e.target.value)}
             placeholder="navn@epost.no"
-            style={{ flex:'1 1 220px', padding:'10px 14px', border:'1px solid #D9CFC0', borderRadius:'8px', fontSize:'14px', background:'#E8DFD0', color:'#3A2F26', fontFamily:'Karla, sans-serif' }}
+            style={{ flex:'1 1 220px', padding:'10px 14px', border:'1px solid #D9CFC0', borderRadius:'8px', fontSize:'0.875rem', background:'#E8DFD0', color:'#3A2F26', fontFamily:'Karla, sans-serif' }}
           />
           <button type="submit" disabled={busy || !email.trim()} style={{
-            padding:'10px 20px', border:'none', borderRadius:'8px', fontSize:'14px', fontFamily:'Karla, sans-serif',
+            padding:'10px 20px', border:'none', borderRadius:'8px', fontSize:'0.875rem', fontFamily:'Karla, sans-serif',
             background: busy || !email.trim() ? '#D9CFC0' : '#3A2F26', color:'#FBF9F5',
             cursor: busy || !email.trim() ? 'not-allowed' : 'pointer',
           }}>{busy ? 'Legger til…' : 'Legg til'}</button>
@@ -77,7 +77,7 @@ export default function FounderManagement({ session, onToast }) {
           <thead>
             <tr style={{ background:'#FBF9F5', borderBottom:'1px solid #D9CFC0' }}>
               {['Founder','Tofaktor','Lagt til',''].map(h=>(
-                <th key={h} style={{ padding:'12px 16px', textAlign:'left', fontSize:'12px', color:'#75604B', fontWeight:'500', textTransform:'uppercase', letterSpacing:'0.5px' }}>{h}</th>
+                <th key={h} style={{ padding:'12px 16px', textAlign:'left', fontSize:'0.75rem', color:'#75604B', fontWeight:'500', textTransform:'uppercase', letterSpacing:'0.5px' }}>{h}</th>
               ))}
             </tr>
           </thead>
@@ -87,21 +87,21 @@ export default function FounderManagement({ session, onToast }) {
               return (
                 <tr key={f.user_id} style={{ borderBottom: i<founders.length-1?'1px solid #E8DFD0':'none' }}>
                   <td style={{ padding:'12px 16px' }}>
-                    <div style={{ fontSize:'14px', color:'#3A2F26' }}>{f.display_name || '—'}{isMe && <span style={{ color:'#75604B' }}> (deg)</span>}</div>
-                    <div style={{ fontSize:'12px', color:'#75604B' }}>{f.email}</div>
+                    <div style={{ fontSize:'0.875rem', color:'#3A2F26' }}>{f.display_name || '—'}{isMe && <span style={{ color:'#75604B' }}> (deg)</span>}</div>
+                    <div style={{ fontSize:'0.75rem', color:'#75604B' }}>{f.email}</div>
                   </td>
                   <td style={{ padding:'12px 16px' }}>
-                    <span style={{ fontSize:'11px', padding:'3px 8px', borderRadius:'20px', background:f.has_mfa?'#DCE3D2':'#E8DFD0', color:f.has_mfa?'#5F6E52':'#5C4530' }}>
+                    <span style={{ fontSize:'0.6875rem', padding:'3px 8px', borderRadius:'20px', background:f.has_mfa?'#DCE3D2':'#E8DFD0', color:f.has_mfa?'#5F6E52':'#5C4530' }}>
                       {f.has_mfa ? 'Aktiv' : 'Ikke satt opp'}
                     </span>
                   </td>
-                  <td style={{ padding:'12px 16px', fontSize:'13px', color:'#75604B' }}>
+                  <td style={{ padding:'12px 16px', fontSize:'0.8125rem', color:'#75604B' }}>
                     {fmtDate(f.created_at)}
-                    {f.added_by_email && <div style={{ fontSize:'12px' }}>av {f.added_by_email}</div>}
+                    {f.added_by_email && <div style={{ fontSize:'0.75rem' }}>av {f.added_by_email}</div>}
                   </td>
                   <td style={{ padding:'12px 16px', textAlign:'right' }}>
                     {!isMe && (
-                      <button onClick={() => remove(f)} style={{ fontSize:'12px', padding:'5px 12px', border:'1px solid #D9CFC0', borderRadius:'6px', background:'#fff', color:'#8B3A3A', cursor:'pointer', fontFamily:'Karla, sans-serif' }}>
+                      <button onClick={() => remove(f)} style={{ fontSize:'0.75rem', padding:'5px 12px', border:'1px solid #D9CFC0', borderRadius:'6px', background:'#fff', color:'#8B3A3A', cursor:'pointer', fontFamily:'Karla, sans-serif' }}>
                         Fjern
                       </button>
                     )}

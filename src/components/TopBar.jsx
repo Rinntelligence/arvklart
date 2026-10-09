@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import { signOut } from '../lib/supabase'
 import { getLang, setLang, L } from '../lib/lang'
 import { isDemoSession } from '../lib/demo'
+import TextSizeControl from './TextSizeControl'
 
 const tc = c => { if(!c)return'#FBF9F5'; const r=parseInt(c.slice(1,3),16),g=parseInt(c.slice(3,5),16),b=parseInt(c.slice(5,7),16); return(0.299*r+0.587*g+0.114*b)/255>0.55?'#3A2F26':'#FBF9F5' }
 
@@ -67,7 +68,7 @@ export default function TopBar({ profile, session, estate }) {
       <style>{`
         .tb-logo { background: none; border: 1px solid transparent; border-radius: 8px; padding: 4px 8px; margin-left: -8px; cursor: pointer; display: flex; align-items: center; gap: 6px; color: #FBF9F5; transition: background 0.15s, border-color 0.15s; }
         .tb-logo:hover, .tb-logo[aria-expanded="true"] { background: rgba(251,249,245,0.14); border-color: rgba(251,249,245,0.3); }
-        .tb-item { display: block; width: 100%; padding: 11px 16px; background: none; border: none; text-align: left; cursor: pointer; font-size: 14px; color: #3A2F26; font-family: Karla, sans-serif; transition: background 0.12s; }
+        .tb-item { display: block; width: 100%; padding: 11px 16px; background: none; border: none; text-align: left; cursor: pointer; font-size: 0.875rem; color: #3A2F26; font-family: Karla, sans-serif; transition: background 0.12s; }
         .tb-item:hover, .tb-item:focus-visible { background: #F3EDE3; }
         .tb-item:focus-visible { outline: 3px solid #5F6E52; outline-offset: -3px; }
         .tb-logo:focus-visible, .tb-nav a:focus-visible, .tb-avatar:focus-visible { outline: 3px solid #FBF9F5; outline-offset: 2px; }
@@ -75,9 +76,9 @@ export default function TopBar({ profile, session, estate }) {
         .tb-item + .tb-item { border-top: 1px solid #E8DFD0; }
         .tb-nav { flex: 1; min-width: 0; display: flex; justify-content: flex-end; gap: 4px; margin: 0 12px; overflow-x: auto; scrollbar-width: none; }
         .tb-nav::-webkit-scrollbar { display: none; }
-        .tb-nav a { flex-shrink: 0; padding: 7px 13px; border-radius: 999px; border: 1px solid transparent; font-size: 14px; font-weight: 500; color: #FBF9F5; text-decoration: none; white-space: nowrap; transition: background 0.15s, border-color 0.15s; }
+        .tb-nav a { flex-shrink: 0; padding: 7px 13px; border-radius: 999px; border: 1px solid transparent; font-size: 0.875rem; font-weight: 500; color: #FBF9F5; text-decoration: none; white-space: nowrap; transition: background 0.15s, border-color 0.15s; }
         .tb-nav a:hover, .tb-nav a:focus-visible { background: rgba(251,249,245,0.14); border-color: rgba(251,249,245,0.3); }
-        @media (max-width: 860px) { .tb-nav { justify-content: flex-start; margin: 0 8px; } .tb-nav a { padding: 6px 10px; font-size: 13.5px; } }
+        @media (max-width: 860px) { .tb-nav { justify-content: flex-start; margin: 0 8px; } .tb-nav a { padding: 6px 10px; font-size: 0.8438rem; } }
       `}</style>
 
       {(menuOpen || logoMenuOpen) && (
@@ -87,7 +88,7 @@ export default function TopBar({ profile, session, estate }) {
       <div style={{ position: 'relative', zIndex: 200 }}>
         <button ref={logoRef} className="tb-logo" aria-label={L('Arvklart-meny', 'Arvklart menu')} aria-haspopup="menu" aria-expanded={logoMenuOpen} onClick={() => { setLogoMenuOpen(!logoMenuOpen); setMenuOpen(false) }}>
           <img src="/ARVKLART Horizontal Negative.svg" alt="Arvklart" style={{ height: '32px', display: 'block' }} />
-          <span aria-hidden="true" style={{ fontSize: '10px', opacity: 0.8 }}>▾</span>
+          <span aria-hidden="true" style={{ fontSize: '0.625rem', opacity: 0.8 }}>▾</span>
         </button>
 
         {logoMenuOpen && (
@@ -114,27 +115,28 @@ export default function TopBar({ profile, session, estate }) {
       )}
 
       <div style={{ position: 'relative', zIndex: 200 }}>
-        <button ref={avatarRef} className="tb-avatar" aria-haspopup="menu" aria-expanded={menuOpen}
+        <button ref={avatarRef} className="tb-avatar" aria-expanded={menuOpen}
           aria-label={L(`Meny for ${profile?.display_name || 'kontoen'}`, `Menu for ${profile?.display_name || 'the account'}`)}
           onClick={() => { setMenuOpen(!menuOpen); setLogoMenuOpen(false) }} style={{
           width: '44px', height: '44px', borderRadius: '50%',
           background: profile?.avatar_color || '#DCE3D2',
           border: tc(profile?.avatar_color||'#DCE3D2')==='#3A2F26' ? '2px solid #D9CFC0' : '2px solid rgba(255,255,255,0.25)', cursor: 'pointer',
-          fontSize: '14px', color: tc(profile?.avatar_color||'#DCE3D2'), fontWeight: '500', fontFamily: 'Karla, sans-serif',
+          fontSize: '0.875rem', color: tc(profile?.avatar_color||'#DCE3D2'), fontWeight: '500', fontFamily: 'Karla, sans-serif',
         }}>{(profile?.display_name || '?')[0].toUpperCase()}</button>
 
         {menuOpen && (
-          <div role="menu" style={{
+          <div style={{
             position: 'absolute', top: '44px', right: 0, background: '#fff',
             border: '1px solid #D9CFC0', borderRadius: '12px', minWidth: '200px',
             boxShadow: '0 8px 32px rgba(0,0,0,0.14)', overflow: 'hidden', zIndex: 200,
           }}>
             <div style={{ padding: '12px 16px', borderBottom: '1px solid #E8DFD0' }}>
-              <div style={{ fontSize: '14px', color: '#3A2F26', fontWeight: '500' }}>{profile?.display_name}</div>
-              <div style={{ fontSize: '12px', color: '#75604B', marginTop: '2px' }}>{session?.user?.email}</div>
+              <div style={{ fontSize: '0.875rem', color: '#3A2F26', fontWeight: '500' }}>{profile?.display_name}</div>
+              <div style={{ fontSize: '0.75rem', color: '#75604B', marginTop: '2px' }}>{session?.user?.email}</div>
             </div>
 
-            <button role="menuitem" className="tb-item" lang={lang === 'en' ? 'no' : 'en'} onClick={toggleLang} style={{ borderBottom: '1px solid #E8DFD0' }}>
+            <div style={{ borderBottom: '1px solid #E8DFD0' }}><TextSizeControl compact /></div>
+            <button className="tb-item" lang={lang === 'en' ? 'no' : 'en'} onClick={toggleLang} style={{ borderBottom: '1px solid #E8DFD0' }}>
               {lang === 'en' ? '🇳🇴 Bytt til Norsk' : '🇬🇧 Switch to English'}
             </button>
 
@@ -147,7 +149,7 @@ export default function TopBar({ profile, session, estate }) {
               ...(isDemo ? [] : [{ label: L('Tilbake til hjemmesiden', 'Back to the home page'), action: goHome }]),
               { label: isDemo ? L('Avslutt demo', 'End demo') : L('Logg ut', 'Log out'), action: logout, danger: true },
             ].map(({ label, action, danger }) => (
-              <button key={label} role="menuitem" className={danger ? 'tb-item danger' : 'tb-item'} onClick={action}>{label}</button>
+              <button key={label} className={danger ? 'tb-item danger' : 'tb-item'} onClick={action}>{label}</button>
             ))}
           </div>
         )}

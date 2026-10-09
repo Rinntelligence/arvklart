@@ -174,7 +174,7 @@ export default function App() {
       <div style={{ minHeight: '100vh', background: '#FBF9F5' }}>
         <TopBar profile={profile} session={session} onToast={showToast} />
         {isDemo && (
-          <div style={{ background: '#DCE3D2', borderBottom: '1px solid #B8C8A8', padding: '8px 20px', textAlign: 'center', fontSize: '13px', color: '#3A5A30', fontFamily: 'Karla, sans-serif' }}>
+          <div style={{ background: '#DCE3D2', borderBottom: '1px solid #B8C8A8', padding: '8px 20px', textAlign: 'center', fontSize: '0.8125rem', color: '#3A5A30', fontFamily: 'Karla, sans-serif' }}>
             {L('Du ser på en', 'You are viewing a')} <strong>demo</strong> — {L('Mona sitt bo. Du kan vise interesse, sveipe og prøve fordelingen, men ikke endre boet.', "Mona's estate. You can show interest, swipe and try the distribution, but not change the estate.")}
           </div>
         )}
@@ -221,7 +221,7 @@ export default function App() {
 
 function Splash() {
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#FBF9F5', fontFamily: "'Fraunces', serif", color: '#75604B', fontSize: '20px', gap: '12px' }}>
+    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#FBF9F5', fontFamily: "'Fraunces', serif", color: '#75604B', fontSize: '1.25rem', gap: '12px' }}>
       Arvklart
     </div>
   )

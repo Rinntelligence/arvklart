@@ -17,7 +17,7 @@ export default function Toasts({ success, errors = [], onDismiss }) {
           <span style={{ flex: 1 }}>{e.msg}</span>
           <button onClick={() => onDismiss(e.id)} aria-label={L('Lukk feilmeldingen', 'Close the error message')} style={{
             minWidth: '44px', minHeight: '44px', background: 'none', border: 'none', color: '#FBF9F5',
-            fontSize: '20px', lineHeight: 1, cursor: 'pointer', borderRadius: '8px',
+            fontSize: '1.25rem', lineHeight: 1, cursor: 'pointer', borderRadius: '8px',
           }}>×</button>
         </div>
       ))}
@@ -27,6 +27,6 @@ export default function Toasts({ success, errors = [], onDismiss }) {
 }
 
 const box = {
-  color: '#FBF9F5', borderRadius: '10px', fontSize: '15px', boxShadow: '0 4px 24px rgba(0,0,0,0.2)',
+  color: '#FBF9F5', borderRadius: '10px', fontSize: '0.9375rem', boxShadow: '0 4px 24px rgba(0,0,0,0.2)',
   textAlign: 'center', lineHeight: 1.45, animation: 'fadeUp 0.2s ease', maxWidth: '100%',
 }

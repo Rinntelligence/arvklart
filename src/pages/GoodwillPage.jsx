@@ -92,14 +92,14 @@ export default function GoodwillPage({ session, onToast }) {
 
   return (
     <div style={{ maxWidth:'820px', margin:'0 auto', padding:'28px 16px', fontFamily:'Karla, sans-serif' }}>
-      <button onClick={() => navigate(`/estate/${id}`)} style={{ background:'none', border:'none', color:'#75604B', cursor:'pointer', fontSize:'13px', padding:'0 0 20px', fontFamily:'Karla, sans-serif' }}>{L('← Tilbake til boet', '← Back to the estate')}</button>
+      <button onClick={() => navigate(`/estate/${id}`)} style={{ background:'none', border:'none', color:'#75604B', cursor:'pointer', fontSize:'0.8125rem', padding:'0 0 20px', fontFamily:'Karla, sans-serif' }}>{L('← Tilbake til boet', '← Back to the estate')}</button>
 
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:'28px', flexWrap:'wrap', gap:'12px' }}>
         <div>
-          <h1 style={{ fontFamily:'Fraunces, serif', fontSize:'26px', fontWeight:'400', color:'#3A2F26', marginBottom:'4px' }}>{L('Goodwill og arbeid', 'Goodwill and work')}</h1>
-          <p style={{ color:'#75604B', fontSize:'14px' }}>{L('Spor bidrag, kompromisser og rettferdighet', 'Track contributions, compromises and fairness')}</p>
+          <h1 style={{ fontFamily:'Fraunces, serif', fontSize:'1.625rem', fontWeight:'400', color:'#3A2F26', marginBottom:'4px' }}>{L('Goodwill og arbeid', 'Goodwill and work')}</h1>
+          <p style={{ color:'#75604B', fontSize:'0.875rem' }}>{L('Spor bidrag, kompromisser og rettferdighet', 'Track contributions, compromises and fairness')}</p>
         </div>
-        <button onClick={() => { setShowAddChore(true); setTab('chores') }} style={{ padding:'9px 18px', background:'#3A2F26', color:'#FBF9F5', border:'none', borderRadius:'8px', cursor:'pointer', fontSize:'14px', fontFamily:'Karla, sans-serif' }}>
+        <button onClick={() => { setShowAddChore(true); setTab('chores') }} style={{ padding:'9px 18px', background:'#3A2F26', color:'#FBF9F5', border:'none', borderRadius:'8px', cursor:'pointer', fontSize:'0.875rem', fontFamily:'Karla, sans-serif' }}>
           {L('+ Legg til oppgave', '+ Add task')}
         </button>
       </div>
@@ -108,9 +108,9 @@ export default function GoodwillPage({ session, onToast }) {
       <div style={{ background:'linear-gradient(135deg, #3A2F26 0%, #4A3820 100%)', borderRadius:'14px', padding:'24px', marginBottom:'24px', color:'#FBF9F5' }}>
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'wrap', gap:'12px' }}>
           <div>
-            <div style={{ fontSize:'13px', color:'#C8BEA0', marginBottom:'4px', textTransform:'uppercase', letterSpacing:'0.5px' }}>{L('Din goodwill-score', 'Your goodwill score')}</div>
-            <div style={{ fontSize:'42px', fontFamily:'Fraunces, serif', fontWeight:'400', color:'#FBF9F5' }}>{myScore}</div>
-            <div style={{ fontSize:'13px', color:'#C8BEA0', marginTop:'4px' }}>
+            <div style={{ fontSize:'0.8125rem', color:'#C8BEA0', marginBottom:'4px', textTransform:'uppercase', letterSpacing:'0.5px' }}>{L('Din goodwill-score', 'Your goodwill score')}</div>
+            <div style={{ fontSize:'2.625rem', fontFamily:'Fraunces, serif', fontWeight:'400', color:'#FBF9F5' }}>{myScore}</div>
+            <div style={{ fontSize:'0.8125rem', color:'#C8BEA0', marginTop:'4px' }}>
               {myScore === 0 ? L('Begynn å bidra for å tjene goodwill', 'Start contributing to earn goodwill') :
                myScore < 50 ? L('Godt begynt — fortsett å bidra!', 'Good start — keep contributing!') :
                myScore < 150 ? L('Du har vært til god hjelp', 'You have been a great help') :
@@ -119,14 +119,14 @@ export default function GoodwillPage({ session, onToast }) {
           </div>
           <div className="gw-rank" style={{ textAlign:'right' }}>
             <style>{`@media (max-width: 600px) { .gw-rank { text-align: left !important; flex-basis: 100%; } .gw-rank-row { justify-content: flex-start !important; } }`}</style>
-            <div style={{ fontSize:'13px', color:'#C8BEA0', marginBottom:'8px' }}>{L('Familierangering', 'Family ranking')}</div>
+            <div style={{ fontSize:'0.8125rem', color:'#C8BEA0', marginBottom:'8px' }}>{L('Familierangering', 'Family ranking')}</div>
             {scores.slice(0, 3).map((s, i) => (
               <div key={s.user_id} className="gw-rank-row" style={{ display:'flex', alignItems:'center', gap:'8px', justifyContent:'flex-end', marginBottom:'4px' }}>
-                <span style={{ fontSize:'12px', color:'#C8BEA0' }}>#{i+1}</span>
-                <div style={{ width:'20px', height:'20px', borderRadius:'50%', background:s.profiles?.avatar_color||'#DCE3D2', border:tc(s.profiles?.avatar_color||'#DCE3D2')==='#3A2F26'?'1px solid #D9CFC0':'none', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'9px', color:tc(s.profiles?.avatar_color||'#DCE3D2'), fontWeight:'600' }}>
+                <span style={{ fontSize:'0.75rem', color:'#C8BEA0' }}>#{i+1}</span>
+                <div style={{ width:'20px', height:'20px', borderRadius:'50%', background:s.profiles?.avatar_color||'#DCE3D2', border:tc(s.profiles?.avatar_color||'#DCE3D2')==='#3A2F26'?'1px solid #D9CFC0':'none', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'0.5625rem', color:tc(s.profiles?.avatar_color||'#DCE3D2'), fontWeight:'600' }}>
                   {(s.profiles?.display_name||'?')[0].toUpperCase()}
                 </div>
-                <span style={{ fontSize:'13px', color:s.user_id===session.user.id?'#FBF9F5':'#C8BEA0', fontWeight:s.user_id===session.user.id?'500':'400' }}>
+                <span style={{ fontSize:'0.8125rem', color:s.user_id===session.user.id?'#FBF9F5':'#C8BEA0', fontWeight:s.user_id===session.user.id?'500':'400' }}>
                   {s.profiles?.display_name} — {s.score} p
                 </span>
               </div>
@@ -141,7 +141,7 @@ export default function GoodwillPage({ session, onToast }) {
         {[['overview',L('Oversikt','Overview')],['chores',L('Oppgaver','Tasks')],['log',L('Aktivitetslogg','Activity log')]].map(([t,l]) => (
           <button key={t} onClick={() => setTab(t)} style={{
             padding:'10px 18px', border:'none', background:'none', cursor:'pointer',
-            fontSize:'14px', fontFamily:'Karla, sans-serif',
+            fontSize:'0.875rem', fontFamily:'Karla, sans-serif',
             color:tab===t?'#3A2F26':'#75604B',
             borderBottom:tab===t?'2px solid #3A2F26':'2px solid transparent',
             marginBottom:'-1px',
@@ -153,32 +153,32 @@ export default function GoodwillPage({ session, onToast }) {
       {tab === 'overview' && (
         <div style={{ display:'flex', flexDirection:'column', gap:'14px' }}>
           <div style={{ background:'#fff', border:'1px solid #D9CFC0', borderRadius:'12px', padding:'24px' }}>
-            <h3 style={{ fontFamily:'Fraunces, serif', fontSize:'17px', fontWeight:'400', color:'#3A2F26', marginBottom:'20px' }}>{L('Rettferdighetsoversikt', 'Fairness overview')}</h3>
+            <h3 style={{ fontFamily:'Fraunces, serif', fontSize:'1.0625rem', fontWeight:'400', color:'#3A2F26', marginBottom:'20px' }}>{L('Rettferdighetsoversikt', 'Fairness overview')}</h3>
             {scores.map((s, i) => (
               <div key={s.user_id} style={{ marginBottom:'16px' }}>
                 <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'6px' }}>
                   <div style={{ display:'flex', alignItems:'center', gap:'10px' }}>
-                    <div style={{ width:'32px', height:'32px', borderRadius:'50%', background:s.profiles?.avatar_color||getScoreColor(i), border:tc(s.profiles?.avatar_color||getScoreColor(i))==='#3A2F26'?'1px solid #D9CFC0':'none', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'13px', color:tc(s.profiles?.avatar_color||getScoreColor(i)), fontWeight:'500' }}>
+                    <div style={{ width:'32px', height:'32px', borderRadius:'50%', background:s.profiles?.avatar_color||getScoreColor(i), border:tc(s.profiles?.avatar_color||getScoreColor(i))==='#3A2F26'?'1px solid #D9CFC0':'none', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'0.8125rem', color:tc(s.profiles?.avatar_color||getScoreColor(i)), fontWeight:'500' }}>
                       {(s.profiles?.display_name||'?')[0].toUpperCase()}
                     </div>
                     <div>
-                      <div style={{ fontSize:'14px', color:'#3A2F26', fontWeight:s.user_id===session.user.id?'500':'400' }}>
+                      <div style={{ fontSize:'0.875rem', color:'#3A2F26', fontWeight:s.user_id===session.user.id?'500':'400' }}>
                         {s.profiles?.display_name}
-                        {s.user_id===session.user.id && <span style={{ fontSize:'11px', color:'#75604B', marginLeft:'6px' }}>{L('(deg)', '(you)')}</span>}
+                        {s.user_id===session.user.id && <span style={{ fontSize:'0.6875rem', color:'#75604B', marginLeft:'6px' }}>{L('(deg)', '(you)')}</span>}
                       </div>
-                      <div style={{ fontSize:'12px', color:'#75604B' }}>{s.events.length} {L('bidrag', s.events.length === 1 ? 'contribution' : 'contributions')}</div>
+                      <div style={{ fontSize:'0.75rem', color:'#75604B' }}>{s.events.length} {L('bidrag', s.events.length === 1 ? 'contribution' : 'contributions')}</div>
                     </div>
                   </div>
                   <div style={{ textAlign:'right' }}>
-                    <div style={{ fontSize:'20px', fontFamily:'Fraunces, serif', color:getScoreColor(i) }}>{s.score}</div>
-                    <div style={{ fontSize:'11px', color:'#75604B' }}>{L('poeng', 'points')}</div>
+                    <div style={{ fontSize:'1.25rem', fontFamily:'Fraunces, serif', color:getScoreColor(i) }}>{s.score}</div>
+                    <div style={{ fontSize:'0.6875rem', color:'#75604B' }}>{L('poeng', 'points')}</div>
                   </div>
                 </div>
                 <div style={{ height:'8px', background:'#E8DFD0', borderRadius:'4px', overflow:'hidden' }}>
                   <div style={{ height:'100%', width:`${(s.score/maxScore)*100}%`, background:getScoreColor(i), borderRadius:'4px', transition:'width 0.5s ease' }} />
                 </div>
                 {s.events.slice(0, 2).map(e => (
-                  <div key={e.id} style={{ fontSize:'12px', color:'#75604B', marginTop:'4px', paddingLeft:'42px' }}>
+                  <div key={e.id} style={{ fontSize:'0.75rem', color:'#75604B', marginTop:'4px', paddingLeft:'42px' }}>
                     {logText(e.description)} <span style={{ color:'#5F6E52' }}>+{e.points}</span>
                   </div>
                 ))}
@@ -188,7 +188,7 @@ export default function GoodwillPage({ session, onToast }) {
 
           {/* Slik tjener du goodwill */}
           <div style={{ background:'#FBF9F5', border:'1px solid #D9CFC0', borderRadius:'12px', padding:'20px' }}>
-            <h3 style={{ fontSize:'14px', color:'#3A2F26', fontWeight:'500', marginBottom:'14px' }}>{L('Slik tjener du goodwill', 'How to earn goodwill')}</h3>
+            <h3 style={{ fontSize:'0.875rem', color:'#3A2F26', fontWeight:'500', marginBottom:'14px' }}>{L('Slik tjener du goodwill', 'How to earn goodwill')}</h3>
             <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(200px, 1fr))', gap:'8px' }}>
               {[
                 { action: L('Liten oppgave (under 1 time)', 'Small task (under 1 hour)'), pts: '+15' },
@@ -197,8 +197,8 @@ export default function GoodwillPage({ session, onToast }) {
                 { action: L('Søppelkjøring', 'Dump run'), pts: '+40' },
               ].map(g => (
                 <div key={g.action} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'8px 12px', background:'#fff', borderRadius:'8px', border:'1px solid #D9CFC0' }}>
-                  <span style={{ fontSize:'13px', color:'#5C4530' }}>{g.action}</span>
-                  <span style={{ fontSize:'13px', color:'#5F6E52', fontWeight:'500', marginLeft:'8px' }}>{g.pts}</span>
+                  <span style={{ fontSize:'0.8125rem', color:'#5C4530' }}>{g.action}</span>
+                  <span style={{ fontSize:'0.8125rem', color:'#5F6E52', fontWeight:'500', marginLeft:'8px' }}>{g.pts}</span>
                 </div>
               ))}
             </div>
@@ -211,35 +211,35 @@ export default function GoodwillPage({ session, onToast }) {
         <div>
           {showAddChore && (
             <div style={{ background:'#fff', border:'1px solid #D9CFC0', borderRadius:'12px', padding:'24px', marginBottom:'16px' }}>
-              <h3 style={{ fontFamily:'Fraunces, serif', fontSize:'16px', fontWeight:'400', color:'#3A2F26', marginBottom:'16px' }}>{L('Legg til oppgave', 'Add task')}</h3>
+              <h3 style={{ fontFamily:'Fraunces, serif', fontSize:'1rem', fontWeight:'400', color:'#3A2F26', marginBottom:'16px' }}>{L('Legg til oppgave', 'Add task')}</h3>
               <div style={{ display:'flex', flexDirection:'column', gap:'12px' }}>
                 <input value={newChore.title} onChange={e => setNewChore(p => ({ ...p, title: e.target.value }))} placeholder={L('Oppgavetittel, f.eks. Rydde garasjen', 'Task title, e.g. Clear out the garage')} maxLength={200}
-                  style={{ width:'100%', padding:'11px 14px', border:'1px solid #9A8B78', borderRadius:'8px', fontSize:'14px', background:'#FBF9F5', color:'#3A2F26', fontFamily:'Karla, sans-serif', boxSizing:'border-box' }} />
+                  style={{ width:'100%', padding:'11px 14px', border:'1px solid #9A8B78', borderRadius:'8px', fontSize:'0.875rem', background:'#FBF9F5', color:'#3A2F26', fontFamily:'Karla, sans-serif', boxSizing:'border-box' }} />
                 <input value={newChore.description} onChange={e => setNewChore(p => ({ ...p, description: e.target.value }))} placeholder={L('Beskrivelse (valgfri)', 'Description (optional)')} maxLength={500}
-                  style={{ width:'100%', padding:'11px 14px', border:'1px solid #9A8B78', borderRadius:'8px', fontSize:'14px', background:'#FBF9F5', color:'#3A2F26', fontFamily:'Karla, sans-serif', boxSizing:'border-box' }} />
+                  style={{ width:'100%', padding:'11px 14px', border:'1px solid #9A8B78', borderRadius:'8px', fontSize:'0.875rem', background:'#FBF9F5', color:'#3A2F26', fontFamily:'Karla, sans-serif', boxSizing:'border-box' }} />
                 <div style={{ display:'flex', gap:'8px', flexWrap:'wrap' }}>
                   {CHORE_SIZES.map(s => (
                     <button key={s.id} onClick={() => setNewChore(p => ({ ...p, size: s.id }))} style={{
                       padding:'9px 14px', border:`2px solid ${newChore.size===s.id?'#3A2F26':'#D9CFC0'}`,
-                      borderRadius:'8px', cursor:'pointer', fontSize:'13px', fontFamily:'Karla, sans-serif',
+                      borderRadius:'8px', cursor:'pointer', fontSize:'0.8125rem', fontFamily:'Karla, sans-serif',
                       background:newChore.size===s.id?'#3A2F26':'#fff',
                       color:newChore.size===s.id?'#FBF9F5':'#5C4530',
                     }}>
-                      {s.label} <span style={{ fontSize:'11px', opacity:0.7 }}>+{s.points}p</span>
+                      {s.label} <span style={{ fontSize:'0.6875rem', opacity:0.7 }}>+{s.points}p</span>
                     </button>
                   ))}
                 </div>
                 <div>
-                  <label htmlFor="goodwill-f1" style={{ display:'block', fontSize:'13px', color:'#75604B', marginBottom:'6px' }}>{L('Tildel til (valgfri)', 'Assign to (optional)')}</label>
+                  <label htmlFor="goodwill-f1" style={{ display:'block', fontSize:'0.8125rem', color:'#75604B', marginBottom:'6px' }}>{L('Tildel til (valgfri)', 'Assign to (optional)')}</label>
                   <select id="goodwill-f1" value={newChore.assigned_to} onChange={e => setNewChore(p => ({ ...p, assigned_to: e.target.value }))}
-                    style={{ width:'100%', padding:'11px 14px', border:'1px solid #9A8B78', borderRadius:'8px', fontSize:'14px', background:'#FBF9F5', color:'#3A2F26', fontFamily:'Karla, sans-serif' }}>
+                    style={{ width:'100%', padding:'11px 14px', border:'1px solid #9A8B78', borderRadius:'8px', fontSize:'0.875rem', background:'#FBF9F5', color:'#3A2F26', fontFamily:'Karla, sans-serif' }}>
                     <option value="">{L('— Hvem som helst kan ta den —', '— Anyone can take it —')}</option>
                     {members.map(m => <option key={m.user_id} value={m.user_id}>{m.profiles?.display_name}</option>)}
                   </select>
                 </div>
                 <div style={{ display:'flex', gap:'10px' }}>
-                  <button onClick={() => setShowAddChore(false)} style={{ flex:1, padding:'11px', background:'none', border:'1px solid #D9CFC0', borderRadius:'8px', cursor:'pointer', color:'#5C4530', fontSize:'14px', fontFamily:'Karla, sans-serif' }}>{L('Avbryt', 'Cancel')}</button>
-                  <button onClick={addChore} disabled={!newChore.title.trim()} style={{ flex:2, padding:'11px', background:newChore.title.trim()?'#3A2F26':'#D9CFC0', color:'#FBF9F5', border:'none', borderRadius:'8px', cursor:newChore.title.trim()?'pointer':'not-allowed', fontSize:'14px', fontFamily:'Karla, sans-serif' }}>
+                  <button onClick={() => setShowAddChore(false)} style={{ flex:1, padding:'11px', background:'none', border:'1px solid #D9CFC0', borderRadius:'8px', cursor:'pointer', color:'#5C4530', fontSize:'0.875rem', fontFamily:'Karla, sans-serif' }}>{L('Avbryt', 'Cancel')}</button>
+                  <button onClick={addChore} disabled={!newChore.title.trim()} style={{ flex:2, padding:'11px', background:newChore.title.trim()?'#3A2F26':'#D9CFC0', color:'#FBF9F5', border:'none', borderRadius:'8px', cursor:newChore.title.trim()?'pointer':'not-allowed', fontSize:'0.875rem', fontFamily:'Karla, sans-serif' }}>
                     {L('Legg til oppgave', 'Add task')}
                   </button>
                 </div>
@@ -250,13 +250,13 @@ export default function GoodwillPage({ session, onToast }) {
           {chores.length === 0 ? (
             <div style={{ textAlign:'center', padding:'80px 20px', color:'#75604B' }}>
               <p style={{ marginBottom:'20px' }}>{L('Ingen oppgaver ennå. Legg til ting som må gjøres — garasje, søppelkjøring, pakking.', 'No tasks yet. Add things that need doing — garage, dump runs, packing.')}</p>
-              <button onClick={() => setShowAddChore(true)} style={{ padding:'11px 24px', background:'#3A2F26', color:'#FBF9F5', border:'none', borderRadius:'8px', cursor:'pointer', fontSize:'14px', fontFamily:'Karla, sans-serif' }}>{L('Legg til første oppgave', 'Add the first task')}</button>
+              <button onClick={() => setShowAddChore(true)} style={{ padding:'11px 24px', background:'#3A2F26', color:'#FBF9F5', border:'none', borderRadius:'8px', cursor:'pointer', fontSize:'0.875rem', fontFamily:'Karla, sans-serif' }}>{L('Legg til første oppgave', 'Add the first task')}</button>
             </div>
           ) : (
             <div style={{ display:'flex', flexDirection:'column', gap:'10px' }}>
               {chores.filter(c => !c.completed).length > 0 && (
                 <>
-                  <div style={{ fontSize:'13px', color:'#75604B', fontWeight:'500', textTransform:'uppercase', letterSpacing:'0.5px', marginBottom:'4px' }}>{L('Åpne oppgaver', 'Open tasks')}</div>
+                  <div style={{ fontSize:'0.8125rem', color:'#75604B', fontWeight:'500', textTransform:'uppercase', letterSpacing:'0.5px', marginBottom:'4px' }}>{L('Åpne oppgaver', 'Open tasks')}</div>
                   {chores.filter(c => !c.completed).map(chore => (
                     <ChoreCard key={chore.id} chore={chore} session={session} members={members}
                       onClaim={() => claimChore(chore.id)}
@@ -266,7 +266,7 @@ export default function GoodwillPage({ session, onToast }) {
               )}
               {chores.filter(c => c.completed).length > 0 && (
                 <>
-                  <div style={{ fontSize:'13px', color:'#75604B', fontWeight:'500', textTransform:'uppercase', letterSpacing:'0.5px', margin:'12px 0 4px' }}>{L('Fullførte', 'Completed')}</div>
+                  <div style={{ fontSize:'0.8125rem', color:'#75604B', fontWeight:'500', textTransform:'uppercase', letterSpacing:'0.5px', margin:'12px 0 4px' }}>{L('Fullførte', 'Completed')}</div>
                   {chores.filter(c => c.completed).map(chore => (
                     <ChoreCard key={chore.id} chore={chore} session={session} members={members} completed />
                   ))}
@@ -288,18 +288,18 @@ export default function GoodwillPage({ session, onToast }) {
             <div style={{ background:'#fff', border:'1px solid #D9CFC0', borderRadius:'12px', overflow:'hidden' }}>
               {goodwillLog.map((event, i) => (
                 <div key={event.id} style={{ display:'flex', alignItems:'center', gap:'14px', padding:'14px 18px', borderBottom:i < goodwillLog.length-1?'1px solid #FBF9F5':'none' }}>
-                  <div style={{ width:'32px', height:'32px', borderRadius:'50%', background:event.profiles?.avatar_color||'#DCE3D2', border:tc(event.profiles?.avatar_color||'#DCE3D2')==='#3A2F26'?'1px solid #D9CFC0':'none', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'12px', color:tc(event.profiles?.avatar_color||'#DCE3D2'), fontWeight:'500', flexShrink:0 }}>
+                  <div style={{ width:'32px', height:'32px', borderRadius:'50%', background:event.profiles?.avatar_color||'#DCE3D2', border:tc(event.profiles?.avatar_color||'#DCE3D2')==='#3A2F26'?'1px solid #D9CFC0':'none', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'0.75rem', color:tc(event.profiles?.avatar_color||'#DCE3D2'), fontWeight:'500', flexShrink:0 }}>
                     {(event.profiles?.display_name||'?')[0].toUpperCase()}
                   </div>
                   <div style={{ flex:1 }}>
-                    <div style={{ fontSize:'14px', color:'#3A2F26' }}>
+                    <div style={{ fontSize:'0.875rem', color:'#3A2F26' }}>
                       <strong>{event.profiles?.display_name}</strong> — {logText(event.description)}
                     </div>
-                    <div style={{ fontSize:'12px', color:'#75604B', marginTop:'2px' }}>
+                    <div style={{ fontSize:'0.75rem', color:'#75604B', marginTop:'2px' }}>
                       {new Date(event.created_at).toLocaleDateString(locale(), { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' })}
                     </div>
                   </div>
-                  <div style={{ fontSize:'16px', color:'#5F6E52', fontWeight:'500', whiteSpace:'nowrap' }}>+{event.points} p</div>
+                  <div style={{ fontSize:'1rem', color:'#5F6E52', fontWeight:'500', whiteSpace:'nowrap' }}>+{event.points} p</div>
                 </div>
               ))}
             </div>
@@ -325,22 +325,22 @@ function ChoreCard({ chore, session, members, onClaim, onComplete, completed }) 
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:'12px', flexWrap:'wrap' }}>
         <div style={{ flex:1, minWidth:'200px' }}>
           <div style={{ display:'flex', alignItems:'center', gap:'8px', marginBottom:'4px' }}>
-            <span style={{ fontSize:'15px', color:'#3A2F26', textDecoration:completed?'line-through':'none' }}>{chore.title}</span>
+            <span style={{ fontSize:'0.9375rem', color:'#3A2F26', textDecoration:completed?'line-through':'none' }}>{chore.title}</span>
           </div>
-          {chore.description && <div style={{ fontSize:'13px', color:'#5C4530', marginBottom:'8px' }}>{chore.description}</div>}
+          {chore.description && <div style={{ fontSize:'0.8125rem', color:'#5C4530', marginBottom:'8px' }}>{chore.description}</div>}
           <div style={{ display:'flex', gap:'8px', alignItems:'center', flexWrap:'wrap' }}>
-            <span style={{ fontSize:'12px', background:'#E8DFD0', color:'#5C4530', padding:'2px 8px', borderRadius:'20px' }}>
+            <span style={{ fontSize:'0.75rem', background:'#E8DFD0', color:'#5C4530', padding:'2px 8px', borderRadius:'20px' }}>
               {size.label} · {size.desc}
             </span>
-            <span style={{ fontSize:'12px', color:'#5F6E52', fontWeight:'500' }}>+{size.points} p</span>
+            <span style={{ fontSize:'0.75rem', color:'#5F6E52', fontWeight:'500' }}>+{size.points} p</span>
             {completed && chore.completed_by_profile && (
-              <span style={{ fontSize:'12px', color:'#5F6E52' }}>{L('Gjort av', 'Done by')} {chore.completed_by_profile.display_name}</span>
+              <span style={{ fontSize:'0.75rem', color:'#5F6E52' }}>{L('Gjort av', 'Done by')} {chore.completed_by_profile.display_name}</span>
             )}
             {!completed && chore.assigned_to_profile && (
-              <span style={{ fontSize:'12px', color:'#75604B' }}>{L('Tatt av', 'Taken by')} {chore.assigned_to_profile.display_name}</span>
+              <span style={{ fontSize:'0.75rem', color:'#75604B' }}>{L('Tatt av', 'Taken by')} {chore.assigned_to_profile.display_name}</span>
             )}
             {!completed && isUnassigned && (
-              <span style={{ fontSize:'12px', color:'#75604B', fontStyle:'italic' }}>{L('Ikke tatt — første til å fullføre får poengene', 'Not taken — the first to complete it gets the points')}</span>
+              <span style={{ fontSize:'0.75rem', color:'#75604B', fontStyle:'italic' }}>{L('Ikke tatt — første til å fullføre får poengene', 'Not taken — the first to complete it gets the points')}</span>
             )}
           </div>
         </div>
@@ -348,12 +348,12 @@ function ChoreCard({ chore, session, members, onClaim, onComplete, completed }) 
         {!completed && (
           <div style={{ display:'flex', gap:'8px', flexShrink:0 }}>
             {isUnassigned && (
-              <button onClick={onClaim} style={{ padding:'8px 14px', background:'none', border:'1px solid #D9CFC0', borderRadius:'8px', cursor:'pointer', fontSize:'13px', color:'#5C4530', fontFamily:'Karla, sans-serif' }}>
+              <button onClick={onClaim} style={{ padding:'8px 14px', background:'none', border:'1px solid #D9CFC0', borderRadius:'8px', cursor:'pointer', fontSize:'0.8125rem', color:'#5C4530', fontFamily:'Karla, sans-serif' }}>
                 {L('Ta oppgaven', 'Take the task')}
               </button>
             )}
             {(isAssignedToMe || isUnassigned) && (
-              <button onClick={onComplete} style={{ padding:'8px 14px', background:'#5F6E52', color:'#fff', border:'none', borderRadius:'8px', cursor:'pointer', fontSize:'13px', fontFamily:'Karla, sans-serif' }}>
+              <button onClick={onComplete} style={{ padding:'8px 14px', background:'#5F6E52', color:'#fff', border:'none', borderRadius:'8px', cursor:'pointer', fontSize:'0.8125rem', fontFamily:'Karla, sans-serif' }}>
                 {L('Merk ferdig', 'Mark as done')} (+{size.points} p)
               </button>
             )}
