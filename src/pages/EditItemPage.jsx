@@ -4,6 +4,7 @@ import { getItem, getCategories, supabase } from '../lib/supabase'
 import { fileToDataUrl, uploadEstateImage, removeImages, itemImageUrls } from '../lib/images'
 import { parseNOK } from '../lib/format'
 import { L } from '../lib/lang'
+import { CONDITION_OPTIONS } from '../lib/analysisView'
 import { categoryLabel } from '../lib/categories'
 
 export default function EditItemPage({ session, profile, onToast }) {
@@ -15,7 +16,7 @@ export default function EditItemPage({ session, profile, onToast }) {
   const [title, setTitle] = useState('')
   const [categoryId, setCategoryId] = useState('')
   const [description, setDescription] = useState('')
-  const [condition, setCondition] = useState('good')
+  const [condition, setCondition] = useState('unknown')
   const [estimatedValue, setEstimatedValue] = useState('')
   const [existingImages, setExistingImages] = useState([])
   const [newFiles, setNewFiles] = useState([])
@@ -37,7 +38,7 @@ export default function EditItemPage({ session, profile, onToast }) {
       setTitle(it?.title || '')
       setCategoryId(it?.category_id || '')
       setDescription(it?.description || '')
-      setCondition(it?.condition || 'good')
+      setCondition(it?.condition || 'unknown')
       setEstimatedValue(it?.estimated_value == null ? '' : String(it.estimated_value))
       setExistingImages(itemImageUrls(it))
       setCategories(cats || [])
@@ -48,12 +49,12 @@ export default function EditItemPage({ session, profile, onToast }) {
   const handleNewImages = (e) => {
     const MAX_IMAGE_SIZE = 10 * 1024 * 1024 // 10 MB
     const files = Array.from(e.target.files).filter(f => {
-      if (f.size > MAX_IMAGE_SIZE) { onToast(`"${f.name}" er for stor (maks 10 MB)`, 'error'); return false }
+      if (f.size > MAX_IMAGE_SIZE) { onToast(L(`«${f.name}» er for stor (maks 10 MB)`, `«${f.name}» is too large (max 10 MB)`), 'error'); return false }
       return true
     })
     const total = existingImages.length + newFiles.length + files.length
     if (total > 5) {
-      onToast(`Maks 5 bilder totalt (har ${existingImages.length + newFiles.length})`, 'error')
+      onToast(L(`Maks 5 bilder totalt (har ${existingImages.length + newFiles.length})`, `Max 5 photos in total (has ${existingImages.length + newFiles.length})`), 'error')
       return
     }
     setNewFiles(prev => [...prev, ...files])
@@ -207,10 +208,10 @@ export default function EditItemPage({ session, profile, onToast }) {
         {/* Condition */}
         <div>
           <div style={{ display:'block', fontSize:'0.8125rem', color:'#75604B', marginBottom:'8px' }}>{L('Tilstand', 'Condition')}</div>
-          <div style={{ display:'flex', gap:'8px' }}>
-            {[['excellent',L('Utmerket','Excellent')],['good',L('God','Good')],['fair',L('Middels','Fair')],['poor',L('Dårlig','Poor')]].map(([val, label]) => (
+          <div style={{ display:'flex', gap:'8px', flexWrap:'wrap' }}>
+            {CONDITION_OPTIONS().map(({ value: val, label }) => (
               <button key={val} onClick={() => setCondition(val)} aria-pressed={condition===val} style={{
-                flex:1, padding:'10px 4px', minHeight:'44px',
+                flex:'1 1 60px', padding:'10px 4px', minHeight:'44px',
                 border:`2px solid ${condition===val?'#3A2F26':'#D9CFC0'}`,
                 borderRadius:'8px', cursor:'pointer', fontSize:'0.75rem',
                 fontFamily:'Karla, sans-serif',

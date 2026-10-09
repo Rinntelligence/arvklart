@@ -10,7 +10,7 @@ VITE=$!
 trap 'kill $VITE 2>/dev/null || true' EXIT
 until curl -sf "localhost:$PORT" >/dev/null 2>&1; do sleep 1; done
 FAILED=()
-for t in test/e2e/addItemsPage.mjs test/e2e/a11y.mjs test/e2e/journey.mjs test/e2e/itemGuard.mjs; do
+for t in test/e2e/addItemsPage.mjs test/e2e/a11y.mjs test/e2e/journey.mjs test/e2e/itemGuard.mjs test/e2e/reason.mjs test/e2e/language.mjs; do
   [ -f "$t" ] || continue
   BASE_URL="http://localhost:$PORT" node "$t" || FAILED+=("$t")
 done

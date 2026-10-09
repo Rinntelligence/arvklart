@@ -32,7 +32,19 @@ export const removePass = (item_id, user_id) =>
 export const addInterestClearingPass = async (item_id, user_id, reason) => {
   const { error } = await removePass(item_id, user_id)
   if (error) return { error }
-  return addInterest(item_id, user_id, reason)
+  return addInterest(item_id, user_id, reason?.trim() || null)
+}
+
+// Begrunnelsen på eget ønske (tom tekst fjerner den). Databasen lar bare eieren av ønsket endre den;
+// en oppdatering som ikke treffer noen rad gir ingen feil derfra, så det meldes som feil her.
+export const setInterestReason = async (item_id, user_id, reason) => {
+  const { data, error } = await supabase.from('interests')
+    .update({ reason: reason?.trim() || null })
+    .eq('item_id', item_id).eq('user_id', user_id)
+    .select('id')
+  if (error) return { error }
+  if (!data?.length) return { error: new Error('not_updated') }
+  return { error: null }
 }
 
 // Henter det som trengs utover gjenstandene for å vite hva som gjenstår i boet.

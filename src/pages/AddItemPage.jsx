@@ -6,7 +6,10 @@ import { hasAiConsent, giveAiConsent } from '../lib/aiConsent'
 import { formatNOK } from '../lib/format'
 import { L, isEn } from '../lib/lang'
 import { categoryLabel } from '../lib/categories'
-import { analyzeItemPhotos, callEdgeFunction, matchCategory } from '../lib/itemAi'
+import { aiErrorMessage, analyzeItemPhotos, callEdgeFunction, valuationRecord } from '../lib/itemAi'
+import { aiAnalysisRecord, aiSuggestion, applyAiSuggestion } from '../lib/itemAiHelpers'
+import { CONDITION_OPTIONS, multipleItemsText } from '../lib/analysisView'
+import AnalysisDetails from '../components/AnalysisDetails'
 import { AiConsent, DemoNotice } from '../components/AiDialogs'
 import CameraCapture from '../components/CameraCapture'
 
@@ -17,13 +20,16 @@ export default function AddItemPage({ session, profile, onToast, isDemo }) {
   const [title, setTitle] = useState('')
   const [categoryId, setCategoryId] = useState('')
   const [description, setDescription] = useState('')
-  const [condition, setCondition] = useState('good')
+  const [condition, setCondition] = useState('unknown') // ukjent til noen har vurdert den
+  const [analysis, setAnalysis] = useState(null) // AI-vurderingen (lagres i ai_analysis)
+  const [aiFilled, setAiFilled] = useState({}) // feltene AI-en har fylt inn, så brukerens egne valg ikke overskrives
   const [imageFiles, setImageFiles] = useState([])
   const [imagePreviews, setImagePreviews] = useState([])
   const [saving, setSaving] = useState(false)
   const [analyzing, setAnalyzing] = useState(false)
   const [estimating, setEstimating] = useState(false)
   const [aiEstimate, setAiEstimate] = useState(null)
+  const [estimateMissing, setEstimateMissing] = useState(null) // «for lite informasjon»: tips om hva som mangler
   const [purchasePrice, setPurchasePrice] = useState('')
   const [purchaseYear, setPurchaseYear] = useState('')
   const [myEstimateVote, setMyEstimateVote] = useState(null) // 'agree' | 'disagree'
@@ -42,7 +48,8 @@ export default function AddItemPage({ session, profile, onToast, isDemo }) {
   const trackQuota = (res) => { if (typeof res?.quota?.remaining === 'number') setDemoRemaining(res.quota.remaining) }
   const handleAiError = (e, fallback) => {
     if (e.code === 'demo_limit') { setDemoRemaining(0); setDemoBlocked(true); return }
-    onToast(e.code === 'rate_limit' || e.code === 'ai_busy' ? e.message : fallback, 'error')
+    // Feilkoden oversettes på brukerens språk (serverens tekst er alltid norsk)
+    onToast(e.code && e.code !== 'error' ? aiErrorMessage(e.code) : fallback, 'error')
   }
 
   const loadCategories = () => getCategories(id).then(({ data }) => {
@@ -97,11 +104,16 @@ export default function AddItemPage({ session, profile, onToast, isDemo }) {
     try {
       const { result, quota } = await analyzeItemPhotos(imageFiles, { categories })
       trackQuota({ quota })
-      if (result.title && !title) setTitle(result.title)
-      if (result.description && !description) setDescription(result.description)
-      if (result.condition) setCondition(result.condition)
-      const match = matchCategory(categories, result.category)
-      if (match) setCategoryId(match.id)
+      // AI fyller bare felt brukeren ikke har endret selv
+      // Første kategori er forhåndsvalgt når siden lastes; den regnes ikke som brukerens eget valg
+      const cur = { title, description, categoryId: aiFilled.categoryId === undefined && categoryId === categories[0]?.id ? '' : categoryId, condition, aiFilled }
+      const { aiFilled: filled, ...changes } = applyAiSuggestion(cur, aiSuggestion(result, categories))
+      if ('title' in changes) setTitle(changes.title)
+      if ('description' in changes) setDescription(changes.description)
+      if ('condition' in changes) setCondition(changes.condition)
+      if ('categoryId' in changes) setCategoryId(changes.categoryId)
+      setAiFilled(filled)
+      setAnalysis(result.analysis || null)
       onToast(L('AI identifiserte gjenstanden ✓', 'AI identified the item ✓'))
     } catch (e) {
       handleAiError(e, L('AI-analyse feilet — fyll inn manuelt', 'AI analysis failed — fill in manually'))
@@ -123,16 +135,21 @@ export default function AddItemPage({ session, profile, onToast, isDemo }) {
         condition,
         purchase_price: purchasePrice ? parseFloat(purchasePrice) : undefined,
         purchase_year: purchaseYear ? parseInt(purchaseYear) : undefined,
+        analysis, // bildeanalysen, så bildene ikke sendes igjen
         lang: isEn() ? 'en' : 'no',
       })
       trackQuota(res)
       const d = res.data || res
+      // For lite grunnlag: ingen verdi (aldri 0 kr), men tips om hva som kan hjelpe
+      if (d.status === 'insufficient') { setAiEstimate(null); setEstimateMissing(d.missing || []); return }
+      setEstimateMissing(null)
       setAiEstimate({
         low_nok: d.summary?.low_nok ?? d.low_nok,
         high_nok: d.summary?.high_nok ?? d.high_nok,
         likely_nok: d.summary?.likely_nok ?? d.likely_nok,
         reasoning: d.market?.reasoning ?? d.reasoning,
         confidence: d.market?.confidence ?? d.confidence,
+        valuation: valuationRecord(d),
       })
     } catch (e) {
       handleAiError(e, L('Verdiestimering feilet', 'Value estimate failed'))
@@ -145,6 +162,9 @@ export default function AddItemPage({ session, profile, onToast, isDemo }) {
     if (isDemo) { setDemoBlocked(true); return }
     if (!title.trim()) { onToast(L('Legg til navn på gjenstanden', 'Add the item name'), 'error'); return }
     setSaving(true)
+    const aiRecord = aiAnalysisRecord({ analysis, aiFilled, title, description, categoryId, condition })
+    // AI-ens anslag lagres for seg (veiledende), adskilt fra verdien
+    if (aiRecord && aiEstimate?.valuation) aiRecord.valuation = aiEstimate.valuation
     try {
       const { data: newItem, error } = await supabase.from('items').insert({
         estate_id: id,
@@ -161,6 +181,8 @@ export default function AddItemPage({ session, profile, onToast, isDemo }) {
         estimate_confidence: aiEstimate?.confidence || null,
         purchase_price: purchasePrice ? parseFloat(purchasePrice) : null,
         purchase_year: purchaseYear ? parseInt(purchaseYear) : null,
+        // AI-vurderingen og hva brukeren gjorde med forslagene; bare når AI-en har analysert gjenstanden
+        ...(aiRecord ? { ai_analysis: aiRecord } : {}),
         value_agree_count: myEstimateVote === 'agree' ? 1 : 0,
         value_disagree_count: myEstimateVote === 'disagree' ? 1 : 0,
         value_voter_ids: myEstimateVote ? [session.user.id] : [],
@@ -263,6 +285,15 @@ export default function AddItemPage({ session, profile, onToast, isDemo }) {
             </button>
           )}
           {consentFor === 'analyze' && <AiConsent onCancel={() => setConsentFor(null)} onAccept={() => { giveAiConsent(); setAiConsented(true); setConsentFor(null); analyzeWithAI() }} />}
+          {analysis?.ai && multipleItemsText(analysis.ai) && (
+            <p style={{ fontSize: '0.8125rem', color: '#8A4B2A', background: '#F3E3D3', borderRadius: '8px', padding: '8px 10px', margin: '10px 0 0', lineHeight: 1.5 }}>{multipleItemsText(analysis.ai)}</p>
+          )}
+          {analysis?.ai && (
+            <details style={{ marginTop: '10px' }}>
+              <summary style={{ cursor: 'pointer', fontSize: '0.875rem', color: '#5C4530', padding: '10px 0', minHeight: '44px', boxSizing: 'border-box' }}>{L('Hva AI-en så', 'What the AI saw')}</summary>
+              <AnalysisDetails analysis={analysis} heading={false} />
+            </details>
+          )}
         </div>
 
         {/* Navn */}
@@ -346,10 +377,10 @@ export default function AddItemPage({ session, profile, onToast, isDemo }) {
           <div style={{ display: 'block', fontSize: '0.8125rem', color: '#75604B', marginBottom: '8px' }}>
             {L('Tilstand', 'Condition')}
           </div>
-          <div style={{ display: 'flex', gap: '8px' }}>
-            {[['excellent',L('Utmerket','Excellent')],['good',L('God','Good')],['fair',L('Middels','Fair')],['poor',L('Dårlig','Poor')]].map(([val, label]) => (
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+            {CONDITION_OPTIONS().map(({ value: val, label }) => (
               <button key={val} onClick={() => setCondition(val)} aria-pressed={condition === val} style={{
-                flex: 1, padding: '10px 4px', minHeight: '44px',
+                flex: '1 1 60px', padding: '10px 4px', minHeight: '44px',
                 border: `2px solid ${condition === val ? '#3A2F26' : '#D9CFC0'}`,
                 borderRadius: '8px', cursor: 'pointer', fontSize: '0.75rem',
                 fontFamily: 'Karla, sans-serif',
@@ -407,10 +438,17 @@ export default function AddItemPage({ session, profile, onToast, isDemo }) {
           </button>
         )}
 
+        {estimateMissing && !aiEstimate && (
+          <p role="status" style={{ fontSize: '0.8125rem', color: '#5C4530', background: '#FBF9F5', border: '1px solid #E8DFD0', borderRadius: '10px', padding: '10px 12px', margin: 0, lineHeight: 1.5 }}>
+            {L('For lite informasjon til å anslå verdi.', 'Too little information to estimate a value.')}
+            {estimateMissing.length > 0 && <> {L('Dette kan hjelpe', 'This could help')}: {estimateMissing.join('; ')}.</>}
+          </p>
+        )}
+
         {/* Verdiestimat-resultat */}
         {aiEstimate && (
           <div style={{ background: '#DCE3D2', border: '1px solid #B8C8A8', borderRadius: '12px', padding: '20px' }}>
-            <div style={{ fontSize: '0.8125rem', color: '#3A5A30', fontWeight: '500', marginBottom: '12px' }}>{L('Verdiestimat (NOK)', 'Value estimate (NOK)')}</div>
+            <div style={{ fontSize: '0.8125rem', color: '#3A5A30', fontWeight: '500', marginBottom: '12px' }}>{L('Veiledende AI-anslag (NOK)', 'Indicative AI estimate (NOK)')}</div>
             <div style={{ display: 'flex', gap: '16px', marginBottom: '12px', flexWrap: 'wrap' }}>
               <div style={{ textAlign: 'center' }}>
                 <div style={{ fontSize: '0.6875rem', color: '#75604B', marginBottom: '2px' }}>{L('Lavt', 'Low')}</div>
@@ -453,7 +491,7 @@ export default function AddItemPage({ session, profile, onToast, isDemo }) {
               )}
             </div>
 
-            <p style={{ fontSize: '0.6875rem', color: '#75604B', marginTop: '8px', marginBottom: 0 }}>{L('Estimater er kun veiledende — ikke profesjonell takst.', 'Estimates are for guidance only — not a professional appraisal.')}</p>
+            <p style={{ fontSize: '0.6875rem', color: '#75604B', marginTop: '8px', marginBottom: 0 }}>{L('Anslaget er laget av AI ut fra det som er registrert, og er ikke en dokumentert markedsverdi eller takst.', 'The estimate is made by AI from what has been registered, and is not a documented market value or appraisal.')}</p>
           </div>
         )}
 

@@ -1,45 +1,40 @@
-// Anslår markedsverdi i NOK for en gjenstand (verdifall + AI-estimat).
-// Krever innlogget bruker og teller mot AI-kvoten (demoen: 5 forsøk per besøk). Bruker Claude Haiku.
-import { getUser, json, preflight } from '../_shared/http.ts'
-import { MODEL, aiErrorResponse, anthropic, claimAiCall, parseJsonReply } from '../_shared/ai.ts'
+// Veiledende AI-anslag på bruktverdi i NOK (norsk bruktmarked) for en gjenstand. Bygger på bildeanalysen når
+// den finnes (sendt med som «analysis», eller lagret på gjenstanden med «item_id»); bildene analyseres ikke på
+// nytt, så kallet er bare tekst. Ingen eksterne kilder. For lite grunnlag gir status «insufficient» og ingen
+// verdi (aldri 0 kr). Logikken ligger i _shared/valuation.ts.
+// Krever innlogget bruker og teller mot AI-kvoten (demoen: 5 forsøk per besøk). Modell: se _shared/ai.ts.
+import { getUser, json, preflight, userClient } from '../_shared/http.ts'
+import { aiConfigured, aiErrorJson, aiErrorResponse, callStructured, claimAiCall, currentModel } from '../_shared/ai.ts'
+import { categoryKeyFor, depreciatedValue, readEstimateInput, type EstimateInput } from '../_shared/aiCore.ts'
+import { normalizeAnalysis, type Analysis } from '../_shared/analysis.ts'
+import {
+  ESTIMATE_SCHEMA_V2, VALUATION_VERSION, conditionGuidance, describeItem, finalizeEstimate, insufficientWithoutCall, validateEstimateV2, valuationSystem,
+} from '../_shared/valuation.ts'
 
-// Depreciation rates per category
-const DEPRECIATION_RATES: Record<string, number> = {
-  'Electronics': 0.30, 'Furniture': 0.08, 'Art & pictures': 0.02,
-  'Jewelry': 0.03, 'Books': 0.10, 'Kitchen': 0.12,
-  'Clothing & textiles': 0.20, 'Collectibles': -0.03,
-  'Tools': 0.10, 'Sports & outdoors': 0.15, 'Decorations': 0.08, 'Other': 0.12,
+const MAX_ANALYSIS_CHARS = 20_000
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+// Analysen fra klienten valideres på nytt (den kan være endret); feil form gir ingen analyse
+function readAnalysis(value: unknown): Analysis | null {
+  if (!value || typeof value !== 'object') return null
+  const v = value as Record<string, unknown>
+  const ai = v.ai ?? v // hele ai_analysis-dokumentet eller bare AI-delen
+  if (JSON.stringify(ai).length > MAX_ANALYSIS_CHARS) return null
+  const r = normalizeAnalysis([])(ai)
+  return r.ok ? r.value : null
 }
-const VALUE_FLOORS: Record<string, number> = {
-  'Electronics': 0.05, 'Furniture': 0.20, 'Art & pictures': 0.30,
-  'Jewelry': 0.40, 'Collectibles': 0.50, 'Other': 0.10,
-}
 
-// Kategoriene i appen er norske og kan navngis fritt per bo; finn nærmeste tabellnøkkel.
-const CATEGORY_KEYWORDS: [RegExp, string][] = [
-  [/elektronikk|tv|data|telefon/i, 'Electronics'],
-  [/møbl|stol|bord|sofa/i, 'Furniture'],
-  [/kunst|maleri|bilde/i, 'Art & pictures'],
-  [/smykk|\bur\b|klokke|gull|sølv/i, 'Jewelry'],
-  [/bok|bøker/i, 'Books'],
-  [/kjøkken|porselen|servise|glass/i, 'Kitchen'],
-  [/klær|tekstil|tøy/i, 'Clothing & textiles'],
-  [/samle|antikk|minne|arvestykke/i, 'Collectibles'],
-  [/verktøy/i, 'Tools'],
-  [/sport|friluft/i, 'Sports & outdoors'],
-  [/dekor|pynt/i, 'Decorations'],
-]
-const categoryKey = (label = '') => CATEGORY_KEYWORDS.find(([re]) => re.test(label))?.[1] || 'Other'
-
-// Free price sources by category
-const PRICE_SOURCES: Record<string, string[]> = {
-  'Electronics': ['finn.no', 'prisjakt.no', 'ebay.com'],
-  'Furniture': ['finn.no', 'ikea.com', 'ebay.com'],
-  'Art & pictures': ['finn.no', 'ebay.com', 'invaluable.com'],
-  'Jewelry': ['finn.no', 'ebay.com', 'pricecharting.com'],
-  'Collectibles': ['ebay.com', 'pricecharting.com', 'finn.no'],
-  'Books': ['finn.no', 'ebay.com', 'bokkilden.no'],
-  'Other': ['finn.no', 'ebay.com'],
+// Lagret gjenstand: hentes med brukerens egen innlogging, så RLS avgjør om brukeren har tilgang
+async function loadItem(req: Request, itemId: string): Promise<{ body: Record<string, unknown>; analysis: unknown } | null> {
+  const { data } = await userClient(req).from('items')
+    .select('title, description, condition, purchase_price, purchase_year, ai_analysis, categories(label)')
+    .eq('id', itemId).maybeSingle()
+  if (!data) return null
+  const d = data as Record<string, unknown> & { categories?: { label?: string } | null }
+  return {
+    body: { title: d.title, description: d.description, condition: d.condition, purchase_price: d.purchase_price, purchase_year: d.purchase_year, category: d.categories?.label ?? '' },
+    analysis: d.ai_analysis,
+  }
 }
 
 Deno.serve(async (req) => {
@@ -49,94 +44,82 @@ Deno.serve(async (req) => {
   try {
     const user = await getUser(req)
     if (!user) return json({ success: false, error: 'Du må være logget inn' }, 401)
+    if (!aiConfigured()) return aiErrorJson('ai_unavailable')
 
-    const { title, description, category, condition, purchase_price, purchase_year, ai_identified_model, lang } = await req.json()
-    // Begrunnelsen skrives på brukerens språk
-    const language = lang === 'en' ? 'English' : 'Norwegian (bokmål)'
-    if (typeof title !== 'string' || !title.trim()) return json({ success: false, error: 'Mangler navn på gjenstanden' }, 400)
-    const key = categoryKey(category)
+    const raw = (await req.json()) ?? {}
+    const english = raw.lang === 'en'
+    let body: Record<string, unknown> = raw
+    let rawAnalysis: unknown = raw.analysis
+    if (typeof raw.item_id === 'string') {
+      if (!UUID.test(raw.item_id)) return json({ success: false, error: 'Ugyldig gjenstand' }, 400)
+      const item = await loadItem(req, raw.item_id)
+      if (!item) return json({ success: false, error: 'Fant ikke gjenstanden' }, 404)
+      body = item.body
+      rawAnalysis = item.analysis
+    }
+    const input = readEstimateInput(body)
+    if (typeof input === 'string') return json({ success: false, error: input }, 400)
+    const analysis = readAnalysis(rawAnalysis)
+    const key = analysis?.suggestion.category_key && analysis.suggestion.category_key !== 'other'
+      ? analysis.suggestion.category_key : categoryKeyFor(input.category)
+    const depreciation = depreciatedValue(key, input.purchasePrice, input.purchaseYear)
 
-    const { denied, quota } = await claimAiCall(req, user, 'estimate-value')
+    // For lite grunnlag: svar uten å spørre AI-en og uten å bruke av kvoten
+    const missing = insufficientWithoutCall(input.title, input.description, analysis, english)
+    if (missing) return json({ success: true, data: insufficientResponse(missing, '', analysis) })
+
+    const { denied, quota, usageId } = await claimAiCall(req, user, 'estimate-value')
     if (denied) return denied
 
-    // 1. Depreciation calc if we have purchase data
-    let depreciationEstimate = null
-    if (purchase_price && purchase_year) {
-      const yearsOld = new Date().getFullYear() - parseInt(purchase_year)
-      const rate = DEPRECIATION_RATES[key] ?? 0.12
-      const floor = VALUE_FLOORS[key] ?? 0.10
-      const depreciated = purchase_price * Math.pow(1 - rate, yearsOld)
-      depreciationEstimate = {
-        value: Math.max(depreciated, purchase_price * floor),
-        years_old: yearsOld,
-        rate_used: rate,
-        original_price: purchase_price,
-      }
-    }
+    const est = await callStructured({
+      fn: 'estimate-value', usageId, effort: 'low', maxTokens: 2000, schemaVersion: VALUATION_VERSION,
+      system: valuationSystem(english ? 'English' : 'Norwegian (bokmål)'),
+      schema: ESTIMATE_SCHEMA_V2,
+      validate: validateEstimateV2,
+      content: `${describeItem(toFacts(input), analysis, depreciation?.value ?? null)}
 
-    // 2. AI-estimat av markedsverdi
-    const message = await anthropic().messages.create({
-        model: MODEL,
-        max_tokens: 1024,
-        messages: [{
-          role: 'user',
-          content: `You are an expert Norwegian estate appraiser. Estimate the current Norwegian market value (in NOK) for this item.
+${conditionGuidance(key)}
 
-Item: ${title}
-Description: ${description || 'No description'}
-Category: ${category}
-Condition: ${condition || 'good'}
-${ai_identified_model ? `AI identified as: ${ai_identified_model}` : ''}
-${purchase_price ? `Original price: ${purchase_price} NOK (${purchase_year})` : ''}
-
-Use your knowledge of:
-- Current Norwegian second-hand market (finn.no prices)
-- Typical depreciation for this category
-- The specific model/brand if identifiable
-- Condition impact
-
-Write "reasoning" and "market_references" in ${language}.
-
-Respond ONLY with this JSON (no other text):
-{
-  "low_nok": <number>,
-  "high_nok": <number>,
-  "likely_nok": <number>,
-  "reasoning": "2 sentences max explaining the estimate",
-  "market_references": ["e.g. Similar Samsung TV on finn.no: 1500-2500 kr", "eBay completed listings: $150-200"],
-  "price_check_urls": ["https://www.finn.no/bap/forsale/search.html?q=SEARCH_TERM", "https://www.ebay.com/sch/i.html?_nkw=SEARCH_TERM"],
-  "estimated_year": "e.g. 2018-2020",
-  "confidence": "high|medium|low",
-  "category_trend": "appreciating|stable|depreciating"
-}`
-        }]
+Give status, low_nok, likely_nok and high_nok as whole NOK amounts (low ≤ likely ≤ high), reasoning, confidence (high, medium or low) and missing.`,
     })
-    const aiEstimate = parseJsonReply(message)
 
-    // Fill in search URLs with actual item title
-    const searchTerm = encodeURIComponent(title.split(' ').slice(0, 4).join(' '))
-    aiEstimate.price_check_urls = [
-      `https://www.finn.no/bap/forsale/search.html?q=${searchTerm}`,
-      `https://www.ebay.com/sch/i.html?_nkw=${searchTerm}&LH_Sold=1&LH_Complete=1`,
-    ]
+    if (est.status === 'insufficient') return json({ success: true, data: insufficientResponse(est.missing, est.reasoning, analysis), quota })
 
-    const sources = PRICE_SOURCES[key] || PRICE_SOURCES['Other']
-
+    const final = finalizeEstimate(est, { condition: input.condition, analysis, hasDescription: !!input.description })
     return json({
       success: true,
       data: {
-        depreciation: depreciationEstimate,
-        market: aiEstimate,
-        price_sources: sources,
-        summary: {
-          low_nok: aiEstimate.low_nok,
-          high_nok: aiEstimate.high_nok,
-          likely_nok: aiEstimate.likely_nok,
-        }
+        v: VALUATION_VERSION,
+        status: 'ok',
+        price_type: 'estimated_price', // senere også sold_price / asking_price / new_price fra en markedsmotor
+        market_area: 'NO',
+        currency: 'NOK',
+        estimate: { low: final.low, likely: final.likely, high: final.high },
+        confidence: final.confidence,
+        uncertainty: final.uncertainty,
+        basis: { used_analysis: !!analysis, identified: final.identified, category_key: key },
+        reasoning: est.reasoning,
+        missing: est.missing,
+        sources: [],
+        model: currentModel(),
+        depreciation,
+        // Feltene appen har brukt hittil
+        market: { low_nok: final.low, likely_nok: final.likely, high_nok: final.high, reasoning: est.reasoning, confidence: final.confidence },
+        summary: { low_nok: final.low, likely_nok: final.likely, high_nok: final.high },
       },
       quota,
     })
   } catch (error) {
     return aiErrorResponse(error, 'estimate-value')
   }
+})
+
+const toFacts = (i: EstimateInput) => ({
+  title: i.title, description: i.description, category: i.category, condition: i.condition,
+  purchasePrice: i.purchasePrice, purchaseYear: i.purchaseYear, identifiedModel: i.identifiedModel,
+})
+
+const insufficientResponse = (missing: string[], reasoning: string, analysis: Analysis | null) => ({
+  v: VALUATION_VERSION, status: 'insufficient', price_type: 'estimated_price', market_area: 'NO', currency: 'NOK',
+  estimate: null, missing, reasoning, sources: [], basis: { used_analysis: !!analysis },
 })

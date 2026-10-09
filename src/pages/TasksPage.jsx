@@ -7,7 +7,8 @@ import { Modal } from '../components/UI'
 
 const tc = c => { if(!c)return'#FBF9F5'; const r=parseInt(c.slice(1,3),16),g=parseInt(c.slice(3,5),16),b=parseInt(c.slice(5,7),16); return(0.299*r+0.587*g+0.114*b)/255>0.55?'#3A2F26':'#FBF9F5' }
 
-// Standardoppgavene lagres i boet på språket brukeren har valgt når listen lastes
+// Standardoppgavene lagres alltid på norsk (delt innhold i boet, uavhengig av hvem som laster listen)
+// og oversettes ved visning. Oppgaver brukerne skriver selv vises som de er skrevet.
 const DEFAULT_TASKS = [
   { category: 'Umiddelbart', title: 'Registrer dødsfallet', description: 'Innhent dødsattest fra sykehus eller lege', title_en: 'Register the death', description_en: 'Obtain a death certificate from the hospital or doctor', priority: 1 },
   { category: 'Umiddelbart', title: 'Varsle nærmeste familie', description: 'Informer nærmeste familiemedlemmer og nære venner', title_en: 'Notify close family', description_en: 'Inform close family members and close friends', priority: 2 },
@@ -31,6 +32,20 @@ const CATEGORY_ORDER = ['Umiddelbart', 'Uke 1', 'Måned 1', 'Fordeling']
 // Kategoriene lagres på norsk i databasen og oversettes bare ved visning
 const CATEGORY_EN = { 'Umiddelbart': 'Immediately', 'Uke 1': 'Week 1', 'Måned 1': 'Month 1', 'Fordeling': 'Distribution', 'Annet': 'Other' }
 const catLabel = c => L(c, CATEGORY_EN[c] || c)
+
+// Standardoppgavene vises på brukerens språk, også i bo der de ble lagret på engelsk før dette ble endret.
+// Teksten oversettes bare når den fortsatt er standardteksten (ikke hvis noen har endret den).
+const DEFAULT_TEXT = new Map()
+for (const t of DEFAULT_TASKS) {
+  for (const [no, en] of [[t.title, t.title_en], [t.description, t.description_en]]) {
+    DEFAULT_TEXT.set(no, { no, en })
+    DEFAULT_TEXT.set(en, { no, en })
+  }
+}
+const taskText = text => {
+  const d = text && DEFAULT_TEXT.get(text)
+  return d ? L(d.no, d.en) : text
+}
 const CATEGORY_COLORS = {
   'Umiddelbart': { bg: '#DCE3D2', border: '#B8C8A8', text: '#3A5A30', dot: '#5F6E52' },
   'Uke 1':       { bg: '#E8EAD8', border: '#C4C8A8', text: '#4A5230', dot: '#8B9A7D' },
@@ -71,9 +86,9 @@ export default function TasksPage({ session, onToast, isDemo }) {
   }
 
   const seedTasks = () => run(
-    // Sjekklisten lagres på brukerens språk; title_en/description_en er ikke kolonner i tasks
+    // Sjekklisten lagres på norsk; title_en/description_en er ikke kolonner i tasks
     supabase.from('tasks').insert(DEFAULT_TASKS.map(({ title_en, description_en, ...t }) => ({
-      ...t, title: L(t.title, title_en), description: L(t.description, description_en),
+      ...t,
       estate_id: id, completed: false, added_by: session.user.id,
     }))),
     L('Kunne ikke laste sjekklisten', 'Could not load the checklist'),
@@ -213,7 +228,7 @@ export default function TasksPage({ session, onToast, isDemo }) {
       {confirmTask && (
         <Modal onClose={() => setConfirmTask(null)} labelledBy="delete-task-title" maxWidth={400}>
             <h3 id="delete-task-title" style={{ fontFamily:'Fraunces, serif', fontSize:'1.125rem', fontWeight:'400', color:'#3A2F26', marginBottom:'8px' }}>{L('Slette oppgaven?', 'Delete the task?')}</h3>
-            <p style={{ fontSize:'0.875rem', color:'#5C4530' }}>«{confirmTask.title}»</p>
+            <p style={{ fontSize:'0.875rem', color:'#5C4530' }}>«{taskText(confirmTask.title)}»</p>
             <div style={{ display:'flex', gap:'10px', marginTop:'20px' }}>
               <button onClick={() => setConfirmTask(null)} style={{ flex:1, minHeight:'44px', padding:'11px', background:'none', border:'1px solid #9A8B78', borderRadius:'8px', cursor:'pointer', color:'#5C4530', fontSize:'0.875rem', fontFamily:'Karla, sans-serif' }}>{L('Avbryt', 'Cancel')}</button>
               <button onClick={() => { deleteTask(confirmTask.id); setConfirmTask(null) }} style={{ flex:1, minHeight:'44px', padding:'11px', background:'#8B3A3A', color:'#fff', border:'none', borderRadius:'8px', cursor:'pointer', fontSize:'0.875rem', fontFamily:'Karla, sans-serif' }}>{L('Slett', 'Delete')}</button>
@@ -246,8 +261,8 @@ function TaskRow({ task, members, myRole, readOnly, onToggle, onAssign, onDelete
         }}>{task.completed ? '✓' : ''}</button>
 
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: '0.875rem', color: '#3A2F26', textDecoration: task.completed ? 'line-through' : 'none', lineHeight: '1.4' }}>{task.title}</div>
-          {task.description && !expanded && <div style={{ fontSize: '0.75rem', color: '#75604B', marginTop: '2px', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{task.description}</div>}
+          <div style={{ fontSize: '0.875rem', color: '#3A2F26', textDecoration: task.completed ? 'line-through' : 'none', lineHeight: '1.4' }}>{taskText(task.title)}</div>
+          {task.description && !expanded && <div style={{ fontSize: '0.75rem', color: '#75604B', marginTop: '2px', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{taskText(task.description)}</div>}
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
@@ -264,7 +279,7 @@ function TaskRow({ task, members, myRole, readOnly, onToggle, onAssign, onDelete
 
       {expanded && (
         <div style={{ padding: '0 16px 16px', borderTop: '1px solid #E8DFD0' }}>
-          {task.description && <p style={{ fontSize: '0.8125rem', color: '#5C4530', lineHeight: '1.6', margin: '12px 0' }}>{task.description}</p>}
+          {task.description && <p style={{ fontSize: '0.8125rem', color: '#5C4530', lineHeight: '1.6', margin: '12px 0' }}>{taskText(task.description)}</p>}
           <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
               <span style={{ fontSize: '0.75rem', color: '#75604B' }}>{L('Tildel til:', 'Assign to:')}</span>
