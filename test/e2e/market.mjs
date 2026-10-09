@@ -57,7 +57,7 @@ await check('Anslå verdi med tre sammenligninger: markedsbasert, spenn i treff,
   await open(page)
   await page.getByText('Gyngestol eik 1').waitFor()
   await page.getByRole('button', { name: 'Anslå verdi' }).click()
-  await page.getByText('Anslag ut fra sammenligningene').waitFor()
+  await page.getByText('Anslag ut fra priser familien har oppgitt (ikke bekreftet av en kilde)').waitFor()
   await page.getByText(/Spenn i 3 treff/).first().waitFor()
   await page.getByText(/Basert på 3 salgspriser oppgitt av familien/).waitFor()
   await page.getByRole('button', { name: /^Bruk .*1\s?200.* som verdi$/ }).click()

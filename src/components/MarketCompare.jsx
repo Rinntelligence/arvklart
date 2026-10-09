@@ -87,6 +87,8 @@ export default function MarketCompare({ item, userId, canEdit, onChanged, onToas
   }
 
   const isMarket = estimate?.method === 'market_sold' || estimate?.method === 'market_asking'
+  // Priser familien selv har lagt inn, presenteres aldri som uavhengig bekreftede salgspriser
+  const familyReported = isMarket && (estimate?.uncertainty?.reasons?.includes('family_reported') || (estimate?.references || []).some(r => r.used && !r.verified))
   const e = estimate?.status === 'ok' ? estimate.estimate : null
 
   return (
@@ -118,6 +120,7 @@ export default function MarketCompare({ item, userId, canEdit, onChanged, onToas
                 <span style={{ flex: '1 1 200px' }}>
                   {r.url ? <a href={r.url} target="_blank" rel="noopener noreferrer" style={{ color: '#3A2F26' }}>{r.title}</a> : <span style={{ color: '#3A2F26' }}>{r.title}</span>}
                   <br />{priceTypeLabel(r.price_type)} {formatNOK(r.price)}{r.date ? ` · ${dateText(r.date)}` : ''}
+                  <span style={{ color: '#75604B' }}> · {L('oppgitt av familien', 'reported by the family')}</span>
                 </span>
                 {canEdit && <button onClick={() => removeReference(r.id)} disabled={busy} aria-label={L(`Fjern «${r.title}»`, `Remove «${r.title}»`)} style={{ ...btn, color: '#8A4B2A' }}>{L('Fjern', 'Remove')}</button>}
               </li>
@@ -168,7 +171,9 @@ export default function MarketCompare({ item, userId, canEdit, onChanged, onToas
         {e && (
           <div role="status" style={{ background: '#DCE3D2', border: '1px solid #B8C8A8', borderRadius: '10px', padding: '12px 14px', display: 'grid', gap: '6px' }}>
             <div style={{ fontSize: '0.75rem', color: '#3A5A30', fontWeight: 600 }}>
-              {isMarket ? L('Anslag ut fra sammenligningene', 'Estimate from the comparisons') : L('Veiledende AI-anslag, ikke en dokumentert markedsverdi', 'Indicative AI estimate, not a documented market value')}
+              {!isMarket ? L('Veiledende AI-anslag, ikke en dokumentert markedsverdi', 'Indicative AI estimate, not a documented market value')
+                : familyReported ? L('Anslag ut fra priser familien har oppgitt (ikke bekreftet av en kilde)', 'Estimate from prices reported by the family (not confirmed by a source)')
+                  : L('Anslag ut fra sammenligningene', 'Estimate from the comparisons')}
             </div>
             <div style={{ fontFamily: "'Fraunces', serif", fontSize: '1.375rem', color: '#3A2F26' }}>{formatNOK(e.likely)}</div>
             <div style={{ ...small, color: '#3A5A30' }}>
