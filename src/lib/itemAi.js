@@ -22,6 +22,8 @@ export function aiErrorMessage(code) {
   switch (code) {
     case 'rate_limit': return L('Du har brukt AI-hjelpen mye den siste tiden. Prøv igjen om en stund – du kan fylle inn selv i mellomtiden.', 'You have used the AI help a lot recently. Try again in a while – you can fill in the details yourself meanwhile.')
     case 'ai_busy': return L('AI-tjenesten er opptatt akkurat nå. Prøv igjen om litt.', 'The AI service is busy right now. Please try again shortly.')
+    case 'estate_limit': return L('Dette boet har brukt opp AI-kvoten for de siste 30 dagene. Du kan fylle inn selv.', 'This estate has used up its AI quota for the last 30 days. You can fill in the details yourself.')
+    case 'not_member': return L('Du er ikke lenger medlem av dette boet.', 'You are no longer a member of this estate.')
     case 'demo_limit': return L('Du har brukt opp AI-forsøkene i demoen.', 'You have used up the AI attempts in the demo.')
     case 'ai_refused': return L('AI-en kunne ikke vurdere dette. Fyll inn selv.', 'The AI could not assess this. Please fill in the details yourself.')
     case 'ai_timeout': return L('AI-en brukte for lang tid. Prøv igjen.', 'The AI took too long. Please try again.')
@@ -35,7 +37,8 @@ export const MAX_AI_IMAGES = 3
 
 // Identifiserer gjenstanden fra opptil tre bilder. Med estimate: true kommer også verdiestimat i samme kall
 // (ett AI-kall per gjenstand). Forminsket JPEG: mobilbilder er ofte over grensen på 5 MB, og HEIC støttes ikke.
-export async function analyzeItemPhotos(files, { categories = [], estimate = false } = {}) {
+// estateId: boet kallet gjelder; teller mot boets AI-budsjett (claim_ai_call)
+export async function analyzeItemPhotos(files, { categories = [], estimate = false, estateId = null } = {}) {
   const images = await Promise.all(files.slice(0, MAX_AI_IMAGES).map(async (file) => {
     const image = await downscaleImage(file, 1568)
     return { data: await fileToBase64(image), mimeType: image.type || 'image/jpeg' }
@@ -47,22 +50,35 @@ export async function analyzeItemPhotos(files, { categories = [], estimate = fal
     mimeType: images[0].mimeType,
     categories: categories.map(c => c.label),
     estimate,
+    estate_id: estateId,
     lang: isEn() ? 'en' : 'no',
   })
   return { result: res?.data || res, quota: res?.quota }
 }
 
-// Det som lagres som AI-ens anslag (ai_analysis.valuation), adskilt fra verdien i feltet. Null for eldre svar.
+// Det som lagres som anslaget (ai_analysis.valuation), adskilt fra verdien i feltet. Null for eldre svar.
+// v3: method sier om det bygger på markedet (market_sold / market_asking) eller er et AI-anslag (model).
+// Sammenligningene lagres uten annet annonseinnhold enn tittel, pris, dato og lenke.
 export const valuationRecord = d => (d?.v ? {
-  v: d.v, price_type: d.price_type, market_area: d.market_area, currency: d.currency, estimate: d.estimate,
-  confidence: d.confidence, uncertainty: d.uncertainty, basis: d.basis, model: d.model, at: new Date().toISOString(),
+  v: d.v, method: d.method ?? 'model', price_type: d.price_type, range_kind: d.range_kind ?? null, market_area: d.market_area, currency: d.currency,
+  estimate: d.estimate, confidence: d.confidence, uncertainty: d.uncertainty, basis: d.basis, model: d.model,
+  stats: d.stats ?? null, explanation: d.explanation ?? null, queries: d.queries ?? [],
+  references: (d.references || []).slice(0, 10).map(r => ({ provider: r.provider, url: r.url, title: r.title, price: r.price, currency: r.currency, price_type: r.price_type, date: r.date, verified: r.verified, used: r.used, flags: r.flags })),
+  at: new Date().toISOString(),
 } : null)
+
+// Verdianslag for en lagret gjenstand: serveren henter opplysningene, analysen og familiens sammenligninger
+// selv (item_id, med brukerens tilgang). Gir hele svaret (estimate-value v3).
+export async function requestItemEstimate(itemId) {
+  const res = await callEdgeFunction('estimate-value', { item_id: itemId, lang: isEn() ? 'en' : 'no' })
+  return res?.data || res
+}
 
 // Veiledende AI-anslag ut fra det som er registrert og bildeanalysen (analysis), uten å sende bildene igjen:
 // ett tekstkall. Markedet er alltid Norge (NOK). Brukes når brukeren selv ber om det.
 // For lite grunnlag gir insufficient (med tips) og ingen verdi – aldri 0 kr.
-export async function requestValueEstimate({ title, description = '', category = '', condition = '', analysis = null }) {
-  const res = await callEdgeFunction('estimate-value', { title, description, category, condition, analysis, lang: isEn() ? 'en' : 'no' })
+export async function requestValueEstimate({ title, description = '', category = '', condition = '', analysis = null, estateId = null }) {
+  const res = await callEdgeFunction('estimate-value', { title, description, category, condition, analysis, estate_id: estateId, lang: isEn() ? 'en' : 'no' })
   const d = res?.data || res || {}
   if (d.status === 'insufficient') {
     return { estimate: null, insufficient: { missing: d.missing || [], reasoning: d.reasoning || '' }, quota: res?.quota }

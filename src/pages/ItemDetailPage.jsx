@@ -8,6 +8,10 @@ import { L, locale } from '../lib/lang'
 import { categoryLabel } from '../lib/categories'
 import ReasonEditor from '../components/ReasonEditor'
 import AnalysisDetails from '../components/AnalysisDetails'
+import AiCorrectionsForm from '../components/AiCorrectionsForm'
+import MarketCompare from '../components/MarketCompare'
+import { withCorrections } from '../lib/aiCorrections'
+import StoredImage from '../components/StoredImage'
 
 const tc = c => { if(!c)return'#FBF9F5'; const r=parseInt(c.slice(1,3),16),g=parseInt(c.slice(3,5),16),b=parseInt(c.slice(5,7),16); return(0.299*r+0.587*g+0.114*b)/255>0.55?'#3A2F26':'#FBF9F5' }
 
@@ -31,6 +35,7 @@ export default function ItemDetailPage({ session, profile, onToast, isDemo }) {
   const [suggestedValue, setSuggestedValue] = useState('')
   const [showSuggestInput, setShowSuggestInput] = useState(false)
   const [busy, setBusy] = useState(false)
+  const [correcting, setCorrecting] = useState(false)
   const commentsEndRef = useRef(null)
 
   const load = async () => {
@@ -72,6 +77,8 @@ export default function ItemDetailPage({ session, profile, onToast, isDemo }) {
   const canEdit = !isDemo
   // Den som la inn gjenstanden kan slette den bare før den er tildelt (håndheves også i databasen)
   const canDelete = !isDemo && (isAdmin || (item.added_by === session.user.id && !item.assigned_to && item.status !== 'assigned'))
+  // AI-ens identifikasjon kan rettes av administrator og den som la inn gjenstanden (håndheves i guard_item_update)
+  const canCorrect = !isDemo && (isAdmin || item.added_by === session.user.id)
   const allImages = itemImageUrls(item)
   const assignedMember = members.find(m => m.user_id === item.assigned_to)
 
@@ -85,6 +92,17 @@ export default function ItemDetailPage({ session, profile, onToast, isDemo }) {
     if (okMsg) onToast(okMsg)
     load()
     return true
+  }
+
+  // Rettelsene bygges på det som er lagret nå, så andre endringer i ai_analysis ikke går tapt
+  const saveCorrections = async (values) => {
+    const ok = await run(async () => {
+      const { data, error } = await supabase.from('items').select('ai_analysis').eq('id', itemId).single()
+      if (error) return { error }
+      const next = withCorrections(data?.ai_analysis, values, session.user.id)
+      return next ? supabase.from('items').update({ ai_analysis: next }).eq('id', itemId) : {}
+    }, L('Rettelsene er lagret', 'Corrections saved'), L('Kunne ikke lagre rettelsene. Prøv igjen.', 'Could not save the corrections. Please try again.'))
+    if (ok) setCorrecting(false)
   }
 
   const handleInterest = async () => {
@@ -191,7 +209,7 @@ export default function ItemDetailPage({ session, profile, onToast, isDemo }) {
       {allImages.length > 0 ? (
         <div style={{ marginBottom:'24px', position:'relative' }}>
           <div style={{ background:'#E8DFD0', borderRadius:'14px', height:'280px', display:'flex', alignItems:'center', justifyContent:'center', overflow:'hidden', position:'relative' }}>
-            <img src={allImages[currentImageIndex]} alt={item.title} style={{ width:'100%', height:'100%', objectFit:'contain' }} />
+            <StoredImage src={allImages[currentImageIndex]} alt={item.title} style={{ width:'100%', height:'100%', objectFit:'contain' }} />
             {allImages.length > 1 && currentImageIndex > 0 && (
               <button onClick={() => setCurrentImageIndex(i => i-1)} style={{ position:'absolute', left:'8px', top:'50%', transform:'translateY(-50%)', background:'rgba(0,0,0,0.5)', color:'#fff', border:'none', borderRadius:'50%', width:'40px', height:'40px', fontSize:'1.375rem', cursor:'pointer' }}>‹</button>
             )}
@@ -305,9 +323,25 @@ export default function ItemDetailPage({ session, profile, onToast, isDemo }) {
         {item.ai_analysis?.ai && (
           <details style={{ marginBottom:'24px', background:'#FBF9F5', border:'1px solid #E8DFD0', borderRadius:'10px', padding:'0 14px' }}>
             <summary style={{ cursor:'pointer', fontSize:'0.875rem', color:'#5C4530', padding:'12px 0', minHeight:'44px', boxSizing:'border-box' }}>{L('Hva AI-en så', 'What the AI saw')}</summary>
-            <div style={{ paddingBottom:'14px' }}><AnalysisDetails analysis={item.ai_analysis} heading={false} /></div>
+            <div style={{ paddingBottom:'14px' }}>
+              {correcting ? (
+                <AiCorrectionsForm record={item.ai_analysis} saving={busy} onSave={saveCorrections} onCancel={() => setCorrecting(false)} />
+              ) : (
+                <>
+                  <AnalysisDetails analysis={item.ai_analysis} heading={false} />
+                  {canCorrect && (
+                    <button onClick={() => setCorrecting(true)} style={{ marginTop:'12px', background:'none', border:'1px solid #D9CFC0', borderRadius:'8px', color:'#5C4530', cursor:'pointer', fontSize:'0.8125rem', padding:'10px 14px', minHeight:'44px', fontFamily:'Karla, sans-serif' }}>
+                      {L('Rett opplysningene', 'Correct the details')}
+                    </button>
+                  )}
+                </>
+              )}
+            </div>
           </details>
         )}
+
+        {/* Sammenligninger og verdianslag: valgfritt; søkelenker og liste for alle, endringer for admin og den som la inn */}
+        <MarketCompare item={item} userId={session.user.id} canEdit={canCorrect} onChanged={load} onToast={onToast} />
 
         {isAssigned ? (
           <div style={{ padding:'16px', background:'#DCE3D2', border:'1px solid #B8C8A8', borderRadius:'10px', marginBottom:'24px', display:'flex', justifyContent:'space-between', alignItems:'center', gap:'12px', flexWrap:'wrap' }}>

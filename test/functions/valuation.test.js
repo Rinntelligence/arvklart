@@ -111,3 +111,21 @@ describe('skjema', { skip }, () => {
     assert.deepEqual([...s.required].sort(), Object.keys(s.properties).sort())
   })
 })
+
+describe('familiens rettelser i anslaget', { skip }, () => {
+  const facts = { title: 'Tallerken', description: '', category: '', condition: 'good', purchasePrice: null, purchaseYear: null, identifiedModel: '' }
+  test('rettede felt sendes som bekreftet av familien, og fjernede AI-forslag sendes ikke', () => {
+    const { analysis: a } = an.applyCorrections(analysis(), { brand: { value: 'Porsgrund' }, model: { value: null } })
+    const text = val.describeItem(facts, a, null)
+    assert.match(text, /Brand: Porsgrund \(confirmed by the family\)/)
+    assert.doesNotMatch(text, /Figgjo \(read|Lotte/)
+  })
+  test('rettede felt regnes som identifisert; fjernet merke uten annen identifikasjon gir «ikke identifisert»', () => {
+    const e = { low: 200, likely: 300, high: 450, confidence: 'high' }
+    const plain = analysis({ identification: {} })
+    const fixed = an.applyCorrections(plain, { designer_or_artist: { value: 'Arne Jacobsen' } }).analysis
+    assert.deepEqual(val.finalizeEstimate(e, { condition: 'good', analysis: fixed, hasDescription: true }).identified, ['designer_or_artist'])
+    const removed = an.applyCorrections(analysis(), { brand: { value: null }, model: { value: null } }).analysis
+    assert.ok(val.finalizeEstimate(e, { condition: 'good', analysis: removed, hasDescription: true }).uncertainty.reasons.includes('not_identified'))
+  })
+})

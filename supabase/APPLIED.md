@@ -30,6 +30,7 @@ Sist verifisert: 2026-10-09 (funksjoner, policies, triggere og RLS på `items` l
 | `migrations/20261012_items_ai_analysis.sql` | **ja, 2026-10-09 15:05 UTC** | `schema_migrations` 20261009150538. Kjørt i samme transaksjon som 20261010, 20261011 og 20261013. Kontroll: `items.ai_analysis` finnes (alle 224 gjenstander har null, ingen omskriving), `guard_item_update()` md5 lik repoet (c81566e4…, før 487b50fa…); etterkontroll: demokonto kan ikke endre `ai_analysis` på andres gjenstand (rullet tilbake). Tilbakerulling: `rollback/20261012_items_ai_analysis.down.sql` |
 | `migrations/20261013_profiles_preferred_lang.sql` | **ja, 2026-10-09 15:05 UTC** | `schema_migrations` 20261009150539. Kjørt i samme transaksjon som 20261010–20261012, før frontend fra PR C. Lesesjekk før: alle 27 profiler hadde bare standardverdien `'en'` (ingen hadde valgt). Kontroll: standardverdien er fjernet, alle 27 er `null` (= norsk), sjekk `no`/`en`/null. Tilbakerulling: `rollback/20261013_profiles_preferred_lang.down.sql` |
 | `migrations/20261014_item_images_private.sql` | **nei** | ny (S3): `item-images` blir privat (gamle offentlige lenker slutter å virke), og bilder kan bare slettes av administrator eller den som lastet opp filen. **Kjøres etter** at S1 (signerte URL-er) er i produksjon og S2 (`migrate-legacy-images`) er kjørt, ellers vises ikke eldre bilder. Etterkontroll: en gammel offentlig URL gir 400, og bildene vises i appen. Tilbakerulling: `rollback/20261014_item_images_private.down.sql` |
+| `migrations/20261015_ai_estate_budget.sql` | **ja, 2026-10-09** | `schema_migrations` 20261009175442 (`ai_estate_budget`). Kjørt i én transaksjon etter grønn CI. Kontroll: bare 5-parameterversjonen av `claim_ai_call()` finnes (md5 33513465…), `ai_usage.estate_id` er `uuid`, `authenticated`/`anon` kan ikke kalle funksjonen. Etterkontroll i prod med testbo og testkontoer: kallet registreres på boet, utenforstående får `not_member` (403). Tilbakerulling: `rollback/20261015_ai_estate_budget.down.sql` (deploy forrige versjon av AI-funksjonene først) |
 
 ## Finnes bare i produksjon (ikke i repoet)
 
@@ -48,12 +49,15 @@ Sist verifisert: 2026-10-09 (funksjoner, policies, triggere og RLS på `items` l
 
 | Funksjon | Prod-versjon | Lik repo | Merknad |
 |---|---|---|---|
-| `analyze-item` | v11 | ja | deployet med `verify_jwt: false` (funksjonen sjekker innlogging selv) |
-| `estimate-value` | v10 | ja fra 2026-10-08 | FINN-versjonen ligger i grenen `claude/estimate-value-finn` og er **ikke** deployet |
-| `delete-account` | v4 | nei fra 2026-10-08 | repoet bruker nå `deleteEstate()` (paginering, kontroll av filer, sletter tilbakemeldinger knyttet til boet). Deployet med `verify_jwt: false`, men sjekker innlogging selv |
-| `demo-login` | v3 | ja | |
-| `cleanup-closed-estates` | v3 | nei fra 2026-10-08 | repoet har ny versjon (paginering, dry_run, kjørelogg, tilbakemeldinger). Ikke deployet; ingen cron-jobb |
+| `analyze-item` | v15 | ja (main 2026-10-09) | U2 (effort `low`, cache av systemprompten; `ANALYZE_EFFORT=medium` ruller tilbake uten deploy) og U3 (`estate_id`). `verify_jwt: false` (sjekker innlogging selv) |
+| `estimate-value` | v14 | ja (main 2026-10-09) | v3: markedsmotoren med familiens sammenligninger, rettelser fra U1, AI-budsjett per bo. `verify_jwt: true` |
+| `delete-account` | v7 | ja (main 2026-10-09) | S4. Testet i prod med egne testkontoer. `verify_jwt: false` (sjekker innlogging selv) |
+| `migrate-legacy-images` | v1 | ja | S2, midlertidig. Krever `x-cron-secret` = `LEGACY_IMAGES_SECRET` (egen engangshemmelighet). Funksjonen og hemmeligheten fjernes når flyttingen er ferdig |
+| `demo-login` | v5 | ja | |
+| `cleanup-closed-estates` | v5 | nei fra 2026-10-08 | repoet har ny versjon (paginering, dry_run, kjørelogg, tilbakemeldinger). Ikke deployet; ingen cron-jobb |
 | `cleanup-orphan-images` | – | ny i repoet | ikke deployet |
+
+Merk: `supabase secrets set` lager en ny versjon av alle funksjonene (uten kodeendring). Derfor økte også `demo-login` og `cleanup-closed-estates` 2026-10-09.
 
 ## Plan for varig sporing (ikke innført)
 
