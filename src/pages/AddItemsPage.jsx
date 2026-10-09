@@ -22,7 +22,8 @@ import CameraCapture from '../components/CameraCapture'
 const MAX_ITEMS = 20
 const MAX_PHOTOS = 5
 const MAX_IMAGE_SIZE = 10 * 1024 * 1024 // etter forminsking
-const AI_PARALLEL = 3
+const AI_PARALLEL = 4
+const AI_STOP_CODES = ['demo_limit', 'rate_limit', 'estate_limit', 'not_member', 'ai_busy', 'ai_unavailable']
 
 let nextKey = 1
 const newDraft = () => ({
@@ -66,7 +67,9 @@ export default function AddItemsPage({ session, profile, onToast, isDemo }) {
   const [cameraKey, setCameraKey] = useState(null) // gjenstanden kameraet fotograferer
   const [pendingFiles, setPendingFiles] = useState(null) // valgte bilder som venter på «hver for seg / samme»
   const [preparing, setPreparing] = useState(false)
-  const [busy, setBusy] = useState(null) // 'analyzing' | 'saving'
+  const [busy, setBusy] = useState(null) // 'estimating' | 'saving'; AI-analysen låser bare kortene den gjelder
+  const [aiProgress, setAiProgress] = useState(null) // { done, total } mens AI analyserer
+  const [autoAnalyze, setAutoAnalyze] = useState(false) // etter første «Analyser med AI»: nye bilder analyseres av seg selv
   const [progress, setProgress] = useState({ done: 0, total: 0 })
   const [cameraSame, setCameraSame] = useState(false) // kameraet: neste bilde til samme gjenstand (ellers ny gjenstand)
   const [undo, setUndo] = useState(null) // { removed, text } fra sletting til neste sletting, endring av grupperingen eller lagring
@@ -93,6 +96,9 @@ export default function AddItemsPage({ session, profile, onToast, isDemo }) {
   const captureQueue = useRef(Promise.resolve())
   const undoRef = useRef(undo)
   undoRef.current = undo
+  const aiQueue = useRef([]) // gjenstander som venter på analyse
+  const aiRunning = useRef(0)
+  const aiBatch = useRef(null) // { total, done, analyzed, failedKeys, keys, stopped, manual } til køen er tom
 
   // Meldinger (toast) legges over bunnlinjen i stedet for oppå knappene
   const barObserver = useRef(null)
@@ -262,6 +268,7 @@ export default function AddItemsPage({ session, profile, onToast, isDemo }) {
     const i = prev.findIndex(d => d.key === key)
     if (i < 1) return
     const above = prev[i - 1], cur = prev[i]
+    if (above.status === 'analyzing' || cur.status === 'analyzing') return
     const photos = [...above.photos, ...cur.photos]
     if (photos.length > MAX_PHOTOS) { onToast(L('Maks 5 bilder per gjenstand', 'Max 5 photos per item'), 'error'); return }
     dismissUndo()
@@ -339,63 +346,107 @@ export default function AddItemsPage({ session, profile, onToast, isDemo }) {
 
   const aiTargets = drafts.filter(d => d.photos.length > 0 && (d.status === 'idle' || d.status === 'failed'))
 
-  const analyzeAll = async (consented = aiConsented, onlyKey = null) => {
+  // Analysen går i en kø med høyst AI_PARALLEL kall samtidig. Bare kortene som analyseres er låst; resten av
+  // siden kan brukes imens (legge til bilder, rette andre kort, lagre de som er ferdige).
+  const analyzeAll = (consented = aiConsented, onlyKey = null, { auto = false } = {}) => {
     if (!consented) { setAskConsent({ kind: 'analyze', key: onlyKey }); return }
-    let targets = draftsRef.current.filter(d => d.photos.length > 0 && (d.status === 'idle' || d.status === 'failed') && (!onlyKey || d.key === onlyKey))
+    let targets = draftsRef.current.filter(d => d.photos.length > 0 && (onlyKey ? d.key === onlyKey && (d.status === 'idle' || d.status === 'failed')
+      : auto ? d.status === 'idle' && d.key !== cameraKeyRef.current : d.status === 'idle' || d.status === 'failed'))
     if (isDemo) {
-      if (demoRemaining === 0) { setDemoBlocked(true); return }
-      targets = targets.slice(0, demoRemaining)
+      const room = (demoRemaining ?? 0) - aiQueue.current.length - aiRunning.current
+      if (room <= 0) { if (!auto && !aiRunning.current) setDemoBlocked(true); return }
+      targets = targets.slice(0, room)
     }
     if (!targets.length) return
-    setBusy('analyzing')
-    setProgress({ done: 0, total: targets.length })
-    let stopped = null
-    const failedKeys = []
-    let analyzed = 0
-    targets.forEach(d => update(d.key, { status: 'analyzing' }))
-    await runPool(targets, AI_PARALLEL, async (d) => {
-      try {
-        // Bare identifikasjon: ingen verdi i bulk (verdien er valgfri og fylles inn av brukeren)
-        const { result, quota } = await analyzeItemPhotos(d.photos.map(p => p.file), { categories, estateId: id })
-        if (typeof quota?.remaining === 'number') setDemoRemaining(quota.remaining)
-        // AI fyller bare felt brukeren ikke har endret selv (også ved «Prøv AI igjen»)
-        update(d.key, cur => ({
-          status: 'analyzed',
-          analysis: result.analysis || null,
-          ...applyAiSuggestion(cur, aiSuggestion(result, categories)),
-        }))
-        analyzed++
-      } catch (e) {
-        update(d.key, { status: 'failed' })
-        failedKeys.push(d.key)
-        if (['demo_limit', 'rate_limit', 'estate_limit', 'not_member', 'ai_busy', 'ai_unavailable'].includes(e.code)) stopped = stopped || e
-      } finally {
-        setProgress(p => ({ ...p, done: p.done + 1 }))
-      }
-    }, () => !!stopped)
-    // Gjenstander som ikke ble startet fordi grensen ble nådd
-    const notStarted = targets.length - analyzed - failedKeys.length
-    setDrafts(prev => prev.map(d => d.status === 'analyzing' ? { ...d, status: 'idle' } : d))
-    setBusy(null)
+    setAutoAnalyze(true)
+    const b = aiBatch.current ||= { total: 0, done: 0, analyzed: 0, failedKeys: [], keys: new Set(), stopped: null, manual: false }
+    b.total += targets.length
+    b.manual = b.manual || !auto
+    const keys = new Set(targets.map(d => d.key))
+    keys.forEach(k => { b.keys.add(k); aiQueue.current.push(k) })
+    draftsRef.current = draftsRef.current.map(d => keys.has(d.key) ? { ...d, status: 'analyzing' } : d)
+    setDrafts(draftsRef.current)
+    setAiProgress({ done: b.done, total: b.total })
+    pumpAi()
+  }
 
-    if (stopped?.code === 'demo_limit') { setDemoRemaining(0); setDemoBlocked(true); return }
-    // Ingenting lagres her: brukeren ser over kortene og trykker «Godkjenn og lagre alle».
-    // Delvise feil vises i en oppsummering som blir stående til de er rettet (ikke i en toast som forsvinner).
-    if (stopped || failedKeys.length) {
-      setAiReport(prev => {
-        // «Prøv AI igjen» på ett kort: behold de andre som fortsatt mangler
-        const earlier = onlyKey && prev ? prev.failedKeys.filter(k => k !== onlyKey) : []
-        return { failedKeys: [...earlier, ...failedKeys], stoppedCode: stopped?.code || null, notStarted }
-      })
-    } else {
-      setAiReport(prev => (onlyKey && prev ? { ...prev, failedKeys: prev.failedKeys.filter(k => k !== onlyKey) } : null))
-      onToast(L('AI har fylt inn gjenstandene. Se over og trykk «Godkjenn og lagre alle».', 'AI has filled in the items. Review them and tap «Approve and save all».'))
+  const pumpAi = () => {
+    const b = aiBatch.current
+    while (b && !b.stopped && aiRunning.current < AI_PARALLEL && aiQueue.current.length) {
+      const d = draftsRef.current.find(x => x.key === aiQueue.current[0])
+      aiQueue.current.shift()
+      if (!d) { b.done++; continue } // fjernet mens den ventet
+      aiRunning.current++
+      analyzeOne(d, b).finally(() => { aiRunning.current--; pumpAi() })
+    }
+    finishAi()
+  }
+
+  const analyzeOne = async (d, b) => {
+    try {
+      // Bare identifikasjon: ingen verdi i bulk (verdien er valgfri og fylles inn av brukeren)
+      const { result, quota } = await analyzeItemPhotos(d.photos.map(p => p.file), { categories, estateId: id })
+      if (typeof quota?.remaining === 'number') setDemoRemaining(quota.remaining)
+      // AI fyller bare felt brukeren ikke har endret selv (også ved «Prøv AI igjen»). Fikk kortet flere bilder
+      // underveis (kameraet), analyseres det på nytt med alle bildene.
+      update(d.key, cur => ({
+        status: cur.photos.length === d.photos.length ? 'analyzed' : 'idle',
+        analysis: result.analysis || null,
+        ...applyAiSuggestion(cur, aiSuggestion(result, categories)),
+      }))
+      b.analyzed++
+    } catch (e) {
+      update(d.key, { status: 'failed' })
+      b.failedKeys.push(d.key)
+      if (AI_STOP_CODES.includes(e.code)) b.stopped = b.stopped || e
+    } finally {
+      b.done++
+      setAiProgress({ done: b.done, total: b.total })
     }
   }
 
+  // Når køen er tom (eller stoppet av en grense): oppsummering, og kortene som ikke ble startet låses opp
+  const finishAi = () => {
+    const b = aiBatch.current
+    if (!b || aiRunning.current > 0 || (aiQueue.current.length && !b.stopped)) return
+    const notStarted = aiQueue.current.filter(k => draftsRef.current.some(d => d.key === k))
+    const waiting = new Set(aiQueue.current)
+    aiQueue.current = []
+    aiBatch.current = null
+    setAiProgress(null)
+    setDrafts(prev => prev.map(d => d.status === 'analyzing' && waiting.has(d.key) ? { ...d, status: 'idle' } : d))
+    if (b.stopped) setAutoAnalyze(false) // ikke prøv igjen av seg selv etter en grense eller feil hos AI-en
+
+    if (b.stopped?.code === 'demo_limit') { setDemoRemaining(0); setDemoBlocked(true); return }
+    // Ingenting lagres her: brukeren ser over kortene og trykker «Godkjenn og lagre alle».
+    // Delvise feil vises i en oppsummering som blir stående til de er rettet (ikke i en toast som forsvinner).
+    if (b.stopped || b.failedKeys.length) {
+      setAiReport(prev => ({
+        failedKeys: [...new Set([...(prev?.failedKeys || []).filter(k => !b.keys.has(k)), ...b.failedKeys])],
+        stoppedCode: b.stopped?.code || null, notStarted: notStarted.length,
+      }))
+      return
+    }
+    setAiReport(prev => {
+      const left = (prev?.failedKeys || []).filter(k => !b.keys.has(k))
+      return left.length ? { ...prev, failedKeys: left, stoppedCode: null, notStarted: 0 } : null
+    })
+    if (b.manual) onToast(L('AI har fylt inn gjenstandene. Se over og trykk «Godkjenn og lagre alle».', 'AI has filled in the items. Review them and tap «Approve and save all».'))
+  }
+
+  // Etter første «Analyser med AI» analyseres nye bilder av seg selv, uten flere trykk. Gjenstanden kameraet
+  // fotograferer venter til man går videre (det kan komme flere bilder av den), og alt venter litt, så bilder
+  // som tas raskt etter hverandre kommer med i samme analyse.
+  useEffect(() => {
+    if (!autoAnalyze || !aiConsented || busy || merging) return
+    if (!drafts.some(d => d.photos.length > 0 && d.status === 'idle' && d.key !== cameraKey)) return
+    const t = setTimeout(() => analyzeAll(true, null, { auto: true }), 1200)
+    return () => clearTimeout(t)
+  }, [drafts, autoAnalyze, aiConsented, busy, merging, cameraKey])
+
   // Verdianslag: bare når brukeren ber om det, ett tekstkall per gjenstand (estimate-value), ingen bilder.
   // Verdien fylles inn synlig og merkes som AI-anslag; brukeren kan endre eller tømme den.
-  const canEstimate = (d) => d.status !== 'saved' && d.title.trim() && !d.estimating
+  const canEstimate = (d) => d.status !== 'saved' && d.status !== 'analyzing' && d.title.trim() && !d.estimating
   const estimateValues = async (consented = aiConsented, onlyKey = null) => {
     if (!consented) { setAskConsent({ kind: 'estimate', key: onlyKey }); return }
     // «Anslå verdi for alle» hopper over kort som fikk «for lite informasjon»; de kan prøves igjen på kortet
@@ -428,7 +479,7 @@ export default function AddItemsPage({ session, profile, onToast, isDemo }) {
       } catch (e) {
         failed++
         update(d.key, { estimating: false })
-        if (['demo_limit', 'rate_limit', 'estate_limit', 'not_member', 'ai_busy', 'ai_unavailable'].includes(e.code)) stopped = stopped || e
+        if (AI_STOP_CODES.includes(e.code)) stopped = stopped || e
       } finally {
         if (!onlyKey) setProgress(p => ({ ...p, done: p.done + 1 }))
       }
@@ -473,7 +524,8 @@ export default function AddItemsPage({ session, profile, onToast, isDemo }) {
 
   const saveAll = async () => {
     if (isDemo) { setDemoBlocked(true); return }
-    const pending = draftsRef.current.filter(d => d.status !== 'saved')
+    // Kort som AI-en fortsatt analyserer, venter; de kan lagres når de er ferdige
+    const pending = draftsRef.current.filter(d => d.status !== 'saved' && d.status !== 'analyzing')
     const ready = pending.filter(d => d.title.trim())
     const missing = pending.length - ready.length
     if (!ready.length) { onToast(L('Gi gjenstandene et navn, eller bruk AI', 'Give the items a name, or use AI'), 'error'); return }
@@ -496,7 +548,8 @@ export default function AddItemsPage({ session, profile, onToast, isDemo }) {
     })
     setBusy(null)
     const notSaved = ready.length - saved
-    if (!missing && !notSaved) {
+    const analyzing = draftsRef.current.filter(d => d.status === 'analyzing').length
+    if (!missing && !notSaved && !analyzing) {
       draftsRef.current.forEach(d => d.photos.forEach(p => URL.revokeObjectURL(p.url)))
       setDrafts([])
       setAiReport(null)
@@ -509,6 +562,7 @@ export default function AddItemsPage({ session, profile, onToast, isDemo }) {
     const parts = [L(`${saved} lagt til.`, `${saved} added.`)]
     if (missing) parts.push(L(`${missing} mangler navn.`, `${missing} need a name.`))
     if (notSaved) parts.push(L(`${notSaved} kunne ikke lagres — prøv igjen.`, `${notSaved} could not be saved — try again.`))
+    if (analyzing) parts.push(L(`${analyzing} analyseres fortsatt av AI.`, `${analyzing} still being analysed by AI.`))
     onToast(parts.join(' '), saved ? undefined : 'error')
   }
 
@@ -516,9 +570,9 @@ export default function AddItemsPage({ session, profile, onToast, isDemo }) {
 
   const cameraDraft = drafts.find(d => d.key === cameraKey)
   const cameraIndex = drafts.findIndex(d => d.key === cameraKey)
-  const toSave = drafts.filter(d => d.status !== 'saved' && d.title.trim()).length
+  const toSave = drafts.filter(d => d.status !== 'saved' && d.status !== 'analyzing' && d.title.trim()).length
   const full = drafts.length >= MAX_ITEMS
-  const mergeable = drafts.filter(d => d.status !== 'saved' && d.photos.length > 0)
+  const mergeable = drafts.filter(d => d.status !== 'saved' && d.status !== 'analyzing' && d.photos.length > 0)
 
   return (
     <div
@@ -663,7 +717,7 @@ export default function AddItemsPage({ session, profile, onToast, isDemo }) {
         <MergeGrid drafts={drafts} items={mergeable} selected={mergeSel} onToggle={toggleMergePhoto} />
       ) : <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
         {drafts.map((d, i) => (
-          <DraftCard key={d.key} draft={d} index={i} categories={categories} locked={!!busy} userId={session.user.id}
+          <DraftCard key={d.key} draft={d} index={i} categories={categories} locked={!!busy || d.status === 'analyzing'} userId={session.user.id}
             onChange={patch => update(d.key, patch)}
             onRemove={() => removeDraft(d.key)}
             onRemovePhoto={pi => removePhoto(d.key, pi)}
@@ -696,6 +750,16 @@ export default function AddItemsPage({ session, profile, onToast, isDemo }) {
                 }} />
               </div>
             )}
+            {aiProgress && !merging && (
+              <div style={{ marginBottom: '10px' }}>
+                <div role="status" style={{ fontSize: '0.875rem', color: '#3A2F26', marginBottom: '6px' }}>
+                  {L(`AI analyserer… ${aiProgress.done} av ${aiProgress.total} ferdig. Du kan fortsette imens.`, `AI is analysing… ${aiProgress.done} of ${aiProgress.total} done. You can carry on meanwhile.`)}
+                </div>
+                <div style={{ height: '6px', background: '#E8DFD0', borderRadius: '3px', overflow: 'hidden' }}>
+                  <div style={{ height: '100%', width: `${aiProgress.total ? (aiProgress.done / aiProgress.total) * 100 : 0}%`, background: '#5F6E52', transition: 'width 0.3s' }} />
+                </div>
+              </div>
+            )}
             {merging ? (
               <div>
                 <div style={{ fontSize: '0.8125rem', color: mergeSel.length > MAX_PHOTOS ? '#8A4B2A' : '#5C4530', marginBottom: '10px' }}>
@@ -725,7 +789,7 @@ export default function AddItemsPage({ session, profile, onToast, isDemo }) {
             ) : busy ? (
               <div>
                 <div role="status" style={{ fontSize: '0.875rem', color: '#3A2F26', marginBottom: '8px' }}>
-                  {busy === 'analyzing' ? L(`AI analyserer… ${progress.done} av ${progress.total}`, `AI is analysing… ${progress.done} of ${progress.total}`) : busy === 'estimating' ? L(`Anslår verdi… ${progress.done} av ${progress.total}`, `Estimating value… ${progress.done} of ${progress.total}`) : L(`Lagrer… ${progress.done} av ${progress.total}`, `Saving… ${progress.done} of ${progress.total}`)}
+                  {busy === 'estimating' ? L(`Anslår verdi… ${progress.done} av ${progress.total}`, `Estimating value… ${progress.done} of ${progress.total}`) : L(`Lagrer… ${progress.done} av ${progress.total}`, `Saving… ${progress.done} of ${progress.total}`)}
                 </div>
                 <div style={{ height: '8px', background: '#E8DFD0', borderRadius: '4px', overflow: 'hidden' }}>
                   <div style={{ height: '100%', width: `${progress.total ? (progress.done / progress.total) * 100 : 0}%`, background: '#5F6E52', transition: 'width 0.3s' }} />
@@ -742,7 +806,7 @@ export default function AddItemsPage({ session, profile, onToast, isDemo }) {
                 )}
                 {(() => {
                   // Oversikt før lagring: hvor mange som er klare, og hvilke som mangler navn
-                  const missing = drafts.filter(d => d.status !== 'saved' && !d.title.trim() && !aiTargets.includes(d))
+                  const missing = drafts.filter(d => d.status !== 'saved' && d.status !== 'analyzing' && !d.title.trim() && !aiTargets.includes(d))
                   if (!toSave && !missing.length) return null
                   return (
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', fontSize: '0.875rem', color: '#3A2F26', marginBottom: '8px' }}>

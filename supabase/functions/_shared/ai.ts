@@ -86,7 +86,7 @@ async function finishAiCall(usageId: number | null, m: Metrics) {
 // avslag gir ai_refused uten nytt forsøk.
 export async function callStructured<T>(p: {
   fn: string; usageId: number | null; system: string; content: Anthropic.ContentBlockParam[] | string; schema: Schema
-  validate: (v: unknown) => Validation<T>; maxTokens: number; effort: Effort; imageCount?: number; schemaVersion?: number
+  validate: (v: unknown) => Validation<T>; maxTokens: number; effort: Effort; imageCount?: number; schemaVersion?: number; cacheSystem?: boolean
 }): Promise<T> {
   const model = currentModel()
   const started = Date.now()
@@ -96,7 +96,7 @@ export async function callStructured<T>(p: {
     while (true) {
       attempts++
       const message = await anthropic().messages.create(
-        buildParams({ model, system: p.system, content: p.content, schema: p.schema, maxTokens, effort: p.effort }) as unknown as Anthropic.MessageCreateParamsNonStreaming,
+        buildParams({ model, system: p.system, content: p.content, schema: p.schema, maxTokens, effort: p.effort, cacheSystem: p.cacheSystem }) as unknown as Anthropic.MessageCreateParamsNonStreaming,
       )
       for (const k of Object.keys(usage) as (keyof typeof usage)[]) usage[k] += (message.usage as Usage)?.[k] || 0
       const reply = interpretReply(message as unknown as Parameters<typeof interpretReply>[0], p.validate)

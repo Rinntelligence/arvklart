@@ -6,8 +6,8 @@
 // Krever innlogget bruker og teller mot AI-kvoten (demoen: 5 forsøk per besøk). Modell: se _shared/ai.ts.
 import { getUser, json, preflight } from '../_shared/http.ts'
 import { aiConfigured, aiErrorJson, aiErrorResponse, callStructured, claimAiCall, currentModel } from '../_shared/ai.ts'
-import { readEstateId } from '../_shared/aiCore.ts'
 import { ANALYSIS_SCHEMA, ANALYSIS_VERSION, PROMPT_VERSION, analysisSystem, legacyFields, normalizeAnalysis } from '../_shared/analysis.ts'
+import { analyzeEffort, readEstateId } from '../_shared/aiCore.ts'
 
 const CATEGORIES = [
   'Møbler', 'Kunst og bilder', 'Bøker', 'Kjøkken',
@@ -63,7 +63,7 @@ Deno.serve(async (req) => {
     if (denied) return denied
 
     const ai = await callStructured({
-      fn: 'analyze-item', usageId, effort: 'medium', maxTokens: 6000, imageCount: images.length, schemaVersion: ANALYSIS_VERSION,
+      fn: 'analyze-item', usageId, effort: analyzeEffort(Deno.env.get('ANALYZE_EFFORT')), cacheSystem: true, maxTokens: 6000, imageCount: images.length, schemaVersion: ANALYSIS_VERSION,
       system: analysisSystem(english),
       schema: ANALYSIS_SCHEMA,
       validate: normalizeAnalysis(categories),
