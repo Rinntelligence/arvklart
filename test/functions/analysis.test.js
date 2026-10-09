@@ -64,7 +64,7 @@ describe('normalisering', { skip }, () => {
     assert.equal(r.value.marks.length, 5)
     assert.equal(r.value.marks[0].text.length, 120)
     assert.equal(r.value.condition_observations.length, 6)
-    assert.equal(r.value.photo_suggestions.length, 3)
+    assert.equal(r.value.photo_suggestions.length, 2)
     assert.equal(an.normalizeAnalysis(CATS)(reply()).value.marks.length, 1, 'merke uten tekst og sted fjernes')
   })
 

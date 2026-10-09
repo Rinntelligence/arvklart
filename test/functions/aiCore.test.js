@@ -37,6 +37,19 @@ describe('modell og parametre', { skip }, () => {
     assert.equal(p.messages[0].role, 'user', 'siste melding må være fra brukeren (ingen prefill)')
   })
 
+  test('systemprompten caches bare når cacheSystem er satt; ellers ren tekst som før', () => {
+    const base = { model: 'claude-haiku-5-5', system: 'regler', content: 'c', schema: { type: 'object' }, maxTokens: 4000, effort: 'low' }
+    assert.equal(ai.buildParams(base).system, 'regler')
+    assert.deepEqual(ai.buildParams({ ...base, cacheSystem: true }).system, [{ type: 'text', text: 'regler', cache_control: { type: 'ephemeral' } }])
+  })
+
+  test('effort for bildeanalysen: low som standard, medium/high bare når ANALYZE_EFFORT sier det', () => {
+    assert.equal(ai.analyzeEffort(undefined), 'low')
+    assert.equal(ai.analyzeEffort('medium'), 'medium')
+    assert.equal(ai.analyzeEffort('high'), 'high')
+    assert.equal(ai.analyzeEffort('max'), 'low')
+  })
+
   test('4.5 (tilbakerulling): samme skjema, men uten effort (gir feil på 4.5)', () => {
     const p = ai.buildParams({ model: 'claude-haiku-4-5', system: 's', content: 'c', schema: { type: 'object' }, maxTokens: 1000, effort: 'low' })
     assert.deepEqual(p.output_config, { format: { type: 'json_schema', schema: { type: 'object' } } })

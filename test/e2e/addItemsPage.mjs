@@ -20,7 +20,7 @@ const run = async (name, fn) => {
   try { await fn(); results.push(`OK   ${name}`) } catch (e) { results.push(`FAIL ${name}: ${e.message.split('\n').slice(0,6).join(' | ')}`) }
 }
 
-async function setup(browser, { lang = 'no', failCall = null, failEstimate = null, viewport = { width: 390, height: 844 }, v2 = null, estimateReply = null } = {}) {
+async function setup(browser, { lang = 'no', failCall = null, failEstimate = null, viewport = { width: 390, height: 844 }, v2 = null, estimateReply = null, hold = null } = {}) {
   const ctx = await browser.newContext({ viewport, deviceScaleFactor: 2, hasTouch: true, permissions: ['camera'] })
   const page = await ctx.newPage()
   const calls = { analyze: 0, itemInserts: 0, uploads: 0, analyzeLangs: [], analyzeEstimate: [], estimate: 0, insertBodies: [], estimateBodies: [] }
@@ -33,6 +33,8 @@ async function setup(browser, { lang = 'no', failCall = null, failEstimate = nul
       const body = JSON.parse(req.postData() || '{}')
       calls.analyzeLangs.push(body.lang)
       calls.analyzeEstimate.push(Boolean(body.estimate))
+      // hold: testen bestemmer når svaret kommer (for å sjekke siden mens AI-en analyserer)
+      if (hold) await hold(calls.analyze)
       // failCall kan gi en feilkode (f.eks. 'ai_refused'); true betyr ai_error
       const fail = failCall && failCall(calls.analyze)
       if (fail) {
@@ -266,7 +268,7 @@ await run('F3: AI utilgjengelig (ai_unavailable): analysen stopper og sier at ma
   await page.getByRole('button', { name: 'Ferdig' }).click()
   await page.getByRole('button', { name: 'Analyser med AI (5)' }).click()
   await page.getByText(/AI-hjelpen er ikke tilgjengelig akkurat nå\. Du kan fylle inn selv\./).waitFor()
-  assert.ok(calls.analyze <= 3, `forventet at analysen stoppet, men ${calls.analyze} kall ble gjort`)
+  assert.ok(calls.analyze <= 4, `forventet at analysen stoppet (høyst fire samtidige), men ${calls.analyze} kall ble gjort`)
   assert.equal(await page.getByText('Norsk servertekst som ikke skal vises').count(), 0)
   await ctx.close()
 })
@@ -503,6 +505,49 @@ await run('T6: 20 gjenstander på liten skjerm (360×640): lagreknappen er allti
   assert.ok(lastBottom <= barTop, `siste kort (${lastBottom}) skjules av bunnlinjen (${barTop})`)
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), true, 'ingen horisontal rulling')
   await shot(page, 'T6-20-gjenstander-liten-skjerm.png')
+  await ctx.close()
+})
+
+// U2: analysen låser bare kortene den gjelder, og nye bilder analyseres av seg selv etter første trykk
+const gate = () => { let open; const p = new Promise(r => { open = r }); return { wait: () => p, open } }
+
+await run('U2a: mens AI analyserer kan man legge til bilder, rette andre kort og lagre ferdige; bare kortene som analyseres er låst', async () => {
+  const g = gate()
+  const { ctx, page, calls } = await setup(browser, { hold: () => g.wait() })
+  await page.locator('input[type=file][multiple]').first().setInputFiles([{ name: 'a.png', mimeType: 'image/png', buffer: PNG }])
+  await page.getByRole('button', { name: '+ Legg til gjenstand uten bilde' }).click()
+  await page.getByRole('button', { name: 'Analyser med AI (1)' }).click()
+  await page.getByText(/AI analyserer… 0 av 1 ferdig/).waitFor()
+  assert.equal(await page.getByRole('textbox', { name: 'Navn' }).first().isDisabled(), true, 'kortet som analyseres er ikke låst')
+  const other = page.getByRole('textbox', { name: 'Navn' }).nth(1)
+  assert.equal(await other.isDisabled(), false, 'de andre kortene er låst')
+  for (const name of ['Ta bilder', 'Velg bilder']) assert.equal(await page.getByRole('button', { name }).first().isDisabled(), false, `«${name}» er låst under analysen`)
+  await other.fill('Kommode')
+  await page.getByRole('button', { name: 'Godkjenn og lagre alle (1)' }).click()
+  await page.getByText(/1 lagt til\..*1 analyseres fortsatt av AI/).waitFor()
+  assert.equal(calls.insertBodies.length, 1)
+  assert.equal(calls.insertBodies[0].title, 'Kommode')
+  g.open()
+  await page.getByText('✓ Fylt inn av AI – se over').waitFor()
+  await page.getByRole('button', { name: 'Godkjenn og lagre alle (1)' }).click()
+  await page.getByText('✓ 1 gjenstand lagt til i boet').waitFor()
+  assert.equal(calls.insertBodies.length, 2)
+  await ctx.close()
+})
+
+await run('U2b: etter første «Analyser med AI» analyseres nye bilder uten nytt trykk, høyst fire om gangen', async () => {
+  let inFlight = 0, maxInFlight = 0
+  const { ctx, page, calls } = await setup(browser, { hold: async () => { inFlight++; maxInFlight = Math.max(maxInFlight, inFlight); await new Promise(r => setTimeout(r, 300)); inFlight-- } })
+  await page.locator('input[type=file][multiple]').first().setInputFiles([{ name: 'a.png', mimeType: 'image/png', buffer: PNG }])
+  await page.getByRole('button', { name: 'Analyser med AI (1)' }).click()
+  await page.getByText('✓ Fylt inn av AI – se over').waitFor()
+  const files = Array.from({ length: 6 }, (_, i) => ({ name: `b${i}.png`, mimeType: 'image/png', buffer: PNG }))
+  await page.locator('input[type=file][multiple]').first().setInputFiles(files)
+  await page.getByRole('button', { name: '6 ulike gjenstander' }).click()
+  await page.waitForFunction(() => document.body.innerText.split('✓ Fylt inn av AI – se over').length - 1 === 7, null, { timeout: 15000 })
+  assert.equal(calls.analyze, 7)
+  assert.ok(maxInFlight <= 4, `for mange samtidige analyser: ${maxInFlight}`)
+  assert.equal(await page.getByRole('button', { name: /Analyser med AI/ }).count(), 0)
   await ctx.close()
 })
 
