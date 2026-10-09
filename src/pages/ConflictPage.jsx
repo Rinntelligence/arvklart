@@ -5,6 +5,7 @@ import { loadStatusExtras } from '../lib/decisions'
 import { getUndecided, isContested } from '../lib/estateProgress'
 import { parseNOK, formatNOK as formatAmount } from '../lib/format'
 import { L } from '../lib/lang'
+import { equalValueResolutions, itemsWithoutValue, valueTotal } from '../lib/distribution'
 
 const PALETTE = ['#5F6E52','#8B9A7D','#A97C3F','#7A8B6E','#9C8267','#6E8B87']
 
@@ -23,7 +24,6 @@ function Avatar({ name, color, size = 32 }) {
 
 // null når gjenstanden ikke har en verdi som kan leses som kroner
 const formatNOK = (v) => (parseNOK(v) === null ? null : formatAmount(v))
-const valueOf = (item) => parseNOK(item.estimated_value) || 0
 
 export default function ConflictPage({ session, onToast }) {
   const { id } = useParams()
@@ -68,22 +68,10 @@ export default function ConflictPage({ session, onToast }) {
   const memberColor = (userId) => PALETTE[members.findIndex(m => m.user_id === userId) % PALETTE.length]
 
   // Det hver arving allerede har fått tildelt, er utgangspunktet for den jevne fordelingen.
-  const alreadyAssigned = (userId) => assignedItems.filter(i => i.assigned_to === userId).reduce((sum, i) => sum + valueOf(i), 0)
-
-  const computeEqualResolutions = () => {
-    if (!members.length || !items.length) return {}
-    const sorted = [...items].sort((a, b) => valueOf(b) - valueOf(a))
-    const totals = Object.fromEntries(members.map(m => [m.user_id, alreadyAssigned(m.user_id)]))
-    const res = {}
-    for (const item of sorted) {
-      const interested = (item.interests || []).map(x => x.user_id).filter(uid => uid in totals)
-      const candidates = interested.length ? interested : Object.keys(totals)
-      const winner = candidates.reduce((best, uid) => (totals[uid] || 0) < (totals[best] || 0) ? uid : best)
-      res[item.id] = winner
-      totals[winner] = (totals[winner] || 0) + valueOf(item)
-    }
-    return res
-  }
+  // Ukjent verdi er ikke 0 (src/lib/distribution.js): mangler noe verdi, regnes ikke jevn fordeling ut
+  const alreadyAssigned = (userId) => valueTotal(assignedItems.filter(i => i.assigned_to === userId))
+  const missingValues = itemsWithoutValue(items, assignedItems)
+  const computeEqualResolutions = () => equalValueResolutions(items, members.map(m => m.user_id), assignedItems)
 
   useEffect(() => {
     if (mode === 'equal' && items.length && members.length) {
@@ -180,14 +168,12 @@ export default function ConflictPage({ session, onToast }) {
     navigate(`/estate/${id}`)
   }
 
-  const memberTotals = members.map((m, i) => ({
-    ...m,
-    color: PALETTE[i % PALETTE.length],
-    assignedItems: items.filter(it => resolutions[it.id] === m.user_id),
-    earlier: alreadyAssigned(m.user_id),
-    total: alreadyAssigned(m.user_id) + items.filter(it => resolutions[it.id] === m.user_id)
-      .reduce((sum, it) => sum + valueOf(it), 0),
-  }))
+  const memberTotals = members.map((m, i) => {
+    const mine = items.filter(it => resolutions[it.id] === m.user_id)
+    const earlier = alreadyAssigned(m.user_id)
+    const now = valueTotal(mine)
+    return { ...m, color: PALETTE[i % PALETTE.length], assignedItems: mine, earlier: earlier.sum, total: earlier.sum + now.sum, unknown: earlier.unknown + now.unknown }
+  })
 
   if (loading) return <div style={{ padding:'80px', textAlign:'center', color:'#75604B', fontFamily:'Karla, sans-serif' }}>{L('Laster…', 'Loading…')}</div>
 
@@ -507,7 +493,26 @@ export default function ConflictPage({ session, onToast }) {
       )}
 
       {/* JEVN VERDIFORDELING */}
-      {mode === 'equal' && (
+      {mode === 'equal' && missingValues.length > 0 && (
+        <div role="status" style={{ background:'#F3E3D3', border:'1px solid #C9AE8E', borderRadius:'12px', padding:'18px 20px', marginBottom:'20px', color:'#3A2F26', lineHeight:1.6 }}>
+          <div style={{ fontWeight:'600', marginBottom:'6px' }}>{L('Jevn verdifordeling trenger en verdi på alle gjenstandene', 'Equal value distribution needs a value on every item')}</div>
+          <p style={{ fontSize:'0.875rem', marginBottom:'10px' }}>
+            {L('En gjenstand uten verdi ville blitt regnet som gratis. Sett en verdi dere er enige om på disse. 0 kr er en gyldig verdi hvis dere mener den ikke har verdi.', 'An item without a value would count as free. Set a value you agree on for these. NOK 0 is a valid value if you think it has no value.')}
+          </p>
+          <ul style={{ listStyle:'none', padding:0, margin:0, display:'flex', flexDirection:'column', gap:'6px' }}>
+            {missingValues.map(it => (
+              <li key={it.id} style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:'10px', flexWrap:'wrap', fontSize:'0.875rem' }}>
+                <span>{it.title}{it.status === 'assigned' ? L(' (tildelt tidligere)', ' (assigned earlier)') : ''}</span>
+                <button onClick={() => navigate(`/estate/${id}/item/${it.id}/edit`)} style={{ minHeight:'44px', padding:'8px 14px', background:'#fff', border:'1px solid #9A8B78', borderRadius:'8px', cursor:'pointer', fontSize:'0.875rem', fontFamily:'Karla, sans-serif', color:'#3A2F26' }}>
+                  {L(`Sett verdi på ${it.title}`, `Set value for ${it.title}`)}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {mode === 'equal' && missingValues.length === 0 && (
         <div>
           <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(240px, 1fr))', gap:'16px', marginBottom:'20px' }}>
             {memberTotals.map(m => (
@@ -538,7 +543,7 @@ export default function ConflictPage({ session, onToast }) {
             ))}
           </div>
           <div style={{ background:'#E8DFD0', border:'1px solid #D9CFC0', borderRadius:'10px', padding:'14px 18px', fontSize:'0.8125rem', color:'#5C4530', marginBottom:'20px', lineHeight:1.6 }}>
-            {L('Algoritmen sorterer gjenstandene etter synkende verdi og gir neste gjenstand til den av de interesserte som har lavest total så langt – medregnet det hver arving allerede har fått tildelt i boet. Gjenstander uten anslått verdi teller som 0 kr.', 'The algorithm sorts the items by descending value and gives the next item to the interested heir with the lowest total so far – including what each heir has already been assigned in the estate. Items without an estimated value count as NOK 0.')}
+            {L('Algoritmen sorterer gjenstandene etter synkende verdi og gir neste gjenstand til den av de interesserte som har lavest total så langt – medregnet det hver arving allerede har fått tildelt i boet. Alle gjenstandene må ha en verdi; 0 kr er en gyldig verdi.', 'The algorithm sorts the items by descending value and gives the next item to the interested heir with the lowest total so far – including what each heir has already been assigned in the estate. Every item needs a value; NOK 0 is a valid value.')}
           </div>
           <button onClick={() => setResolutions(computeEqualResolutions())} style={{ padding:'9px 18px', background:'none', border:'1px solid #D9CFC0', borderRadius:'8px', cursor:'pointer', fontSize:'0.8125rem', fontFamily:'Karla, sans-serif', color:'#5C4530', marginBottom:'20px' }}>
             {L('Kjør på nytt', 'Run again')}
