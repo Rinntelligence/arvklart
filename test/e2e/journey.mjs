@@ -183,6 +183,25 @@ await check('Veiviser i appen: uten VITE_GUIDE_EN får engelske brukere den nors
   assert(!src.includes('lang=en'), `iframe ber om engelsk uten at det er slått på: ${src}`)
 }, { loggedIn: false })
 
+// E-postmalene (supabase/templates) velger språk ut fra user_metadata.lang, som settes ved registrering
+for (const [lang, tab, submit] of [['no', 'Opprett konto', 'Opprett konto'], ['en', 'Create account', 'Create account']]) {
+  await check(`Registrering: språket (${lang}) sendes med, så bekreftelses-e-posten kommer på riktig språk`, async page => {
+    let body = null
+    await page.route('https://test.supabase.co/auth/v1/signup**', route => { body = JSON.parse(route.request().postData() || '{}'); return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ id: 'u-new', email: 'ny@test.no', user_metadata: {} }) }) })
+    if (lang === 'en') await page.addInitScript(() => localStorage.setItem('hs_lang', 'en'))
+    await page.goto(`${BASE}/logg-inn`)
+    await page.getByRole('button', { name: tab }).first().click()
+    await page.locator('#login-f1').fill('Kari')
+    await page.locator('#login-f2').fill('ny@test.no')
+    await page.locator('#login-f3').fill('hemmelig123')
+    await page.getByRole('button', { name: submit }).last().click()
+    for (let i = 0; i < 50 && !body; i++) await page.waitForTimeout(100)
+    assert(body, 'ingen registrering ble sendt')
+    assert(body.data?.lang === lang, `lang i metadata var ${JSON.stringify(body.data?.lang)}, ventet ${lang}`)
+    assert(body.data?.display_name === 'Kari', 'navnet ble ikke sendt')
+  }, { loggedIn: false })
+}
+
 await browser.close()
 console.log(results.join('\n'))
 process.exit(results.some(r => r.startsWith('FAIL')) ? 1 : 0)

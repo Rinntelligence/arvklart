@@ -19,6 +19,7 @@ ArvKlart er en norsk SaaS-tjeneste for arveoppgjør. React 18 + Vite SPA, Supaba
   - `localStorage` (`hs_lang`) er bare en hurtigbuffer.
   - Delt innhold i boet skrives aldri om av ett språkvalg. Standardoppgavene lagres på norsk og oversettes ved visning.
   - Arveveiviseren er på norsk, med en engelsk oversettelse: `public/arveveiviser/i18n.js` gir `tr(no, en)` og `field(obj, key)`, der innholdet får `*_en`-felter. Den engelske versjonen vises bare med `?lang=en`, og appen sender det bare når `VITE_GUIDE_EN=true`. Flagget er av i prod til de engelske tekstene er juridisk gjennomgått, og norsk er alltid den gjeldende versjonen
+- **E-post**: malene for Supabase Auth (bekreftelse, nytt passord, magisk lenke, ny e-post) ligger i `supabase/templates/` og er på norsk eller engelsk etter `user_metadata.lang`, som `signUp` setter. De legges inn i dashbordet manuelt, se `supabase/README.md`
 - **Deployment**: Vercel, automatisk fra `main`
 
 ## Fargepalett — bruk alltid disse

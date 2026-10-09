@@ -80,6 +80,22 @@ Funksjonene `analyze-item`, `estimate-value` og `delete-account` krever innlogge
 
   Råtekst fra feil sendes aldri til appen.
 
+## E-postmaler (norsk og engelsk)
+
+Malene for e-postene fra Supabase Auth ligger i `supabase/templates/`. Repoet er kilden. De gjelder først når de er lagt inn i **Supabase Dashboard → Authentication → Email Templates**, og det er en produksjonsendring som må godkjennes.
+
+| Fil | Mal i dashbordet | Emne |
+|---|---|---|
+| `confirmation.html` | Confirm signup | `Bekreft e-postadressen din / Confirm your email address` |
+| `recovery.html` | Reset password | `Tilbakestill passordet ditt / Reset your password` |
+| `magic_link.html` | Magic link | `Logg inn i Arvklart / Log in to Arvklart` |
+| `email_change.html` | Change email address | `Bekreft ny e-postadresse / Confirm your new email address` |
+
+- **Språk:** norsk er standard. Engelsk brukes når `user_metadata.lang` er `"en"`. Det settes ved registrering (`signUp` i `src/lib/supabase.js`) og når brukeren bytter språk i appen (`changeLanguage`, PR C). Mangler språket, for eksempel hos brukere som registrerte seg før dette, blir e-posten norsk.
+- **Emnene:** de er tospråklige, fordi emnefeltet i dashbordet er felles for begge språk.
+- **Test:** `go run test/emails/render.go` kjører i CI og sjekker at malene kan tolkes med Go sine maler, og at de gir norsk som standard og engelsk med `lang = "en"`.
+- **Før lansering:** de engelske tekstene skal gjennomgås språklig og juridisk.
+
 ## Automatisk sletting av avsluttede bo
 
 Personvernerklæringen lover at avsluttede bo slettes etter 12 måneder. En administrator avslutter boet under «Administrer», og da settes `closed_at`.
