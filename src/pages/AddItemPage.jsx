@@ -6,7 +6,7 @@ import { hasAiConsent, giveAiConsent } from '../lib/aiConsent'
 import { formatNOK } from '../lib/format'
 import { L, isEn } from '../lib/lang'
 import { categoryLabel } from '../lib/categories'
-import { analyzeItemPhotos, callEdgeFunction, matchCategory } from '../lib/itemAi'
+import { aiErrorMessage, analyzeItemPhotos, callEdgeFunction, matchCategory } from '../lib/itemAi'
 import { AiConsent, DemoNotice } from '../components/AiDialogs'
 import CameraCapture from '../components/CameraCapture'
 
@@ -42,7 +42,8 @@ export default function AddItemPage({ session, profile, onToast, isDemo }) {
   const trackQuota = (res) => { if (typeof res?.quota?.remaining === 'number') setDemoRemaining(res.quota.remaining) }
   const handleAiError = (e, fallback) => {
     if (e.code === 'demo_limit') { setDemoRemaining(0); setDemoBlocked(true); return }
-    onToast(e.code === 'rate_limit' || e.code === 'ai_busy' ? e.message : fallback, 'error')
+    // Feilkoden oversettes på brukerens språk (serverens tekst er alltid norsk)
+    onToast(e.code && e.code !== 'error' ? aiErrorMessage(e.code) : fallback, 'error')
   }
 
   const loadCategories = () => getCategories(id).then(({ data }) => {

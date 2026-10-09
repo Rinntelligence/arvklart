@@ -6,7 +6,7 @@ import { isEn, L } from './lang'
 export { addCapturedPhotos, estimateApplies, matchCategory, mergeSelectedPhotos, removePhotoAt, restoreRemoved, runPool, splitDraft } from './itemAiHelpers.js'
 
 // Kalles med brukerens innlogging; edge-funksjonene avviser anonyme kall og teller AI-bruken.
-// Feil får med koden fra funksjonen (demo_limit, rate_limit, ai_busy …).
+// Feil får med koden fra funksjonen (demo_limit, rate_limit, ai_busy, ai_refused, ai_timeout, ai_invalid, ai_unavailable …).
 export async function callEdgeFunction(name, body) {
   const { data, error } = await supabase.functions.invoke(name, { body })
   if (!error) return data
@@ -23,6 +23,10 @@ export function aiErrorMessage(code) {
     case 'rate_limit': return L('Du har brukt AI-hjelpen mye den siste tiden. Prøv igjen om en stund – du kan fylle inn selv i mellomtiden.', 'You have used the AI help a lot recently. Try again in a while – you can fill in the details yourself meanwhile.')
     case 'ai_busy': return L('AI-tjenesten er opptatt akkurat nå. Prøv igjen om litt.', 'The AI service is busy right now. Please try again shortly.')
     case 'demo_limit': return L('Du har brukt opp AI-forsøkene i demoen.', 'You have used up the AI attempts in the demo.')
+    case 'ai_refused': return L('AI-en kunne ikke vurdere dette. Fyll inn selv.', 'The AI could not assess this. Please fill in the details yourself.')
+    case 'ai_timeout': return L('AI-en brukte for lang tid. Prøv igjen.', 'The AI took too long. Please try again.')
+    case 'ai_invalid': return L('AI-en ga et svar vi ikke kunne bruke. Prøv igjen, eller fyll inn selv.', 'The AI gave an answer we could not use. Try again, or fill in the details yourself.')
+    case 'ai_unavailable': return L('AI-hjelpen er ikke tilgjengelig akkurat nå. Du kan fylle inn selv.', 'The AI help is not available right now. You can fill in the details yourself.')
     default: return L('AI-en klarte ikke dette nå. Prøv igjen, eller fyll inn selv.', 'The AI could not do this right now. Try again, or fill in the details yourself.')
   }
 }
