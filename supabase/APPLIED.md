@@ -28,6 +28,7 @@ Sist verifisert: 2026-10-09 (funksjoner, policies, triggere og RLS på `items` l
 | `migrations/20261010_interests_reason_update.sql` | **ja, 2026-10-09 15:05 UTC** | `schema_migrations` 20261009150536. Kjørt sammen med 20261011–20261013 i én transaksjon (R4 steg 3). Kontroll: policy `interests_update`, bare `reason` kan oppdateres, lengdesjekk validert (ingen eksisterende over 1000 tegn). Etterkontroll med demokonto (rullet tilbake): egen begrunnelse 1 rad, andres 0, `item_id` låst. Tilbakerulling: `rollback/20261010_interests_reason_update.down.sql` |
 | `migrations/20261011_ai_usage_metrics.sql` | **ja, 2026-10-09 15:05 UTC** | `schema_migrations` 20261009150537. Kjørt i samme transaksjon som 20261010, 20261012 og 20261013. Kontroll: 10 målekolonner, `claim_ai_call()` md5 lik repoet (31b03a27…), grensene uendret; etterkontroll ga `usage_id` (rullet tilbake). Tilbakerulling: `rollback/20261011_ai_usage_metrics.down.sql` |
 | `migrations/20261012_items_ai_analysis.sql` | **ja, 2026-10-09 15:05 UTC** | `schema_migrations` 20261009150538. Kjørt i samme transaksjon som 20261010, 20261011 og 20261013. Kontroll: `items.ai_analysis` finnes (alle 224 gjenstander har null, ingen omskriving), `guard_item_update()` md5 lik repoet (c81566e4…, før 487b50fa…); etterkontroll: demokonto kan ikke endre `ai_analysis` på andres gjenstand (rullet tilbake). Tilbakerulling: `rollback/20261012_items_ai_analysis.down.sql` |
+| `migrations/20261013_profiles_preferred_lang.sql` | **ja, 2026-10-09 15:05 UTC** | `schema_migrations` 20261009150539. Kjørt i samme transaksjon som 20261010–20261012, før frontend fra PR C. Lesesjekk før: alle 27 profiler hadde bare standardverdien `'en'` (ingen hadde valgt). Kontroll: standardverdien er fjernet, alle 27 er `null` (= norsk), sjekk `no`/`en`/null. Tilbakerulling: `rollback/20261013_profiles_preferred_lang.down.sql` |
 
 ## Finnes bare i produksjon (ikke i repoet)
 
@@ -36,7 +37,7 @@ Sist verifisert: 2026-10-09 (funksjoner, policies, triggere og RLS på `items` l
 | migrering `20260921173019_estate_closed_at_and_cleanup` | eneste rad i `schema_migrations` før 2026-10-08 |
 | funksjon `cleanup_old_closed_estates()` | gammel SQL-sletting (sletter ikke bilder). Kan nå bare kalles av `service_role`. Bør fjernes når cron for `cleanup-closed-estates` er på plass |
 | funksjon og trigger `set_estate_closed_at` på `estates` | setter `closed_at` når `status` endres til/fra `closed`. Forenlig med `AdminPage` |
-| `profiles.preferred_lang` (default `'en'`), `profiles.preferred_market` (default `'ebay'`) | brukes ikke av koden. Alle rader har standardverdien |
+| `profiles.preferred_market` (default `'ebay'`) | brukes ikke av koden. Alle rader har standardverdien. (`preferred_lang` fantes også her med default `'en'`; ryddet og tatt i bruk av 20261013_profiles_preferred_lang.sql) |
 | FK `comments_profile_fkey`, `comments_user_id_fkey`, `interests_profile_fkey` → `profiles(user_id)` | repoet har FK til `auth.users` |
 | indekser `items_estate_id_idx`, `interests_item_id_idx` | nyttige, mangler i repoet |
 | `rls_auto_enable()` + event-trigger `ensure_rls` | Supabase-plattformens funksjon, ikke vår |
