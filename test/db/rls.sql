@@ -362,6 +362,10 @@ begin
   if exists (select 1 from ai_usage where session_id = 'utenfor-okt') then raise exception 'FAIL: avvist kall ble registrert'; end if;
   raise notice 'OK   den som ikke er medlem, kan ikke bruke boets AI-budsjett';
 
+  -- Frank ble fjernet fra boet lenger opp; han er utenforstående her og legges inn igjen som medlem
+  r := claim_ai_call(frank, 'frank-ute', 'analyze-item', false, evas_bo);
+  if (r->>'ok')::boolean or r->>'reason' <> 'not_member' then raise exception 'FAIL: fjernet medlem på boets budsjett ga %', r; end if;
+  insert into estate_members (estate_id, user_id, role) values (evas_bo, frank, 'member');
   r := claim_ai_call(frank, 'frank-bo', 'analyze-item', false, evas_bo);
   if not (r->>'ok')::boolean then raise exception 'FAIL: medlem ble avvist: %', r; end if;
   if (select estate_id from ai_usage where id = (r->>'usage_id')::bigint) is distinct from evas_bo then raise exception 'FAIL: estate_id ble ikke lagret'; end if;
@@ -380,4 +384,5 @@ begin
   if not (r->>'ok')::boolean then raise exception 'FAIL: kall eldre enn 30 dager telte: %', r; end if;
   raise notice 'OK   kall eldre enn 30 dager teller ikke mot boet';
   delete from ai_usage where session_id in ('frank-fylt', 'frank-bo', 'frank-uten-bo');
+  delete from estate_members where estate_id = evas_bo and user_id = frank;
 end $$;
