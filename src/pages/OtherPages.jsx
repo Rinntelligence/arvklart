@@ -1,14 +1,14 @@
 // ── JoinPage ──────────────────────────────────────────────────────────────────
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { supabase } from '../lib/supabase'
+import { supabase, signOut } from '../lib/supabase'
 import { joinEstateByCode } from '../lib/joinEstate'
 import { hasAiConsent, withdrawAiConsent } from '../lib/aiConsent'
 import { L, isEn } from '../lib/lang'
 import { categoryLabel } from '../lib/categories'
 import TextSizeControl from '../components/TextSizeControl'
 
-const btn = { padding:'10px 20px', background:'#3A2F26', color:'#FBF9F5', border:'none', borderRadius:'8px', cursor:'pointer', fontSize:'0.875rem', fontFamily:'Karla, sans-serif' }
+const btn = { minHeight:'44px', padding:'10px 20px', background:'#3A2F26', color:'#FBF9F5', border:'none', borderRadius:'8px', cursor:'pointer', fontSize:'0.875rem', fontFamily:'Karla, sans-serif' }
 const h2 = { fontFamily:"'Fraunces', serif", fontSize:'1.375rem', fontWeight:'400', color:'#3A2F26' }
 
 export function JoinPage({ session, onToast }) {
@@ -16,6 +16,17 @@ export function JoinPage({ session, onToast }) {
   const navigate = useNavigate()
   const [status, setStatus] = useState('joining')
   const [errorMsg, setErrorMsg] = useState('')
+  const [attempt, setAttempt] = useState(0)
+  const [copied, setCopied] = useState(false)
+  const email = session?.user?.email || ''
+
+  // Feil konto: logg ut og inn med riktig e-post; koden huskes til etter innlogging
+  const switchAccount = async () => {
+    try { localStorage.setItem('pendingJoinCode', code) } catch { /* privat modus */ }
+    await signOut()
+    navigate('/logg-inn', { replace: true })
+  }
+  const copyEmail = () => { navigator.clipboard?.writeText(email); setCopied(true) }
 
   useEffect(() => {
     if (!session) {
@@ -29,9 +40,9 @@ export function JoinPage({ session, onToast }) {
       onToast(L(`Ble med i "${estate.name}" ✓`, `Joined "${estate.name}" ✓`))
       navigate(`/estate/${estate.id}`, { replace: true })
     })
-  }, [session?.user?.id, code])
+  }, [session?.user?.id, code, attempt])
 
-  const titles = { denied: L('Du er ikke lagt til i dette boet', 'You have not been added to this estate'), invalid: L('Ugyldig invitasjonslenke', 'Invalid invite link'), error: L('Noe gikk galt', 'Something went wrong') }
+  const titles = { denied: L('Du er ikke lagt til i dette boet ennå', 'You have not been added to this estate yet'), invalid: L('Ugyldig invitasjonslenke', 'Invalid invite link'), error: L('Noe gikk galt', 'Something went wrong') }
   const texts = { invalid: L('Lenken kan ha blitt fornyet. Be den som administrerer boet om en ny.', 'The link may have been renewed. Ask the estate administrator for a new one.') }
 
   return (
@@ -42,8 +53,20 @@ export function JoinPage({ session, onToast }) {
         ) : (
           <>
             <h2 style={h2}>{titles[status]}</h2>
-            <p style={{ color:'#75604B', marginTop:'8px', lineHeight:'1.5' }}>{texts[status] || errorMsg}</p>
-            <button onClick={() => navigate('/')} style={{ ...btn, marginTop:'20px' }}>{L('Til mine bo', 'To my estates')}</button>
+            {status === 'denied' ? (
+              <div style={{ textAlign:'left', marginTop:'12px', color:'#3A2F26', lineHeight:1.6 }}>
+                <p>{L('Du er logget inn som', 'You are logged in as')} <strong style={{ overflowWrap:'anywhere' }}>{email}</strong>.</p>
+                <p style={{ marginTop:'8px' }}>{L('Den som administrerer boet, må legge til akkurat denne e-postadressen under «Arvinger». Send den gjerne til dem, og trykk «Prøv igjen» etterpå.', 'The estate administrator must add exactly this email address under «Heirs». You can send it to them, then tap «Try again».')}</p>
+                <div style={{ display:'flex', flexDirection:'column', gap:'8px', marginTop:'16px' }}>
+                  <button onClick={copyEmail} style={{ ...btn, background:'#fff', color:'#3A2F26', border:'1px solid #9A8B78' }}>{copied ? L('E-postadressen er kopiert ✓', 'Email address copied ✓') : L('Kopier e-postadressen min', 'Copy my email address')}</button>
+                  <button onClick={() => { setStatus('joining'); setAttempt(a => a + 1) }} style={btn}>{L('Prøv igjen', 'Try again')}</button>
+                  <button onClick={switchAccount} style={{ ...btn, background:'none', color:'#5F6E52', textDecoration:'underline' }}>{L('Logg inn med en annen e-post', 'Log in with another email')}</button>
+                </div>
+              </div>
+            ) : (
+              <p style={{ color:'#75604B', marginTop:'8px', lineHeight:'1.5' }}>{texts[status] || errorMsg}</p>
+            )}
+            <button onClick={() => navigate('/')} style={{ ...btn, marginTop:'20px', background:'none', color:'#5C4530', border:'1px solid #9A8B78' }}>{L('Til mine bo', 'To my estates')}</button>
           </>
         )}
       </div>

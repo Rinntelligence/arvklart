@@ -4,6 +4,7 @@ import { supabase, getEstateMembers } from '../lib/supabase'
 import { WIZARD_TAG } from '../lib/wizardEstate'
 import { L, locale } from '../lib/lang'
 import { Modal } from '../components/UI'
+import InviteCard from '../components/InviteCard'
 
 const RELATIONSHIPS = ['Barn', 'Ektefelle / Partner', 'Søsken', 'Forelder', 'Barnebarn', 'Bobestyrer', 'Advokat', 'Rådgiver', 'Annen']
 // Relasjonen lagres på norsk (også fra arveveiviseren) og oversettes bare ved visning
@@ -30,17 +31,20 @@ export default function HeirsPage({ session, profile, onToast, isDemo }) {
   const [copied, setCopied] = useState('')
   const [emailEdit, setEmailEdit] = useState(null)
   const [confirmHeir, setConfirmHeir] = useState(null)
+  const [invitee, setInvitee] = useState(null) // arvingen invitasjonskortet gjelder
+  const [estateName, setEstateName] = useState('')
 
   const load = async () => {
     const [{ data: hs }, { data: mem }, { data: es }, { data: members }] = await Promise.all([
       supabase.from('heirs').select('*').eq('estate_id', id).order('created_at'),
       supabase.from('estate_members').select('role').eq('estate_id', id).eq('user_id', session.user.id).single(),
-      supabase.from('estates').select('total_value, split_mode, invite_code').eq('id', id).single(),
+      supabase.from('estates').select('name, total_value, split_mode, invite_code').eq('id', id).single(),
       getEstateMembers(id),
     ])
     setHeirs(hs || [])
     setMyRole(mem?.role || 'member')
     setInviteCode(es?.invite_code || '')
+    setEstateName(es?.name || '')
     setMemberEmails((members || []).map(m => normEmail(m.profiles?.email)).filter(Boolean))
     if (es?.total_value) setTotalValue(es.total_value.toString())
     if (es?.split_mode) setSplitMode(es.split_mode)
@@ -73,9 +77,9 @@ export default function HeirsPage({ session, profile, onToast, isDemo }) {
     if (email && !isEmail(email)) { onToast?.(L('Ugyldig e-postadresse', 'Invalid email address'), 'error'); return }
     const { error } = await supabase.from('heirs').insert({ ...newHeir, email: email || null, estate_id: id, percentage: parseFloat(newHeir.percentage) || 0 })
     if (error) { onToast?.(L('Kunne ikke legge til arving: ', 'Could not add heir: ') + error.message, 'error'); return }
-    onToast?.(email
-      ? L(`${newHeir.name.trim()} er lagt til. Send invitasjonskoden ${inviteCode} til ${email}`, `${newHeir.name.trim()} has been added. Send the invite code ${inviteCode} to ${email}`)
-      : L(`${newHeir.name.trim()} er lagt til`, `${newHeir.name.trim()} has been added`))
+    onToast?.(L(`${newHeir.name.trim()} er lagt til`, `${newHeir.name.trim()} has been added`))
+    // Neste steg vises der og da: send invitasjonen (ikke bare en melding som forsvinner)
+    if (email) setInvitee({ name: newHeir.name.trim(), email })
     setNewHeir({ name: '', email: '', relationship: 'Barn', notes: '', percentage: '' })
     setShowAdd(false)
     load()
@@ -153,6 +157,10 @@ export default function HeirsPage({ session, profile, onToast, isDemo }) {
             {L('Endre svarene i veiviseren', 'Change the answers in the guide')}
           </button>}
         </div>
+      )}
+
+      {invitee && canEdit && inviteUrl && (
+        <InviteCard heir={invitee} estateName={estateName} inviteUrl={inviteUrl} onClose={() => setInvitee(null)} />
       )}
 
       {/* Invitasjon */}
@@ -322,6 +330,11 @@ export default function HeirsPage({ session, profile, onToast, isDemo }) {
                           : { label:L('Venter på at arvingen blir med', 'Waiting for the heir to join'), bg:'#FBF9F5', fg:'#75604B' }
                         return <span style={{ fontSize:'0.6875rem', background:st.bg, color:st.fg, border:'1px solid #D9CFC0', padding:'1px 8px', borderRadius:'20px' }}>{st.label}</span>
                       })()}
+                      {canEdit && heir.email && !memberEmails.includes(normEmail(heir.email)) && (
+                        <button onClick={() => setInvitee({ name: heir.name, email: normEmail(heir.email) })} style={{ fontSize:'0.8125rem', minHeight:'36px', padding:'4px 10px', color:'#3A2F26', background:'#fff', border:'1px solid #9A8B78', borderRadius:'8px', cursor:'pointer', fontFamily:'Karla, sans-serif' }}>
+                          {L('Send invitasjon', 'Send invitation')}
+                        </button>
+                      )}
                       {canEdit && !memberEmails.includes(normEmail(heir.email)) && (
                         <button onClick={() => setEmailEdit({ id: heir.id, value: heir.email || '' })} style={{ fontSize:'0.75rem', color:'#75604B', background:'none', border:'none', padding:0, cursor:'pointer', textDecoration:'underline', fontFamily:'Karla, sans-serif' }}>
                           {heir.email ? L('Endre e-post', 'Change email') : L('Legg til e-post', 'Add email')}

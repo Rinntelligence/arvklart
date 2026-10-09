@@ -233,17 +233,25 @@ export default function EstatePage({ session, profile, onToast, isDemo }) {
       ) : <div style={{ marginBottom:'12px' }} />}
 
       {/* Snarveier */}
+      {/* For arvinger: egne ønsker ett trykk unna */}
+      {myRole !== 'admin' && myCount > 0 && (
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:'10px', flexWrap:'wrap', background:'#fff', border:'1px solid #D9CFC0', borderRadius:'10px', padding:'12px 16px', marginBottom:'16px' }}>
+          <span style={{ fontSize:'0.9375rem', color:'#3A2F26' }}>{L(`Du ønsker ${myCount} ${myCount === 1 ? 'gjenstand' : 'gjenstander'}`, `You want ${myCount} ${myCount === 1 ? 'item' : 'items'}`)}</span>
+          <button onClick={() => { setTab('items'); setFilterStatus('mine') }} style={btn}>{L('Se mine ønsker', 'See my wishes')}</button>
+        </div>
+      )}
+
       <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(min(100%, 10rem), 1fr))', gap:'8px', marginBottom:'32px' }}>
         {[
           { path:`/estate/${id}/guide`, label:L('Veiviser', 'Guide'), desc:L('For arveprosessen', 'For the inheritance process') },
-          { path:`/estate/${id}/heirs`, label:L('Arvinger', 'Heirs'), desc:L('Fordelingskalkulator', 'Distribution calculator') },
+          { path:`/estate/${id}/heirs`, label:L('Arvinger', 'Heirs'), desc:L('Fordelingskalkulator', 'Distribution calculator'), adminOnly: true },
           undecidedCount > 0
             ? { path:`/estate/${id}/conflicts`, label:L('Løsningsmetoder', 'Resolution methods'), desc:L(`Venter på ${undecidedCount} ${undecidedCount === 1 ? 'arving' : 'arvinger'}`, `Waiting for ${undecidedCount} ${undecidedCount === 1 ? 'heir' : 'heirs'}`) }
             : contested > 0
             ? { path:`/estate/${id}/conflicts`, label:L('Løsningsmetoder', 'Resolution methods'), desc:L(`${contested} ettertraktede`, `${contested} contested`), highlight: true }
             : { path:`/estate/${id}/conflicts`, label:L('Løsningsmetoder', 'Resolution methods'), desc:L('Ingen ettertraktede ennå', 'None contested yet') },
           { path:`/estate/${id}/status`, label:L('Hva gjenstår', 'What remains'), desc: remainingSteps === null ? L('Oversikt over boet', 'Estate overview') : remainingSteps === 0 ? L('Alt er klart', 'All done') : L(`${remainingSteps} steg gjenstår`, `${remainingSteps} ${remainingSteps === 1 ? 'step' : 'steps'} left`) },
-        ].map(mod => (
+        ].filter(mod => myRole === 'admin' || !mod.adminOnly).map(mod => (
           <button key={mod.path} onClick={() => navigate(mod.path)} style={{
             padding:'12px 14px', background:'#fff', border:`1px solid ${mod.highlight ? '#8B9A7D' : '#D9CFC0'}`,
             borderRadius:'8px', cursor:'pointer', textAlign:'left', fontFamily:'Karla, sans-serif',

@@ -25,7 +25,8 @@ export const FIXTURES = {
   heirs: [{ id: 'h1', estate_id: EST, name: 'Kari', email: 'kari@test.no', relationship: 'Barn', percentage: 0, created_at: now }],
 }
 
-export async function setup(browser, { loggedIn = true, viewport = { width: 390, height: 844 }, textSize = null } = {}) {
+export async function setup(browser, { loggedIn = true, viewport = { width: 390, height: 844 }, textSize = null, fixtures = {}, rpc = {} } = {}) {
+  const data = { ...FIXTURES, ...fixtures }
   const ctx = await browser.newContext({ viewport })
   const page = await ctx.newPage()
   const calls = [] // { method, table } for alle kall mot databasen, så testene kan sjekke hva som ble gjort
@@ -36,8 +37,16 @@ export async function setup(browser, { loggedIn = true, viewport = { width: 390,
     if (req.method() === 'DELETE') return route.fulfill({ status: 204, body: '' })
     const table = url.pathname.match(/\/rest\/v1\/([a-z_]+)/)?.[1]
     const single = (req.headers()['accept'] || '').includes('vnd.pgrst.object')
-    const rows = (table && FIXTURES[table]) || []
-    if (url.pathname.startsWith('/rest/v1/rpc/')) return route.fulfill({ status: 200, contentType: 'application/json', body: '[]' })
+    // Enkle filtre som kolonne=eq.verdi brukes, så .eq(...).maybeSingle() får riktig rad
+    let rows = (table && data[table]) || []
+    for (const [key, val] of url.searchParams) {
+      if (['select', 'order', 'limit', 'offset'].includes(key) || key.includes('.') || !val.startsWith('eq.')) continue
+      rows = rows.filter(r => !(key in r) || String(r[key]) === val.slice(3))
+    }
+    if (url.pathname.startsWith('/rest/v1/rpc/')) {
+      const r = rpc[url.pathname.split('/').pop()]
+      return route.fulfill({ status: r?.status || 200, contentType: 'application/json', body: JSON.stringify(r?.body ?? []) })
+    }
     const body = single ? (rows[0] ?? null) : rows
     return route.fulfill({ status: single && !rows.length ? 406 : 200, contentType: 'application/json', body: JSON.stringify(body) })
   })
