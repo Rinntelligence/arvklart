@@ -11,6 +11,10 @@ import { L, isEn } from '../lib/lang'
 // Hindrer at en ventende lagring kjøres to ganger hvis siden monteres på nytt underveis
 let processingPending = false
 
+// Engelsk arveveiviser vises bare når den er slått på (VITE_GUIDE_EN=true) etter juridisk gjennomgang av de
+// engelske tekstene. Til da får engelske brukere den norske veiviseren med en forklaring.
+const GUIDE_EN = import.meta.env.VITE_GUIDE_EN === 'true'
+
 export default function GuidePage({ standalone = false, session = null, onToast = () => {} }) {
   const navigate = useNavigate()
   const { id } = useParams()
@@ -181,11 +185,11 @@ export default function GuidePage({ standalone = false, session = null, onToast 
           {id ? L('← Tilbake til boet', '← Back to the estate') : L('← Tilbake til hjemmesiden', '← Back to the home page')}
         </button>
         {busy && <span style={{ fontSize: '0.8125rem', color: '#5F6E52', fontFamily: 'Karla, sans-serif' }}>{L('Lagrer i boet …', 'Saving to the estate …')}</span>}
-        {isEn() && <span style={{ fontSize: '0.8125rem', color: '#75604B', fontFamily: 'Karla, sans-serif', marginLeft: 'auto' }}>The inheritance guide follows Norwegian law and is only available in Norwegian.</span>}
+        {isEn() && !GUIDE_EN && <span style={{ fontSize: '0.8125rem', color: '#75604B', fontFamily: 'Karla, sans-serif', marginLeft: 'auto' }}>The inheritance guide follows Norwegian law and is only available in Norwegian.</span>}
       </div>
       <iframe
         ref={frameRef}
-        src={id ? `/veiviser.html?bo=${encodeURIComponent(id)}` : '/veiviser.html?back=home'}
+        src={(id ? `/veiviser.html?bo=${encodeURIComponent(id)}` : '/veiviser.html?back=home') + (isEn() && GUIDE_EN ? '&lang=en' : '')}
         style={{ flex: 1, border: 'none', width: '100%' }}
         title={L('Arveprosess-veiviser', 'Inheritance process guide')}
       />

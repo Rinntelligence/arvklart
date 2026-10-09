@@ -11,8 +11,10 @@ import { TERMS, linkTerms } from './glossary.js'
 import { GRANDPARENT_SIDES, childLines } from './heirs.js'
 import { fill, kr as krPlain, pct } from './text.js'
 import { estateRows, answerSummary, toEstatePayload } from './report.js'
+import { tr, field, isEn, dateLocale } from './i18n.js'
 
 const root = document.getElementById('arvWizard')
+document.documentElement.lang = isEn() ? 'en' : 'no'
 
 // ── Tilstand og lagring ──────────────────────────────────────
 // Svarene lagres i nettleseren per bruker og per bo. Da får et bo aldri svarene til et annet bo,
@@ -116,24 +118,24 @@ function rich(text, facts) {
     .replace(/\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g, (_, key, label) => {
       const t = TERMS[key]
       if (!t) return label || key
-      return `<button type="button" class="aw-term" data-def="${esc(t.def)}" aria-expanded="false">${label || t.term}</button>`
+      return `<button type="button" class="aw-term" data-def="${esc(field(t, 'def'))}" aria-expanded="false">${label || field(t, 'term')}</button>`
     })
 }
 function titleFor(q, facts) {
-  if (facts.survivor && q.titleSurvivor) return q.titleSurvivor
-  if (facts.married && q.titleMarried) return q.titleMarried
-  return q.title
+  if (facts.survivor && q.titleSurvivor) return field(q, 'titleSurvivor')
+  if (facts.married && q.titleMarried) return field(q, 'titleMarried')
+  return field(q, 'title')
 }
 // Kompakt kildelinje, brukt der mange kilder ellers ville gjort teksten tung å lese.
 function sourceLine(ids = []) {
   const list = ids.map(id => SOURCES[id]).filter(Boolean)
   if (!list.length) return ''
-  return `<p class="aw-src-line">Kilde: ${list.map(s => `<a href="${esc(s.url)}" target="_blank" rel="noopener noreferrer">${esc(s.short || s.title)}</a>`).join(' · ')}</p>`
+  return `<p class="aw-src-line">${tr('Kilde', 'Source')}: ${list.map(s => `<a href="${esc(s.url)}" target="_blank" rel="noopener noreferrer">${esc(field(s, 'short') || field(s, 'title'))}</a>`).join(' · ')}</p>`
 }
 function sourceLinks(ids = []) {
   const list = ids.map(id => SOURCES[id]).filter(Boolean)
   if (!list.length) return ''
-  return `<div class="aw-sources">${list.map(s => `<a class="item-link" href="${esc(s.url)}" target="_blank" rel="noopener noreferrer">${esc(s.short || s.title)}${ICON.ext}</a>`).join('')}</div>`
+  return `<div class="aw-sources">${list.map(s => `<a class="item-link" href="${esc(s.url)}" target="_blank" rel="noopener noreferrer">${esc(field(s, 'short') || field(s, 'title'))}${ICON.ext}</a>`).join('')}</div>`
 }
 
 function setAnswer(id, value) {
@@ -199,7 +201,7 @@ function prevQuestion() {
 // ── Visninger ────────────────────────────────────────────────
 function render() {
   if (!storageKey) {
-    root.innerHTML = '<div class="aw-card"><p class="aw-why">Laster veiviseren …</p></div>'
+    root.innerHTML = `<div class="aw-card"><p class="aw-why">${tr('Laster veiviseren …', 'Loading the guide …')}</p></div>`
     return
   }
   const a = pruneAnswers(state.answers)
@@ -218,19 +220,20 @@ function renderIntro() {
   const hasProgress = Object.keys(state.answers).length > 0
   return `
   <div class="aw-card aw-intro">
-    <span class="eyebrow">Arveveiviser</span>
-    <h2>Hvem arver – og hvor mye?</h2>
-    <p>Svar på noen enkle spørsmål om familien og økonomien. Du får en oversikt over hvem som arver, omtrent hvor mye hver får, og hva dere bør gjøre nå.</p>
+    <span class="eyebrow">${tr('Arveveiviser', 'Inheritance guide')}</span>
+    <h2>${tr('Hvem arver – og hvor mye?', 'Who inherits – and how much?')}</h2>
+    <p>${tr('Svar på noen enkle spørsmål om familien og økonomien. Du får en oversikt over hvem som arver, omtrent hvor mye hver får, og hva dere bør gjøre nå.', 'Answer a few simple questions about the family and finances. You get an overview of who inherits, roughly how much each person gets, and what you should do now.')}</p>
+    ${isEn() ? '<p class="aw-hint aw-hint-box">This guide explains Norwegian inheritance law. It is a translation for guidance only; the Norwegian version is the authoritative one.</p>' : ''}
     <ul class="aw-intro-list">
-      <li>${ICON.check}<span>Du trenger ikke kunne noe om arveregler – vi forklarer underveis.</span></li>
-      <li>${ICON.check}<span>Det tar omtrent 5 minutter. Omtrentlige tall holder.</span></li>
-      <li>${ICON.check}<span>Svarene lagres bare i din egen nettleser.</span></li>
+      <li>${ICON.check}<span>${tr('Du trenger ikke kunne noe om arveregler – vi forklarer underveis.', 'You do not need to know anything about inheritance rules – we explain as we go.')}</span></li>
+      <li>${ICON.check}<span>${tr('Det tar omtrent 5 minutter. Omtrentlige tall holder.', 'It takes about 5 minutes. Approximate figures are fine.')}</span></li>
+      <li>${ICON.check}<span>${tr('Svarene lagres bare i din egen nettleser.', 'Your answers are only stored in your own browser.')}</span></li>
     </ul>
     <div class="aw-actions">
       ${hasProgress
-        ? `<button type="button" class="aw-btn primary" data-action="resume">Fortsett der du slapp ${ICON.arrow}</button>
-           <button type="button" class="aw-btn ghost" data-action="restart">Start på nytt</button>`
-        : `<button type="button" class="aw-btn primary" data-action="start">Start ${ICON.arrow}</button>`}
+        ? `<button type="button" class="aw-btn primary" data-action="resume">${tr('Fortsett der du slapp', 'Continue where you left off')} ${ICON.arrow}</button>
+           <button type="button" class="aw-btn ghost" data-action="restart">${tr('Start på nytt', 'Start again')}</button>`
+        : `<button type="button" class="aw-btn primary" data-action="start">${tr('Start', 'Start')} ${ICON.arrow}</button>`}
     </div>
   </div>`
 }
@@ -241,10 +244,10 @@ function renderProgress(qs, idx, q, a) {
   const openIdx = qs.findIndex(x => validationError(x, a))
   const firstOpen = openIdx === -1 ? qs.length : openIdx
   return `
-  <div class="aw-progress" aria-label="Fremdrift">
+  <div class="aw-progress" aria-label="${tr('Fremdrift', 'Progress')}">
     <div class="aw-progress-top">
-      <span>Steg ${idx + 1} av ${qs.length}</span>
-      <span class="aw-progress-section">${esc(SECTIONS.find(s => s.id === q.section)?.label || '')}</span>
+      <span>${tr(`Steg ${idx + 1} av ${qs.length}`, `Step ${idx + 1} of ${qs.length}`)}</span>
+      <span class="aw-progress-section">${esc(field(SECTIONS.find(s => s.id === q.section), 'label') || '')}</span>
     </div>
     <div class="aw-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${pctDone}"><span style="width:${pctDone}%"></span></div>
     <ol class="aw-steps">${activeSections.map(s => {
@@ -254,7 +257,7 @@ function renderProgress(qs, idx, q, a) {
       // Brukeren kan hoppe til alle deler som er nådd – også fremover når alt før er besvart.
       const reachable = first <= firstOpen && s.id !== q.section
       const cls = s.id === q.section ? 'current' : sIdx < curIdx ? 'done' : ''
-      return `<li class="${cls}">${reachable ? `<button type="button" data-action="edit" data-q="${qs[first].id}" data-keep="1">${esc(s.label)}</button>` : esc(s.label)}</li>`
+      return `<li class="${cls}">${reachable ? `<button type="button" data-action="edit" data-q="${qs[first].id}" data-keep="1">${esc(field(s, 'label'))}</button>` : esc(field(s, 'label'))}</li>`
     }).join('')}</ol>
   </div>`
 }
@@ -265,8 +268,8 @@ function renderLearnMore(q, facts, a) {
   if (lm.showIf && !evaluate(lm.showIf, { answers: a, facts })) return ''
   return `
   <details class="aw-more">
-    <summary>${esc(fill(lm.title || 'Les mer', facts))}</summary>
-    ${lm.text ? `<p>${rich(lm.text, facts)}</p>` : ''}
+    <summary>${esc(fill(field(lm, 'title') || tr('Les mer', 'Read more'), facts))}</summary>
+    ${lm.text ? `<p>${rich(field(lm, 'text'), facts)}</p>` : ''}
     ${sourceLinks(lm.sources)}
   </details>`
 }
@@ -282,18 +285,18 @@ function renderQuestion(q, facts, a) {
   <div class="aw-card aw-question" data-q="${q.id}">
     ${renderProgress(qs, idx, q, a)}
     <h3 class="aw-title" tabindex="-1" data-autofocus>${rich(titleFor(q, facts), facts)}</h3>
-    <p class="aw-why"><span>Hvorfor spør vi om dette?</span> ${rich(typeof q.why === 'function' ? q.why(facts) : q.why, facts)}</p>
+    <p class="aw-why"><span>${tr('Hvorfor spør vi om dette?', 'Why do we ask this?')}</span> ${rich((w => typeof w === 'function' ? w(facts) : w)(field(q, 'why')), facts)}</p>
     <div class="aw-input">${renderInput(q, facts, a)}</div>
     ${error ? `<p class="aw-error" role="alert">${esc(error)}</p>` : ''}
     ${renderFlags(flags, facts, acked)}
     ${renderLearnMore(q, facts, a)}
     <div class="aw-nav">
-      <button type="button" class="aw-btn ghost" data-action="prev">${ICON.back} Tilbake</button>
-      <button type="button" class="aw-btn primary" data-action="next">${state.returnTo ? 'Lagre endringen' : isLast ? 'Se resultatet' : 'Neste'} ${ICON.arrow}</button>
+      <button type="button" class="aw-btn ghost" data-action="prev">${ICON.back} ${tr('Tilbake', 'Back')}</button>
+      <button type="button" class="aw-btn primary" data-action="next">${state.returnTo ? tr('Lagre endringen', 'Save the change') : isLast ? tr('Se resultatet', 'See the result') : tr('Neste', 'Next')} ${ICON.arrow}</button>
     </div>
     <div class="aw-quicklinks">
-      ${idx > 0 ? '<button type="button" class="aw-link" data-action="review">Se over og endre alle svarene</button>' : ''}
-      ${!state.returnTo && qs.every(x => !validationError(x, a)) ? '<button type="button" class="aw-link" data-action="result">Gå rett til resultatet</button>' : ''}
+      ${idx > 0 ? `<button type="button" class="aw-link" data-action="review">${tr('Se over og endre alle svarene', 'Review and change all answers')}</button>` : ''}
+      ${!state.returnTo && qs.every(x => !validationError(x, a)) ? `<button type="button" class="aw-link" data-action="result">${tr('Gå rett til resultatet', 'Go straight to the result')}</button>` : ''}
     </div>
   </div>`
 }
@@ -303,19 +306,21 @@ function renderQuestion(q, facts, a) {
 function renderFlags(flags, facts, acked) {
   if (!flags.length) return ''
   const blocker = flags.some(f => f.kind === 'blocker')
-  const title = blocker ? 'Med dette svaret kan vi ikke beregne fordelingen' : 'Dette svaret gjør situasjonen mer sammensatt enn veiviseren kan beregne'
+  const title = blocker
+    ? tr('Med dette svaret kan vi ikke beregne fordelingen', 'With this answer we cannot calculate the distribution')
+    : tr('Dette svaret gjør situasjonen mer sammensatt enn veiviseren kan beregne', 'This answer makes the situation more complex than the guide can calculate')
   const after = blocker
-    ? 'Du kan gå videre, men resultatet viser ikke hvordan arven fordeles før dette er avklart.'
-    : 'Du kan gå videre, og vi viser fortsatt en beregning – men den kan bli feil for dere. I resultatet forklarer vi nøyaktig hvorfor.'
+    ? tr('Du kan gå videre, men resultatet viser ikke hvordan arven fordeles før dette er avklart.', 'You can continue, but the result will not show how the inheritance is distributed until this has been clarified.')
+    : tr('Du kan gå videre, og vi viser fortsatt en beregning – men den kan bli feil for dere. I resultatet forklarer vi nøyaktig hvorfor.', 'You can continue, and we still show a calculation – but it may be wrong for you. In the result we explain exactly why.')
   return `<div class="aw-notice ${blocker ? 'critical' : 'warning'} aw-flag ${needsAck && !acked ? 'attention' : ''}" role="${acked ? 'note' : 'alertdialog'}" aria-label="${esc(title)}">
     <div class="aw-notice-icon">${ICON.warn}</div>
     <div>
       <h4>${title}</h4>
-      ${flags.map(f => `<p><strong>${esc(fill(f.title, facts))}.</strong> ${rich(f.text, facts)}</p>`).join('')}
+      ${flags.map(f => `<p><strong>${esc(fill(field(f, 'title'), facts))}.</strong> ${rich(field(f, 'text'), facts)}</p>`).join('')}
       <p class="aw-flag-after">${after}</p>
       ${acked
-        ? `<p class="aw-flag-done">${ICON.check} Du har lest dette</p>`
-        : `${needsAck ? '<p class="aw-flag-need" role="alert">Trykk «OK» for å gå videre.</p>' : ''}<button type="button" class="aw-btn primary small" data-action="ack">OK ${ICON.arrow}</button>`}
+        ? `<p class="aw-flag-done">${ICON.check} ${tr('Du har lest dette', 'You have read this')}</p>`
+        : `${needsAck ? `<p class="aw-flag-need" role="alert">${tr('Trykk «OK» for å gå videre.', 'Press «OK» to continue.')}</p>` : ''}<button type="button" class="aw-btn primary small" data-action="ack">OK ${ICON.arrow}</button>`}
     </div>
   </div>`
 }
@@ -336,7 +341,7 @@ function countInput(path, value) {
 }
 
 function optionHint(o, facts) {
-  const hint = facts.survivor && o.hintSurvivor ? o.hintSurvivor : o.hint
+  const hint = facts.survivor && o.hintSurvivor ? field(o, 'hintSurvivor') : field(o, 'hint')
   return hint ? `<span class="aw-option-hint">${esc(fill(hint, facts))}</span>` : ''
 }
 
@@ -347,26 +352,26 @@ function renderInput(q, facts, a) {
     case 'single':
       return `<div class="aw-options">${q.options.filter(o => evaluate(o.showIf, ctx)).map(o => `
         <button type="button" class="aw-option ${v === o.value ? 'selected' : ''}" data-action="choose" data-value="${o.value}" aria-pressed="${v === o.value}">
-          <span class="aw-radio"></span><span><span class="aw-option-label">${esc(fill(o.label, facts))}</span>${optionHint(o, facts)}</span>
+          <span class="aw-radio"></span><span><span class="aw-option-label">${esc(fill(field(o, 'label'), facts))}</span>${optionHint(o, facts)}</span>
         </button>`).join('')}</div>`
     case 'multi': {
       const arr = Array.isArray(v) ? v : []
       return `<div class="aw-options">${q.options.filter(o => evaluate(o.showIf, ctx)).map(o => `
         <button type="button" class="aw-option multi ${arr.includes(o.value) ? 'selected' : ''}" data-action="toggle" data-value="${o.value}" aria-pressed="${arr.includes(o.value)}">
-          <span class="aw-checkbox">${ICON.check}</span><span><span class="aw-option-label">${esc(fill(o.label, facts))}</span>${optionHint(o, facts)}</span>
+          <span class="aw-checkbox">${ICON.check}</span><span><span class="aw-option-label">${esc(fill(field(o, 'label'), facts))}</span>${optionHint(o, facts)}</span>
         </button>`).join('')}</div>`
     }
     case 'date':
       return `<input class="aw-date" type="date" data-path="${q.id}" value="${esc(v || '')}" max="${localToday()}" min="1900-01-01">`
     case 'number':
-      return moneyInput(q.id, v, 'Beløp', q.optional ? 'La stå tomt hvis du ikke vet' : '')
+      return moneyInput(q.id, v, tr('Beløp', 'Amount'), q.optional ? tr('La stå tomt hvis du ikke vet', 'Leave empty if you do not know') : '')
     case 'percent':
       return `<label class="aw-money">
-        <span class="aw-money-label">Andel${q.optional ? '<small>La stå tomt hvis du ikke vet – da regner vi med 50 %</small>' : ''}</span>
+        <span class="aw-money-label">${tr('Andel', 'Share')}${q.optional ? `<small>${tr('La stå tomt hvis du ikke vet – da regner vi med 50 %', 'Leave empty if you do not know – we then assume 50 %')}</small>` : ''}</span>
         <span class="aw-money-field"><input type="text" inputmode="decimal" autocomplete="off" data-path="${q.id}" value="${esc(v ?? '')}" placeholder="50"><span>%</span></span>
       </label>`
     case 'amounts':
-      return q.fields.map(f => moneyInput(`${q.id}.${f.key}`, v?.[f.key], f.label)).join('')
+      return q.fields.map(f => moneyInput(`${q.id}.${f.key}`, v?.[f.key], field(f, 'label'))).join('')
     case 'children': return renderChildren(v, facts)
     case 'otherChildren': return renderOtherChildren(v)
     case 'siblings': return renderSiblings(v)
@@ -375,7 +380,7 @@ function renderInput(q, facts, a) {
     case 'advancements': {
       const lines = childLines(a.children || [])
       return lines.map(l => moneyInput(`${q.id}.${l.id}`, v?.[l.id], l.label)).join('') +
-        '<p class="aw-hint">La feltet stå tomt for barn som ikke fikk forskudd.</p>'
+        `<p class="aw-hint">${tr('La feltet stå tomt for barn som ikke fikk forskudd.', 'Leave the field empty for children who did not receive an advance.')}</p>`
     }
     default: return ''
   }
@@ -388,21 +393,21 @@ function renderChildren(list, facts) {
     state.answers.children = [{ id: uid() }]
     return renderChildren(state.answers.children, facts)
   }
-  const commonQ = facts.survivor ? 'Er dette også ditt barn?' : `Er dette også barnet til ${fill('{partner}', facts)}?`
+  const commonQ = facts.survivor ? tr('Er dette også ditt barn?', 'Is this also your child?') : tr(`Er dette også barnet til ${fill('{partner}', facts)}?`, `Is this also the child of ${fill('{partner}', facts)}?`)
   return `<div class="aw-rows">${children.map((c, i) => `
     <div class="aw-row">
       <div class="aw-row-head">
-        <input class="aw-name" type="text" maxlength="40" placeholder="Barn ${i + 1} (navn er valgfritt)" data-path="children.${i}.name" value="${esc(c.name || '')}">
-        ${children.length > 1 ? `<button type="button" class="aw-remove" data-action="remove" data-path="children" data-index="${i}" aria-label="Fjern barn ${i + 1}">Fjern</button>` : ''}
+        <input class="aw-name" type="text" maxlength="40" placeholder="${tr(`Barn ${i + 1} (navn er valgfritt)`, `Child ${i + 1} (name is optional)`)}" data-path="children.${i}.name" value="${esc(c.name || '')}">
+        ${children.length > 1 ? `<button type="button" class="aw-remove" data-action="remove" data-path="children" data-index="${i}" aria-label="${tr(`Fjern barn ${i + 1}`, `Remove child ${i + 1}`)}">${tr('Fjern', 'Remove')}</button>` : ''}
       </div>
-      ${facts.hasPartner ? `<div class="aw-field"><span>${esc(commonQ)}</span>${seg(`children.${i}.common`, c.common, [{ value: 'yes', label: 'Ja, felles barn' }, { value: 'no', label: 'Nei, fra et annet forhold' }])}</div>` : ''}
-      ${facts.previousUskifte ? `<div class="aw-field"><span>${esc(fill('Er dette også barnet til {first}?', facts))}</span>${seg(`children.${i}.firstCommon`, c.firstCommon, [{ value: 'yes', label: 'Ja' }, { value: 'no', label: 'Nei, fra et annet forhold' }])}</div>` : ''}
-      <div class="aw-field"><span>Lever barnet?</span>${seg(`children.${i}.alive`, c.alive, [{ value: 'yes', label: 'Ja' }, { value: 'no', label: 'Nei, er død' }])}</div>
-      ${c.alive === 'no' ? `<div class="aw-field"><span>Hvor mange barn etterlot barnet seg? <small>Skriv 0 hvis ingen</small></span>${countInput(`children.${i}.grandchildren`, c.grandchildren)}</div>` : ''}
-      ${c.alive === 'yes' ? `<label class="aw-check"><input type="checkbox" data-path="children.${i}.minor" ${c.minor ? 'checked' : ''}> Barnet er under 18 år</label>` : ''}
+      ${facts.hasPartner ? `<div class="aw-field"><span>${esc(commonQ)}</span>${seg(`children.${i}.common`, c.common, [{ value: 'yes', label: tr('Ja, felles barn', 'Yes, a joint child') }, { value: 'no', label: tr('Nei, fra et annet forhold', 'No, from another relationship') }])}</div>` : ''}
+      ${facts.previousUskifte ? `<div class="aw-field"><span>${esc(fill(tr('Er dette også barnet til {first}?', 'Is this also the child of {first}?'), facts))}</span>${seg(`children.${i}.firstCommon`, c.firstCommon, [{ value: 'yes', label: tr('Ja', 'Yes') }, { value: 'no', label: tr('Nei, fra et annet forhold', 'No, from another relationship') }])}</div>` : ''}
+      <div class="aw-field"><span>${tr('Lever barnet?', 'Is the child alive?')}</span>${seg(`children.${i}.alive`, c.alive, [{ value: 'yes', label: tr('Ja', 'Yes') }, { value: 'no', label: tr('Nei, er død', 'No, has died') }])}</div>
+      ${c.alive === 'no' ? `<div class="aw-field"><span>${tr('Hvor mange barn etterlot barnet seg?', 'How many children did the child leave?')} <small>${tr('Skriv 0 hvis ingen', 'Enter 0 if none')}</small></span>${countInput(`children.${i}.grandchildren`, c.grandchildren)}</div>` : ''}
+      ${c.alive === 'yes' ? `<label class="aw-check"><input type="checkbox" data-path="children.${i}.minor" ${c.minor ? 'checked' : ''}> ${tr('Barnet er under 18 år', 'The child is under 18')}</label>` : ''}
     </div>`).join('')}
-    <button type="button" class="aw-add" data-action="add" data-path="children">${ICON.plus} Legg til barn</button>
-    <p class="aw-hint">Var et barn unnfanget, men ikke født ennå? Legg det inn som et barn som lever.</p>
+    <button type="button" class="aw-add" data-action="add" data-path="children">${ICON.plus} ${tr('Legg til barn', 'Add child')}</button>
+    <p class="aw-hint">${tr('Var et barn unnfanget, men ikke født ennå? Legg det inn som et barn som lever.', 'Was a child conceived but not yet born? Add it as a living child.')}</p>
   </div>`
 }
 
@@ -413,13 +418,13 @@ function renderOtherChildren(list) {
   return `<div class="aw-rows">${children.map((c, i) => `
     <div class="aw-row">
       <div class="aw-row-head">
-        <input class="aw-name" type="text" maxlength="40" placeholder="Barn ${i + 1} (navn er valgfritt)" data-path="${path}.${i}.name" value="${esc(c.name || '')}">
-        ${children.length > 1 ? `<button type="button" class="aw-remove" data-action="remove" data-path="${path}" data-index="${i}" aria-label="Fjern barn ${i + 1}">Fjern</button>` : ''}
+        <input class="aw-name" type="text" maxlength="40" placeholder="${tr(`Barn ${i + 1} (navn er valgfritt)`, `Child ${i + 1} (name is optional)`)}" data-path="${path}.${i}.name" value="${esc(c.name || '')}">
+        ${children.length > 1 ? `<button type="button" class="aw-remove" data-action="remove" data-path="${path}" data-index="${i}" aria-label="${tr(`Fjern barn ${i + 1}`, `Remove child ${i + 1}`)}">${tr('Fjern', 'Remove')}</button>` : ''}
       </div>
-      <div class="aw-field"><span>Lever barnet?</span>${seg(`${path}.${i}.alive`, c.alive, [{ value: 'yes', label: 'Ja' }, { value: 'no', label: 'Nei, er død' }])}</div>
-      ${c.alive === 'no' ? `<div class="aw-field"><span>Hvor mange barn etterlot barnet seg? <small>Skriv 0 hvis ingen</small></span>${countInput(`${path}.${i}.grandchildren`, c.grandchildren)}</div>` : ''}
+      <div class="aw-field"><span>${tr('Lever barnet?', 'Is the child alive?')}</span>${seg(`${path}.${i}.alive`, c.alive, [{ value: 'yes', label: tr('Ja', 'Yes') }, { value: 'no', label: tr('Nei, er død', 'No, has died') }])}</div>
+      ${c.alive === 'no' ? `<div class="aw-field"><span>${tr('Hvor mange barn etterlot barnet seg?', 'How many children did the child leave?')} <small>${tr('Skriv 0 hvis ingen', 'Enter 0 if none')}</small></span>${countInput(`${path}.${i}.grandchildren`, c.grandchildren)}</div>` : ''}
     </div>`).join('')}
-    <button type="button" class="aw-add" data-action="add" data-path="${path}">${ICON.plus} Legg til barn</button>
+    <button type="button" class="aw-add" data-action="add" data-path="${path}">${ICON.plus} ${tr('Legg til barn', 'Add child')}</button>
   </div>`
 }
 
@@ -428,14 +433,14 @@ function renderSiblings(list) {
   return `<div class="aw-rows">${siblings.map((s, i) => `
     <div class="aw-row">
       <div class="aw-row-head">
-        <input class="aw-name" type="text" maxlength="40" placeholder="Søsken ${i + 1} (navn er valgfritt)" data-path="siblings.${i}.name" value="${esc(s.name || '')}">
-        ${siblings.length > 1 ? `<button type="button" class="aw-remove" data-action="remove" data-path="siblings" data-index="${i}" aria-label="Fjern søsken ${i + 1}">Fjern</button>` : ''}
+        <input class="aw-name" type="text" maxlength="40" placeholder="${tr(`Søsken ${i + 1} (navn er valgfritt)`, `Sibling ${i + 1} (name is optional)`)}" data-path="siblings.${i}.name" value="${esc(s.name || '')}">
+        ${siblings.length > 1 ? `<button type="button" class="aw-remove" data-action="remove" data-path="siblings" data-index="${i}" aria-label="${tr(`Fjern søsken ${i + 1}`, `Remove sibling ${i + 1}`)}">${tr('Fjern', 'Remove')}</button>` : ''}
       </div>
-      <div class="aw-field"><span>Hvilke foreldre hadde de felles?</span>${seg(`siblings.${i}.type`, s.type, [{ value: 'full', label: 'Samme mor og far' }, { value: 'halfMother', label: 'Bare samme mor' }, { value: 'halfFather', label: 'Bare samme far' }])}</div>
-      <div class="aw-field"><span>Lever søskenet?</span>${seg(`siblings.${i}.alive`, s.alive, [{ value: 'yes', label: 'Ja' }, { value: 'no', label: 'Nei, er død' }])}</div>
-      ${s.alive === 'no' ? `<div class="aw-field"><span>Hvor mange barn har søskenet som lever? <small>Skriv 0 hvis ingen</small></span>${countInput(`siblings.${i}.children`, s.children)}</div>` : ''}
+      <div class="aw-field"><span>${tr('Hvilke foreldre hadde de felles?', 'Which parents did they share?')}</span>${seg(`siblings.${i}.type`, s.type, [{ value: 'full', label: tr('Samme mor og far', 'Same mother and father') }, { value: 'halfMother', label: tr('Bare samme mor', 'Same mother only') }, { value: 'halfFather', label: tr('Bare samme far', 'Same father only') }])}</div>
+      <div class="aw-field"><span>${tr('Lever søskenet?', 'Is the sibling alive?')}</span>${seg(`siblings.${i}.alive`, s.alive, [{ value: 'yes', label: tr('Ja', 'Yes') }, { value: 'no', label: tr('Nei, er død', 'No, has died') }])}</div>
+      ${s.alive === 'no' ? `<div class="aw-field"><span>${tr('Hvor mange barn har søskenet som lever?', 'How many living children does the sibling have?')} <small>${tr('Skriv 0 hvis ingen', 'Enter 0 if none')}</small></span>${countInput(`siblings.${i}.children`, s.children)}</div>` : ''}
     </div>`).join('')}
-    <button type="button" class="aw-add" data-action="add" data-path="siblings">${ICON.plus} Legg til søsken</button>
+    <button type="button" class="aw-add" data-action="add" data-path="siblings">${ICON.plus} ${tr('Legg til søsken', 'Add sibling')}</button>
   </div>`
 }
 
@@ -445,20 +450,24 @@ function renderGrandparents(v = {}) {
     const relatives = Array.isArray(g.relatives) ? g.relatives : []
     const someoneDead = g.gp1 === 'no' || g.gp2 === 'no'
     const base = `grandparents.${side.key}`
+    const label = field(side, 'label'), gp1 = field(side, 'gp1').toLowerCase(), gp2 = field(side, 'gp2').toLowerCase()
+    const yesNo = [{ value: 'yes', label: tr('Ja', 'Yes') }, { value: 'no', label: tr('Nei', 'No') }]
     return `<div class="aw-row">
-      <div class="aw-row-title">${side.label}</div>
-      <div class="aw-field"><span>Lever ${side.gp1.toLowerCase()}?</span>${seg(`${base}.gp1`, g.gp1, [{ value: 'yes', label: 'Ja' }, { value: 'no', label: 'Nei' }])}</div>
-      <div class="aw-field"><span>Lever ${side.gp2.toLowerCase()}?</span>${seg(`${base}.gp2`, g.gp2, [{ value: 'yes', label: 'Ja' }, { value: 'no', label: 'Nei' }])}</div>
+      <div class="aw-row-title">${label}</div>
+      <div class="aw-field"><span>${tr(`Lever ${gp1}?`, `Is the ${gp1} alive?`)}</span>${seg(`${base}.gp1`, g.gp1, yesNo)}</div>
+      <div class="aw-field"><span>${tr(`Lever ${gp2}?`, `Is the ${gp2} alive?`)}</span>${seg(`${base}.gp2`, g.gp2, yesNo)}</div>
       ${someoneDead ? `<div class="aw-sub">
-        <p class="aw-hint">Tanter og onkler på ${side.label.toLowerCase()} – altså barna til ${side.gp1.toLowerCase()} og ${side.gp2.toLowerCase()}, bortsett fra avdødes ${side.key === 'father' ? 'far' : 'mor'}. La listen være tom hvis det ikke finnes noen.</p>
+        <p class="aw-hint">${tr(
+          `Tanter og onkler på ${label.toLowerCase()} – altså barna til ${gp1} og ${gp2}, bortsett fra avdødes ${side.key === 'father' ? 'far' : 'mor'}. La listen være tom hvis det ikke finnes noen.`,
+          `Aunts and uncles on the ${label.toLowerCase()} – that is, the children of the ${gp1} and the ${gp2}, apart from the deceased's ${side.key === 'father' ? 'father' : 'mother'}. Leave the list empty if there are none.`)}</p>
         ${relatives.map((r, i) => `<div class="aw-subrow">
-          <div class="aw-row-head"><input class="aw-name" type="text" maxlength="40" placeholder="Tante/onkel ${i + 1}" data-path="${base}.relatives.${i}.name" value="${esc(r.name || '')}">
-          <button type="button" class="aw-remove" data-action="removeNested" data-path="${base}.relatives" data-index="${i}">Fjern</button></div>
-          <div class="aw-field"><span>Hvem er foreldrene?</span>${seg(`${base}.relatives.${i}.type`, r.type, [{ value: 'full', label: `Både ${side.gp1.toLowerCase()} og ${side.gp2.toLowerCase()}` }, { value: 'half1', label: `Bare ${side.gp1.toLowerCase()}` }, { value: 'half2', label: `Bare ${side.gp2.toLowerCase()}` }])}</div>
-          <div class="aw-field"><span>Lever hen?</span>${seg(`${base}.relatives.${i}.alive`, r.alive, [{ value: 'yes', label: 'Ja' }, { value: 'no', label: 'Nei' }])}</div>
-          ${r.alive === 'no' ? `<div class="aw-field"><span>Hvor mange barn (avdødes søskenbarn) lever?</span>${countInput(`${base}.relatives.${i}.children`, r.children)}</div>` : ''}
+          <div class="aw-row-head"><input class="aw-name" type="text" maxlength="40" placeholder="${tr(`Tante/onkel ${i + 1}`, `Aunt/uncle ${i + 1}`)}" data-path="${base}.relatives.${i}.name" value="${esc(r.name || '')}">
+          <button type="button" class="aw-remove" data-action="removeNested" data-path="${base}.relatives" data-index="${i}">${tr('Fjern', 'Remove')}</button></div>
+          <div class="aw-field"><span>${tr('Hvem er foreldrene?', 'Who are the parents?')}</span>${seg(`${base}.relatives.${i}.type`, r.type, [{ value: 'full', label: tr(`Både ${gp1} og ${gp2}`, `Both the ${gp1} and the ${gp2}`) }, { value: 'half1', label: tr(`Bare ${gp1}`, `Only the ${gp1}`) }, { value: 'half2', label: tr(`Bare ${gp2}`, `Only the ${gp2}`) }])}</div>
+          <div class="aw-field"><span>${tr('Lever hen?', 'Are they alive?')}</span>${seg(`${base}.relatives.${i}.alive`, r.alive, yesNo)}</div>
+          ${r.alive === 'no' ? `<div class="aw-field"><span>${tr('Hvor mange barn (avdødes søskenbarn) lever?', 'How many of their children (cousins of the deceased) are alive?')}</span>${countInput(`${base}.relatives.${i}.children`, r.children)}</div>` : ''}
         </div>`).join('')}
-        <button type="button" class="aw-add" data-action="addNested" data-path="${base}.relatives">${ICON.plus} Legg til tante eller onkel</button>
+        <button type="button" class="aw-add" data-action="addNested" data-path="${base}.relatives">${ICON.plus} ${tr('Legg til tante eller onkel', 'Add aunt or uncle')}</button>
       </div>` : ''}
     </div>`
   }).join('')}</div>`
@@ -471,26 +480,30 @@ function renderAssets(v, facts, a) {
   const sepSurvivor = sep && ['survivor', 'both'].includes(a.separatePropertyWho)
   const couple = fill('{couple}', facts)
   const intro = married
-    ? `<p class="aw-hint aw-hint-box">Ta med alt <strong>${couple} eide til sammen</strong> – både det som sto på avdøde og på gjenlevende. Ektefellers felles formue deles først i to like deler. Bare avdødes halvdel er arv.${sep ? ' Det som etter ektepakten skal holdes utenfor, fører du opp nederst.' : ''}</p>`
+    ? `<p class="aw-hint aw-hint-box">${tr(
+      `Ta med alt <strong>${couple} eide til sammen</strong> – både det som sto på avdøde og på gjenlevende. Ektefellers felles formue deles først i to like deler. Bare avdødes halvdel er arv.${sep ? ' Det som etter ektepakten skal holdes utenfor, fører du opp nederst.' : ''}`,
+      `Include everything <strong>${couple} owned together</strong> – both what was in the deceased's name and in the surviving spouse's name. Spouses' joint property is first split into two equal halves. Only the deceased's half is inheritance.${sep ? ' What the prenuptial agreement keeps separate is entered at the bottom.' : ''}`)}</p>`
     : facts.cohabitant
-      ? '<p class="aw-hint aw-hint-box">Ta bare med det <strong>avdøde eide</strong>. Eide dere noe sammen, for eksempel boligen, fører du opp avdødes andel. Det samboeren eier selv, er ikke en del av arven.</p>'
-      : '<p class="aw-hint aw-hint-box">Ta med det avdøde eide og skyldte. Omtrentlige beløp holder.</p>'
+      ? `<p class="aw-hint aw-hint-box">${tr('Ta bare med det <strong>avdøde eide</strong>. Eide dere noe sammen, for eksempel boligen, fører du opp avdødes andel. Det samboeren eier selv, er ikke en del av arven.', 'Only include what <strong>the deceased owned</strong>. If you owned something together, for example the home, enter the deceased\'s share. What the cohabitant owns themselves is not part of the inheritance.')}</p>`
+      : `<p class="aw-hint aw-hint-box">${tr('Ta med det avdøde eide og skyldte. Omtrentlige beløp holder.', 'Include what the deceased owned and owed. Approximate amounts are fine.')}</p>`
+  const money = f => moneyInput(`assets.${f.key}`, v[f.key], field(f, 'label'), field(f, 'hint'))
+  const notAlsoAbove = tr('Ikke ta det med i feltene over også', 'Do not also include it in the fields above')
   return `${intro}
-  <fieldset class="aw-group"><legend>${married ? `Det ${couple} eide` : 'Det avdøde eide'}</legend>
-    ${ASSET_FIELDS.map(f => moneyInput(`assets.${f.key}`, v[f.key], f.label, f.hint)).join('')}
+  <fieldset class="aw-group"><legend>${married ? tr(`Det ${couple} eide`, `What ${couple} owned`) : tr('Det avdøde eide', 'What the deceased owned')}</legend>
+    ${ASSET_FIELDS.map(money).join('')}
   </fieldset>
-  <fieldset class="aw-group"><legend>${married ? `Det ${couple} skyldte` : 'Det avdøde skyldte'}</legend>
-    ${DEBT_FIELDS.map(f => moneyInput(`assets.${f.key}`, v[f.key], f.label, f.hint)).join('')}
+  <fieldset class="aw-group"><legend>${married ? tr(`Det ${couple} skyldte`, `What ${couple} owed`) : tr('Det avdøde skyldte', 'What the deceased owed')}</legend>
+    ${DEBT_FIELDS.map(money).join('')}
   </fieldset>
-  ${sepDeceased ? `<fieldset class="aw-group"><legend>Avdødes eiendeler som skal holdes utenfor (særeie)</legend>
-    ${moneyInput('assets.sepDeceasedAssets', v.sepDeceasedAssets, 'Verdi', 'Ikke ta det med i feltene over også')}
-    ${moneyInput('assets.sepDeceasedDebts', v.sepDeceasedDebts, 'Gjeld knyttet til dette')}
+  ${sepDeceased ? `<fieldset class="aw-group"><legend>${tr('Avdødes eiendeler som skal holdes utenfor (særeie)', 'The deceased\'s assets to be kept separate (separate property)')}</legend>
+    ${moneyInput('assets.sepDeceasedAssets', v.sepDeceasedAssets, tr('Verdi', 'Value'), notAlsoAbove)}
+    ${moneyInput('assets.sepDeceasedDebts', v.sepDeceasedDebts, tr('Gjeld knyttet til dette', 'Debt related to this'))}
   </fieldset>` : ''}
-  ${sepSurvivor ? `<fieldset class="aw-group"><legend>Gjenlevendes eiendeler som skal holdes utenfor (særeie)</legend>
-    ${moneyInput('assets.sepSurvivor', v.sepSurvivor, 'Verdi etter gjeld', 'Ikke ta det med i feltene over også')}
+  ${sepSurvivor ? `<fieldset class="aw-group"><legend>${tr('Gjenlevendes eiendeler som skal holdes utenfor (særeie)', 'The surviving spouse\'s assets to be kept separate (separate property)')}</legend>
+    ${moneyInput('assets.sepSurvivor', v.sepSurvivor, tr('Verdi etter gjeld', 'Value after debt'), notAlsoAbove)}
   </fieldset>` : ''}
-  <fieldset class="aw-group"><legend>Utgifter etter dødsfallet</legend>
-    ${moneyInput('assets.funeral', v.funeral, 'Begravelse og gravstein', 'Dekkes av boet før arven fordeles')}
+  <fieldset class="aw-group"><legend>${tr('Utgifter etter dødsfallet', 'Expenses after the death')}</legend>
+    ${moneyInput('assets.funeral', v.funeral, tr('Begravelse og gravstein', 'Funeral and headstone'), tr('Dekkes av boet før arven fordeles', 'Paid by the estate before the inheritance is distributed'))}
   </fieldset>
   <div class="aw-live" aria-live="polite">${liveTotal(v)}</div>`
 }
@@ -499,7 +512,7 @@ function liveTotal(v) {
   const n = x => { const k = Number(String(x ?? '').replace(/\s/g, '').replace(',', '.')); return Number.isFinite(k) && k > 0 ? k : 0 }
   const assets = ASSET_FIELDS.reduce((s, f) => s + n(v[f.key]), 0)
   const debts = DEBT_FIELDS.reduce((s, f) => s + n(v[f.key]), 0)
-  return `<span>Eiendeler ${kr(assets)}</span><span>− Gjeld ${kr(debts)}</span><strong>= ${kr(assets - debts)}</strong>`
+  return `<span>${tr('Eiendeler', 'Assets')} ${kr(assets)}</span><span>− ${tr('Gjeld', 'Debt')} ${kr(debts)}</span><strong>= ${kr(assets - debts)}</strong>`
 }
 
 // ── Oversikt over svar ──────────────────────────────────────
@@ -515,25 +528,25 @@ function renderReview(facts, a) {
   const flagTag = id => {
     const own = flags.filter(f => f.questionId === id)
     if (!own.length) return ''
-    const label = own.some(f => f.kind === 'blocker') ? 'Hindrer beregningen' : 'Gjør fordelingen usikker'
-    return `<span class="aw-flag-tag" title="${esc(own.map(f => f.title).join(' · '))}">${ICON.warn}${label}</span>`
+    const label = own.some(f => f.kind === 'blocker') ? tr('Hindrer beregningen', 'Prevents the calculation') : tr('Gjør fordelingen usikker', 'Makes the distribution uncertain')
+    return `<span class="aw-flag-tag" title="${esc(own.map(f => field(f, 'title')).join(' · '))}">${ICON.warn}${label}</span>`
   }
   return `
   <div class="aw-card">
-    <span class="eyebrow">Dine svar</span>
-    <h3 class="aw-title" tabindex="-1" data-autofocus>Se over og endre svarene dine</h3>
-    <p class="aw-why">Trykk på «Endre» ved et svar for å rette det. Du kommer tilbake hit etterpå, og resultatet oppdateres automatisk.</p>
+    <span class="eyebrow">${tr('Dine svar', 'Your answers')}</span>
+    <h3 class="aw-title" tabindex="-1" data-autofocus>${tr('Se over og endre svarene dine', 'Review and change your answers')}</h3>
+    <p class="aw-why">${tr('Trykk på «Endre» ved et svar for å rette det. Du kommer tilbake hit etterpå, og resultatet oppdateres automatisk.', 'Press «Change» next to an answer to correct it. You will come back here afterwards, and the result is updated automatically.')}</p>
     ${groups.map(g => `
       <h4 class="aw-review-section">${esc(g.section)}</h4>
       <dl class="aw-review">${g.rows.map(r => `
-        <div><dt>${esc(r.question)}</dt><dd>${r.answer === 'Ikke besvart' ? '<em>Ikke besvart</em>' : esc(r.answer)}${flagTag(r.id)}</dd>
-        <button type="button" class="aw-link" data-action="edit" data-q="${r.id}" aria-label="Endre: ${esc(r.question)}">${ICON.edit} Endre</button></div>`).join('')}
+        <div><dt>${esc(r.question)}</dt><dd>${r.unanswered ? `<em>${esc(r.answer)}</em>` : esc(r.answer)}${flagTag(r.id)}</dd>
+        <button type="button" class="aw-link" data-action="edit" data-q="${r.id}" aria-label="${tr('Endre', 'Change')}: ${esc(r.question)}">${ICON.edit} ${tr('Endre', 'Change')}</button></div>`).join('')}
       </dl>`).join('')}
     <div class="aw-nav">
-      <button type="button" class="aw-btn ghost" data-action="restart">Start på nytt</button>
+      <button type="button" class="aw-btn ghost" data-action="restart">${tr('Start på nytt', 'Start again')}</button>
       ${missing
-        ? `<button type="button" class="aw-btn primary" data-action="edit" data-q="${missing.id}">Svar på det som mangler ${ICON.arrow}</button>`
-        : `<button type="button" class="aw-btn primary" data-action="result">Se resultatet ${ICON.arrow}</button>`}
+        ? `<button type="button" class="aw-btn primary" data-action="edit" data-q="${missing.id}">${tr('Svar på det som mangler', 'Answer what is missing')} ${ICON.arrow}</button>`
+        : `<button type="button" class="aw-btn primary" data-action="result">${tr('Se resultatet', 'See the result')} ${ICON.arrow}</button>`}
     </div>
   </div>`
 }
@@ -543,9 +556,9 @@ function notice(n, facts) {
   return `<div class="aw-notice ${n.level}">
     <div class="aw-notice-icon">${n.level === 'info' ? ICON.info : ICON.warn}</div>
     <div>
-      <h4>${esc(fill(n.title, facts))}</h4>
-      <p>${rich(n.text, facts)}</p>
-      ${n.more || n.sources?.length ? `<details class="aw-more"><summary>Les mer om hvorfor</summary>${n.more ? `<p>${rich(n.more, facts)}</p>` : ''}${sourceLinks(n.sources)}</details>` : ''}
+      <h4>${esc(fill(field(n, 'title'), facts))}</h4>
+      <p>${rich(field(n, 'text'), facts)}</p>
+      ${n.more || n.sources?.length ? `<details class="aw-more"><summary>${tr('Les mer om hvorfor', 'Read more about why')}</summary>${n.more ? `<p>${rich(field(n, 'more'), facts)}</p>` : ''}${sourceLinks(n.sources)}</details>` : ''}
     </div>
   </div>`
 }
@@ -559,8 +572,8 @@ function heirCards(people, E, facts, opts = {}) {
   return `<div class="aw-heirs">${people.map(p => `
     <div class="aw-heir ${p.isPartner ? 'partner' : ''} ${p.isTestament ? 'testament' : ''}">
       <div class="aw-heir-top">
-        <div><div class="aw-heir-name">${esc(p.label)}</div><div class="aw-heir-rel">${esc(p.relation)}${p.side ? ' · ' + esc(p.side) : ''}${p.common === 'no' ? ' · særkullsbarn' : ''}${p.fromFirst ? ' · inkl. ' + kr(p.fromFirst) + ' etter den som døde først' : ''}${p.advance ? ' · forskudd ' + kr(p.advance) + ' trukket fra' : ''}</div></div>
-        <div class="aw-heir-amount">${kr(p.amount)}<small>${E > 0 ? pct(p.amount / E) + ' av arven' : ''}</small></div>
+        <div><div class="aw-heir-name">${esc(p.label)}</div><div class="aw-heir-rel">${esc(p.relation)}${p.side ? ' · ' + esc(p.side) : ''}${p.common === 'no' ? ' · ' + tr('særkullsbarn', 'child from another relationship') : ''}${p.fromFirst ? ' · ' + tr(`inkl. ${kr(p.fromFirst)} etter den som døde først`, `incl. ${kr(p.fromFirst)} from the first to die`) : ''}${p.advance ? ' · ' + tr(`forskudd ${kr(p.advance)} trukket fra`, `advance of ${kr(p.advance)} deducted`) : ''}</div></div>
+        <div class="aw-heir-amount">${kr(p.amount)}<small>${E > 0 ? pct(p.amount / E) + tr(' av arven', ' of the inheritance') : ''}</small></div>
       </div>
       <div class="aw-heir-bar"><span style="width:${Math.max(2, (p.amount / max) * 100)}%"></span></div>
       ${opts.note?.(p) || ''}
@@ -572,14 +585,16 @@ function renderSkifte(r, facts) {
   const e = s.estate
   return `
   <div class="aw-block">
-    <h3>Slik fordeles boet hvis dere skifter nå</h3>
+    <h3>${tr('Slik fordeles boet hvis dere skifter nå', 'How the estate is divided if you settle it now')}</h3>
     ${s.fullE <= 0
-      ? `<p class="aw-lead">Etter at gjelden${e.funeral ? ' og begravelsen' : ''} er betalt, er det ingenting igjen å arve.</p>`
+      ? `<p class="aw-lead">${tr(`Etter at gjelden${e.funeral ? ' og begravelsen' : ''} er betalt, er det ingenting igjen å arve.`, `After the debts${e.funeral ? ' and the funeral' : ''} have been paid, there is nothing left to inherit.`)}</p>`
       : `<p class="aw-lead">${rich(r.howMuch, facts)}</p>`}
     ${waterfall(r)}
     ${s.fullE > 0 && s.people.length ? heirCards(s.people, s.fullE, facts) : ''}
-    ${s.toCharity > 0 ? `<div class="aw-flow"><div class="aw-flow-row total"><span>Til frivillig arbeid for barn og unge</span><strong>${kr(s.toCharity)}</strong></div></div>` : ''}
-    ${e.kind === 'married' && s.people.some(p => p.isPartner) ? `<p class="aw-hint">I tillegg beholder gjenlevende sin egen halvdel av felles formue (${kr(e.half)})${e.survivorSep ? ` og sitt særeie (${kr(e.survivorSep)})` : ''}. Det er ikke arv. Til sammen sitter gjenlevende igjen med <strong>${kr(e.half + e.survivorSep + s.partner.amount)}</strong>.</p>` : ''}
+    ${s.toCharity > 0 ? `<div class="aw-flow"><div class="aw-flow-row total"><span>${tr('Til frivillig arbeid for barn og unge', 'To voluntary work for children and young people')}</span><strong>${kr(s.toCharity)}</strong></div></div>` : ''}
+    ${e.kind === 'married' && s.people.some(p => p.isPartner) ? `<p class="aw-hint">${tr(
+      `I tillegg beholder gjenlevende sin egen halvdel av felles formue (${kr(e.half)})${e.survivorSep ? ` og sitt særeie (${kr(e.survivorSep)})` : ''}. Det er ikke arv. Til sammen sitter gjenlevende igjen med <strong>${kr(e.half + e.survivorSep + s.partner.amount)}</strong>.`,
+      `In addition, the surviving spouse keeps their own half of the joint property (${kr(e.half)})${e.survivorSep ? ` and their separate property (${kr(e.survivorSep)})` : ''}. That is not inheritance. In total the surviving spouse is left with <strong>${kr(e.half + e.survivorSep + s.partner.amount)}</strong>.`)}</p>` : ''}
     ${r.skifteNotices.map(n => notice(n, facts)).join('')}
   </div>`
 }
@@ -593,8 +608,8 @@ function renderUskifte(r, facts) {
     <p class="aw-lead">${rich(u.lead, facts)}</p>
     <div class="aw-flow">${u.rows.map(row => `<div class="aw-flow-row ${row.kind || ''}"><span>${esc(row.label)}</span><strong>${kr(row.amount)}</strong></div>`).join('')}</div>
     <div class="aw-cols">
-      <div><h4>Hva skjer nå</h4><ul class="aw-list">${u.now.map(t => `<li>${rich(t, facts)}</li>`).join('')}</ul></div>
-      <div><h4>Hva skjer senere</h4><ul class="aw-list">${u.later.map(t => `<li>${rich(t, facts)}</li>`).join('')}</ul></div>
+      <div><h4>${tr('Hva skjer nå', 'What happens now')}</h4><ul class="aw-list">${u.now.map(t => `<li>${rich(t, facts)}</li>`).join('')}</ul></div>
+      <div><h4>${tr('Hva skjer senere', 'What happens later')}</h4><ul class="aw-list">${u.later.map(t => `<li>${rich(t, facts)}</li>`).join('')}</ul></div>
     </div>
     <h4>${esc(u.consequencesTitle)}</h4>
     <ul class="aw-list">${u.consequences.map(t => `<li>${rich(t, facts)}</li>`).join('')}</ul>
@@ -608,22 +623,22 @@ function renderCompare(r, facts) {
   const u = r.uskifte
   return `
   <div class="aw-block">
-    <h3>Skifte nå eller uskifte – forskjellen kort fortalt</h3>
+    <h3>${tr('Skifte nå eller uskifte – forskjellen kort fortalt', 'Settle now or undivided estate – the difference in short')}</h3>
     <div class="aw-compare">
       <div class="aw-compare-col">
-        <h4>Skifte nå</h4>
+        <h4>${tr('Skifte nå', 'Settle now')}</h4>
         <ul class="aw-list">
-          ${s.people.map(p => `<li><strong>${esc(p.label)}</strong> får ${kr(p.amount)} nå.</li>`).join('')}
-          <li>Boet gjøres opp, og hver arving disponerer sin egen arv.</li>
-          <li>Arvingene som overtar boet, tar ansvar for avdødes gjeld.</li>
+          ${s.people.map(p => `<li>${tr(`<strong>${esc(p.label)}</strong> får ${kr(p.amount)} nå.`, `<strong>${esc(p.label)}</strong> gets ${kr(p.amount)} now.`)}</li>`).join('')}
+          <li>${tr('Boet gjøres opp, og hver arving disponerer sin egen arv.', 'The estate is settled, and each heir manages their own inheritance.')}</li>
+          <li>${tr('Arvingene som overtar boet, tar ansvar for avdødes gjeld.', 'The heirs who take over the estate take responsibility for the deceased\'s debts.')}</li>
         </ul>
       </div>
       <div class="aw-compare-col">
-        <h4>Uskifte</h4>
+        <h4>${tr('Uskifte', 'Undivided estate (uskifte)')}</h4>
         <ul class="aw-list">${u.compare.map(t => `<li>${rich(t, facts)}</li>`).join('')}</ul>
       </div>
     </div>
-    <p class="aw-hint">Velg «Skifte nå» eller «Uskifte» over for å se detaljene.</p>
+    <p class="aw-hint">${tr('Velg «Skifte nå» eller «Uskifte» over for å se detaljene.', 'Choose «Settle now» or «Undivided estate» above to see the details.')}</p>
   </div>`
 }
 
@@ -631,39 +646,40 @@ function isDirty() {
   return Boolean(host.saved) && !sameAnswers(host.saved.answers, state.answers)
 }
 function renderSaveCard(r) {
-  const date = d => new Date(d).toLocaleDateString('nb-NO', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+  const date = d => new Date(d).toLocaleDateString(dateLocale(), { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })
   const what = r.skifte
-    ? 'arvingene med beregnet fordeling, boets verdi og stegene dere bør gjøre'
-    : 'stegene dere bør gjøre'
+    ? tr('arvingene med beregnet fordeling, boets verdi og stegene dere bør gjøre', 'the heirs with the calculated distribution, the value of the estate and the steps you should take')
+    : tr('stegene dere bør gjøre', 'the steps you should take')
+  const saving = tr('Lagrer …', 'Saving …')
   let body
   if (!embedded) {
-    body = `<p>Opprett en gratis bruker i Arvklart, så tar vi vare på svarene og legger ${what} inn i et eget bo. Du kan når som helst komme tilbake og endre svarene.</p>
-      <a class="aw-btn primary" href="/veiviser" target="_top">${ICON.save} Opprett bruker og lagre</a>`
+    body = `<p>${tr(`Opprett en gratis bruker i Arvklart, så tar vi vare på svarene og legger ${what} inn i et eget bo. Du kan når som helst komme tilbake og endre svarene.`, `Create a free account in Arvklart, and we will keep your answers and add ${what} to an estate of its own. You can come back and change the answers at any time.`)}</p>
+      <a class="aw-btn primary" href="/veiviser" target="_top">${ICON.save} ${tr('Opprett bruker og lagre', 'Create account and save')}</a>`
   } else if (!host.loggedIn) {
-    body = `<p>Opprett en gratis bruker, så legger vi ${what} inn i et eget bo i Arvklart. Svarene tas vare på, og du kan når som helst gå tilbake og endre dem.</p>
+    body = `<p>${tr(`Opprett en gratis bruker, så legger vi ${what} inn i et eget bo i Arvklart. Svarene tas vare på, og du kan når som helst gå tilbake og endre dem.`, `Create a free account, and we will add ${what} to an estate of its own in Arvklart. Your answers are kept, and you can go back and change them at any time.`)}</p>
       <div class="aw-actions">
-        <button type="button" class="aw-btn primary" data-action="saveToEstate">${ICON.save} Opprett bruker og lagre</button>
-        <button type="button" class="aw-link" data-action="saveToEstate" data-login="1">Har du allerede bruker? Logg inn</button>
+        <button type="button" class="aw-btn primary" data-action="saveToEstate">${ICON.save} ${tr('Opprett bruker og lagre', 'Create account and save')}</button>
+        <button type="button" class="aw-link" data-action="saveToEstate" data-login="1">${tr('Har du allerede bruker? Logg inn', 'Already have an account? Log in')}</button>
       </div>`
   } else if (host.estate && host.estate.role !== 'admin') {
-    body = `<p>Bare administratorer av boet <strong>${esc(host.estate.name)}</strong> kan lagre resultatet der. Du kan likevel laste ned PDF-en og dele den.</p>`
+    body = `<p>${tr(`Bare administratorer av boet <strong>${esc(host.estate.name)}</strong> kan lagre resultatet der. Du kan likevel laste ned PDF-en og dele den.`, `Only administrators of the estate <strong>${esc(host.estate.name)}</strong> can save the result there. You can still download the PDF and share it.`)}</p>`
   } else if (host.estate) {
-    const status = host.saving ? 'Lagrer …'
-      : isDirty() ? 'Du har endret svarene etter at de sist ble lagret i boet.'
-        : host.saved ? `Sist lagret ${date(host.saved.savedAt)}.` : ''
-    body = `<p>Lagre resultatet i boet <strong>${esc(host.estate.name)}</strong>. Vi legger inn ${what}. Lagrer du på nytt etter å ha endret svarene, blir det som kom fra veiviseren oppdatert.</p>
+    const status = host.saving ? saving
+      : isDirty() ? tr('Du har endret svarene etter at de sist ble lagret i boet.', 'You have changed the answers since they were last saved to the estate.')
+        : host.saved ? tr(`Sist lagret ${date(host.saved.savedAt)}.`, `Last saved ${date(host.saved.savedAt)}.`) : ''
+    body = `<p>${tr(`Lagre resultatet i boet <strong>${esc(host.estate.name)}</strong>. Vi legger inn ${what}. Lagrer du på nytt etter å ha endret svarene, blir det som kom fra veiviseren oppdatert.`, `Save the result to the estate <strong>${esc(host.estate.name)}</strong>. We add ${what}. If you save again after changing the answers, what came from the guide is updated.`)}</p>
       ${status ? `<p class="aw-save-status ${isDirty() ? 'dirty' : ''}">${esc(status)}</p>` : ''}
       <div class="aw-actions">
-        <button type="button" class="aw-btn primary" data-action="saveToEstate" ${host.saving ? 'disabled' : ''}>${ICON.save} ${host.saved ? 'Oppdater boet' : 'Lagre i boet'}</button>
-        ${host.saved ? `<button type="button" class="aw-link" data-action="open" data-path="/estate/${esc(host.estate.id)}/heirs">Se arvinger</button>
-        <button type="button" class="aw-link" data-action="open" data-path="/estate/${esc(host.estate.id)}/tasks">Se oppgaver</button>` : ''}
+        <button type="button" class="aw-btn primary" data-action="saveToEstate" ${host.saving ? 'disabled' : ''}>${ICON.save} ${host.saved ? tr('Oppdater boet', 'Update the estate') : tr('Lagre i boet', 'Save to the estate')}</button>
+        ${host.saved ? `<button type="button" class="aw-link" data-action="open" data-path="/estate/${esc(host.estate.id)}/heirs">${tr('Se arvinger', 'See heirs')}</button>
+        <button type="button" class="aw-link" data-action="open" data-path="/estate/${esc(host.estate.id)}/tasks">${tr('Se oppgaver', 'See tasks')}</button>` : ''}
       </div>`
   } else {
-    body = `<p>Lagre resultatet i et av boene dine, eller opprett et nytt. Vi legger inn ${what}.</p>
-      <button type="button" class="aw-btn primary" data-action="saveToEstate" ${host.saving ? 'disabled' : ''}>${ICON.save} ${host.saving ? 'Lagrer …' : 'Lagre i et bo'}</button>`
+    body = `<p>${tr(`Lagre resultatet i et av boene dine, eller opprett et nytt. Vi legger inn ${what}.`, `Save the result to one of your estates, or create a new one. We add ${what}.`)}</p>
+      <button type="button" class="aw-btn primary" data-action="saveToEstate" ${host.saving ? 'disabled' : ''}>${ICON.save} ${host.saving ? saving : tr('Lagre i et bo', 'Save to an estate')}</button>`
   }
   return `<div class="aw-block aw-save" id="awSave">
-    <h3>Ta vare på resultatet</h3>
+    <h3>${tr('Ta vare på resultatet', 'Keep the result')}</h3>
     ${host.message ? `<p class="aw-save-msg ${host.message.type}" role="status">${esc(host.message.text)}</p>` : ''}
     ${body}
   </div>`
@@ -675,21 +691,21 @@ function renderResult() {
   const blocked = r.blockers.length > 0
 
   const head = `
-    <span class="eyebrow">Resultat</span>
-    <h3 class="aw-title" tabindex="-1" data-autofocus>${blocked ? 'Vi trenger litt mer informasjon' : 'Slik blir arveoppgjøret – basert på svarene dine'}</h3>
-    <p class="aw-disclaimer">Dette er en veiledende beregning etter gjeldende regler, basert på opplysningene du har gitt. Det kan finnes forhold vi ikke har tatt hensyn til.</p>
+    <span class="eyebrow">${tr('Resultat', 'Result')}</span>
+    <h3 class="aw-title" tabindex="-1" data-autofocus>${blocked ? tr('Vi trenger litt mer informasjon', 'We need a little more information') : tr('Slik blir arveoppgjøret – basert på svarene dine', 'Your inheritance settlement – based on your answers')}</h3>
+    <p class="aw-disclaimer">${tr('Dette er en veiledende beregning etter gjeldende regler, basert på opplysningene du har gitt. Det kan finnes forhold vi ikke har tatt hensyn til.', 'This is an indicative calculation under the current Norwegian rules, based on the information you have given. There may be circumstances we have not taken into account.')}${isEn() ? ' The Norwegian version of this guide is the authoritative one.' : ''}</p>
     <div class="aw-toolbar">
-      <button type="button" class="aw-btn ghost small-ghost" data-action="review">${ICON.edit} Endre svar</button>
-      <button type="button" class="aw-btn ghost small-ghost" data-action="pdf" ${pdfBusy ? 'disabled' : ''}>${ICON.download} ${pdfBusy ? 'Lager PDF …' : 'Last ned PDF'}</button>
-      <button type="button" class="aw-btn ghost small-ghost" data-action="gotoSave">${ICON.save} ${host.estate ? 'Lagre i boet' : 'Lagre i Arvklart'}</button>
+      <button type="button" class="aw-btn ghost small-ghost" data-action="review">${ICON.edit} ${tr('Endre svar', 'Change answers')}</button>
+      <button type="button" class="aw-btn ghost small-ghost" data-action="pdf" ${pdfBusy ? 'disabled' : ''}>${ICON.download} ${pdfBusy ? tr('Lager PDF …', 'Creating PDF …') : tr('Last ned PDF', 'Download PDF')}</button>
+      <button type="button" class="aw-btn ghost small-ghost" data-action="gotoSave">${ICON.save} ${host.estate ? tr('Lagre i boet', 'Save to the estate') : tr('Lagre i Arvklart', 'Save in Arvklart')}</button>
     </div>
     ${pdfError ? `<p class="aw-error" role="alert">${esc(pdfError)}</p>` : ''}`
 
   const blockers = blocked ? `
     <div class="aw-block">
       ${r.blockers.map(b => `<div class="aw-notice critical"><div class="aw-notice-icon">${ICON.warn}</div><div>
-        <h4>${esc(b.title)}</h4><p>${rich(b.text, facts)}</p>
-        ${b.questionId ? `<button type="button" class="aw-btn small" data-action="edit" data-q="${b.questionId}">Gå til spørsmålet</button>` : ''}
+        <h4>${esc(field(b, 'title'))}</h4><p>${rich(field(b, 'text'), facts)}</p>
+        ${b.questionId ? `<button type="button" class="aw-btn small" data-action="edit" data-q="${b.questionId}">${tr('Gå til spørsmålet', 'Go to the question')}</button>` : ''}
         ${sourceLinks(b.sources)}
       </div></div>`).join('')}
     </div>` : ''
@@ -700,16 +716,16 @@ function renderResult() {
       <div class="aw-notice warning aw-complex">
         <div class="aw-notice-icon">${ICON.warn}</div>
         <div>
-          <h4>Situasjonen deres kan være mer sammensatt enn veiviseren kan beregne</h4>
+          <h4>${tr('Situasjonen deres kan være mer sammensatt enn veiviseren kan beregne', 'Your situation may be more complex than the guide can calculate')}</h4>
           <p>${blocked
-            ? 'Når det som mangler er avklart, vil disse svarene i tillegg gjøre beregningen usikker:'
-            : 'Fordelingen vi viser, bygger på lovens hovedregler. Disse svarene gjør at den kan bli feil for dere:'}</p>
+            ? tr('Når det som mangler er avklart, vil disse svarene i tillegg gjøre beregningen usikker:', 'Once what is missing has been clarified, these answers will also make the calculation uncertain:')
+            : tr('Fordelingen vi viser, bygger på lovens hovedregler. Disse svarene gjør at den kan bli feil for dere:', 'The distribution we show is based on the main rules of the law. These answers mean it may be wrong for you:')}</p>
           <ol class="aw-reasons">${r.complexReasons.map(x => `<li>
-            <strong>${esc(fill(x.title, facts))}</strong>
-            <p>${rich(x.text, facts)}</p>
-            <button type="button" class="aw-link inline" data-action="edit" data-q="${x.questionId}">${ICON.edit} Se svaret ditt</button>
+            <strong>${esc(fill(field(x, 'title'), facts))}</strong>
+            <p>${rich(field(x, 'text'), facts)}</p>
+            <button type="button" class="aw-link inline" data-action="edit" data-q="${x.questionId}">${ICON.edit} ${tr('Se svaret ditt', 'See your answer')}</button>
           </li>`).join('')}</ol>
-          <p>${rich('Vurder å kontakte [[tingretten]] (gratis veiledning) eller en advokat før dere bestemmer dere.', facts)}</p>
+          <p>${rich(tr('Vurder å kontakte [[tingretten]] (gratis veiledning) eller en advokat før dere bestemmer dere.', 'Consider contacting the [[tingretten]] (free guidance) or a lawyer before you decide.'), facts)}</p>
           ${sourceLinks(['domstol_kontakt'])}
         </div>
       </div>
@@ -717,16 +733,16 @@ function renderResult() {
 
   const summary = `
     <div class="aw-summary">
-      <div class="aw-summary-item"><span class="aw-num">1</span><div><h4>Hvem arver?</h4><p>${rich(r.who, facts)}</p></div></div>
-      ${blocked ? '' : `<div class="aw-summary-item"><span class="aw-num">2</span><div><h4>Hvor mye?</h4><p>${rich(r.howMuchShort, facts)}</p></div></div>`}
-      <div class="aw-summary-item"><span class="aw-num">${blocked ? 2 : 3}</span><div><h4>Hva gjør jeg nå?</h4><p>${rich(r.firstStep, facts)}</p></div></div>
+      <div class="aw-summary-item"><span class="aw-num">1</span><div><h4>${tr('Hvem arver?', 'Who inherits?')}</h4><p>${rich(r.who, facts)}</p></div></div>
+      ${blocked ? '' : `<div class="aw-summary-item"><span class="aw-num">2</span><div><h4>${tr('Hvor mye?', 'How much?')}</h4><p>${rich(r.howMuchShort, facts)}</p></div></div>`}
+      <div class="aw-summary-item"><span class="aw-num">${blocked ? 2 : 3}</span><div><h4>${tr('Hva gjør jeg nå?', 'What do I do now?')}</h4><p>${rich(r.firstStep, facts)}</p></div></div>
     </div>`
 
   const situation = `
     <div class="aw-block">
-      <h3>Din situasjon</h3>
+      <h3>${tr('Din situasjon', 'Your situation')}</h3>
       ${r.situation.map(t => `<p>${rich(t, facts)}</p>`).join('')}
-      ${r.assumptions.length ? `<div class="aw-assumptions"><h4>Dette har vi lagt til grunn</h4><ul>${r.assumptions.map(a => `<li>${rich(a.text, facts)}${a.questionId ? ` <button type="button" class="aw-link inline" data-action="edit" data-q="${a.questionId}">Endre svar</button>` : ''}</li>`).join('')}</ul></div>` : ''}
+      ${r.assumptions.length ? `<div class="aw-assumptions"><h4>${tr('Dette har vi lagt til grunn', 'What we have assumed')}</h4><ul>${r.assumptions.map(a => `<li>${rich(field(a, 'text'), facts)}${a.questionId ? ` <button type="button" class="aw-link inline" data-action="edit" data-q="${a.questionId}">${tr('Endre svar', 'Change answer')}</button>` : ''}</li>`).join('')}</ul></div>` : ''}
     </div>`
 
   let distribution = ''
@@ -735,12 +751,12 @@ function renderResult() {
       const view = state.resultView || 'choose'
       distribution = `
       <div class="aw-block">
-        <h3>Hva ønsker du å se nærmere på?</h3>
+        <h3>${tr('Hva ønsker du å se nærmere på?', 'What would you like to look at more closely?')}</h3>
         <p>${rich(r.uskifte.choiceIntro, facts)}</p>
         <div class="aw-choice">
-          <button type="button" class="${view === 'skifte' ? 'on' : ''}" data-action="resultView" data-value="skifte"><strong>Skifte nå</strong><span>Se hvordan arven fordeles hvis dere gjør opp nå</span></button>
-          <button type="button" class="${view === 'uskifte' ? 'on' : ''}" data-action="resultView" data-value="uskifte"><strong>Uskifte</strong><span>Se hvordan uskifte fungerer for dere</span></button>
-          <button type="button" class="${view === 'compare' ? 'on' : ''}" data-action="resultView" data-value="compare"><strong>Jeg er usikker</strong><span>Se forskjellen side om side</span></button>
+          <button type="button" class="${view === 'skifte' ? 'on' : ''}" data-action="resultView" data-value="skifte"><strong>${tr('Skifte nå', 'Settle now')}</strong><span>${tr('Se hvordan arven fordeles hvis dere gjør opp nå', 'See how the inheritance is divided if you settle now')}</span></button>
+          <button type="button" class="${view === 'uskifte' ? 'on' : ''}" data-action="resultView" data-value="uskifte"><strong>${tr('Uskifte', 'Undivided estate')}</strong><span>${tr('Se hvordan uskifte fungerer for dere', 'See how an undivided estate works for you')}</span></button>
+          <button type="button" class="${view === 'compare' ? 'on' : ''}" data-action="resultView" data-value="compare"><strong>${tr('Jeg er usikker', 'I am not sure')}</strong><span>${tr('Se forskjellen side om side', 'See the difference side by side')}</span></button>
         </div>
       </div>
       ${view === 'skifte' ? renderSkifte(r, facts) : view === 'uskifte' ? renderUskifte(r, facts) : view === 'compare' ? renderCompare(r, facts) : ''}`
@@ -751,23 +767,23 @@ function renderResult() {
 
   const meaning = r.notices.length ? `
     <div class="aw-block">
-      <h3>Hva betyr dette for dere?</h3>
+      <h3>${tr('Hva betyr dette for dere?', 'What does this mean for you?')}</h3>
       ${r.notices.map(n => notice(n, facts)).join('')}
     </div>` : ''
 
   const steps = `
     <div class="aw-block">
-      <h3>Dette bør dere gjøre nå</h3>
-      <ol class="aw-timeline">${r.nextSteps.map(s => `<li><div><h4>${esc(fill(s.title, facts))}</h4><p>${rich(s.text, facts)}</p>${sourceLine(s.sources)}</div></li>`).join('')}</ol>
+      <h3>${tr('Dette bør dere gjøre nå', 'What you should do now')}</h3>
+      <ol class="aw-timeline">${r.nextSteps.map(s => `<li><div><h4>${esc(fill(field(s, 'title'), facts))}</h4><p>${rich(field(s, 'text'), facts)}</p>${sourceLine(s.sources)}</div></li>`).join('')}</ol>
     </div>`
 
   const method = `
     <details class="aw-block aw-method">
-      <summary><h3>Slik har vi kommet frem til dette</h3></summary>
-      <ol class="aw-method-list">${r.method.map(m => `<li>${rich(m.text, facts)}${sourceLinks(m.sources)}</li>`).join('')}</ol>
-      <h4>Kilder</h4>
-      <ul class="aw-source-list">${r.sourcesUsed.map(id => SOURCES[id]).filter(Boolean).map(s => `<li><a href="${esc(s.url)}" target="_blank" rel="noopener noreferrer">${esc(s.title)}</a>${s.note ? ` <small>${esc(s.note)}</small>` : ''}</li>`).join('')}</ul>
-      <p class="aw-hint">Grunnbeløpet (G) som er brukt: ${kr(r.G.value)} (gjelder fra ${new Date(r.G.from).toLocaleDateString('nb-NO', { day: 'numeric', month: 'long', year: 'numeric' })}).</p>
+      <summary><h3>${tr('Slik har vi kommet frem til dette', 'How we arrived at this')}</h3></summary>
+      <ol class="aw-method-list">${r.method.map(m => `<li>${rich(field(m, 'text'), facts)}${sourceLinks(m.sources)}</li>`).join('')}</ol>
+      <h4>${tr('Kilder', 'Sources')}</h4>
+      <ul class="aw-source-list">${r.sourcesUsed.map(id => SOURCES[id]).filter(Boolean).map(s => `<li><a href="${esc(s.url)}" target="_blank" rel="noopener noreferrer">${esc(field(s, 'title'))}</a>${s.note ? ` <small>${esc(field(s, 'note'))}</small>` : ''}</li>`).join('')}</ul>
+      <p class="aw-hint">${tr('Grunnbeløpet (G) som er brukt', 'The basic amount (G) used')}: ${kr(r.G.value)} (${tr('gjelder fra', 'valid from')} ${new Date(r.G.from).toLocaleDateString(dateLocale(), { day: 'numeric', month: 'long', year: 'numeric' })}).</p>
     </details>`
 
   return `
@@ -783,9 +799,9 @@ function renderResult() {
     ${method}
     ${renderSaveCard(r)}
     <div class="aw-nav aw-result-nav">
-      <button type="button" class="aw-btn ghost" data-action="review">${ICON.edit} Endre svar</button>
-      <button type="button" class="aw-btn ghost" data-action="pdf" ${pdfBusy ? 'disabled' : ''}>${ICON.download} Last ned PDF</button>
-      <button type="button" class="aw-btn ghost" data-action="restart">Start på nytt</button>
+      <button type="button" class="aw-btn ghost" data-action="review">${ICON.edit} ${tr('Endre svar', 'Change answers')}</button>
+      <button type="button" class="aw-btn ghost" data-action="pdf" ${pdfBusy ? 'disabled' : ''}>${ICON.download} ${tr('Last ned PDF', 'Download PDF')}</button>
+      <button type="button" class="aw-btn ghost" data-action="restart">${tr('Start på nytt', 'Start again')}</button>
     </div>
   </div>`
 }
@@ -834,7 +850,7 @@ root.addEventListener('click', e => {
       break
     }
     case 'restart':
-      if (!Object.keys(state.answers).length || confirm('Vil du slette svarene dine og starte på nytt?')) { state = fresh(); save(); go('intro') }
+      if (!Object.keys(state.answers).length || confirm(tr('Vil du slette svarene dine og starte på nytt?', 'Do you want to delete your answers and start again?'))) { state = fresh(); save(); go('intro') }
       break
     case 'next': nextQuestion(); break
     case 'ack': {
@@ -852,7 +868,7 @@ root.addEventListener('click', e => {
       pdfBusy = true; pdfError = null; render()
       import('./pdf.js')
         .then(m => m.downloadPdf(state.answers))
-        .catch(() => { pdfError = 'Vi klarte ikke å lage PDF-en. Sjekk nettforbindelsen og prøv igjen.' })
+        .catch(() => { pdfError = tr('Vi klarte ikke å lage PDF-en. Sjekk nettforbindelsen og prøv igjen.', 'We could not create the PDF. Check your connection and try again.') })
         .finally(() => { pdfBusy = false; render() })
       break
     }
@@ -948,11 +964,11 @@ window.addEventListener('message', e => {
       host.loggedIn = true
       state.synced = true
       save()
-      host.message = { type: 'ok', text: m.text || 'Lagret! Arvingene og stegene er lagt inn i boet.' }
+      host.message = { type: 'ok', text: m.text || tr('Lagret! Arvingene og stegene er lagt inn i boet.', 'Saved! The heirs and the steps have been added to the estate.') }
     } else if (m.cancelled) {
       host.message = null
     } else {
-      host.message = { type: 'error', text: m.error || 'Noe gikk galt under lagringen. Prøv igjen.' }
+      host.message = { type: 'error', text: m.error || tr('Noe gikk galt under lagringen. Prøv igjen.', 'Something went wrong while saving. Please try again.') }
     }
     render()
   }

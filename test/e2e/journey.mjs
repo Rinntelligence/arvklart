@@ -154,6 +154,28 @@ await check('Arving: ser egne ønsker ett trykk unna, ikke admin-verktøyene', a
   { estate_id: EST, user_id: U2, role: 'admin', joined_at: now, profiles: kari },
 ] } })
 
+// Arveveiviseren på engelsk (E1): bare med ?lang=en, som appen sender når VITE_GUIDE_EN er slått på
+await check('Veiviser: norsk som standard, engelsk grensesnitt med ?lang=en og merknad om at norsk gjelder', async page => {
+  await page.goto(`${BASE}/veiviser.html`)
+  await page.getByRole('heading', { name: 'Hvem arver – og hvor mye?' }).waitFor()
+  assert(await page.evaluate(() => document.documentElement.lang) === 'no', 'html lang er ikke no')
+  await page.goto(`${BASE}/veiviser.html?lang=en`)
+  await page.getByRole('heading', { name: 'Who inherits – and how much?' }).waitFor()
+  await page.getByText('the Norwegian version is the authoritative one', { exact: false }).first().waitFor()
+  await page.getByRole('heading', { name: 'Glossary' }).waitFor()
+  assert(await page.evaluate(() => document.documentElement.lang) === 'en', 'html lang er ikke en')
+  await page.getByRole('button', { name: 'Start', exact: true }).click()
+  await page.getByRole('button', { name: /Next/ }).waitFor()
+}, { loggedIn: false })
+
+await check('Veiviser i appen: uten VITE_GUIDE_EN får engelske brukere den norske veiviseren med forklaring', async page => {
+  await page.addInitScript(() => localStorage.setItem('hs_lang', 'en'))
+  await page.goto(`${BASE}/veiviser`)
+  await page.getByText('The inheritance guide follows Norwegian law and is only available in Norwegian.').waitFor()
+  const src = await page.locator('iframe').getAttribute('src')
+  assert(!src.includes('lang=en'), `iframe ber om engelsk uten at det er slått på: ${src}`)
+}, { loggedIn: false })
+
 await browser.close()
 console.log(results.join('\n'))
 process.exit(results.some(r => r.startsWith('FAIL')) ? 1 : 0)
