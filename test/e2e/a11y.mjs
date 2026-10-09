@@ -42,9 +42,9 @@ for (const p of PAGES) {
 }
 const check = checker(browser, results)
 
-await check('Tastatur: bokortet åpnes med Enter', async page => {
+await check('Tastatur: bokortet åpnes med Enter (lenken heter det som står på kortet)', async page => {
   await page.goto(`${BASE}/`)
-  const card = page.getByRole('link', { name: 'Åpne Testbo' })
+  const card = page.getByRole('link', { name: 'Testbo', exact: true })
   await card.focus()
   await page.keyboard.press('Enter')
   await page.waitForURL(`**/estate/${EST}`)
