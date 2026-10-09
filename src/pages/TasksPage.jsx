@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { supabase, getEstateMembers } from '../lib/supabase'
 import { isOverdue, formatDateOnly } from '../lib/format'
 import { L } from '../lib/lang'
+import { Modal } from '../components/UI'
 
 const tc = c => { if(!c)return'#FBF9F5'; const r=parseInt(c.slice(1,3),16),g=parseInt(c.slice(3,5),16),b=parseInt(c.slice(5,7),16); return(0.299*r+0.587*g+0.114*b)/255>0.55?'#3A2F26':'#FBF9F5' }
 
@@ -44,6 +45,7 @@ export default function TasksPage({ session, onToast, isDemo }) {
   const [members, setMembers] = useState([])
   const [loading, setLoading] = useState(true)
   const [showAdd, setShowAdd] = useState(false)
+  const [confirmTask, setConfirmTask] = useState(null)
   const [newTask, setNewTask] = useState({ title: '', description: '', category: 'Uke 1', due_date: '' })
   const [myRole, setMyRole] = useState('member')
 
@@ -201,12 +203,22 @@ export default function TasksPage({ session, onToast, isDemo }) {
                   <TaskRow key={task.id} task={task} members={members} session={session} myRole={myRole} readOnly={isDemo}
                     onToggle={() => toggleTask(task)}
                     onAssign={(uid) => assignTask(task.id, uid)}
-                    onDelete={() => deleteTask(task.id)} />
+                    onDelete={() => setConfirmTask(task)} />
                 ))}
               </div>
             </div>
           )
         })
+      )}
+      {confirmTask && (
+        <Modal onClose={() => setConfirmTask(null)} labelledBy="delete-task-title" maxWidth={400}>
+            <h3 id="delete-task-title" style={{ fontFamily:'Fraunces, serif', fontSize:'1.125rem', fontWeight:'400', color:'#3A2F26', marginBottom:'8px' }}>{L('Slette oppgaven?', 'Delete the task?')}</h3>
+            <p style={{ fontSize:'0.875rem', color:'#5C4530' }}>«{confirmTask.title}»</p>
+            <div style={{ display:'flex', gap:'10px', marginTop:'20px' }}>
+              <button onClick={() => setConfirmTask(null)} style={{ flex:1, minHeight:'44px', padding:'11px', background:'none', border:'1px solid #9A8B78', borderRadius:'8px', cursor:'pointer', color:'#5C4530', fontSize:'0.875rem', fontFamily:'Karla, sans-serif' }}>{L('Avbryt', 'Cancel')}</button>
+              <button onClick={() => { deleteTask(confirmTask.id); setConfirmTask(null) }} style={{ flex:1, minHeight:'44px', padding:'11px', background:'#8B3A3A', color:'#fff', border:'none', borderRadius:'8px', cursor:'pointer', fontSize:'0.875rem', fontFamily:'Karla, sans-serif' }}>{L('Slett', 'Delete')}</button>
+            </div>
+        </Modal>
       )}
     </div>
   )

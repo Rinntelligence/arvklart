@@ -294,7 +294,7 @@ export default function ConflictPage({ session, onToast }) {
       <div className="cf-modes" style={{ display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:'10px', marginBottom:'28px' }}>
         {[
           { id: 'lottery', title: L('Loddtrekning', 'Lottery'), desc: L('Tilfeldig trekk per gjenstand — rettferdig for emosjonelle gjenstander', 'Random draw per item — fair for sentimental items') },
-          { id: 'snake', title: L('Vekslende runder', 'Alternating rounds'), desc: L('Arvingene velger på omgang — snake draft', 'Heirs take turns choosing — snake draft') },
+          { id: 'snake', title: L('Vekslende runder', 'Alternating rounds'), desc: L('Arvingene velger én gjenstand hver, på omgang', 'Heirs take turns choosing one item each') },
           { id: 'equal', title: L('Jevn verdifordeling', 'Even value split'), desc: L('Algoritme balanserer total NOK-verdi per arving', 'An algorithm balances the total NOK value per heir') },
         ].map(m => (
           <button key={m.id} onClick={() => setMode(m.id)} style={{
@@ -385,7 +385,7 @@ export default function ConflictPage({ session, onToast }) {
       {mode === 'snake' && !draftStarted && (
         <div style={{ background:'#fff', border:'1px solid #D9CFC0', borderRadius:'12px', padding:'28px', maxWidth:'500px' }}>
           <h3 style={{ fontFamily:'Fraunces, serif', fontSize:'1.125rem', fontWeight:'400', color:'#3A2F26', marginBottom:'4px' }}>{L('Rekkefølge', 'Picking order')}</h3>
-          <p style={{ fontSize:'0.8125rem', color:'#75604B', marginBottom:'20px' }}>{L('Runde 1: nedover. Runde 2: oppover. Osv. (slangeformat)', 'Round 1: top to bottom. Round 2: bottom to top. And so on (snake format)')}</p>
+          <p style={{ fontSize:'0.8125rem', color:'#75604B', marginBottom:'20px' }}>{L('Den som velger sist i én runde, velger først i neste. Slik blir det rettferdig for alle.', 'Whoever chooses last in one round chooses first in the next. That way it is fair to everyone.')}</p>
           <div style={{ display:'flex', flexDirection:'column', gap:'8px', marginBottom:'20px' }}>
             {snakeOrderIds.map((uid, i) => {
               const m = getMember(uid)

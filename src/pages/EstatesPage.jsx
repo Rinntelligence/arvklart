@@ -44,9 +44,8 @@ export default function EstatesPage({ session, profile, onToast }) {
     if (memberError) { onToast(L('Boet ble opprettet, men du ble ikke lagt til som admin: ', 'The estate was created, but you were not added as admin: ') + memberError.message, 'error'); setCreating(false); return }
     await ensureDefaultCategories(data.id)
     onToast(L('Bo opprettet! ✓', 'Estate created! ✓'))
-    setShowNew(false); setNewName(''); setNewDesc('')
-    load()
-    setCreating(false)
+    // Rett inn i det nye boet, der neste steg vises
+    navigate(`/estate/${data.id}`)
   }
 
   const joinByCode = async () => {
