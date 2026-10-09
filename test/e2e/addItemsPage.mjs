@@ -23,7 +23,7 @@ const run = async (name, fn) => {
 async function setup(browser, { lang = 'no', failCall = null, failEstimate = null, viewport = { width: 390, height: 844 }, v2 = null, estimateReply = null, hold = null } = {}) {
   const ctx = await browser.newContext({ viewport, deviceScaleFactor: 2, hasTouch: true, permissions: ['camera'] })
   const page = await ctx.newPage()
-  const calls = { analyze: 0, itemInserts: 0, uploads: 0, analyzeLangs: [], analyzeEstimate: [], estimate: 0, insertBodies: [], estimateBodies: [] }
+  const calls = { analyze: 0, itemInserts: 0, uploads: 0, analyzeLangs: [], analyzeEstates: [], analyzeEstimate: [], estimate: 0, insertBodies: [], estimateBodies: [] }
   await page.route('https://test.supabase.co/**', async route => {
     const req = route.request()
     const url = new URL(req.url())
@@ -32,6 +32,7 @@ async function setup(browser, { lang = 'no', failCall = null, failEstimate = nul
       calls.analyze++
       const body = JSON.parse(req.postData() || '{}')
       calls.analyzeLangs.push(body.lang)
+      calls.analyzeEstates.push(body.estate_id)
       calls.analyzeEstimate.push(Boolean(body.estimate))
       // hold: testen bestemmer når svaret kommer (for å sjekke siden mens AI-en analyserer)
       if (hold) await hold(calls.analyze)
@@ -193,6 +194,7 @@ await run('E: AI-analyse av sju lagrer ingenting; kortene kan redigeres; «Godkj
   await page.getByRole('button', { name: 'Analyser med AI (7)' }).click()
   await page.getByRole('button', { name: 'Godkjenn og lagre alle (7)' }).waitFor()
   assert.equal(calls.analyze, 7)
+  assert.deepEqual(calls.analyzeEstates, Array(7).fill(EST), 'boet sendes med (AI-budsjett per bo)')
   // T2: ingen verdiestimat i bulk, og verdifeltet er tomt
   assert.deepEqual(calls.analyzeEstimate, Array(7).fill(false))
   assert.equal(await page.getByText(/AI-estimat/).count(), 0)
@@ -382,6 +384,7 @@ await run('E3: verdianslaget bruker bildeanalysen (ingen bilder sendes), og AI-e
   await page.getByText('Veiledende AI-anslag, ikke en dokumentert markedsverdi', { exact: false }).waitFor()
   const sent = calls.estimateBodies[0]
   assert.equal(sent.analysis?.v, 2, 'analysen ble ikke sendt med')
+  assert.equal(sent.estate_id, EST, 'boet ble ikke sendt med (AI-budsjett per bo)')
   assert.ok(!('images' in sent) && !('imageBase64' in sent), 'bilder ble sendt til verdianslaget')
   await page.getByRole('button', { name: 'Godkjenn og lagre alle (1)' }).click()
   await page.getByText('✓ 1 gjenstand lagt til i boet').waitFor()

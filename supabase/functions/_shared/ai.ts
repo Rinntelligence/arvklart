@@ -33,22 +33,28 @@ function sessionId(req: Request) {
   }
 }
 
-type Quota = { ok: boolean; reason?: 'demo_limit' | 'rate_limit'; remaining?: number }
+type Quota = { ok: boolean; reason?: 'demo_limit' | 'rate_limit' | 'estate_limit' | 'not_member'; remaining?: number }
 
 // Registrerer ett AI-kall. Returnerer et ferdig 429-svar når grensen er nådd, ellers kvoten (til klienten)
 // og usage_id (raden målingene skrives til; mangler før 20261011_ai_usage_metrics.sql er kjørt).
-export async function claimAiCall(req: Request, user: User, fn: string): Promise<{ denied: Response | null; quota: Quota; usageId: number | null }> {
+const DENIED: Record<string, { status: number; message: string }> = {
+  demo_limit: { status: 429, message: 'Dette er en demo. Du må opprette et arveoppgjør i Arvklart for å bruke denne funksjonen.' },
+  rate_limit: { status: 429, message: 'Du har brukt AI-funksjonene mye den siste tiden. Prøv igjen senere.' },
+  estate_limit: { status: 429, message: 'Dette boet har brukt opp AI-kvoten for de siste 30 dagene.' },
+  not_member: { status: 403, message: 'Du er ikke medlem av dette boet.' },
+}
+
+// estateId: boet kallet gjelder (teller mot boets grense; brukeren må være medlem). null for eldre klienter.
+export async function claimAiCall(req: Request, user: User, fn: string, estateId: string | null = null): Promise<{ denied: Response | null; quota: Quota; usageId: number | null }> {
   const isDemo = isDemoEmail(user.email)
   const { data, error } = await adminClient().rpc('claim_ai_call', {
-    p_user_id: user.id, p_session_id: sessionId(req), p_fn: fn, p_is_demo: isDemo,
+    p_user_id: user.id, p_session_id: sessionId(req), p_fn: fn, p_is_demo: isDemo, ...(estateId ? { p_estate_id: estateId } : {}),
   })
   if (error) throw error
   const { usage_id, ...quota } = data as Quota & { usage_id?: number }
   if (quota.ok) return { denied: null, quota, usageId: usage_id ?? null }
-  const message = quota.reason === 'demo_limit'
-    ? 'Dette er en demo. Du må opprette et arveoppgjør i Arvklart for å bruke denne funksjonen.'
-    : 'Du har brukt AI-funksjonene mye den siste tiden. Prøv igjen senere.'
-  return { denied: json({ success: false, code: quota.reason, error: message }, 429), quota, usageId: null }
+  const d = DENIED[quota.reason || ''] || DENIED.rate_limit
+  return { denied: json({ success: false, code: quota.reason, error: d.message }, d.status), quota, usageId: null }
 }
 
 // Feil fra SDK-en gjøres om til faste koder

@@ -13,6 +13,10 @@ export type Effort = 'low' | 'medium' | 'high'
 // setter den tilbake uten ny deploy hvis kvaliteten faller.
 export const analyzeEffort = (env: string | undefined): Effort => (env === 'medium' || env === 'high' ? env : 'low')
 
+// Boet et AI-kall gjelder (estate_id fra klienten): en gyldig UUID, ellers null
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+export const readEstateId = (v: unknown): string | null => (typeof v === 'string' && UUID_RE.test(v) ? v.toLowerCase() : null)
+
 export function resolveModel(value: string | null | undefined): { model: Model; warning: string | null } {
   const v = (value || '').trim()
   if (!v || v === DEFAULT_MODEL) return { model: DEFAULT_MODEL, warning: null }

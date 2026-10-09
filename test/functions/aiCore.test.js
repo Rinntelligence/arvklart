@@ -37,6 +37,11 @@ describe('modell og parametre', { skip }, () => {
     assert.equal(p.messages[0].role, 'user', 'siste melding må være fra brukeren (ingen prefill)')
   })
 
+  test('estate_id fra klienten brukes bare når det er en UUID', () => {
+    assert.equal(ai.readEstateId('EEEE0000-0000-0000-0000-000000000001'), 'eeee0000-0000-0000-0000-000000000001')
+    for (const v of [null, undefined, '', 'abc', 42, "x' or 1=1"]) assert.equal(ai.readEstateId(v), null)
+  })
+
   test('systemprompten caches bare når cacheSystem er satt; ellers ren tekst som før', () => {
     const base = { model: 'claude-haiku-5-5', system: 'regler', content: 'c', schema: { type: 'object' }, maxTokens: 4000, effort: 'low' }
     assert.equal(ai.buildParams(base).system, 'regler')

@@ -23,7 +23,7 @@ const MAX_ITEMS = 20
 const MAX_PHOTOS = 5
 const MAX_IMAGE_SIZE = 10 * 1024 * 1024 // etter forminsking
 const AI_PARALLEL = 4
-const AI_STOP_CODES = ['demo_limit', 'rate_limit', 'ai_busy', 'ai_unavailable']
+const AI_STOP_CODES = ['demo_limit', 'rate_limit', 'estate_limit', 'not_member', 'ai_busy', 'ai_unavailable']
 
 let nextKey = 1
 const newDraft = () => ({
@@ -385,7 +385,7 @@ export default function AddItemsPage({ session, profile, onToast, isDemo }) {
   const analyzeOne = async (d, b) => {
     try {
       // Bare identifikasjon: ingen verdi i bulk (verdien er valgfri og fylles inn av brukeren)
-      const { result, quota } = await analyzeItemPhotos(d.photos.map(p => p.file), { categories })
+      const { result, quota } = await analyzeItemPhotos(d.photos.map(p => p.file), { categories, estateId: id })
       if (typeof quota?.remaining === 'number') setDemoRemaining(quota.remaining)
       // AI fyller bare felt brukeren ikke har endret selv (også ved «Prøv AI igjen»). Fikk kortet flere bilder
       // underveis (kameraet), analyseres det på nytt med alle bildene.
@@ -465,7 +465,7 @@ export default function AddItemsPage({ session, profile, onToast, isDemo }) {
       try {
         const cat = categories.find(c => c.id === d.categoryId)
         // Bildeanalysen sendes med, så anslaget bygger på den uten at bildene sendes igjen
-        const { estimate, insufficient, quota } = await requestValueEstimate({ title: d.title.trim(), description: d.description.trim(), category: cat?.label || '', condition: d.condition, analysis: d.analysis })
+        const { estimate, insufficient, quota } = await requestValueEstimate({ title: d.title.trim(), description: d.description.trim(), category: cat?.label || '', condition: d.condition, analysis: d.analysis, estateId: id })
         if (typeof quota?.remaining === 'number') setDemoRemaining(quota.remaining)
         // For lite grunnlag: ingen verdi (aldri 0 kr), men tips om hva som kan hjelpe
         if (insufficient) { update(d.key, { estimating: false, estimateMissing: insufficient.missing }); return }

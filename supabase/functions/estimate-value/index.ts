@@ -5,7 +5,7 @@
 // Krever innlogget bruker og teller mot AI-kvoten (demoen: 5 forsøk per besøk). Modell: se _shared/ai.ts.
 import { getUser, json, preflight, userClient } from '../_shared/http.ts'
 import { aiConfigured, aiErrorJson, aiErrorResponse, callStructured, claimAiCall, currentModel } from '../_shared/ai.ts'
-import { categoryKeyFor, depreciatedValue, readEstimateInput, type EstimateInput } from '../_shared/aiCore.ts'
+import { categoryKeyFor, depreciatedValue, readEstateId, readEstimateInput, type EstimateInput } from '../_shared/aiCore.ts'
 import { applyCorrections, normalizeAnalysis, type Analysis } from '../_shared/analysis.ts'
 import {
   ESTIMATE_SCHEMA_V2, VALUATION_VERSION, conditionGuidance, describeItem, finalizeEstimate, insufficientWithoutCall, validateEstimateV2, valuationSystem,
@@ -27,15 +27,16 @@ function readAnalysis(value: unknown): { analysis: Analysis | null; corrected: s
 }
 
 // Lagret gjenstand: hentes med brukerens egen innlogging, så RLS avgjør om brukeren har tilgang
-async function loadItem(req: Request, itemId: string): Promise<{ body: Record<string, unknown>; analysis: unknown } | null> {
+async function loadItem(req: Request, itemId: string): Promise<{ body: Record<string, unknown>; analysis: unknown; estateId: string | null } | null> {
   const { data } = await userClient(req).from('items')
-    .select('title, description, condition, purchase_price, purchase_year, ai_analysis, categories(label)')
+    .select('estate_id, title, description, condition, purchase_price, purchase_year, ai_analysis, categories(label)')
     .eq('id', itemId).maybeSingle()
   if (!data) return null
   const d = data as Record<string, unknown> & { categories?: { label?: string } | null }
   return {
     body: { title: d.title, description: d.description, condition: d.condition, purchase_price: d.purchase_price, purchase_year: d.purchase_year, category: d.categories?.label ?? '' },
     analysis: d.ai_analysis,
+    estateId: readEstateId(d.estate_id),
   }
 }
 
@@ -52,12 +53,14 @@ Deno.serve(async (req) => {
     const english = raw.lang === 'en'
     let body: Record<string, unknown> = raw
     let rawAnalysis: unknown = raw.analysis
+    let estateId = readEstateId(raw.estate_id)
     if (typeof raw.item_id === 'string') {
       if (!UUID.test(raw.item_id)) return json({ success: false, error: 'Ugyldig gjenstand' }, 400)
       const item = await loadItem(req, raw.item_id)
       if (!item) return json({ success: false, error: 'Fant ikke gjenstanden' }, 404)
       body = item.body
       rawAnalysis = item.analysis
+      estateId = item.estateId // boet gjenstanden hører til, ikke det klienten oppgir
     }
     const input = readEstimateInput(body)
     if (typeof input === 'string') return json({ success: false, error: input }, 400)
@@ -70,7 +73,7 @@ Deno.serve(async (req) => {
     const missing = insufficientWithoutCall(input.title, input.description, analysis, english)
     if (missing) return json({ success: true, data: insufficientResponse(missing, '', analysis) })
 
-    const { denied, quota, usageId } = await claimAiCall(req, user, 'estimate-value')
+    const { denied, quota, usageId } = await claimAiCall(req, user, 'estimate-value', estateId)
     if (denied) return denied
 
     const est = await callStructured({
