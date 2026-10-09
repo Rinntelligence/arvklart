@@ -8,6 +8,7 @@ import { removeImages, itemImageUrls } from '../lib/images'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
 import { L, locale } from '../lib/lang'
 import { categoryLabel } from '../lib/categories'
+import { Modal } from '../components/UI'
 
 const PALETTE = ['#5F6E52','#8B9A7D','#A97C3F','#7A8B6E','#9C8267','#6E8B87']
 
@@ -69,8 +70,8 @@ export default function EstatePage({ session, profile, onToast, isDemo }) {
     return () => supabase.removeChannel(channel)
   }, [id])
 
-  if (loading) return <div style={{ padding:'80px', textAlign:'center', color:'#9C8267', fontFamily:'Karla, sans-serif' }}>{L('Laster…', 'Loading…')}</div>
-  if (!estate) return <div style={{ padding:'60px', textAlign:'center', color:'#9C8267', fontFamily:'Karla, sans-serif' }}>{L('Fant ikke boet. Det kan være slettet, eller du er ikke medlem.', 'Estate not found. It may have been deleted, or you are not a member.')}</div>
+  if (loading) return <div style={{ padding:'80px', textAlign:'center', color:'#75604B', fontFamily:'Karla, sans-serif' }}>{L('Laster…', 'Loading…')}</div>
+  if (!estate) return <div style={{ padding:'60px', textAlign:'center', color:'#75604B', fontFamily:'Karla, sans-serif' }}>{L('Fant ikke boet. Det kan være slettet, eller du er ikke medlem.', 'Estate not found. It may have been deleted, or you are not a member.')}</div>
 
   const myItems = items.filter(i => i.interests?.some(x => x.user_id === session.user.id))
   const otherItems = items.filter(i => !i.interests?.some(x => x.user_id === session.user.id))
@@ -138,26 +139,26 @@ export default function EstatePage({ session, profile, onToast, isDemo }) {
 
   const statusBar = [
     { label:L('Tildelt', 'Assigned'), value:breakdown.assigned, color:'#5F6E52' },
-    { label:L('Ettertraktet', 'Contested'), value:breakdown.contested, color:'#9C8267' },
-    { label:L('Én vil ha', 'One wants it'), value:breakdown.single, color:'#8B9A7D' },
+    { label:L('Ettertraktet', 'Contested'), value:breakdown.contested, color:'#75604B' },
+    { label:L('Én vil ha', 'One wants it'), value:breakdown.single, color:'#5F6E52' },
     { label:L('Ingen vil ha', 'No one wants it'), value:breakdown.none, color:'#E8DFD0' },
   ]
 
-  const btn = { padding:'9px 16px', background:'#fff', border:'1px solid #D9CFC0', borderRadius:'8px', cursor:'pointer', color:'#5C4530', fontSize:'14px', fontFamily:'Karla, sans-serif' }
+  const btn = { padding:'9px 16px', background:'#fff', border:'1px solid #D9CFC0', borderRadius:'8px', cursor:'pointer', color:'#5C4530', fontSize:'0.875rem', fontFamily:'Karla, sans-serif' }
   const btnPrimary = { ...btn, background:'#3A2F26', border:'1px solid #3A2F26', color:'#FBF9F5' }
-  const sectionLabel = { fontSize:'13px', fontWeight:'500', marginBottom:'10px', textTransform:'uppercase', letterSpacing:'0.5px' }
+  const sectionLabel = { fontSize:'0.8125rem', fontWeight:'500', marginBottom:'10px', textTransform:'uppercase', letterSpacing:'0.5px' }
   const openItem = item => { sessionStorage.setItem('estate_scroll_' + id, window.scrollY); navigate(`/estate/${id}/item/${item.id}`) }
 
   return (
     <div style={{ maxWidth:'960px', margin:'0 auto', padding:'24px 16px 64px', fontFamily:'Karla, sans-serif' }}>
       <style>{`@media (max-width: 600px) { .item-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 10px !important; } }`}</style>
       {/* Header */}
-      <button onClick={() => navigate('/')} style={{ background:'none', border:'none', color:'#9C8267', cursor:'pointer', fontSize:'13px', padding:'0 0 8px', fontFamily:'Karla, sans-serif' }}>{L('← Alle bo', '← All estates')}</button>
+      <button onClick={() => navigate('/')} style={{ background:'none', border:'none', color:'#75604B', cursor:'pointer', fontSize:'0.8125rem', padding:'0 0 8px', fontFamily:'Karla, sans-serif' }}>{L('← Alle bo', '← All estates')}</button>
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-end', marginBottom:'20px', flexWrap:'wrap', gap:'12px' }}>
         <div>
-          <h1 style={{ fontFamily:'Fraunces, serif', fontSize:'26px', fontWeight:'400', color:'#3A2F26', marginBottom:'2px' }}>{estate.name}</h1>
-          {estate.description && <p style={{ color:'#9C8267', fontSize:'14px' }}>{estate.description}</p>}
-          <p style={{ color:'#9C8267', fontSize:'14px' }}>
+          <h1 style={{ fontFamily:'Fraunces, serif', fontSize:'1.625rem', fontWeight:'400', color:'#3A2F26', marginBottom:'2px' }}>{estate.name}</h1>
+          {estate.description && <p style={{ color:'#75604B', fontSize:'0.875rem' }}>{estate.description}</p>}
+          <p style={{ color:'#75604B', fontSize:'0.875rem' }}>
             {memberCount ? `${memberCount} ${memberCount === 1 ? L('medlem', 'member') : L('medlemmer', 'members')} · ` : ''}{items.length} {items.length === 1 ? L('gjenstand', 'item') : L('gjenstander', 'items')}
           </p>
         </div>
@@ -169,7 +170,7 @@ export default function EstatePage({ session, profile, onToast, isDemo }) {
       </div>
 
       {estate.status === 'closed' && (
-        <div style={{ background:'#E8DFD0', border:'1px solid #D9CFC0', borderRadius:'10px', padding:'12px 16px', marginBottom:'16px', fontSize:'13px', color:'#5C4530', lineHeight:1.5 }}>
+        <div style={{ background:'#E8DFD0', border:'1px solid #D9CFC0', borderRadius:'10px', padding:'12px 16px', marginBottom:'16px', fontSize:'0.8125rem', color:'#5C4530', lineHeight:1.5 }}>
           {L('Boet er avsluttet. Det slettes automatisk, med alle bilder og dokumenter, 12 måneder etter at det ble avsluttet.', 'This estate is closed. It is deleted automatically, with all photos and documents, 12 months after it was closed.')}
           {estate.closed_at && ` (${new Date(estate.closed_at).toLocaleDateString(locale(), { day:'numeric', month:'long', year:'numeric' })})`}
         </div>
@@ -179,13 +180,13 @@ export default function EstatePage({ session, profile, onToast, isDemo }) {
       {items.length > 0 && (
         <div style={{ background:'#fff', border:'1px solid #D9CFC0', borderRadius:'10px', padding:'20px', marginBottom:'16px' }}>
           <div style={{ display:'flex', justifyContent:'space-between', alignItems:'baseline', marginBottom:'10px', gap:'12px', flexWrap:'wrap' }}>
-            <span style={{ fontSize:'15px', fontWeight:'600', color:'#3A2F26' }}>{L('Status for boet', 'Estate status')}</span>
-            <span style={{ fontSize:'14px', color:'#9C8267' }}>{L(`${assigned} av ${items.length} fordelt`, `${assigned} of ${items.length} distributed`)}</span>
+            <span style={{ fontSize:'0.9375rem', fontWeight:'600', color:'#3A2F26' }}>{L('Status for boet', 'Estate status')}</span>
+            <span style={{ fontSize:'0.875rem', color:'#75604B' }}>{L(`${assigned} av ${items.length} fordelt`, `${assigned} of ${items.length} distributed`)}</span>
           </div>
           <div style={{ display:'flex', height:'10px', borderRadius:'5px', overflow:'hidden', background:'#E8DFD0' }}>
             {statusBar.map(s => s.value > 0 && <span key={s.label} style={{ width:`${s.value / items.length * 100}%`, background:s.color }} />)}
           </div>
-          <div style={{ display:'flex', flexWrap:'wrap', gap:'6px 20px', marginTop:'12px', fontSize:'13px', color:'#5C4530' }}>
+          <div style={{ display:'flex', flexWrap:'wrap', gap:'6px 20px', marginTop:'12px', fontSize:'0.8125rem', color:'#5C4530' }}>
             {statusBar.map(s => (
               <span key={s.label} style={{ display:'flex', alignItems:'center', gap:'6px' }}>
                 <i style={{ width:'10px', height:'10px', borderRadius:'2px', background:s.color, border: s.color === '#E8DFD0' ? '1px solid #D9CFC0' : 'none' }} />
@@ -200,28 +201,28 @@ export default function EstatePage({ session, profile, onToast, isDemo }) {
       {myUndecided > 0 ? (
         <div style={{ background:'#DCE3D2', borderRadius:'10px', padding:'16px 20px', marginBottom:'28px', display:'flex', justifyContent:'space-between', alignItems:'center', gap:'16px', flexWrap:'wrap' }}>
           <div>
-            <div style={{ fontSize:'15px', fontWeight:'600', color:'#3A2F26', marginBottom:'2px' }}>
+            <div style={{ fontSize:'0.9375rem', fontWeight:'600', color:'#3A2F26', marginBottom:'2px' }}>
               {L(
                 `Du har ${myUndecided} ${myUndecided === 1 ? 'gjenstand' : 'gjenstander'} du ikke har tatt stilling til`,
                 `You have ${myUndecided} ${myUndecided === 1 ? 'item' : 'items'} you have not decided on`,
               )}
             </div>
-            <div style={{ fontSize:'14px', color:'#5C4530' }}>{L('Si ja eller nei takk til hver av dem, så kan fordelingen starte.', 'Say yes or no thanks to each of them so the distribution can start.')}</div>
+            <div style={{ fontSize:'0.875rem', color:'#5C4530' }}>{L('Si ja eller nei takk til hver av dem, så kan fordelingen starte.', 'Say yes or no thanks to each of them so the distribution can start.')}</div>
           </div>
           <button onClick={() => navigate(`/estate/${id}/swipe`)} style={{ ...btnPrimary, background:'#5F6E52', border:'1px solid #5F6E52' }}>{L('Gå gjennom nå', 'Review now')}</button>
         </div>
       ) : remainingSteps > 0 ? (
         <div style={{ background:'#DCE3D2', borderRadius:'10px', padding:'16px 20px', marginBottom:'28px', display:'flex', justifyContent:'space-between', alignItems:'center', gap:'16px', flexWrap:'wrap' }}>
           <div>
-            <div style={{ fontSize:'15px', fontWeight:'600', color:'#3A2F26', marginBottom:'2px' }}>{L('Du har tatt stilling til alle gjenstandene', 'You have decided on all the items')}</div>
-            <div style={{ fontSize:'14px', color:'#5C4530' }}>{L(`${remainingSteps} steg gjenstår før boet er ferdig.`, `${remainingSteps} ${remainingSteps === 1 ? 'step remains' : 'steps remain'} before the estate is finished.`)}</div>
+            <div style={{ fontSize:'0.9375rem', fontWeight:'600', color:'#3A2F26', marginBottom:'2px' }}>{L('Du har tatt stilling til alle gjenstandene', 'You have decided on all the items')}</div>
+            <div style={{ fontSize:'0.875rem', color:'#5C4530' }}>{L(`${remainingSteps} steg gjenstår før boet er ferdig.`, `${remainingSteps} ${remainingSteps === 1 ? 'step remains' : 'steps remain'} before the estate is finished.`)}</div>
           </div>
           <button onClick={() => navigate(`/estate/${id}/status`)} style={{ ...btnPrimary, background:'#5F6E52', border:'1px solid #5F6E52' }}>{L('Se hva som gjenstår', 'See what remains')}</button>
         </div>
       ) : <div style={{ marginBottom:'12px' }} />}
 
       {/* Snarveier */}
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(160px,1fr))', gap:'8px', marginBottom:'32px' }}>
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(min(100%, 10rem), 1fr))', gap:'8px', marginBottom:'32px' }}>
         {[
           { path:`/estate/${id}/guide`, label:L('Veiviser', 'Guide'), desc:L('For arveprosessen', 'For the inheritance process') },
           { path:`/estate/${id}/heirs`, label:L('Arvinger', 'Heirs'), desc:L('Fordelingskalkulator', 'Distribution calculator') },
@@ -236,8 +237,8 @@ export default function EstatePage({ session, profile, onToast, isDemo }) {
             padding:'12px 14px', background:'#fff', border:`1px solid ${mod.highlight ? '#8B9A7D' : '#D9CFC0'}`,
             borderRadius:'8px', cursor:'pointer', textAlign:'left', fontFamily:'Karla, sans-serif',
           }}>
-            <div style={{ fontSize:'14px', color:'#3A2F26', marginBottom:'2px' }}>{mod.label}</div>
-            <div style={{ fontSize:'12px', color: mod.highlight ? '#5F6E52' : '#9C8267', fontWeight: mod.highlight ? '600' : '400' }}>{mod.desc}</div>
+            <div style={{ fontSize:'0.875rem', color:'#3A2F26', marginBottom:'2px' }}>{mod.label}</div>
+            <div style={{ fontSize:'0.75rem', color: mod.highlight ? '#5F6E52' : '#75604B', fontWeight: mod.highlight ? '600' : '400' }}>{mod.desc}</div>
           </button>
         ))}
       </div>
@@ -252,13 +253,13 @@ export default function EstatePage({ session, profile, onToast, isDemo }) {
               setTab('items'); setFilterStatus(t.key)
             }} style={{
               padding:'10px 12px', border:'none', background:'none', cursor:'pointer', whiteSpace:'nowrap',
-              fontSize:'14px', fontFamily:'Karla, sans-serif',
-              color: active ? '#3A2F26' : '#9C8267',
+              fontSize:'0.875rem', fontFamily:'Karla, sans-serif',
+              color: active ? '#3A2F26' : '#75604B',
               borderBottom: active ? '2px solid #3A2F26' : '2px solid transparent', marginBottom:'-1px',
               marginLeft: t.key === 'analytics' ? 'auto' : 0,
             }}>
               {t.label}
-              {t.count !== undefined && <span style={{ fontSize:'12px', background:'#E8DFD0', color:'#5C4530', borderRadius:'10px', padding:'1px 7px', marginLeft:'6px' }}>{t.count}</span>}
+              {t.count !== undefined && <span style={{ fontSize:'0.75rem', background:'#E8DFD0', color:'#5C4530', borderRadius:'10px', padding:'1px 7px', marginLeft:'6px' }}>{t.count}</span>}
             </button>
           )
         })}
@@ -267,18 +268,18 @@ export default function EstatePage({ session, profile, onToast, isDemo }) {
       {tab === 'analytics' ? (
         <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(280px, 1fr))', gap:'20px' }}>
           <div style={{ background:'#fff', border:'1px solid #D9CFC0', borderRadius:'12px', padding:'24px' }}>
-            <h3 style={{ fontFamily:'Fraunces, serif', fontSize:'16px', fontWeight:'400', color:'#3A2F26', marginBottom:'20px' }}>{L('Gjenstander per kategori', 'Items per category')}</h3>
+            <h3 style={{ fontFamily:'Fraunces, serif', fontSize:'1rem', fontWeight:'400', color:'#3A2F26', marginBottom:'20px' }}>{L('Gjenstander per kategori', 'Items per category')}</h3>
             <ResponsiveContainer width="100%" height={200}>
               <BarChart data={byCat} margin={{ bottom:40, left:-20 }}>
-                <XAxis dataKey="name" tick={{ fontSize:10, fill:'#9C8267' }} angle={-35} textAnchor="end" interval={0} />
-                <YAxis tick={{ fontSize:10, fill:'#9C8267' }} allowDecimals={false} />
+                <XAxis dataKey="name" tick={{ fontSize:10, fill:'#75604B' }} angle={-35} textAnchor="end" interval={0} />
+                <YAxis tick={{ fontSize:10, fill:'#75604B' }} allowDecimals={false} />
                 <Tooltip />
                 <Bar dataKey="count" fill="#5F6E52" radius={[4,4,0,0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
           <div style={{ background:'#fff', border:'1px solid #D9CFC0', borderRadius:'12px', padding:'24px' }}>
-            <h3 style={{ fontFamily:'Fraunces, serif', fontSize:'16px', fontWeight:'400', color:'#3A2F26', marginBottom:'20px' }}>Status</h3>
+            <h3 style={{ fontFamily:'Fraunces, serif', fontSize:'1rem', fontWeight:'400', color:'#3A2F26', marginBottom:'20px' }}>Status</h3>
             <ResponsiveContainer width="100%" height={200}>
               <PieChart>
                 <Pie data={pieData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={70} label={({ percent }) => `${(percent*100).toFixed(0)}%`} labelLine={false}>
@@ -293,8 +294,8 @@ export default function EstatePage({ session, profile, onToast, isDemo }) {
         <>
           {categories.length > 0 && (
             <div style={{ marginBottom:'20px' }}>
-              <select value={filterCat} onChange={e => setFilterCat(e.target.value)}
-                style={{ minWidth:'200px', padding:'9px 12px', border:'1px solid #D9CFC0', borderRadius:'8px', fontSize:'14px', background:'#fff', color:'#3A2F26', outline:'none', fontFamily:'Karla, sans-serif' }}>
+              <select value={filterCat} onChange={e => setFilterCat(e.target.value)} aria-label={L('Vis kategori', 'Show category')}
+                style={{ minWidth:'200px', padding:'9px 12px', border:'1px solid #9A8B78', borderRadius:'8px', fontSize:'0.875rem', background:'#fff', color:'#3A2F26', fontFamily:'Karla, sans-serif' }}>
                 <option value="all">{L('Alle kategorier', 'All categories')}</option>
                 {categories.map(c => <option key={c.id} value={c.id}>{c.emoji} {categoryLabel(c.label)}</option>)}
               </select>
@@ -311,13 +312,13 @@ export default function EstatePage({ session, profile, onToast, isDemo }) {
                 ))}
               </div>
               {otherItems.filter(i => filterCat === 'all' || i.category_id === filterCat).length > 0 && (
-                <div style={{ ...sectionLabel, color:'#9C8267' }}>{L('Andre gjenstander', 'Other items')}</div>
+                <div style={{ ...sectionLabel, color:'#75604B' }}>{L('Andre gjenstander', 'Other items')}</div>
               )}
             </div>
           )}
 
           {filtered.length === 0 ? (
-            <div style={{ textAlign:'center', padding:'80px 20px', color:'#9C8267' }}>
+            <div style={{ textAlign:'center', padding:'80px 20px', color:'#75604B' }}>
               <p style={{ marginBottom:'20px' }}>{items.length === 0 ? L('Ingen gjenstander ennå.', 'No items yet.') : L('Ingen gjenstander i dette utvalget.', 'No items in this selection.')}</p>
               {!isDemo && items.length === 0 && <button onClick={() => navigate(`/estate/${id}/add`)} style={{ ...btnPrimary, padding:'11px 24px' }}>
                 {L('Legg til første gjenstand', 'Add the first item')}
@@ -335,17 +336,15 @@ export default function EstatePage({ session, profile, onToast, isDemo }) {
       )}
 
       {confirmItem && (
-        <div onClick={() => setConfirmItem(null)} style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.5)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:200, padding:'20px' }}>
-          <div onClick={e => e.stopPropagation()} style={{ background:'#fff', borderRadius:'14px', padding:'28px', maxWidth:'380px', width:'100%' }}>
-            <h3 style={{ fontFamily:'Fraunces, serif', fontSize:'18px', fontWeight:'400', color:'#3A2F26', marginBottom:'8px' }}>{L('Slett gjenstand', 'Delete item')}</h3>
-            <p style={{ fontSize:'14px', color:'#5C4530', marginBottom:'6px' }}>«{confirmItem.title}»</p>
-            <p style={{ fontSize:'13px', color:'#9C8267', marginBottom:'24px' }}>{L('Kan ikke angres.', 'This cannot be undone.')}</p>
+        <Modal onClose={() => setConfirmItem(null)} labelledBy="delete-item-title" maxWidth={380}>
+            <h3 id="delete-item-title" style={{ fontFamily:'Fraunces, serif', fontSize:'1.125rem', fontWeight:'400', color:'#3A2F26', marginBottom:'8px' }}>{L('Slett gjenstand', 'Delete item')}</h3>
+            <p style={{ fontSize:'0.875rem', color:'#5C4530', marginBottom:'6px' }}>«{confirmItem.title}»</p>
+            <p style={{ fontSize:'0.8125rem', color:'#75604B', marginBottom:'24px' }}>{L('Kan ikke angres.', 'This cannot be undone.')}</p>
             <div style={{ display:'flex', gap:'10px' }}>
-              <button onClick={() => setConfirmItem(null)} style={{ flex:1, padding:'11px', background:'none', border:'1px solid #D9CFC0', borderRadius:'8px', cursor:'pointer', color:'#5C4530', fontSize:'14px', fontFamily:'Karla, sans-serif' }}>{L('Avbryt', 'Cancel')}</button>
-              <button onClick={confirmDelete} disabled={deleting} style={{ flex:1, padding:'11px', background:'#8B3A3A', color:'#fff', border:'none', borderRadius:'8px', cursor:'pointer', fontSize:'14px', fontFamily:'Karla, sans-serif' }}>{deleting ? L('Sletter…', 'Deleting…') : L('Slett', 'Delete')}</button>
+              <button onClick={() => setConfirmItem(null)} style={{ flex:1, padding:'11px', background:'none', border:'1px solid #D9CFC0', borderRadius:'8px', cursor:'pointer', color:'#5C4530', fontSize:'0.875rem', fontFamily:'Karla, sans-serif' }}>{L('Avbryt', 'Cancel')}</button>
+              <button onClick={confirmDelete} disabled={deleting} style={{ flex:1, padding:'11px', background:'#8B3A3A', color:'#fff', border:'none', borderRadius:'8px', cursor:'pointer', fontSize:'0.875rem', fontFamily:'Karla, sans-serif' }}>{deleting ? L('Sletter…', 'Deleting…') : L('Slett', 'Delete')}</button>
             </div>
-          </div>
-        </div>
+        </Modal>
       )}
     </div>
   )
@@ -378,26 +377,26 @@ function ItemCard({ item, userId, onClick, onDelete, myRole, isDemo }) {
     onMouseLeave={e => { e.currentTarget.style.transform='none'; e.currentTarget.style.boxShadow='none' }}>
 
       {canDelete && (
-        <button onClick={onDelete} style={{
+        <button onClick={onDelete} aria-label={L(`Slett «${item.title}»`, `Delete «${item.title}»`)} style={{
           position:'absolute', top:'8px', left:'8px', zIndex:10,
           background:'#8B3A3A', color:'#fff', border:'none',
-          borderRadius:'6px', padding:'3px 8px', cursor:'pointer',
-          fontSize:'11px', fontFamily:'Karla, sans-serif',
+          borderRadius:'8px', padding:'6px 12px', minHeight:'36px', cursor:'pointer',
+          fontSize:'0.8125rem', fontFamily:'Karla, sans-serif',
         }}>{L('Slett', 'Delete')}</button>
       )}
 
       <div style={{ height:'130px', background:'#E8DFD0', overflow:'hidden', position:'relative' }}>
         {item.image_url
           ? <img src={item.image_url} alt={item.title} style={{ width:'100%', height:'100%', objectFit:'contain' }} />
-          : <span style={{ position:'absolute', left:'10px', bottom:'8px', fontSize:'11px', color:'#9C8267' }}>{cat.emoji} {categoryLabel(cat.label)}</span>}
-        {count > 1 && !isAssigned && <span style={{ position:'absolute', top:'8px', right:'8px', background:'#5F6E52', color:'#fff', fontSize:'11px', padding:'2px 8px', borderRadius:'10px' }}>{L(`${count} vil ha`, `${count} want it`)}</span>}
-        {isAssigned && <span style={{ position:'absolute', top:'8px', right:'8px', background:'#8B9A7D', color:'#fff', fontSize:'11px', padding:'2px 8px', borderRadius:'10px' }}>{L('Tildelt', 'Assigned')}</span>}
+          : <span style={{ position:'absolute', left:'10px', bottom:'8px', fontSize:'0.6875rem', color:'#75604B' }}>{cat.emoji} {categoryLabel(cat.label)}</span>}
+        {count > 1 && !isAssigned && <span style={{ position:'absolute', top:'8px', right:'8px', background:'#5F6E52', color:'#fff', fontSize:'0.6875rem', padding:'2px 8px', borderRadius:'10px' }}>{L(`${count} vil ha`, `${count} want it`)}</span>}
+        {isAssigned && <span style={{ position:'absolute', top:'8px', right:'8px', background:'#5F6E52', color:'#fff', fontSize:'0.6875rem', padding:'2px 8px', borderRadius:'10px' }}>{L('Tildelt', 'Assigned')}</span>}
       </div>
 
       <div style={{ padding:'10px 12px 12px' }}>
-        <div style={{ fontSize:'14px', fontWeight:'500', color:'#3A2F26', marginBottom:'2px', lineHeight:'1.3' }}>{item.title}</div>
-        {item.estimated_value && <div style={{ fontSize:'12px', color:'#9C8267' }}>{formatNOK(item.estimated_value)}</div>}
-        <div style={{ marginTop:'8px', fontSize:'12px', color: count ? '#5C4530' : '#9C8267', fontStyle: count ? 'normal' : 'italic' }}>
+        <button onClick={e => { e.stopPropagation(); onClick() }} style={{ display:'block', width:'100%', textAlign:'left', background:'none', border:'none', padding:0, cursor:'pointer', fontFamily:'Karla, sans-serif', fontSize:'0.875rem', fontWeight:'500', color:'#3A2F26', marginBottom:'2px', lineHeight:'1.3' }}>{item.title}</button>
+        {item.estimated_value && <div style={{ fontSize:'0.75rem', color:'#75604B' }}>{formatNOK(item.estimated_value)}</div>}
+        <div style={{ marginTop:'8px', fontSize:'0.75rem', color: count ? '#5C4530' : '#75604B', fontStyle: count ? 'normal' : 'italic' }}>
           {count === 0 ? L('Ingen ennå', 'No one yet') : names === L('deg', 'you') ? L('Bare deg', 'Only you') : names.charAt(0).toUpperCase() + names.slice(1)}
         </div>
       </div>

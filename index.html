@@ -11,12 +11,19 @@
     <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,500;9..144,600&family=Karla:wght@300;400;500;600&display=swap" rel="stylesheet" />
     <style>
       *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-      html { font-size: 16px; }
+      /* Tekst i rem følger brukerens innstilling: nettleserens standardstørrelse, iPhone-innstillingen
+         (Dynamic Type) og valget «Tekststørrelse» i appen (src/lib/textSize.js). */
+      html { font-size: 100%; -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+      @supports (font: -apple-system-body) and (-webkit-touch-callout: none) { html { font: -apple-system-body; } }
       body { background: #FBF9F5; font-family: 'Karla', sans-serif; color: #3A2F26; -webkit-font-smoothing: antialiased; }
       ::-webkit-scrollbar { width: 5px; }
       ::-webkit-scrollbar-thumb { background: #D9CFC0; border-radius: 3px; }
       /* iOS zoomer inn på felt med skrift under 16px */
-      @media (max-width: 600px) { input, select, textarea { font-size: 16px !important; } }
+      @media (max-width: 600px) { input, select, textarea { font-size: max(16px, 1rem) !important; } }
+      /* Synlig tastaturfokus overalt (WCAG 2.4.7). Mørk sage gir 5,2:1 mot snow; mørke flater setter sin egen farge */
+      :focus-visible { outline: 3px solid #5F6E52; outline-offset: 2px; }
+      /* Tekst utenfor skjermen, for skjermlesere */
+      .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
     </style>
   </head>
   <body>

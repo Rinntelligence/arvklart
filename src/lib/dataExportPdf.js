@@ -4,7 +4,7 @@ import { L, locale } from './lang'
 
 const ESPRESSO = '#3A2F26'
 const WALNUT = '#5C4530'
-const LATTE = '#9C8267'
+const LATTE = '#75604B' // sekundærtekst med nok kontrast
 const BORDER = '#D9CFC0'
 
 const PROFILE_LABELS = {
