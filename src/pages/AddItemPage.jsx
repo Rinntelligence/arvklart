@@ -102,7 +102,7 @@ export default function AddItemPage({ session, profile, onToast, isDemo }) {
     if (isDemo && demoRemaining === 0) { setDemoBlocked(true); return }
     setAnalyzing(true)
     try {
-      const { result, quota } = await analyzeItemPhotos(imageFiles, { categories })
+      const { result, quota } = await analyzeItemPhotos(imageFiles, { categories, estateId: id })
       trackQuota({ quota })
       // AI fyller bare felt brukeren ikke har endret selv
       // Første kategori er forhåndsvalgt når siden lastes; den regnes ikke som brukerens eget valg
@@ -136,6 +136,7 @@ export default function AddItemPage({ session, profile, onToast, isDemo }) {
         purchase_price: purchasePrice ? parseFloat(purchasePrice) : undefined,
         purchase_year: purchaseYear ? parseInt(purchaseYear) : undefined,
         analysis, // bildeanalysen, så bildene ikke sendes igjen
+        estate_id: id, // teller mot boets AI-budsjett
         lang: isEn() ? 'en' : 'no',
       })
       trackQuota(res)

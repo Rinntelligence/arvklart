@@ -57,7 +57,7 @@ Tilgjengelighet (WCAG 2.2 AA): ikke bruk `outline:'none'`; fokus vises med `:foc
 - Admin-handlinger håndheves i databasen, ikke bare i UI: tildeling, kastmerking og verdi (trigger `guard_item_update` på `items`; verdien kan også endres av den som la inn gjenstanden), arvinger, kategorier og `remove_estate_member()`. Den som la inn en gjenstand kan slette den bare før den er tildelt
 - Migrasjoner: lag fil i `supabase/migrations/` med navn `YYYYMMDD_beskrivende_navn.sql`, test med `npm run test:db`
 - Edge Functions: `supabase/functions/<navn>/index.ts` (Deno). Felles kode i `supabase/functions/_shared/`. Funksjoner som koster penger (AI) skal kreve innlogget bruker (`getUser`)
-- AI: alle kall går til Claude Haiku 5.5 (`claude-haiku-5-5`; manuell tilbakerulling til `claude-haiku-4-5` med hemmeligheten `AI_MODEL`) via `callStructured()` i `_shared/ai.ts`. Kallene bruker strukturert svar (JSON-skjema) med validering i `_shared/aiCore.ts`, og høyst ett nytt forsøk. Ingen `temperature` eller prefill (gir 400 på 5.5); effort er `medium` for bildeanalyse og `low` for verdianslag. Hvert kall registreres med `claimAiCall()` først (tabellen `ai_usage`, som også får målinger) og gir faste feilkoder (`ai_refused`, `ai_busy` …) som appen oversetter i `aiErrorMessage()`. Grenser: 30 kall/time og 150/døgn per bruker; demoen 5 per besøk (økt) og 300/døgn totalt
+- AI: alle kall går til Claude Haiku 5.5 (`claude-haiku-5-5`; manuell tilbakerulling til `claude-haiku-4-5` med hemmeligheten `AI_MODEL`) via `callStructured()` i `_shared/ai.ts`. Kallene bruker strukturert svar (JSON-skjema) med validering i `_shared/aiCore.ts`, og høyst ett nytt forsøk. Ingen `temperature` eller prefill (gir 400 på 5.5); effort er `low` for både bildeanalyse og verdianslag (bildeanalysen kan settes tilbake til `medium` med hemmeligheten `ANALYZE_EFFORT=medium`, uten ny deploy), og systemprompten for bildeanalysen caches (`cacheSystem`). Hvert kall registreres med `claimAiCall()` først (tabellen `ai_usage`, som også får målinger) og gir faste feilkoder (`ai_refused`, `ai_busy` …) som appen oversetter i `aiErrorMessage()`. Grenser: 80 kall/time og 400/døgn per bruker, og 1 500 per bo de siste 30 dagene (`ai_usage.estate_id`; klienten sender `estate_id`, ved `item_id` brukes gjenstandens bo, og brukeren må være medlem); demoen 5 per besøk (økt) og 300/døgn totalt
 - AI-vurdering av bilder (`analyze-item`, skjema i `_shared/analysis.ts`) lagres i `items.ai_analysis` (jsonb, `v: 2`).
   - Feltet `ai` er AI-forslaget, og det endres aldri etter lagring.
   - `review` sier om brukeren godtok eller endret hvert forslag.
@@ -75,7 +75,7 @@ Tilgjengelighet (WCAG 2.2 AA): ikke bruk `outline:'none'`; fokus vises med `:foc
   - Koden trekker ikke fra noe i tillegg. Den gjør bare intervallet bredere og senker sikkerheten når grunnlaget er usikkert.
   - For lite grunnlag gir `status: 'insufficient'` med tips og ingen verdi (aldri 0 kr).
   - AI-ens anslag lagres i `ai_analysis.valuation`, adskilt fra `estimated_value`.
-- Storage: `estate-docs` er privat (`documents/<bo-id>/…`, åpnes med `createSignedUrl`); `item-images` er offentlig, nye filer lagres under `<bo-id>/…` (`src/lib/images.js`)
+- Storage: `estate-docs` er privat (`documents/<bo-id>/…`, åpnes med `createSignedUrl`); `item-images` vises med tidsbegrensede, signerte URL-er via `<StoredImage>` (`src/components/StoredImage.jsx`, `src/lib/imageUrls.js`). Databasen lagrer fortsatt den offentlige URL-en som identifikator. Bøtten gjøres privat i S3, så bruk aldri `<img src={item.image_url}>` direkte. Nye filer lagres under `<bo-id>/…` (`src/lib/images.js`)
 
 ## Demokonto
 `mona.demo@heirsplit.no` er en demo-bruker — ikke slett eller endre dennes data i databasen.
@@ -107,7 +107,7 @@ Hent verdiene fra Supabase Dashboard → Project Settings → API.
 | `/` | EstatesPage | Liste over brukerens bo |
 | `/estate/:id` | EstatePage | Bo-oversikt |
 | `/estate/:id/add` | AddItemPage | Legg til gjenstand (inkl. AI-analyse) |
-| `/estate/:id/add-many` | AddItemsPage | Legg til opptil 20 gjenstander: kamera i appen (ett bilde = én gjenstand, «Flere bilder av denne» for flere), kamerarull/filer/dra-og-slipp, AI analyserer alle (ett kall per gjenstand). AI lagrer aldri selv: brukeren ser over kortene og trykker «Godkjenn og lagre alle» |
+| `/estate/:id/add-many` | AddItemsPage | Legg til opptil 20 gjenstander: kamera i appen (ett bilde = én gjenstand, «Flere bilder av denne» for flere), kamerarull/filer/dra-og-slipp, AI analyserer alle (ett kall per gjenstand, høyst fire samtidig). Analysen låser bare kortene den gjelder, og etter første «Analyser med AI» analyseres nye bilder av seg selv. AI lagrer aldri selv: brukeren ser over kortene og trykker «Godkjenn og lagre alle» |
 | `/estate/:id/swipe` | SwipePage | Ta stilling til gjenstander (vil ha / nei takk) |
 | `/estate/:id/conflicts` | ConflictPage | Løsningsmetoder (bare admin fordeler) |
 | `/estate/:id/heirs` | HeirsPage | Arvinger; e-posten styrer hvem som kan bli med |
@@ -128,6 +128,9 @@ Hent verdiene fra Supabase Dashboard → Project Settings → API.
 ## GDPR og personvern
 - Samtykke til AI (bildeanalyse og verdiestimat) spørres om i `AddItemPage.jsx` og kan trekkes tilbake under «Min konto» (`src/lib/aiConsent.js`, localStorage-nøkkel: `aiConsented`)
 - Dataeksport (PDF) er i `AccountPage` + `src/lib/dataExportPdf.js`
-- Slett-konto-funksjon er i `supabase/functions/delete-account/index.ts`: sletter bo brukeren er alene om (med filer), gir admin videre i delte bo og fjerner navnet fra gjenstander
+- Slett-konto-funksjonen ligger i `supabase/functions/delete-account/index.ts`, med logikken i `_shared/deleteAccount.ts` og tester i `test/functions/deleteAccount.test.js`.
+  - Bo brukeren er alene om, slettes med alle filer.
+  - I delte bo gis administratorrollen videre. Navn, verdiforslag, stemmer og AI-rettelser fjernes fra gjenstandene, mens gjenstandene og bildene blir værende som boets innhold.
+  - Appen får faste feilkoder, aldri råtekst.
 - Automatisk sletting 12 mnd etter at et bo avsluttes (`estates.closed_at`): edge-funksjonen `cleanup-closed-estates` (data, filer og tilbakemeldinger knyttet til boet), skal kjøres daglig av Supabase Cron; kjøringer logges i `cleanup_runs`. Foreldreløse bilder ryddes bare manuelt med `cleanup-orphan-images` (dry_run + bekreftelse). Se `supabase/README.md`
 - Behandlingsansvarlig (selskapsnavn og org.nr.) fylles inn i `COMPANY` i `OtherPages.jsx`
