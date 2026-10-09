@@ -1,7 +1,9 @@
 import { useEffect, useState, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { getItems, removeInterest } from '../lib/supabase'
-import { getEstatePasses, addPass, addInterestClearingPass, removePass } from '../lib/decisions'
+import { getEstatePasses, addPass, addInterestClearingPass, removePass, setInterestReason } from '../lib/decisions'
+import { readReasonDraft, clearReasonDraft } from '../lib/reasonDraft'
+import ReasonEditor from '../components/ReasonEditor'
 import { L } from '../lib/lang'
 import { categoryLabel } from '../lib/categories'
 import { formatNOK } from '../lib/format'
@@ -20,6 +22,7 @@ export default function SwipePage({ session, profile, onToast }) {
   const cardRef = useRef(null)
   const busy = useRef(false) // ett kort om gangen, også ved dobbeltklikk
   const [last, setLast] = useState(null) // { type, item }: siste valg kan angres uten tidsfrist
+  const [reasons, setReasons] = useState({}) // itemId → lagret begrunnelse, for ønsker registrert her
   // Sveipingen er bare for ønsker: «Vil ha» eller «Nei takk». Hva som skjer med det ingen vil ha
   // (selges, gis bort, kastes), bestemmes etter at alle har tatt stilling, ikke underveis her.
 
@@ -39,10 +42,26 @@ export default function SwipePage({ session, profile, onToast }) {
 
   const currentItem = items[index]
 
+  // Sveiper man videre med en påbegynt begrunnelse på forrige ønske, lagres den, så teksten ikke går tapt.
+  // Feiler lagringen, ligger teksten igjen som utkast og kan fullføres fra gjenstanden eller «Mine».
+  const saveReasonInProgress = () => {
+    if (last?.type !== 'like') return
+    const { id: itemId, title } = last.item
+    const draft = readReasonDraft(session.user.id, itemId)
+    if (draft === null || draft === (reasons[itemId] || '')) return
+    setInterestReason(itemId, session.user.id, draft).then(({ error }) => {
+      if (error) { onToast(L(`Begrunnelsen for «${title}» ble ikke lagret. Teksten er tatt vare på, og du kan lagre den fra gjenstanden.`, `The reason for «${title}» was not saved. Your text is kept, and you can save it from the item.`), 'error'); return }
+      clearReasonDraft(session.user.id, itemId)
+      setReasons(r => ({ ...r, [itemId]: draft.trim() || null }))
+      onToast(L(`Begrunnelse lagret for «${title}»`, `Reason saved for «${title}»`))
+    })
+  }
+
   const handleAction = (type) => {
     const item = currentItem
     if (!item || busy.current) return
     busy.current = true
+    saveReasonInProgress()
     setAction(type)
 
     setTimeout(async () => {
@@ -76,6 +95,8 @@ export default function SwipePage({ session, profile, onToast }) {
     else ({ error } = await removePass(item.id, session.user.id))
     busy.current = false
     if (error) { onToast(L('Kunne ikke angre. Prøv igjen.', 'Could not undo. Please try again.'), 'error'); return }
+    // Ønsket er borte, og begrunnelsen med det
+    if (type === 'like') { clearReasonDraft(session.user.id, item.id); setReasons(r => ({ ...r, [item.id]: null })) }
     setLast(null)
     setDone(false)
     setIndex(Math.max(0, items.findIndex(i => i.id === item.id)))
@@ -84,10 +105,21 @@ export default function SwipePage({ session, profile, onToast }) {
   const lastText = last && (last.type === 'like'
     ? L(`Du vil ha «${last.item.title}»`, `You want «${last.item.title}»`)
     : L(`Nei takk til «${last.item.title}»`, `No thanks to «${last.item.title}»`))
+  // Statusteksten leses opp; knappene og begrunnelsesfeltet ligger utenfor det levende området.
+  // «+ Si hvorfor» er helt valgfritt: knappene og sveipingen virker som før mens feltet er åpent.
   const undoBar = last && (
-    <div role="status" style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:'10px', flexWrap:'wrap', padding:'8px 20px', fontSize:'0.875rem', color:'#3A2F26' }}>
-      <span>{lastText}</span>
-      <button onClick={undoLast} style={{ minHeight:'44px', padding:'8px 16px', background:'#fff', border:'1px solid #9A8B78', borderRadius:'8px', cursor:'pointer', fontSize:'0.875rem', fontWeight:'600', color:'#3A2F26', fontFamily:'Karla, sans-serif' }}>{L('Angre', 'Undo')}</button>
+    <div style={{ padding:'8px 20px', fontSize:'0.875rem', color:'#3A2F26', width:'100%', maxWidth:'420px', margin:'0 auto', boxSizing:'border-box' }}>
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:'10px', flexWrap:'wrap' }}>
+        <span role="status">{lastText}</span>
+        <button onClick={undoLast} style={{ minHeight:'44px', padding:'8px 16px', background:'#fff', border:'1px solid #9A8B78', borderRadius:'8px', cursor:'pointer', fontSize:'0.875rem', fontWeight:'600', color:'#3A2F26', fontFamily:'Karla, sans-serif' }}>{L('Angre', 'Undo')}</button>
+      </div>
+      {last.type === 'like' && (
+        <div style={{ display:'flex', justifyContent:'center', marginTop:'4px' }}>
+          <ReasonEditor key={last.item.id} itemId={last.item.id} itemTitle={last.item.title} userId={session.user.id} compact
+            savedReason={reasons[last.item.id] || null} onToast={onToast}
+            onSaved={r => setReasons(prev => ({ ...prev, [last.item.id]: r }))} />
+        </div>
+      )}
     </div>
   )
 

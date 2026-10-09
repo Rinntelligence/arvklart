@@ -6,6 +6,7 @@ import { formatNOK, parseNOK } from '../lib/format'
 import { removeImages, itemImageUrls } from '../lib/images'
 import { L, locale } from '../lib/lang'
 import { categoryLabel } from '../lib/categories'
+import ReasonEditor from '../components/ReasonEditor'
 
 const tc = c => { if(!c)return'#FBF9F5'; const r=parseInt(c.slice(1,3),16),g=parseInt(c.slice(3,5),16),b=parseInt(c.slice(5,7),16); return(0.299*r+0.587*g+0.114*b)/255>0.55?'#3A2F26':'#FBF9F5' }
 
@@ -319,9 +320,13 @@ export default function ItemDetailPage({ session, profile, onToast, isDemo }) {
             </div>
           </div>
         ) : myInterest ? (
-          <button onClick={handleInterest} style={{ width:'100%', padding:'14px', background:'#E8DFD0', color:'#3A2F26', border:'1px solid #3A2F26', borderRadius:'10px', cursor:'pointer', fontSize:'0.9375rem', fontFamily:'Karla, sans-serif', marginBottom:'24px' }}>
-            {L('Du er interessert — klikk for å angre', 'You are interested — click to withdraw')}
-          </button>
+          <div style={{ marginBottom:'24px' }}>
+            <button onClick={handleInterest} style={{ width:'100%', padding:'14px', background:'#E8DFD0', color:'#3A2F26', border:'1px solid #3A2F26', borderRadius:'10px', cursor:'pointer', fontSize:'0.9375rem', fontFamily:'Karla, sans-serif', marginBottom:'10px' }}>
+              {L('Du er interessert — klikk for å angre', 'You are interested — click to withdraw')}
+            </button>
+            <ReasonEditor key={itemId} itemId={itemId} userId={session.user.id} savedReason={myInterest.reason || null}
+              onToast={onToast} onSaved={load} />
+          </div>
         ) : showReason ? (
           <div style={{ marginBottom:'24px' }}>
             <label htmlFor="itemdetail-f1" style={{ display:'block', fontSize:'0.875rem', color:'#5C4530', marginBottom:'10px' }}>{L('Hvorfor vil du ha denne?', 'Why do you want this?')} <span style={{ color:'#75604B' }}>{L('(valgfri)', '(optional)')}</span></label>
@@ -374,7 +379,7 @@ export default function ItemDetailPage({ session, profile, onToast, isDemo }) {
           )}
           {!item.interests?.length ? (
             <div>
-              <p style={{ color:'#75604B', fontSize:'0.875rem', fontStyle:'italic', marginBottom:'16px' }}>Ingen har vist interesse ennå.</p>
+              <p style={{ color:'#75604B', fontSize:'0.875rem', fontStyle:'italic', marginBottom:'16px' }}>{L('Ingen har vist interesse ennå.', 'No one has shown interest yet.')}</p>
             </div>
           ) : (
             <div style={{ display:'flex', flexDirection:'column', gap:'10px' }}>

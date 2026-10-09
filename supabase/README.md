@@ -6,6 +6,7 @@ Database, lagring og edge-funksjoner for ArvKlart.
 supabase/
 ├── legacy/       Opprinnelig oppsett (01–05). Allerede kjørt i produksjon – kjøres bare på en ny, tom database.
 ├── migrations/   Endringer etter oppsettet, kjøres i navnerekkefølge (YYYYMMDD_navn.sql).
+├── rollback/     Tilbakerulling av en migrering (`<migrering>.down.sql`). Kjøres bare ved feil, etter godkjenning.
 ├── seed/         Demo-boet «Fam. Hansen sitt bo».
 └── functions/    Edge-funksjoner (Deno). Felles kode ligger i _shared/.
 ```

@@ -27,6 +27,7 @@ import ConflictPage from './pages/ConflictPage'
 import StatusPage from './pages/StatusPage'
 import ContactPage from './pages/ContactPage'
 import { getPendingSave, clearPendingSave } from './lib/wizardEstate'
+import { clearAllReasonDrafts } from './lib/reasonDraft'
 import TopBar from './components/TopBar'
 import Toasts from './components/Toast'
 import FeedbackWidget from './components/FeedbackWidget'
@@ -74,9 +75,10 @@ export default function App() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, s) => {
       setSession(s)
       if (event === 'SIGNED_OUT') {
-        // Neste person på samme maskin skal ikke arve invitasjoner eller veiviser-lagring
+        // Neste person på samme maskin skal ikke arve invitasjoner, veiviser-lagring eller påbegynte begrunnelser
         pendingJoin.clear()
         clearPendingSave()
+        clearAllReasonDrafts()
       }
       // Fallback in case the reset link landed somewhere other than /nytt-passord
       if (event === 'PASSWORD_RECOVERY') navigate(RESET_PATH)
