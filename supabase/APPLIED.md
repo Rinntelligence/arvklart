@@ -2,7 +2,7 @@
 
 Oversikt over hvilke SQL-filer som er kjørt i produksjonsdatabasen (`swmuztsejghweqmaogol`), og hvordan det er verifisert. Migreringene kjøres manuelt (SQL Editor eller Supabase MCP), og `supabase_migrations.schema_migrations` er derfor ufullstendig. **Oppdater denne filen hver gang noe kjøres i produksjon.**
 
-Sist verifisert: 2026-10-08, ved å sammenligne prod med en lokal database bygget fra repoet (som i `test/db/run.sh`). Sammenlignet ble kolonner, constraints, indekser, triggere, RLS, policies (hash av `qual`/`with_check`) og funksjoner (md5 av kildekoden uten `\r`).
+Sist verifisert: 2026-10-09 (funksjoner, policies, triggere og RLS på `items` lest ut og sammenlignet med repoet før migreringen over); fullstendig 2026-10-08, ved å sammenligne prod med en lokal database bygget fra repoet (som i `test/db/run.sh`). Sammenlignet ble kolonner, constraints, indekser, triggere, RLS, policies (hash av `qual`/`with_check`) og funksjoner (md5 av kildekoden uten `\r`).
 
 ## Status per fil
 
@@ -23,8 +23,11 @@ Sist verifisert: 2026-10-08, ved å sammenligne prod med en lokal database bygge
 | `migrations/20261007_security_hardening.sql` | ja | alle policies, `guard_item_update`, `is_estate_*`, Storage-policies lik |
 | `migrations/20261008_estimate_reasoning.sql` | **ja, 2026-10-08 16:31 UTC** | kjørt med `lock_timeout` via MCP (`schema_migrations` 20261008163106). 223 eksisterende rader uendret (hash før/etter), røyktest som innlogget bruker rullet tilbake |
 | `migrations/20261008_revoke_cleanup_old_closed_estates.sql` | **ja, 2026-10-08 16:33 UTC** | `schema_migrations` 20261008163341. `anon`/`authenticated` får 42501, `service_role` kan fortsatt |
-| `migrations/20261008_guard_item_value_disposal.sql` | **nei** | ny: verdi og kastmerking håndheves i `guard_item_update`, og sletting av egen gjenstand bare før tildeling. Kjøres etter godkjenning, og etter at frontend uten «Kast» i sveipingen er ute (i dagens prod-frontend kan alle merke for kast ved sveiping, og de ville da fått en feilmelding) |
+| `migrations/20261008_guard_item_value_disposal.sql` | **ja, 2026-10-09 12:11 UTC** | kjørt i én transaksjon med `lock_timeout` 5 s via `supabase db query --linked` (`schema_migrations` 20261009121126), etter at frontend uten «Kast» var i prod. Før: definisjonene hentet ut og bekreftet lik repoet. Etter: md5 for `guard_item_update` = `487b50fa…` (lik filen), ny `items_delete`, kontroll med demokontoene i en transaksjon som ble rullet tilbake (medlem kan ikke kastmerke, admin kan), røyktest i nettleseren 17/17. Tilbakerulling: `rollback/20261008_guard_item_value_disposal.down.sql` |
 | `migrations/20261008_cleanup_runs.sql` | **nei** | må kjøres før `cleanup-closed-estates` / `cleanup-orphan-images` deployes (uten tabellen avbrytes kjøringen før noe slettes) |
+| `migrations/20261010_interests_reason_update.sql` | **ja, 2026-10-09 15:05 UTC** | `schema_migrations` 20261009150536. Kjørt sammen med 20261011–20261013 i én transaksjon (R4 steg 3). Kontroll: policy `interests_update`, bare `reason` kan oppdateres, lengdesjekk validert (ingen eksisterende over 1000 tegn). Etterkontroll med demokonto (rullet tilbake): egen begrunnelse 1 rad, andres 0, `item_id` låst. Tilbakerulling: `rollback/20261010_interests_reason_update.down.sql` |
+| `migrations/20261011_ai_usage_metrics.sql` | **ja, 2026-10-09 15:05 UTC** | `schema_migrations` 20261009150537. Kjørt i samme transaksjon som 20261010, 20261012 og 20261013. Kontroll: 10 målekolonner, `claim_ai_call()` md5 lik repoet (31b03a27…), grensene uendret; etterkontroll ga `usage_id` (rullet tilbake). Tilbakerulling: `rollback/20261011_ai_usage_metrics.down.sql` |
+| `migrations/20261012_items_ai_analysis.sql` | **ja, 2026-10-09 15:05 UTC** | `schema_migrations` 20261009150538. Kjørt i samme transaksjon som 20261010, 20261011 og 20261013. Kontroll: `items.ai_analysis` finnes (alle 224 gjenstander har null, ingen omskriving), `guard_item_update()` md5 lik repoet (c81566e4…, før 487b50fa…); etterkontroll: demokonto kan ikke endre `ai_analysis` på andres gjenstand (rullet tilbake). Tilbakerulling: `rollback/20261012_items_ai_analysis.down.sql` |
 
 ## Finnes bare i produksjon (ikke i repoet)
 

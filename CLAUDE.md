@@ -47,10 +47,25 @@ Tilgjengelighet (WCAG 2.2 AA): ikke bruk `outline:'none'`; fokus vises med `:foc
 ## Supabase-konvensjoner
 - Alle nye tabeller skal ha RLS aktivert
 - Policies: brukere leser/skriver kun egne data og data for bo de er medlem i. Bruk hjelpefunksjonene `is_estate_member(estate_id)`, `is_estate_admin(estate_id)` og `is_demo_user()` (se `20261007_security_hardening.sql`)
+- Ønsker (`interests`): hver bruker kan legge til, slette og endre begrunnelsen (`reason`, maks 1000 tegn) på sine egne. Bare kolonnen `reason` kan oppdateres, og begrunnelsen er synlig for alle i boet. Påbegynt tekst tas vare på i fanen (`src/lib/reasonDraft.js`, sessionStorage) og slettes ved lagring og utlogging
 - Admin-handlinger håndheves i databasen, ikke bare i UI: tildeling, kastmerking og verdi (trigger `guard_item_update` på `items`; verdien kan også endres av den som la inn gjenstanden), arvinger, kategorier og `remove_estate_member()`. Den som la inn en gjenstand kan slette den bare før den er tildelt
 - Migrasjoner: lag fil i `supabase/migrations/` med navn `YYYYMMDD_beskrivende_navn.sql`, test med `npm run test:db`
 - Edge Functions: `supabase/functions/<navn>/index.ts` (Deno). Felles kode i `supabase/functions/_shared/`. Funksjoner som koster penger (AI) skal kreve innlogget bruker (`getUser`)
-- AI: alle kall går til Claude Haiku (`claude-haiku-4-5`) via Anthropics SDK i `_shared/ai.ts`, og hvert kall registreres med `claimAiCall()` først (tabellen `ai_usage`). Grenser: 30 kall/time og 150/døgn per bruker; demoen 5 per besøk (økt) og 300/døgn totalt
+- AI: alle kall går til Claude Haiku 5.5 (`claude-haiku-5-5`; manuell tilbakerulling til `claude-haiku-4-5` med hemmeligheten `AI_MODEL`) via `callStructured()` i `_shared/ai.ts`. Kallene bruker strukturert svar (JSON-skjema) med validering i `_shared/aiCore.ts`, og høyst ett nytt forsøk. Ingen `temperature` eller prefill (gir 400 på 5.5); effort er `medium` for bildeanalyse og `low` for verdianslag. Hvert kall registreres med `claimAiCall()` først (tabellen `ai_usage`, som også får målinger) og gir faste feilkoder (`ai_refused`, `ai_busy` …) som appen oversetter i `aiErrorMessage()`. Grenser: 30 kall/time og 150/døgn per bruker; demoen 5 per besøk (økt) og 300/døgn totalt
+- AI-vurdering av bilder (`analyze-item`, skjema i `_shared/analysis.ts`) lagres i `items.ai_analysis` (jsonb, `v: 2`).
+  - Feltet `ai` er AI-forslaget, og det endres aldri etter lagring.
+  - `review` sier om brukeren godtok eller endret hvert forslag.
+  - Det brukeren har valgt, står i de vanlige kolonnene.
+  - AI fyller bare felt brukeren ikke har endret (`applyAiSuggestion` i `src/lib/itemAiHelpers.js`).
+  - Tilstand kan være `unknown` («Ikke vurdert»), som er standard for nye gjenstander.
+  - Eldre gjenstander har `null` og skrives ikke om.
+  - `ai_analysis` kan bare endres av administrator eller den som la inn gjenstanden.
+- Verdianslag (`estimate-value`, logikk i `_shared/valuation.ts`) er et *veiledende AI-anslag*, ikke en markedsverdi.
+  - Det bygger på bildeanalysen (`analysis` eller `item_id`) uten å sende bildene igjen, og bruker ingen eksterne kilder.
+  - Modellen anslår for den registrerte tilstanden, med veiledning per type gjenstand.
+  - Koden trekker ikke fra noe i tillegg. Den gjør bare intervallet bredere og senker sikkerheten når grunnlaget er usikkert.
+  - For lite grunnlag gir `status: 'insufficient'` med tips og ingen verdi (aldri 0 kr).
+  - AI-ens anslag lagres i `ai_analysis.valuation`, adskilt fra `estimated_value`.
 - Storage: `estate-docs` er privat (`documents/<bo-id>/…`, åpnes med `createSignedUrl`); `item-images` er offentlig, nye filer lagres under `<bo-id>/…` (`src/lib/images.js`)
 
 ## Demokonto
@@ -66,7 +81,7 @@ npm run build      # bygg for produksjon
 npm run preview    # forhåndsvis bygget lokalt
 npm test           # enhetstester (veiviser, fremdrift, formatering)
 npm run test:db    # tilgangsregler og spørringer mot lokal Postgres + PostgREST (krever Docker)
-npm run test:e2e   # akseptansetester i Chromium (CHROMIUM_PATH) med simulert Supabase: «Legg til flere», tilgjengelighet, kundereisen, hvem kan kaste/endre verdi/slette
+npm run test:e2e   # akseptansetester i Chromium (CHROMIUM_PATH) med simulert Supabase: «Legg til flere», tilgjengelighet, kundereisen, hvem kan kaste/endre verdi/slette, begrunnelse etter «Vil ha»
 ```
 Avhengighetene er låst i `package-lock.json` (bruk `npm ci`). GitHub Actions (`.github/workflows/test.yml`) kjører alle testene, også `test:db`, på hver PR.
 

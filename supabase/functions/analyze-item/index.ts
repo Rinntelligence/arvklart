@@ -1,8 +1,12 @@
-// Identifiserer en gjenstand fra ett til tre bilder (tittel, beskrivelse, kategori, tilstand).
-// Med estimate: true anslås også verdien i samme kall, så «Legg til flere» bruker ett AI-kall per gjenstand.
-// Krever innlogget bruker og teller mot AI-kvoten (demoen: 5 forsøk per besøk). Bruker Claude Haiku.
+// Identifiserer en gjenstand fra ett til tre bilder. Ett AI-kall per gjenstand, med strukturert svar
+// (JSON-skjema, _shared/analysis.ts) som valideres før det sendes videre. Svaret har feltene appen har brukt
+// hittil (title, description, category, condition, confidence) og hele vurderingen i «analysis»
+// (identifikasjon sett/sannsynlig/ukjent, merker, tilstand, flere gjenstander, bildeforslag), som appen
+// lagrer i items.ai_analysis. AI-en lagrer aldri noe selv.
+// Krever innlogget bruker og teller mot AI-kvoten (demoen: 5 forsøk per besøk). Modell: se _shared/ai.ts.
 import { getUser, json, preflight } from '../_shared/http.ts'
-import { MODEL, aiErrorResponse, anthropic, claimAiCall, parseJsonReply } from '../_shared/ai.ts'
+import { aiConfigured, aiErrorJson, aiErrorResponse, callStructured, claimAiCall, currentModel } from '../_shared/ai.ts'
+import { ANALYSIS_SCHEMA, ANALYSIS_VERSION, PROMPT_VERSION, analysisSystem, legacyFields, normalizeAnalysis } from '../_shared/analysis.ts'
 
 const CATEGORIES = [
   'Møbler', 'Kunst og bilder', 'Bøker', 'Kjøkken',
@@ -45,54 +49,47 @@ Deno.serve(async (req) => {
   try {
     const user = await getUser(req)
     if (!user) return json({ success: false, error: 'Du må være logget inn' }, 401)
+    if (!aiConfigured()) return aiErrorJson('ai_unavailable')
 
     const body = await req.json()
     // Tekstene skrives på brukerens språk; kategorien er alltid et av boets kategorinavn (lagres i databasen)
     const english = body.lang === 'en'
-    const estimate = body.estimate === true
     const images = readImages(body)
     if (typeof images === 'string') return json({ success: false, error: images }, images === 'Mangler bilde' ? 400 : 413)
     const categories = readCategories(body.categories)
 
-    const { denied, quota } = await claimAiCall(req, user, 'analyze-item')
+    const { denied, quota, usageId } = await claimAiCall(req, user, 'analyze-item')
     if (denied) return denied
 
-    const message = await anthropic().messages.create({
-        model: MODEL,
-        max_tokens: 1024,
-        messages: [{
-          role: 'user',
-          content: [
-            ...images.map(img => ({
-              type: 'image' as const,
-              source: { type: 'base64' as const, media_type: img.mediaType as 'image/jpeg', data: img.data }
-            })),
-            {
-              type: 'text',
-              text: `Du er en arveboassistent. ${images.length > 1 ? 'Bildene viser samme gjenstand fra ulike vinkler.' : 'Se på bildet.'} Svar KUN med gyldig JSON, ingen annen tekst.
+    const ai = await callStructured({
+      fn: 'analyze-item', usageId, effort: 'medium', maxTokens: 6000, imageCount: images.length, schemaVersion: ANALYSIS_VERSION,
+      system: analysisSystem(english),
+      schema: ANALYSIS_SCHEMA,
+      validate: normalizeAnalysis(categories),
+      content: [
+        ...images.map(img => ({
+          type: 'image' as const,
+          source: { type: 'base64' as const, media_type: img.mediaType as 'image/jpeg', data: img.data },
+        })),
+        {
+          type: 'text' as const,
+          text: `${images.length > 1 ? `De ${images.length} bildene viser samme gjenstand fra ulike vinkler.` : 'Se på bildet.'}
 
-Gi en kort, enkel beskrivelse av gjenstanden på ${english ? 'engelsk' : 'norsk'}. Vær konkret og presis, ikke bruk fluff.
-
-Kategorier å velge fra: ${categories.join(', ')}
-
-Svar KUN med denne JSON-strukturen:
-{
-  "title": "${english ? "Kort engelsk tittel, f.eks. 'Oak rocking chair' eller 'Samsung 55-inch TV'" : "Kort norsk tittel, f.eks. 'Gyngestol i eik' eller 'Samsung TV 55-tommer'"}",
-  "description": "1-2 setninger på ${english ? 'engelsk' : 'norsk'}: materiale, farge, stand, alder hvis synlig. Enkelt språk.",
-  "category": "En av kategoriene over, skrevet nøyaktig som i listen (på norsk)",
-  "condition": "excellent, good, fair eller poor",
-  "confidence": "high, medium eller low"${estimate ? `,
-  "low_nok": <tall: lav markedsverdi i NOK brukt i Norge i dag, f.eks. på finn.no>,
-  "likely_nok": <tall: mest sannsynlig markedsverdi i NOK>,
-  "high_nok": <tall: høy markedsverdi i NOK>,
-  "value_reasoning": "1 setning på ${english ? 'engelsk' : 'norsk'} om hva verdien bygger på"` : ''}
-}`
-            }
-          ]
-        }]
+- suggestion.title: kort tittel, f.eks. ${english ? "'Oak rocking chair' eller 'Figgjo Lotte plate'" : "'Gyngestol i eik' eller 'Figgjo Lotte tallerken'"}
+- suggestion.description: 1–2 setninger: materiale, farge, stand og alder hvis det synes. Enkelt språk.
+- suggestion.category: én av disse, skrevet nøyaktig som i listen, eller tom tekst hvis ingen passer: ${categories.join(', ')}
+- suggestion.category_key: den generelle typen gjenstand
+- suggestion.confidence: hvor sikker du er på hva gjenstanden er`,
+        },
+      ],
     })
 
-    return json({ success: true, data: parseJsonReply(message), quota })
+    const analysis = {
+      v: ANALYSIS_VERSION,
+      meta: { model: currentModel(), prompt_version: PROMPT_VERSION, analyzed_at: new Date().toISOString(), image_count: images.length, lang: english ? 'en' : 'no' },
+      ai,
+    }
+    return json({ success: true, data: { ...legacyFields(ai), analysis }, quota })
   } catch (error) {
     return aiErrorResponse(error, 'analyze-item')
   }

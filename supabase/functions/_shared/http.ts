@@ -36,3 +36,10 @@ export const adminClient = (): SupabaseClient =>
 
 export const anonClient = (): SupabaseClient =>
   createClient(env('SUPABASE_URL'), env('SUPABASE_ANON_KEY'), { auth: { persistSession: false } })
+
+// Klient med brukerens egen innlogging: RLS gjelder, så brukeren ser bare data i bo hen er medlem av
+export const userClient = (req: Request): SupabaseClient =>
+  createClient(env('SUPABASE_URL'), env('SUPABASE_ANON_KEY'), {
+    global: { headers: { Authorization: req.headers.get('Authorization') || '' } },
+    auth: { persistSession: false },
+  })
