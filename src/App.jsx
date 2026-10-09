@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Routes, Route, Navigate, useNavigate } from 'react-router-dom'
+import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { supabase, upsertProfile } from './lib/supabase'
 import { PlanProvider } from './hooks/usePlan'
 import { isDemoSession } from './lib/demo'
@@ -28,7 +28,7 @@ import StatusPage from './pages/StatusPage'
 import ContactPage from './pages/ContactPage'
 import { getPendingSave, clearPendingSave } from './lib/wizardEstate'
 import TopBar from './components/TopBar'
-import Toast from './components/Toast'
+import Toasts from './components/Toast'
 import FeedbackWidget from './components/FeedbackWidget'
 import { L } from './lib/lang'
 
@@ -47,15 +47,27 @@ export default function App() {
   const [profile, setProfile] = useState(null)
   const [demoEstateId, setDemoEstateId] = useState(undefined)
   const [toast, setToast] = useState(null)
+  const [errors, setErrors] = useState([]) // feil blir stående til de lukkes (maks 3, nyeste først)
   const toastTimer = useRef(null)
+  const errorId = useRef(0)
   const navigate = useNavigate()
+  const { pathname } = useLocation()
 
   // Stabil funksjon: sider kan ha den i avhengighetslister uten at effekter kjører på nytt.
   const showToast = useCallback((msg, type = 'success') => {
+    if (type === 'error') {
+      setErrors(prev => [{ id: ++errorId.current, msg, at: Date.now() }, ...prev.filter(e => e.msg !== msg)].slice(0, 3))
+      return
+    }
     clearTimeout(toastTimer.current)
     setToast({ msg, type })
     toastTimer.current = setTimeout(() => setToast(null), 3200)
   }, [])
+  const dismissError = useCallback(id => setErrors(prev => prev.filter(e => e.id !== id)), [])
+
+  // Feilmeldinger gjelder siden de oppsto på. Feil som kom rett før navigeringen (f.eks. «3 kunne ikke
+  // tildeles» før vi går tilbake til boet), beholdes.
+  useEffect(() => { setErrors(prev => prev.filter(e => Date.now() - e.at < 1500)) }, [pathname])
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => setSession(data.session))
@@ -137,7 +149,7 @@ export default function App() {
   if (!session) {
     return (
       <>
-        {toast && <Toast msg={toast.msg} type={toast.type} />}
+        <Toasts success={toast} errors={errors} onDismiss={dismissError} />
         <Routes>
           <Route path="/home" element={<LandingPage onToast={showToast} />} />
           <Route path="/logg-inn" element={<LoginPage onToast={showToast} />} />
@@ -162,11 +174,11 @@ export default function App() {
       <div style={{ minHeight: '100vh', background: '#FBF9F5' }}>
         <TopBar profile={profile} session={session} onToast={showToast} />
         {isDemo && (
-          <div style={{ background: '#DCE3D2', borderBottom: '1px solid #B8C8A8', padding: '8px 20px', textAlign: 'center', fontSize: '13px', color: '#3A5A30', fontFamily: 'Karla, sans-serif' }}>
+          <div style={{ background: '#DCE3D2', borderBottom: '1px solid #B8C8A8', padding: '8px 20px', textAlign: 'center', fontSize: '0.8125rem', color: '#3A5A30', fontFamily: 'Karla, sans-serif' }}>
             {L('Du ser på en', 'You are viewing a')} <strong>demo</strong> — {L('Mona sitt bo. Du kan vise interesse, sveipe og prøve fordelingen, men ikke endre boet.', "Mona's estate. You can show interest, swipe and try the distribution, but not change the estate.")}
           </div>
         )}
-        {toast && <Toast msg={toast.msg} type={toast.type} />}
+        <Toasts success={toast} errors={errors} onDismiss={dismissError} />
         {!isDemo && <FeedbackWidget session={session} onToast={showToast} />}
         <Routes>
           <Route path="/" element={isDemo ? demoHome : <EstatesPage {...p} />} />
@@ -209,7 +221,7 @@ export default function App() {
 
 function Splash() {
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#FBF9F5', fontFamily: "'Fraunces', serif", color: '#9C8267', fontSize: '20px', gap: '12px' }}>
+    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#FBF9F5', fontFamily: "'Fraunces', serif", color: '#75604B', fontSize: '1.25rem', gap: '12px' }}>
       Arvklart
     </div>
   )

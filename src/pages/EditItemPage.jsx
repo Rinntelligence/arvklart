@@ -4,6 +4,7 @@ import { getItem, getCategories, supabase } from '../lib/supabase'
 import { fileToDataUrl, uploadEstateImage, removeImages, itemImageUrls } from '../lib/images'
 import { parseNOK } from '../lib/format'
 import { L } from '../lib/lang'
+import { categoryLabel } from '../lib/categories'
 
 export default function EditItemPage({ session, profile, onToast }) {
   const { id, itemId } = useParams()
@@ -90,15 +91,17 @@ export default function EditItemPage({ session, profile, onToast }) {
       const mainImage = allImages[0] || null
       const extraImages = allImages.slice(1)
 
-      const { error } = await supabase.from('items').update({
+      const changes = {
         title: title.trim(),
         category_id: categoryId || null,
         description: description.trim() || null,
         condition,
-        estimated_value: unchanged ? item.estimated_value : value === null ? null : Math.round(value),
         image_url: mainImage,
         extra_images: extraImages,
-      }).eq('id', itemId)
+      }
+      // Verdien sendes bare av dem som kan endre den; andre lagrer resten uten å røre verdien
+      if (canEditValue) changes.estimated_value = unchanged ? item.estimated_value : value === null ? null : Math.round(value)
+      const { error } = await supabase.from('items').update(changes).eq('id', itemId)
 
       if (error) throw error
       // Bilder som ble fjernet, slettes fra lagringen
@@ -116,11 +119,11 @@ export default function EditItemPage({ session, profile, onToast }) {
 
   const canEditValue = isAdmin || item?.added_by === session.user.id
 
-  if (!loaded) return <div style={{ padding:'80px', textAlign:'center', color:'#9C8267', fontFamily:'Karla, sans-serif' }}>{L('Laster…', 'Loading…')}</div>
+  if (!loaded) return <div style={{ padding:'80px', textAlign:'center', color:'#75604B', fontFamily:'Karla, sans-serif' }}>{L('Laster…', 'Loading…')}</div>
   if (!item) return (
-    <div style={{ padding:'80px 16px', textAlign:'center', color:'#9C8267', fontFamily:'Karla, sans-serif' }}>
+    <div style={{ padding:'80px 16px', textAlign:'center', color:'#75604B', fontFamily:'Karla, sans-serif' }}>
       <p style={{ marginBottom:'16px' }}>{L('Fant ikke gjenstanden. Den kan være slettet.', 'Item not found. It may have been deleted.')}</p>
-      <button onClick={() => navigate(`/estate/${id}`)} style={{ padding:'10px 20px', background:'#3A2F26', color:'#FBF9F5', border:'none', borderRadius:'8px', cursor:'pointer', fontSize:'14px', fontFamily:'Karla, sans-serif' }}>{L('Tilbake til boet', 'Back to the estate')}</button>
+      <button onClick={() => navigate(`/estate/${id}`)} style={{ padding:'10px 20px', background:'#3A2F26', color:'#FBF9F5', border:'none', borderRadius:'8px', cursor:'pointer', fontSize:'0.875rem', fontFamily:'Karla, sans-serif' }}>{L('Tilbake til boet', 'Back to the estate')}</button>
     </div>
   )
 
@@ -128,11 +131,11 @@ export default function EditItemPage({ session, profile, onToast }) {
 
   return (
     <div style={{ maxWidth:'560px', margin:'0 auto', padding:'20px 16px 100px', fontFamily:'Karla, sans-serif' }}>
-      <button onClick={() => navigate(`/estate/${id}/item/${itemId}`)} style={{ background:'none', border:'none', color:'#9C8267', cursor:'pointer', fontSize:'14px', padding:'0 0 16px', fontFamily:'Karla, sans-serif' }}>
+      <button onClick={() => navigate(`/estate/${id}/item/${itemId}`)} style={{ background:'none', border:'none', color:'#75604B', cursor:'pointer', fontSize:'0.875rem', padding:'0 0 16px', fontFamily:'Karla, sans-serif' }}>
         {L('← Tilbake', '← Back')}
       </button>
 
-      <h1 style={{ fontFamily:'Fraunces, serif', fontSize:'24px', fontWeight:'400', color:'#3A2F26', marginBottom:'24px' }}>
+      <h1 style={{ fontFamily:'Fraunces, serif', fontSize:'1.5rem', fontWeight:'400', color:'#3A2F26', marginBottom:'24px' }}>
         {L('Rediger gjenstand', 'Edit item')}
       </h1>
 
@@ -140,9 +143,9 @@ export default function EditItemPage({ session, profile, onToast }) {
 
         {/* Images */}
         <div>
-          <label style={{ display:'block', fontSize:'13px', color:'#9C8267', marginBottom:'8px' }}>
+          <div style={{ display:'block', fontSize:'0.8125rem', color:'#75604B', marginBottom:'8px' }}>
             {L('Bilder', 'Photos')} ({totalImages}/5)
-          </label>
+          </div>
           <div style={{ display:'flex', gap:'8px', flexWrap:'wrap' }}>
             {existingImages.map((url, i) => (
               <div key={`ex-${i}`} style={{ position:'relative', width:'80px', height:'80px', borderRadius:'8px', overflow:'hidden', background:'#E8DFD0' }}>
@@ -151,9 +154,9 @@ export default function EditItemPage({ session, profile, onToast }) {
                   position:'absolute', top:'2px', right:'2px',
                   background:'rgba(139,58,58,0.85)', color:'#fff', border:'none',
                   borderRadius:'50%', width:'20px', height:'20px',
-                  cursor:'pointer', fontSize:'12px', lineHeight:'1',
+                  cursor:'pointer', fontSize:'0.75rem', lineHeight:'1',
                 }}>×</button>
-                {i === 0 && <span style={{ position:'absolute', bottom:'2px', left:'2px', background:'#3A2F26', color:'#fff', fontSize:'9px', padding:'1px 4px', borderRadius:'4px' }}>{L('Hoved', 'Main')}</span>}
+                {i === 0 && <span style={{ position:'absolute', bottom:'2px', left:'2px', background:'#3A2F26', color:'#fff', fontSize:'0.5625rem', padding:'1px 4px', borderRadius:'4px' }}>{L('Hoved', 'Main')}</span>}
               </div>
             ))}
 
@@ -164,9 +167,9 @@ export default function EditItemPage({ session, profile, onToast }) {
                   position:'absolute', top:'2px', right:'2px',
                   background:'rgba(139,58,58,0.85)', color:'#fff', border:'none',
                   borderRadius:'50%', width:'20px', height:'20px',
-                  cursor:'pointer', fontSize:'12px', lineHeight:'1',
+                  cursor:'pointer', fontSize:'0.75rem', lineHeight:'1',
                 }}>×</button>
-                <span style={{ position:'absolute', bottom:'2px', left:'2px', background:'#8B9A7D', color:'#fff', fontSize:'9px', padding:'1px 4px', borderRadius:'4px' }}>{L('Ny', 'New')}</span>
+                <span style={{ position:'absolute', bottom:'2px', left:'2px', background:'#5F6E52', color:'#fff', fontSize:'0.5625rem', padding:'1px 4px', borderRadius:'4px' }}>{L('Ny', 'New')}</span>
               </div>
             ))}
 
@@ -177,8 +180,8 @@ export default function EditItemPage({ session, profile, onToast }) {
                 display:'flex', flexDirection:'column', alignItems:'center',
                 justifyContent:'center', cursor:'pointer', gap:'4px',
               }}>
-                <span style={{ fontSize:'24px', color:'#9C8267', fontWeight:'300' }}>+</span>
-                <span style={{ fontSize:'10px', color:'#9C8267' }}>{L('Legg til', 'Add')}</span>
+                <span style={{ fontSize:'1.5rem', color:'#75604B', fontWeight:'300' }}>+</span>
+                <span style={{ fontSize:'0.625rem', color:'#75604B' }}>{L('Legg til', 'Add')}</span>
               </div>
             )}
           </div>
@@ -187,29 +190,29 @@ export default function EditItemPage({ session, profile, onToast }) {
 
         {/* Title */}
         <div>
-          <label style={{ display:'block', fontSize:'13px', color:'#9C8267', marginBottom:'6px' }}>{L('Navn *', 'Name *')}</label>
-          <input value={title} onChange={e => setTitle(e.target.value)} maxLength={200}
-            style={{ width:'100%', padding:'14px', border:'1px solid #D9CFC0', borderRadius:'10px', fontSize:'16px', background:'#FBF9F5', color:'#3A2F26', outline:'none', fontFamily:'Karla, sans-serif', boxSizing:'border-box' }} />
+          <label htmlFor="edititem-f1" style={{ display:'block', fontSize:'0.8125rem', color:'#75604B', marginBottom:'6px' }}>{L('Navn *', 'Name *')}</label>
+          <input id="edititem-f1" value={title} onChange={e => setTitle(e.target.value)} maxLength={200}
+            style={{ width:'100%', padding:'14px', border:'1px solid #9A8B78', borderRadius:'10px', fontSize:'1rem', background:'#FBF9F5', color:'#3A2F26', fontFamily:'Karla, sans-serif', boxSizing:'border-box' }} />
         </div>
 
         {/* Category */}
         <div>
-          <label style={{ display:'block', fontSize:'13px', color:'#9C8267', marginBottom:'6px' }}>{L('Kategori', 'Category')}</label>
-          <select value={categoryId} onChange={e => setCategoryId(e.target.value)} style={{ width:'100%', padding:'14px', border:'1px solid #D9CFC0', borderRadius:'10px', fontSize:'16px', background:'#FBF9F5', color:'#3A2F26', outline:'none', fontFamily:'Karla, sans-serif' }}>
+          <label htmlFor="edititem-f2" style={{ display:'block', fontSize:'0.8125rem', color:'#75604B', marginBottom:'6px' }}>{L('Kategori', 'Category')}</label>
+          <select id="edititem-f2" value={categoryId} onChange={e => setCategoryId(e.target.value)} style={{ width:'100%', padding:'14px', border:'1px solid #9A8B78', borderRadius:'10px', fontSize:'1rem', background:'#FBF9F5', color:'#3A2F26', fontFamily:'Karla, sans-serif' }}>
             <option value="">{L('— Velg kategori —', '— Choose category —')}</option>
-            {categories.map(c => <option key={c.id} value={c.id}>{c.emoji} {c.label}</option>)}
+            {categories.map(c => <option key={c.id} value={c.id}>{c.emoji} {categoryLabel(c.label)}</option>)}
           </select>
         </div>
 
         {/* Condition */}
         <div>
-          <label style={{ display:'block', fontSize:'13px', color:'#9C8267', marginBottom:'8px' }}>{L('Tilstand', 'Condition')}</label>
+          <div style={{ display:'block', fontSize:'0.8125rem', color:'#75604B', marginBottom:'8px' }}>{L('Tilstand', 'Condition')}</div>
           <div style={{ display:'flex', gap:'8px' }}>
             {[['excellent',L('Utmerket','Excellent')],['good',L('God','Good')],['fair',L('Middels','Fair')],['poor',L('Dårlig','Poor')]].map(([val, label]) => (
-              <button key={val} onClick={() => setCondition(val)} style={{
-                flex:1, padding:'10px 4px',
+              <button key={val} onClick={() => setCondition(val)} aria-pressed={condition===val} style={{
+                flex:1, padding:'10px 4px', minHeight:'44px',
                 border:`2px solid ${condition===val?'#3A2F26':'#D9CFC0'}`,
-                borderRadius:'8px', cursor:'pointer', fontSize:'12px',
+                borderRadius:'8px', cursor:'pointer', fontSize:'0.75rem',
                 fontFamily:'Karla, sans-serif',
                 background: condition===val?'#3A2F26':'#fff',
                 color: condition===val?'#FBF9F5':'#5C4530',
@@ -220,21 +223,21 @@ export default function EditItemPage({ session, profile, onToast }) {
 
         {/* Description */}
         <div>
-          <label style={{ display:'block', fontSize:'13px', color:'#9C8267', marginBottom:'6px' }}>{L('Beskrivelse', 'Description')}</label>
-          <textarea value={description} onChange={e => setDescription(e.target.value)} rows={3} maxLength={2000}
+          <label htmlFor="edititem-f3" style={{ display:'block', fontSize:'0.8125rem', color:'#75604B', marginBottom:'6px' }}>{L('Beskrivelse', 'Description')}</label>
+          <textarea id="edititem-f3" value={description} onChange={e => setDescription(e.target.value)} rows={3} maxLength={2000}
             placeholder={L('Materiale, farge, historikk…', 'Material, colour, history…')}
-            style={{ width:'100%', padding:'14px', border:'1px solid #D9CFC0', borderRadius:'10px', fontSize:'15px', fontFamily:'Karla, sans-serif', background:'#FBF9F5', color:'#3A2F26', resize:'none', outline:'none', boxSizing:'border-box' }} />
+            style={{ width:'100%', padding:'14px', border:'1px solid #9A8B78', borderRadius:'10px', fontSize:'0.9375rem', fontFamily:'Karla, sans-serif', background:'#FBF9F5', color:'#3A2F26', resize:'none', boxSizing:'border-box' }} />
         </div>
 
         {/* Estimated value */}
         <div>
-          <label htmlFor="edit-value" style={{ display:'block', fontSize:'13px', color:'#9C8267', marginBottom:'6px' }}>{L('Estimert verdi i kroner (valgfri)', 'Estimated value in NOK (optional)')}</label>
-          <input id="edit-value" value={estimatedValue} onChange={e => setEstimatedValue(e.target.value)} maxLength={100} inputMode="decimal"
-            readOnly={!canEditValue} aria-describedby={canEditValue ? undefined : 'edit-value-note'}
+          <label htmlFor="edititem-f4" style={{ display:'block', fontSize:'0.8125rem', color:'#75604B', marginBottom:'6px' }}>{L('Estimert verdi i kroner (valgfri)', 'Estimated value in NOK (optional)')}</label>
+          <input id="edititem-f4" value={estimatedValue} onChange={e => setEstimatedValue(e.target.value)} maxLength={100} inputMode="decimal"
+            readOnly={!canEditValue} aria-describedby={canEditValue ? undefined : 'edititem-f4-note'}
             placeholder={canEditValue ? L('f.eks. 1500', 'e.g. 1500') : ''}
-            style={{ width:'100%', padding:'14px', border:'1px solid #D9CFC0', borderRadius:'10px', fontSize:'15px', background: canEditValue ? '#FBF9F5' : '#E8DFD0', color:'#3A2F26', outline:'none', fontFamily:'Karla, sans-serif', boxSizing:'border-box' }} />
+            style={{ width:'100%', padding:'14px', border:'1px solid #9A8B78', borderRadius:'10px', fontSize:'0.9375rem', background: canEditValue ? '#FBF9F5' : '#E8DFD0', color:'#3A2F26', fontFamily:'Karla, sans-serif', boxSizing:'border-box' }} />
           {!canEditValue && (
-            <p id="edit-value-note" style={{ fontSize:'13px', color:'#5C4530', margin:'6px 0 0', lineHeight:1.5 }}>
+            <p id="edititem-f4-note" style={{ fontSize:'0.8125rem', color:'#5C4530', margin:'6px 0 0', lineHeight:1.5 }}>
               {L('Verdien brukes i fordelingen. Bare administrator eller den som la inn gjenstanden kan endre den.', 'The value is used in the distribution. Only the administrator or the person who added the item can change it.')}
             </p>
           )}
@@ -248,7 +251,7 @@ export default function EditItemPage({ session, profile, onToast }) {
           padding:'16px', background: title.trim() ? '#3A2F26' : '#D9CFC0',
           color:'#FBF9F5', border:'none', borderRadius:'10px',
           cursor: title.trim() ? 'pointer' : 'not-allowed',
-          fontSize:'16px', fontFamily:'Karla, sans-serif', fontWeight:'500',
+          fontSize:'1rem', fontFamily:'Karla, sans-serif', fontWeight:'500',
         }}>{saving ? L('Lagrer…', 'Saving…') : L('Lagre endringer', 'Save changes')}</button>
       </div>
     </div>

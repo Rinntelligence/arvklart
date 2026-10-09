@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { supabase, signIn, signUp } from '../lib/supabase'
 import { L } from '../lib/lang'
+import TextSizeControl from '../components/TextSizeControl'
 
 const hasPendingInvite = () => { try { return Boolean(localStorage.getItem('pendingJoinCode')) } catch { return false } }
 
@@ -70,15 +71,15 @@ export default function LoginPage({ onToast }) {
             <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#5C4530" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginBottom:'16px' }}>
               <path d="M12 3v18M7 21h10M5 7h4M15 7h4M5 7L2.5 12a2.5 2.5 0 0 0 5 0L5 7zM19 7l-2.5 5a2.5 2.5 0 0 0 5 0L19 7z"/>
             </svg>
-            <h1 style={{ fontFamily:'Fraunces, serif', fontSize:'30px', fontWeight:'400', color:'#3A2F26', marginBottom:'10px' }}>Arvklart</h1>
-            <p style={{ color:'#9C8267', fontSize:'15px', lineHeight:'1.6' }}>{L('Den profesjonelle plattformen for rettferdig fordeling av arv', 'The professional platform for fair distribution of inheritance')}</p>
+            <h1 style={{ fontFamily:'Fraunces, serif', fontSize:'1.875rem', fontWeight:'400', color:'#3A2F26', marginBottom:'10px' }}>Arvklart</h1>
+            <p style={{ color:'#75604B', fontSize:'0.9375rem', lineHeight:'1.6' }}>{L('Den profesjonelle plattformen for rettferdig fordeling av arv', 'The professional platform for fair distribution of inheritance')}</p>
           </div>
 
           <div style={{ background:'#fff', border:'1px solid #D9CFC0', borderRadius:'14px', padding:'36px', boxShadow:'0 4px 32px rgba(0,0,0,0.06)' }}>
             {mode==='forgot' ? (
               <div style={{ marginBottom:'24px' }}>
-                <h2 style={{ fontFamily:'Fraunces, serif', fontSize:'22px', fontWeight:'400', color:'#3A2F26', marginBottom:'8px' }}>{L('Glemt passord', 'Forgot password')}</h2>
-                <p style={{ color:'#9C8267', fontSize:'14px', lineHeight:'1.6', margin:0 }}>{L('Skriv inn e-postadressen din, så sender vi deg en lenke for å velge nytt passord.', 'Enter your email address and we will send you a link to choose a new password.')}</p>
+                <h2 style={{ fontFamily:'Fraunces, serif', fontSize:'1.375rem', fontWeight:'400', color:'#3A2F26', marginBottom:'8px' }}>{L('Glemt passord', 'Forgot password')}</h2>
+                <p style={{ color:'#75604B', fontSize:'0.875rem', lineHeight:'1.6', margin:0 }}>{L('Skriv inn e-postadressen din, så sender vi deg en lenke for å velge nytt passord.', 'Enter your email address and we will send you a link to choose a new password.')}</p>
               </div>
             ) : (
             <div style={{ display:'flex', background:'#E8DFD0', borderRadius:'8px', padding:'4px', marginBottom:'28px' }}>
@@ -86,7 +87,7 @@ export default function LoginPage({ onToast }) {
                 <button key={m} onClick={()=>switchMode(m)} style={{
                   flex:1, padding:'9px', border:'none', borderRadius:'6px', cursor:'pointer',
                   background:mode===m?'#fff':'transparent',
-                  color:mode===m?'#3A2F26':'#9C8267', fontSize:'14px', fontFamily:'Karla, sans-serif',
+                  color:mode===m?'#3A2F26':'#75604B', fontSize:'0.875rem', fontFamily:'Karla, sans-serif',
                   boxShadow:mode===m?'0 1px 4px rgba(0,0,0,0.08)':'none', transition:'all 0.15s',
                 }}>{l}</button>
               ))}
@@ -94,17 +95,17 @@ export default function LoginPage({ onToast }) {
             )}
 
             {invited && mode !== 'forgot' && !confirmSent && (
-              <div style={{ background:'#DCE3D2', borderRadius:'8px', padding:'12px 14px', fontSize:'13px', color:'#3A5A30', lineHeight:'1.5', marginBottom:'18px' }}>
+              <div style={{ background:'#DCE3D2', borderRadius:'8px', padding:'12px 14px', fontSize:'0.8125rem', color:'#3A5A30', lineHeight:'1.5', marginBottom:'18px' }}>
                 {L('Du er invitert til et bo. Logg inn eller opprett konto med e-posten invitasjonen ble sendt til, så blir du med automatisk.', 'You have been invited to an estate. Log in or create an account with the email the invitation was sent to, and you will join automatically.')}
               </div>
             )}
 
             {confirmSent ? (
-              <div style={{ background:'#DCE3D2', borderRadius:'8px', padding:'16px', fontSize:'14px', color:'#3A2F26', lineHeight:'1.6', marginBottom:'4px' }}>
+              <div style={{ background:'#DCE3D2', borderRadius:'8px', padding:'16px', fontSize:'0.875rem', color:'#3A2F26', lineHeight:'1.6', marginBottom:'4px' }}>
                 {L('Vi har sendt en bekreftelseslenke til', 'We have sent a confirmation link to')} <strong>{email.trim()}</strong>. {L('Klikk på lenken i e-posten for å fullføre registreringen. Sjekk søppelpost hvis den ikke dukker opp.', 'Click the link in the email to complete your registration. Check your spam folder if it does not arrive.')}
               </div>
             ) : mode==='forgot' && resetSent ? (
-              <div style={{ background:'#DCE3D2', borderRadius:'8px', padding:'16px', fontSize:'14px', color:'#3A2F26', lineHeight:'1.6', marginBottom:'4px' }}>
+              <div style={{ background:'#DCE3D2', borderRadius:'8px', padding:'16px', fontSize:'0.875rem', color:'#3A2F26', lineHeight:'1.6', marginBottom:'4px' }}>
                 {L('Hvis det finnes en konto for', 'If an account exists for')} <strong>{email.trim()}</strong>, {L('får du snart en e-post med en lenke for å tilbakestille passordet. Sjekk søppelpost hvis den ikke dukker opp.', 'you will soon receive an email with a link to reset your password. Check your spam folder if it does not show up.')}
               </div>
             ) : (<>
@@ -112,24 +113,24 @@ export default function LoginPage({ onToast }) {
             <div style={{ display:'flex', flexDirection:'column', gap:'14px', marginBottom:'20px' }}>
               {mode==='signup' && (
                 <div>
-                  <label style={{ display:'block', fontSize:'13px', color:'#9C8267', marginBottom:'6px' }}>{L('Ditt navn *', 'Your name *')}</label>
-                  <input value={name} onChange={e=>setName(e.target.value)} placeholder={L('f.eks. Kari Nordmann', 'e.g. Jane Smith')} maxLength={100}
-                    style={{ width:'100%', padding:'12px 14px', border:'1px solid #D9CFC0', borderRadius:'8px', fontSize:'15px', background:'#FBF9F5', color:'#3A2F26', outline:'none', fontFamily:'Karla, sans-serif', boxSizing:'border-box' }} />
+                  <label htmlFor="login-f1" style={{ display:'block', fontSize:'0.8125rem', color:'#75604B', marginBottom:'6px' }}>{L('Ditt navn *', 'Your name *')}</label>
+                  <input id="login-f1" autoComplete="name" value={name} onChange={e=>setName(e.target.value)} placeholder={L('f.eks. Kari Nordmann', 'e.g. Jane Smith')} maxLength={100}
+                    style={{ width:'100%', padding:'12px 14px', border:'1px solid #9A8B78', borderRadius:'8px', fontSize:'0.9375rem', background:'#FBF9F5', color:'#3A2F26', fontFamily:'Karla, sans-serif', boxSizing:'border-box' }} />
                 </div>
               )}
               <div>
-                <label style={{ display:'block', fontSize:'13px', color:'#9C8267', marginBottom:'6px' }}>{L('E-post *', 'Email *')}</label>
-                <input type="email" value={email} onChange={e=>setEmail(e.target.value)} onKeyDown={e=>e.key==='Enter'&&handleSubmit()} placeholder={L('deg@eksempel.no', 'you@example.com')} maxLength={254}
-                  style={{ width:'100%', padding:'12px 14px', border:'1px solid #D9CFC0', borderRadius:'8px', fontSize:'15px', background:'#FBF9F5', color:'#3A2F26', outline:'none', fontFamily:'Karla, sans-serif', boxSizing:'border-box' }} />
+                <label htmlFor="login-f2" style={{ display:'block', fontSize:'0.8125rem', color:'#75604B', marginBottom:'6px' }}>{L('E-post *', 'Email *')}</label>
+                <input id="login-f2" type="email" autoComplete="email" value={email} onChange={e=>setEmail(e.target.value)} onKeyDown={e=>e.key==='Enter'&&handleSubmit()} placeholder={L('deg@eksempel.no', 'you@example.com')} maxLength={254}
+                  style={{ width:'100%', padding:'12px 14px', border:'1px solid #9A8B78', borderRadius:'8px', fontSize:'0.9375rem', background:'#FBF9F5', color:'#3A2F26', fontFamily:'Karla, sans-serif', boxSizing:'border-box' }} />
               </div>
               {mode!=='forgot' && (
               <div>
-                <label style={{ display:'block', fontSize:'13px', color:'#9C8267', marginBottom:'6px' }}>{L('Passord *', 'Password *')}</label>
-                <input type="password" value={password} onChange={e=>setPassword(e.target.value)} onKeyDown={e=>e.key==='Enter'&&handleSubmit()} placeholder={mode==='signup'?L('Minst 6 tegn','At least 6 characters'):'••••••••'} maxLength={128}
-                  style={{ width:'100%', padding:'12px 14px', border:'1px solid #D9CFC0', borderRadius:'8px', fontSize:'15px', background:'#FBF9F5', color:'#3A2F26', outline:'none', fontFamily:'Karla, sans-serif', boxSizing:'border-box' }} />
+                <label htmlFor="login-f3" style={{ display:'block', fontSize:'0.8125rem', color:'#75604B', marginBottom:'6px' }}>{L('Passord *', 'Password *')}</label>
+                <input id="login-f3" type="password" autoComplete={mode==='signup' ? 'new-password' : 'current-password'} value={password} onChange={e=>setPassword(e.target.value)} onKeyDown={e=>e.key==='Enter'&&handleSubmit()} placeholder={mode==='signup'?L('Minst 6 tegn','At least 6 characters'):'••••••••'} maxLength={128}
+                  style={{ width:'100%', padding:'12px 14px', border:'1px solid #9A8B78', borderRadius:'8px', fontSize:'0.9375rem', background:'#FBF9F5', color:'#3A2F26', fontFamily:'Karla, sans-serif', boxSizing:'border-box' }} />
                 {mode==='login' && (
                   <div style={{ textAlign:'right', marginTop:'6px' }}>
-                    <button onClick={()=>switchMode('forgot')} style={{ background:'none', border:'none', padding:0, color:'#5F6E52', cursor:'pointer', fontSize:'13px', fontFamily:'Karla, sans-serif', textDecoration:'underline' }}>{L('Glemt passord?', 'Forgot password?')}</button>
+                    <button onClick={()=>switchMode('forgot')} style={{ background:'none', border:'none', padding:0, color:'#5F6E52', cursor:'pointer', fontSize:'0.8125rem', fontFamily:'Karla, sans-serif', textDecoration:'underline' }}>{L('Glemt passord?', 'Forgot password?')}</button>
                   </div>
                 )}
               </div>
@@ -139,27 +140,28 @@ export default function LoginPage({ onToast }) {
             <button onClick={handleSubmit} disabled={loading||!canSubmit} style={{
               width:'100%', padding:'13px', background:canSubmit?'#3A2F26':'#D9CFC0',
               color:'#FBF9F5', border:'none', borderRadius:'8px',
-              cursor:canSubmit?'pointer':'not-allowed', fontSize:'15px', fontFamily:'Karla, sans-serif',
+              cursor:canSubmit?'pointer':'not-allowed', fontSize:'0.9375rem', fontFamily:'Karla, sans-serif',
             }}>{loading?L('Vent litt…','Please wait…'):mode==='login'?L('Logg inn','Log in'):mode==='forgot'?L('Send lenke','Send link'):L('Opprett konto','Create account')}</button>
             </>)}
 
             {mode==='signup' && (
-              <p style={{ textAlign:'center', marginTop:'12px', fontSize:'12px', color:'#9C8267', lineHeight:'1.6' }}>
+              <p style={{ textAlign:'center', marginTop:'12px', fontSize:'0.75rem', color:'#75604B', lineHeight:'1.6' }}>
                 {L('Ved å opprette konto godtar du våre', 'By creating an account you accept our')}{' '}
                 <a href="/personvern" style={{ color:'#5F6E52' }}>{L('vilkår og personvernerklæring', 'terms and privacy policy')}</a>.
               </p>
             )}
 
-            <p style={{ textAlign:'center', marginTop:'16px', fontSize:'13px', color:'#9C8267' }}>
-              {mode==='forgot'?<button onClick={()=>switchMode('login')} style={{ background:'none', border:'none', color:'#5F6E52', cursor:'pointer', fontSize:'13px', fontFamily:'Karla, sans-serif', textDecoration:'underline' }}>{L('Tilbake til innlogging', 'Back to log in')}</button>
-              :mode==='login'?<>{L('Ny her?', 'New here?')}{' '}<button onClick={()=>switchMode('signup')} style={{ background:'none', border:'none', color:'#5F6E52', cursor:'pointer', fontSize:'13px', fontFamily:'Karla, sans-serif', textDecoration:'underline' }}>{L('Opprett konto', 'Create account')}</button></>
-              :<>{L('Har du konto?', 'Have an account?')}{' '}<button onClick={()=>switchMode('login')} style={{ background:'none', border:'none', color:'#5F6E52', cursor:'pointer', fontSize:'13px', fontFamily:'Karla, sans-serif', textDecoration:'underline' }}>{L('Logg inn', 'Log in')}</button></>}
+            <p style={{ textAlign:'center', marginTop:'16px', fontSize:'0.8125rem', color:'#75604B' }}>
+              {mode==='forgot'?<button onClick={()=>switchMode('login')} style={{ background:'none', border:'none', color:'#5F6E52', cursor:'pointer', fontSize:'0.8125rem', fontFamily:'Karla, sans-serif', textDecoration:'underline' }}>{L('Tilbake til innlogging', 'Back to log in')}</button>
+              :mode==='login'?<>{L('Ny her?', 'New here?')}{' '}<button onClick={()=>switchMode('signup')} style={{ background:'none', border:'none', color:'#5F6E52', cursor:'pointer', fontSize:'0.8125rem', fontFamily:'Karla, sans-serif', textDecoration:'underline' }}>{L('Opprett konto', 'Create account')}</button></>
+              :<>{L('Har du konto?', 'Have an account?')}{' '}<button onClick={()=>switchMode('login')} style={{ background:'none', border:'none', color:'#5F6E52', cursor:'pointer', fontSize:'0.8125rem', fontFamily:'Karla, sans-serif', textDecoration:'underline' }}>{L('Logg inn', 'Log in')}</button></>}
             </p>
           </div>
 
-          <p style={{ textAlign:'center', marginTop:'20px', fontSize:'12px', color:'#9C8267' }}>
+          <p style={{ textAlign:'center', marginTop:'20px', fontSize:'0.75rem', color:'#75604B' }}>
             {L('Brukt av begravelsesbyråer, advokater og familier', 'Used by funeral homes, lawyers and families')}
           </p>
+          <div style={{ marginTop:'20px' }}><TextSizeControl /></div>
         </div>
       </div>
     </div>

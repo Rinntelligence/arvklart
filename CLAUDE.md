@@ -22,12 +22,16 @@ ArvKlart er en norsk SaaS-tjeneste for arveoppgjør. React 18 + Vite SPA, Supaba
 #FBF9F5  snow (side-bakgrunn)
 #E8DFD0  sand (kort, input-bakgrunn)
 #D9CFC0  grense/border
-#9C8267  latte (sekundær tekst)
+#75604B  mørk latte (sekundær tekst; 5,7:1 på snow, 4,5:1 på sand)
+#9C8267  latte (bare ikoner, diagramflater og dekor; for lys som tekst)
+#9A8B78  feltkant (input/select/textarea; 3,3:1 mot hvit)
 #5C4530  valnøtt (primær tekst i lys kontekst)
 #5F6E52  mørk sage (suksess, aksent)
 #8B9A7D  sage
 #DCE3D2  tåkesage (subtil bakgrunn)
 ```
+
+Tilgjengelighet (WCAG 2.2 AA): ikke bruk `outline:'none'`; fokus vises med `:focus-visible` i `index.html` (mørke flater setter lys ring selv). Hvit tekst bare på `#5F6E52` eller mørkere, ikke på `#8B9A7D`.
 
 ## Typografi
 - `fontFamily: 'Karla, sans-serif'` — brødtekst og UI
@@ -62,7 +66,9 @@ npm run build      # bygg for produksjon
 npm run preview    # forhåndsvis bygget lokalt
 npm test           # enhetstester (veiviser, fremdrift, formatering)
 npm run test:db    # tilgangsregler og spørringer mot lokal Postgres + PostgREST (krever Docker)
+npm run test:e2e   # akseptansetester i Chromium (CHROMIUM_PATH) med simulert Supabase: «Legg til flere», tilgjengelighet, kundereisen, hvem kan kaste/endre verdi/slette
 ```
+Avhengighetene er låst i `package-lock.json` (bruk `npm ci`). GitHub Actions (`.github/workflows/test.yml`) kjører alle testene, også `test:db`, på hver PR.
 
 ## Miljøvariabler som trengs lokalt (.env.local)
 ```
@@ -77,7 +83,7 @@ Hent verdiene fra Supabase Dashboard → Project Settings → API.
 | `/` | EstatesPage | Liste over brukerens bo |
 | `/estate/:id` | EstatePage | Bo-oversikt |
 | `/estate/:id/add` | AddItemPage | Legg til gjenstand (inkl. AI-analyse) |
-| `/estate/:id/add-many` | AddItemsPage | Legg til opptil 20 gjenstander: kamera i appen («Neste gjenstand»), kamerarull/filer/dra-og-slipp, AI analyserer alle (ett kall per gjenstand, inkl. verdi) og legger dem inn |
+| `/estate/:id/add-many` | AddItemsPage | Legg til opptil 20 gjenstander: kamera i appen (ett bilde = én gjenstand, «Flere bilder av denne» for flere), kamerarull/filer/dra-og-slipp, AI analyserer alle (ett kall per gjenstand). AI lagrer aldri selv: brukeren ser over kortene og trykker «Godkjenn og lagre alle» |
 | `/estate/:id/swipe` | SwipePage | Ta stilling til gjenstander (vil ha / nei takk) |
 | `/estate/:id/conflicts` | ConflictPage | Løsningsmetoder (bare admin fordeler) |
 | `/estate/:id/heirs` | HeirsPage | Arvinger; e-posten styrer hvem som kan bli med |

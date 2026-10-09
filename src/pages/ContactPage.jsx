@@ -19,21 +19,21 @@ export default function ContactPage() {
         }
         .cp header img { display: block; height: 28px; }
         .cp header .back {
-          font-size: 14.5px; font-weight: 500; color: var(--snow);
+          font-size: 0.9062rem; font-weight: 500; color: var(--snow);
           padding: 8px 14px; border-radius: 999px; border: 1px solid rgba(251,249,245,0.45);
         }
         .cp header .back:hover { background: rgba(251,249,245,0.15); }
         .cp main { flex: 1; padding: 110px 56px; max-width: 760px; margin: 0 auto; width: 100%; }
-        .cp .eyebrow { font-size: 14px; color: var(--sage-d); margin-bottom: 20px; letter-spacing: 0.3px; }
-        .cp h1 { font-family: 'Fraunces', serif; font-weight: 400; font-size: 38px; line-height: 1.3; margin-bottom: 18px; }
-        .cp .lead { font-size: 16px; line-height: 1.65; color: var(--text2); max-width: 520px; margin-bottom: 48px; }
+        .cp .eyebrow { font-size: 0.875rem; color: var(--sage-d); margin-bottom: 20px; letter-spacing: 0.3px; }
+        .cp h1 { font-family: 'Fraunces', serif; font-weight: 400; font-size: 2.375rem; line-height: 1.3; margin-bottom: 18px; }
+        .cp .lead { font-size: 1rem; line-height: 1.65; color: var(--text2); max-width: 520px; margin-bottom: 48px; }
         .cp .card {
           background: var(--snow); border: 1px solid var(--sandgray); border-radius: 12px;
           padding: 28px 32px;
         }
-        .cp .card .label { font-size: 13px; color: var(--text2); margin-bottom: 8px; }
+        .cp .card .label { font-size: 0.8125rem; color: var(--text2); margin-bottom: 8px; }
         .cp .card a.mail {
-          font-family: 'Fraunces', serif; font-size: 24px; color: var(--espresso);
+          font-family: 'Fraunces', serif; font-size: 1.5rem; color: var(--espresso);
           border-bottom: 1px solid var(--sandgray); word-break: break-all;
         }
         .cp .card a.mail:hover { border-bottom-color: var(--espresso); }
@@ -43,9 +43,9 @@ export default function ContactPage() {
         @media (max-width: 860px) {
           .cp header { padding: 20px 24px; }
           .cp main { padding: 64px 24px; }
-          .cp h1 { font-size: 30px; }
+          .cp h1 { font-size: 1.875rem; }
           .cp .card { padding: 24px; }
-          .cp .card a.mail { font-size: 20px; }
+          .cp .card a.mail { font-size: 1.25rem; }
           .cp footer { padding: 28px 24px; text-align: center; }
         }
       `}</style>

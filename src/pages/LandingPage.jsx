@@ -59,15 +59,15 @@ export default function LandingPage({ loggedIn = false }) {
         .lp nav ul { display: flex; gap: 6px; list-style: none; align-items: center; }
         .lp nav a {
           display: inline-block; padding: 8px 14px; border-radius: 999px;
-          font-size: 14.5px; font-weight: 500; color: var(--snow);
+          font-size: 0.9062rem; font-weight: 500; color: var(--snow);
           text-shadow: 0 1px 4px rgba(0,0,0,0.55);
           border: 1px solid transparent;
           transition: background 0.18s ease, border-color 0.18s ease, color 0.18s ease;
         }
         .lp nav a:hover, .lp nav a:focus-visible {
           background: rgba(251,249,245,0.2); border-color: rgba(251,249,245,0.45);
-          outline: none;
         }
+        .lp nav a:focus-visible { outline: 3px solid var(--snow); outline-offset: 2px; }
         .lp nav a.nav-login { border-color: rgba(251,249,245,0.7); margin-left: 8px; }
         .lp nav a.nav-login:hover, .lp nav a.nav-login:focus-visible {
           background: var(--snow); color: var(--espresso); text-shadow: none; border-color: var(--snow);
@@ -102,7 +102,7 @@ export default function LandingPage({ loggedIn = false }) {
         .lp .hero-cta { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; }
         .lp .btn {
           display: inline-flex; align-items: center; gap: 8px;
-          padding: 15px 30px; font-size: 15px; font-family: 'Karla', sans-serif;
+          padding: 15px 30px; font-size: 0.9375rem; font-family: 'Karla', sans-serif;
           font-weight: 500; cursor: pointer; border: none;
         }
         .lp .btn-fill { background: var(--snow); color: var(--espresso); }
@@ -112,22 +112,22 @@ export default function LandingPage({ loggedIn = false }) {
         .lp .btn-line:hover { border-bottom-color: var(--snow); }
 
         .lp .intro { padding: 120px 56px; max-width: 760px; margin: 0 auto; text-align: left; }
-        .lp .eyebrow { font-size: 14px; color: var(--sage-d); margin-bottom: 20px; letter-spacing: 0.3px; }
-        .lp .intro h2 { font-size: 34px; line-height: 1.35; color: var(--espresso); font-weight: 400; font-family: 'Fraunces', serif; }
+        .lp .eyebrow { font-size: 0.875rem; color: var(--sage-d); margin-bottom: 20px; letter-spacing: 0.3px; }
+        .lp .intro h2 { font-size: 2.125rem; line-height: 1.35; color: var(--espresso); font-weight: 400; font-family: 'Fraunces', serif; }
         .lp .intro h2 em { font-style: normal; color: var(--text2); }
 
         .lp .features { background: var(--sand); padding: 110px 56px; }
         .lp .features-head { max-width: 640px; margin: 0 auto 76px; }
-        .lp .features-head h2 { font-size: 32px; font-weight: 400; line-height: 1.3; font-family: 'Fraunces', serif; }
+        .lp .features-head h2 { font-size: 2rem; font-weight: 400; line-height: 1.3; font-family: 'Fraunces', serif; }
         .lp .feature-grid {
           max-width: 1080px; margin: 0 auto;
           display: grid; grid-template-columns: repeat(3,1fr); gap: 0;
         }
         .lp .feature { padding: 0 34px 0 0; }
         .lp .feature + .feature { border-left: 1px solid var(--sandgray); padding-left: 34px; }
-        .lp .feature .num { font-family: 'Fraunces', serif; font-size: 15px; color: var(--sage-d); margin-bottom: 22px; }
-        .lp .feature h3 { font-family: 'Fraunces', serif; font-weight: 400; font-size: 21px; margin-bottom: 14px; }
-        .lp .feature p { font-size: 14.5px; line-height: 1.65; color: var(--text2); }
+        .lp .feature .num { font-family: 'Fraunces', serif; font-size: 0.9375rem; color: var(--sage-d); margin-bottom: 22px; }
+        .lp .feature h3 { font-family: 'Fraunces', serif; font-weight: 400; font-size: 1.3125rem; margin-bottom: 14px; }
+        .lp .feature p { font-size: 0.9062rem; line-height: 1.65; color: var(--text2); }
 
         .lp .demo-section {
           background: var(--espresso); color: var(--snow);
@@ -135,11 +135,11 @@ export default function LandingPage({ loggedIn = false }) {
         }
         .lp .demo-section .eyebrow { color: var(--sage-l); margin-bottom: 18px; }
         .lp .demo-section h2 {
-          font-family: 'Fraunces', serif; font-weight: 300; font-size: 36px;
+          font-family: 'Fraunces', serif; font-weight: 300; font-size: 2.25rem;
           line-height: 1.35; max-width: 580px; margin: 0 auto 16px;
         }
         .lp .demo-section p {
-          font-size: 15px; color: rgba(251,249,245,0.75); max-width: 440px;
+          font-size: 0.9375rem; color: rgba(251,249,245,0.75); max-width: 440px;
           margin: 0 auto 40px; line-height: 1.65;
         }
         .lp .demo-mockup {
@@ -154,18 +154,18 @@ export default function LandingPage({ loggedIn = false }) {
         }
         .lp .demo-topbar img { height: 22px; }
         .lp .demo-body { padding: 28px 28px 32px; }
-        .lp .demo-title { font-family: 'Fraunces', serif; font-size: 18px; color: var(--espresso); margin-bottom: 4px; }
-        .lp .demo-sub { font-size: 12px; color: var(--coffee); margin-bottom: 22px; }
+        .lp .demo-title { font-family: 'Fraunces', serif; font-size: 1.125rem; color: var(--espresso); margin-bottom: 4px; }
+        .lp .demo-sub { font-size: 0.75rem; color: var(--coffee); margin-bottom: 22px; }
         .lp .demo-conflict {
           border: 1px solid var(--sandgray); border-radius: 10px;
           padding: 18px 20px; margin-bottom: 12px;
           display: flex; justify-content: space-between; align-items: center;
           background: var(--lin);
         }
-        .lp .demo-conflict-left h4 { font-size: 14px; color: var(--espresso); margin-bottom: 3px; }
-        .lp .demo-conflict-left span { font-size: 12px; color: var(--coffee); }
+        .lp .demo-conflict-left h4 { font-size: 0.875rem; color: var(--espresso); margin-bottom: 3px; }
+        .lp .demo-conflict-left span { font-size: 0.75rem; color: var(--coffee); }
         .lp .demo-badge {
-          font-size: 11px; padding: 4px 10px; border-radius: 20px;
+          font-size: 0.6875rem; padding: 4px 10px; border-radius: 20px;
           background: var(--sage-mist); color: var(--sage-d);
         }
         .lp .demo-badge.orange { background: #F5E8D5; color: #A97C3F; }
@@ -176,13 +176,13 @@ export default function LandingPage({ loggedIn = false }) {
         }
         footer.lp-footer img { height: 24px; opacity: 0.85; }
         footer.lp-footer .foot-links { display: flex; gap: 32px; list-style: none; }
-        footer.lp-footer .foot-links a { font-size: 13.5px; color: #B7A995; }
+        footer.lp-footer .foot-links a { font-size: 0.8438rem; color: #B7A995; }
         footer.lp-footer .foot-links a:hover { color: var(--snow); }
 
         @media (max-width: 860px) {
           .lp header { padding: 22px 24px; }
           .lp nav ul { gap: 2px; flex-wrap: wrap; justify-content: flex-end; }
-          .lp nav a { padding: 6px 10px; font-size: 13.5px; }
+          .lp nav a { padding: 6px 10px; font-size: 0.8438rem; }
           .lp .hero { background-position: 60% center; }
           .lp .hero-inner { padding: 0 24px 56px; }
           .lp .intro { padding: 76px 24px; }
@@ -208,13 +208,13 @@ export default function LandingPage({ loggedIn = false }) {
           }
           .lp header.nav-open nav ul { display: flex; }
           .lp nav ul li.nav-login-item { display: none; }
-          .lp nav ul a { display: block; padding: 13px 14px; font-size: 15px; border-radius: 10px; text-shadow: none; }
+          .lp nav ul a { display: block; padding: 13px 14px; font-size: 0.9375rem; border-radius: 10px; text-shadow: none; }
           .lp nav > a.nav-login { display: inline-block; margin-left: 0; }
           .lp .nav-toggle {
             display: inline-flex; align-items: center; justify-content: center;
             width: 40px; height: 40px; border-radius: 999px; cursor: pointer;
             background: none; border: 1px solid rgba(251,249,245,0.45); color: var(--snow);
-            font-size: 18px; line-height: 1;
+            font-size: 1.125rem; line-height: 1;
           }
         }
         @media (min-width: 641px) {
@@ -259,7 +259,7 @@ export default function LandingPage({ loggedIn = false }) {
               </button>
               <a className="btn btn-line" href="#slik-fungerer">{L('Se hvordan det fungerer', 'See how it works')}</a>
             </div>
-            {demoError && <div style={{ marginTop: '12px', fontSize: '13px', color: '#F5C2C2', background: 'rgba(0,0,0,0.3)', padding: '8px 14px', borderRadius: '6px', maxWidth: '400px' }}>{demoError}</div>}
+            {demoError && <div style={{ marginTop: '12px', fontSize: '0.8125rem', color: '#F5C2C2', background: 'rgba(0,0,0,0.3)', padding: '8px 14px', borderRadius: '6px', maxWidth: '400px' }}>{demoError}</div>}
           </div>
         </section>
 
@@ -307,7 +307,7 @@ export default function LandingPage({ loggedIn = false }) {
           >
             {demoLabel(L('Åpne demo', 'Open the demo'))}
           </button>
-          {demoError && <div style={{ marginTop: '14px', fontSize: '13px', color: '#F5C2C2', background: 'rgba(0,0,0,0.3)', padding: '8px 14px', borderRadius: '6px', display: 'inline-block' }}>{demoError}</div>}
+          {demoError && <div style={{ marginTop: '14px', fontSize: '0.8125rem', color: '#F5C2C2', background: 'rgba(0,0,0,0.3)', padding: '8px 14px', borderRadius: '6px', display: 'inline-block' }}>{demoError}</div>}
 
           <div className="demo-mockup">
             <div className="demo-topbar">
