@@ -49,21 +49,34 @@ Sist verifisert: 2026-10-09 (funksjoner, policies, triggere og RLS på `items` l
 
 | Jobb | Kjørt | Resultat |
 |---|---|---|
-| S2 `migrate-legacy-images` (copy) | **ja, 2026-10-09 22:16 UTC** | 278 bilder kopiert fra `items/` til `<bo-id>/legacy__…` og 193 gjenstander pekt om (85 ekstrabilder i 67 gjenstander); 0 feil, 0 gamle referanser igjen. Kontroll: alle kopier finnes i riktig bo, like store som originalen; alle 278 lastet over HTTP. Originalene (278) og 63 ubrukte filer i `items/` er **beholdt** til sletting er godkjent (`delete_old`) |
+| S2 `migrate-legacy-images` (copy) | **ja, 2026-10-09 22:16 UTC** | 278 bilder kopiert fra `items/` til `<bo-id>/legacy__…` og 193 gjenstander pekt om (85 ekstrabilder i 67 gjenstander); 0 feil, 0 gamle referanser igjen. Kontroll: alle kopier finnes i riktig bo, like store som originalen; alle 278 lastet over HTTP. Originalene ble beholdt til sletting var godkjent |
+| Sikkerhetskopi før sletting | **ja, 2026-10-10 12:05 UTC** | Fullt innhold av alle 341 filer i `items/` (278 originaler + 63 ubrukte, 1 048 MB) med SHA-256-manifest, lagret lokalt hos eieren utenfor Storage og utenfor repoet. Verifisert: 341/341 leses og stemmer med manifestet, de 278 kopiene i boene er byte-identiske med originalene, og en gjenoppretting (opplasting fra kopien) ga identisk fil |
+| S2 `delete_old` (originaler) | **ja, 2026-10-10 12:08 UTC** | 278 originaler slettet. Tokenet fra tørrkjøringen var lik SHA-256 av den verifiserte originallisten. Før: 0 aktive referanser til `items/` |
+| Sletting av ubrukte filer | **ja, 2026-10-10 12:09 UTC** | 63 filer i `items/` uten kopi og uten referanse i noen tekst-, jsonb- eller array-kolonne i `public`, og uten bruk i koden, slettet med eksplisitt liste via Storage API etter kontroll av at nøyaktig disse 63 var igjen. `items/` er tom |
+| CDN-purge etter sletting | **ja, 2026-10-10 12:09 UTC** | `purgeBucketCache('item-images')`. Etterkontroll: 0 av 341 slettede filer åpne via gamle offentlige URL-er, 303/303 aktive bilder virker med signert URL og 0 offentlig, 0 av 307 bildereferanser peker til manglende fil, medlemmer i de fire berørte boene ser alle sine bilder, utenforstående 0. Opplasting med ekstrabilde, visning og demo testet |
+| Opprydding | **ja, 2026-10-10 12:15 UTC** | `migrate-legacy-images` slettet, `LEGACY_IMAGES_SECRET` fjernet, testkontoene (`arvklart-prodtest-*`) og testboet slettet med filer (kontrollert: bare testkontoer som medlemmer). Ingen ekte brukerdata berørt |
 
 ## Edge-funksjoner
 
 | Funksjon | Prod-versjon | Lik repo | Merknad |
 |---|---|---|---|
-| `analyze-item` | v15 | ja (main 2026-10-09) | U2 (effort `low`, cache av systemprompten; `ANALYZE_EFFORT=medium` ruller tilbake uten deploy) og U3 (`estate_id`). `verify_jwt: false` (sjekker innlogging selv) |
-| `estimate-value` | v14 | ja (main 2026-10-09) | v3: markedsmotoren med familiens sammenligninger, rettelser fra U1, AI-budsjett per bo. `verify_jwt: true` |
-| `delete-account` | v7 | ja (main 2026-10-09) | S4. Testet i prod med egne testkontoer. `verify_jwt: false` (sjekker innlogging selv) |
-| `migrate-legacy-images` | v1 | ja | S2, midlertidig. Krever `x-cron-secret` = `LEGACY_IMAGES_SECRET` (egen engangshemmelighet). Funksjonen og hemmeligheten fjernes når flyttingen er ferdig |
-| `demo-login` | v5 | ja | |
-| `cleanup-closed-estates` | v5 | nei fra 2026-10-08 | repoet har ny versjon (paginering, dry_run, kjørelogg, tilbakemeldinger). Ikke deployet; ingen cron-jobb |
+| `analyze-item` | v16 | ja (main 2026-10-09) | U2 (effort `low`, cache av systemprompten; `ANALYZE_EFFORT=medium` ruller tilbake uten deploy) og U3 (`estate_id`). `verify_jwt: false` (sjekker innlogging selv) |
+| `estimate-value` | v15 | ja (main 2026-10-09) | v3: markedsmotoren med familiens sammenligninger, rettelser fra U1, AI-budsjett per bo. `verify_jwt: true` |
+| `delete-account` | v8 | ja (main 2026-10-09) | S4. Testet i prod med egne testkontoer. `verify_jwt: false` (sjekker innlogging selv) |
+| `demo-login` | v6 | ja | |
+| `cleanup-closed-estates` | v6 | nei fra 2026-10-08 | repoet har ny versjon (paginering, dry_run, kjørelogg, tilbakemeldinger). Ikke deployet; ingen cron-jobb |
 | `cleanup-orphan-images` | – | ny i repoet | ikke deployet |
 
-Merk: `supabase secrets set` lager en ny versjon av alle funksjonene (uten kodeendring). Derfor økte også `demo-login` og `cleanup-closed-estates` 2026-10-09.
+Merk: `supabase secrets set`/`unset` lager en ny versjon av alle funksjonene (uten kodeendring). Derfor økte også `demo-login` og `cleanup-closed-estates`. `migrate-legacy-images` (S2) er slettet etter bruk.
+
+## Status S1–S4 (personvern for bilder og konto)
+
+Fullført 2026-10-10: S1 signerte bilde-URL-er, S2 eldre bilder flyttet inn i bo-mapper, S3 privat `item-images` med strengere sletterett, S4 `delete-account` v2 og utvidet dataeksport. Gjenværende forbehold:
+
+- Sikkerhetskopien av de slettede filene finnes bare lokalt hos eieren (én kopi). Supabase sine daglige backuper dekker ikke Storage-filer.
+- Personverntekstene fra S4 skal gjennomgås juridisk.
+- CDN-buffer: gjør bøtter private via Storage API, eller kjør `purgeBucketCache` etter en SQL-endring (se 20261014 over).
+- Nettlesere kan ha en offentlig bilde-URL i lokal buffer i inntil 1 time etter siste offentlige visning (`max-age=3600`); appen har brukt signerte URL-er siden S1.
 
 ## Plan for varig sporing (ikke innført)
 
