@@ -15,11 +15,7 @@ do $$ begin
   end if;
 end $$;
 
-create or replace function public.protected_item_columns()
-returns text[] language sql immutable as $$
-  select array['value_agree_count', 'value_disagree_count', 'value_voter_ids', 'value_suggestions', 'assigned_to', 'status',
-               'agreed_value', 'agreed_value_source', 'disposition']
-$$;
+insert into public.protected_columns (table_name, column_name) values ('items', 'disposition') on conflict do nothing;
 select public.apply_item_update_grants();
 
 create or replace function public.guard_item_insert()
