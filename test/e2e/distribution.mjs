@@ -334,6 +334,23 @@ await check('F6 Arvinger: en annen beslutningstaker kan bekrefte en representasj
   heir_representatives: [{ id: 'rep-1', estate_id: EST, heir_id: 'heir-gunn', user_id: U2, kind: 'fullmakt', basis: 'Skriftlig fullmakt datert 1. oktober', created_by: U2, verified_at: null, revoked_at: null }] })),
   rpc: { verify_representative: { body: { ok: true } } } })
 
+await check('F6 Arvinger: administrator som selv er arving kobler kontoen sin («Dette er meg») via join_estate', async page => {
+  const { rpc } = watch(page)
+  await page.goto(`${BASE}/estate/${EST}/heirs`)
+  await page.getByText(/E-posten din står på denne arvingen/).waitFor()
+  await page.getByRole('button', { name: 'Dette er meg – koble kontoen min' }).click()
+  await page.getByText('Kontoen din er koblet til arvingen').waitFor()
+  assert(rpc.some(x => x.name === 'join_estate' && x.body.p_code === 'ABC123'), 'join_estate ble ikke kalt med boets kode')
+  const v = await axe(page)
+  assert(!v.length, v.join('; '))
+}, { fixtures: f6({ heirs: [{ ...heirsF6[0], user_id: null }, heirsF6[1]] }), rpc: { join_estate: { body: [{ estate_id: EST, estate_name: 'Testbo' }] } } })
+
+await check('F6 Arvinger: e-post på flere arvinger kan ikke kobles, og det forklares', async page => {
+  await page.goto(`${BASE}/estate/${EST}/heirs`)
+  await page.getByText(/E-posten din står på flere arvinger/).first().waitFor()
+  assert(!(await page.getByRole('button', { name: 'Dette er meg – koble kontoen min' }).count()), 'knappen vises selv om e-posten er tvetydig')
+}, { fixtures: f6({ heirs: [{ ...heirsF6[0], user_id: null }, heirsF6[1], { ...heirsF6[0], id: 'h-dup', name: 'Test 2', user_id: null }] }) })
+
 await browser.close()
 console.log(results.join('\n'))
 process.exit(results.some(r => r.startsWith('FAIL')) ? 1 : 0)
