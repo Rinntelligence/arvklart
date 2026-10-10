@@ -11,6 +11,7 @@ import AnalysisDetails from '../components/AnalysisDetails'
 import AiCorrectionsForm from '../components/AiCorrectionsForm'
 import MarketCompare from '../components/MarketCompare'
 import ItemHistory from '../components/ItemHistory'
+import AgreedValue from '../components/AgreedValue'
 import { withCorrections } from '../lib/aiCorrections'
 import { assignItems, unassignItem } from '../lib/assignments'
 import StoredImage from '../components/StoredImage'
@@ -242,6 +243,8 @@ export default function ItemDetailPage({ session, profile, onToast, isDemo }) {
         <p style={{ color:'#75604B', fontSize:'0.8125rem', marginBottom:'8px' }}>
           {L('Lagt inn av', 'Added by')} {item.added_by_name || L('ukjent', 'unknown')} · {new Date(item.created_at).toLocaleDateString(locale(), { day:'numeric', month:'long', year:'numeric' })}
         </p>
+        {/* Fordelingsverdien (F3): adskilt fra anslaget og forslagene under; settes bare av administrator */}
+        <AgreedValue item={item} estateId={id} canEdit={isAdmin && !isDemo} onChanged={load} onToast={onToast} />
         {item.estimated_value && (() => {
           const voterIds = item.value_voter_ids || []
           const hasVoted = voterIds.includes(session.user.id)
@@ -249,7 +252,7 @@ export default function ItemDetailPage({ session, profile, onToast, isDemo }) {
           const suggestions = item.value_suggestions || []
           return (
             <div style={{ background:'#DCE3D2', border:'1px solid #B8C8A8', borderRadius:'10px', padding:'14px', marginBottom:'12px' }}>
-              <div style={{ fontSize:'0.75rem', color:'#3A5A30', fontWeight:'500', marginBottom:'4px' }}>{L('Verdiestimat', 'Value estimate')}</div>
+              <div style={{ fontSize:'0.75rem', color:'#3A5A30', fontWeight:'500', marginBottom:'4px' }}>{L('Verdiestimat (veiledende)', 'Value estimate (indicative)')}</div>
               <div style={{ fontSize:'1.25rem', color:'#3A2F26', fontFamily:'Fraunces, serif', marginBottom:'8px' }}>
                 {formatNOK(item.estimated_value)}
               </div>

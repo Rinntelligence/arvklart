@@ -16,6 +16,8 @@ const isEmail = e => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)
 const tc = c => { if(!c)return'#FBF9F5'; const r=parseInt(c.slice(1,3),16),g=parseInt(c.slice(3,5),16),b=parseInt(c.slice(5,7),16); return(0.299*r+0.587*g+0.114*b)/255>0.55?'#3A2F26':'#FBF9F5' }
 
 export default function HeirsPage({ session, profile, onToast, isDemo }) {
+  const [sharesConfirmed, setSharesConfirmed] = useState(false)
+  const [savedMode, setSavedMode] = useState('equal')
   const { id } = useParams()
   const navigate = useNavigate()
   const [heirs, setHeirs] = useState([])
@@ -41,7 +43,7 @@ export default function HeirsPage({ session, profile, onToast, isDemo }) {
     const [{ data: hs }, { data: mem }, { data: es }, { data: members }] = await Promise.all([
       supabase.from('heirs').select('*').eq('estate_id', id).order('created_at'),
       supabase.from('estate_members').select('role').eq('estate_id', id).eq('user_id', session.user.id).single(),
-      supabase.from('estates').select('name, total_value, split_mode, invite_code').eq('id', id).single(),
+      supabase.from('estates').select('name, total_value, split_mode, invite_code, shares_confirmed').eq('id', id).single(),
       getEstateMembers(id),
     ])
     setHeirs(hs || [])
@@ -51,6 +53,8 @@ export default function HeirsPage({ session, profile, onToast, isDemo }) {
     setMemberEmails((members || []).map(m => normEmail(m.profiles?.email)).filter(Boolean))
     if (es?.total_value) setTotalValue(es.total_value.toString())
     if (es?.split_mode) setSplitMode(es.split_mode)
+    setSharesConfirmed(!!es?.shares_confirmed)
+    setSavedMode(es?.split_mode || 'equal')
     setLoading(false)
   }
 
@@ -58,6 +62,15 @@ export default function HeirsPage({ session, profile, onToast, isDemo }) {
 
   // Arvinger og e-postene deres styrer hvem som kan bli med i boet, så bare admin endrer dem.
   const canEdit = myRole === 'admin' && !isDemo
+
+  // Arveandelene brukes i fordelingen av innbo og løsøre bare når administrator har bekreftet at de gjelder
+  // (confirm_shares, logges). Databasen sjekker at de summerer til 100 og nullstiller ved endringer.
+  const setConfirmed = async (confirmed) => {
+    const { error } = await supabase.rpc('confirm_shares', { p_estate: id, p_confirmed: confirmed })
+    if (error) { onToast?.(L('Kunne ikke bekrefte. Lagre andelene først, og sjekk at de summerer til 100 %.', 'Could not confirm. Save the shares first and check that they add up to 100%.'), 'error'); return }
+    onToast?.(confirmed ? L('Andelene brukes når innbo og løsøre fordeles', 'The shares are used when the household contents are divided') : L('Bekreftelsen er trukket', 'The confirmation has been withdrawn'))
+    load()
+  }
 
   const saveSettings = async () => {
     setSaving(true)
@@ -314,6 +327,20 @@ export default function HeirsPage({ session, profile, onToast, isDemo }) {
       {splitMode === 'custom' && heirs.length > 0 && customValid && (
         <div style={{ padding:'12px 16px', background:'#DCE3D2', border:'1px solid #B8C8A8', borderRadius:'8px', marginBottom:'16px', fontSize:'0.8125rem', color:'#3A5A30' }}>
           {L('Prosentene summeres til 100% — ser bra ut', 'The percentages add up to 100% — looks good')}
+        </div>
+      )}
+      {splitMode === 'custom' && savedMode === 'custom' && heirs.length > 0 && customValid && (
+        <div role="status" style={{ padding:'14px 16px', background:'#fff', border:'1px solid #D9CFC0', borderRadius:'8px', marginBottom:'16px', fontSize:'0.8125rem', color:'#3A2F26', lineHeight:1.6 }}>
+          {sharesConfirmed
+            ? L('Bekreftet: andelene brukes som beslutningsstøtte når innbo og løsøre fordeles (jevn fordeling vektes etter dem).', 'Confirmed: the shares are used as decision support when the household contents are divided (the equal distribution is weighted by them).')
+            : L('Gjelder disse andelene også fordelingen av innbo og løsøre? Først når administrator har bekreftet det, vektes jevn fordeling etter dem. Ellers deles det likt.', 'Do these shares also apply to the household contents? Only when the administrator has confirmed it is the equal distribution weighted by them. Otherwise it is split equally.')}
+          {canEdit && (
+            <div style={{ marginTop:'10px' }}>
+              <button onClick={() => setConfirmed(!sharesConfirmed)} style={{ minHeight:'44px', padding:'8px 14px', background: sharesConfirmed ? '#fff' : '#5F6E52', color: sharesConfirmed ? '#5C4530' : '#fff', border: sharesConfirmed ? '1px solid #D9CFC0' : 'none', borderRadius:'8px', cursor:'pointer', fontSize:'0.8125rem', fontFamily:'Karla, sans-serif' }}>
+                {sharesConfirmed ? L('Trekk bekreftelsen', 'Withdraw the confirmation') : L('Bekreft at andelene gjelder innbo og løsøre', 'Confirm that the shares apply to the household contents')}
+              </button>
+            </div>
+          )}
         </div>
       )}
 

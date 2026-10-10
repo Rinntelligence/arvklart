@@ -274,6 +274,53 @@ end $$;
 select t_eq((assign_items('eeee0000-0000-0000-0000-000000000001', '[{"item_id":"11110000-0000-0000-0000-000000000001","user_id":"00000000-0000-0000-0000-0000000000f1"}]', 'lottery'))->>'assigned', '1', 'vinneren av loddtrekningen kan tildeles');
 select t_eq((select data->>'draw_no' || ':' || jsonb_array_length(data->'candidates') from estate_events where item_id = '11110000-0000-0000-0000-000000000001' and kind = 'lottery_draw'), '1:1', 'trekningen logges med kandidater og nummer');
 select unassign_item('11110000-0000-0000-0000-000000000001');
+-- F3 (20261018): fordelingsverdi, kobling arving–konto og bekreftede andeler
+do $$ begin
+  update items set agreed_value = 1 where id = '11110000-0000-0000-0000-000000000001';
+  raise exception 'FAIL: admin kunne skrive fordelingsverdien direkte';
+exception when insufficient_privilege then raise notice 'OK   fordelingsverdien kan ikke skrives direkte, heller ikke av admin';
+end $$;
+select t_eq((set_agreed_values('eeee0000-0000-0000-0000-000000000001', '[{"item_id":"11110000-0000-0000-0000-000000000001","value":1200,"source":"heir"}]'))->>'updated', '1', 'admin kan sette fordelingsverdi via set_agreed_values');
+select t_eq((select agreed_value::text || ':' || agreed_value_source || ':' || coalesce(estimated_value::text, '-') from items where id = '11110000-0000-0000-0000-000000000001'), '1200.00:heir:-', 'fordelingsverdien holdes atskilt fra AI-anslaget (som er urørt)');
+select t_eq((select (data->>'value') || ':' || (data->>'source') from estate_events where item_id = '11110000-0000-0000-0000-000000000001' and kind = 'agreed_value_set' order by id desc limit 1), '1200:heir', 'fordelingsverdien logges med kilde');
+do $$ begin
+  perform set_agreed_values('eeee0000-0000-0000-0000-000000000001', '[{"item_id":"11110000-0000-0000-0000-000000000001","value":5,"source":"magi"}]');
+  raise exception 'FAIL: ukjent kilde ble godtatt';
+exception when invalid_parameter_value then raise notice 'OK   kilden må være ai, heir eller manual';
+end $$;
+select set_agreed_values('eeee0000-0000-0000-0000-000000000001', '[{"item_id":"11110000-0000-0000-0000-000000000001","value":0,"source":"manual"}]');
+select t_eq((select agreed_value::text from items where id = '11110000-0000-0000-0000-000000000001'), '0.00', '0 kr kan settes eksplisitt');
+select set_agreed_values('eeee0000-0000-0000-0000-000000000001', '[{"item_id":"11110000-0000-0000-0000-000000000001","value":null}]');
+select t_eq((select coalesce(agreed_value::text, 'mangler') from items where id = '11110000-0000-0000-0000-000000000001'), 'mangler', 'manglende verdi er null, ikke 0');
+select t_eq((select user_id::text || ':' || linked_via from heirs where name = 'Frank'), '00000000-0000-0000-0000-0000000000f1:join_estate', 'arvingen kobles til kontoen når hen selv blir med');
+do $$ begin
+  update heirs set user_id = auth.uid() where name = 'Frank';
+  raise exception 'FAIL: admin kunne koble en arving til en konto';
+exception when insufficient_privilege then raise notice 'OK   admin kan ikke koble arving og konto selv';
+end $$;
+do $$ begin
+  insert into heirs (estate_id, name, user_id) values ('eeee0000-0000-0000-0000-000000000001', 'Falsk kobling', auth.uid());
+  raise exception 'FAIL: kunne opprette arving med kobling';
+exception when insufficient_privilege then raise notice 'OK   koblingen kan ikke settes ved opprettelse';
+end $$;
+do $$ begin
+  perform confirm_shares('eeee0000-0000-0000-0000-000000000001', true);
+  raise exception 'FAIL: andeler som ikke summerer til 100 ble bekreftet';
+exception when invalid_parameter_value then raise notice 'OK   andelene må summere til 100 for å bekreftes';
+end $$;
+update heirs set percentage = 100 where name = 'Frank';
+select confirm_shares('eeee0000-0000-0000-0000-000000000001', true);
+select t_eq((select shares_confirmed from estates where id = 'eeee0000-0000-0000-0000-000000000001'), true, 'admin kan bekrefte andelene');
+do $$ begin
+  update estates set shares_confirmed = false where id = 'eeee0000-0000-0000-0000-000000000001';
+  raise exception 'FAIL: bekreftelsen kunne skrives direkte';
+exception when insufficient_privilege then raise notice 'OK   bekreftelsen av andelene kan ikke skrives direkte';
+end $$;
+update heirs set percentage = 90 where name = 'Frank';
+select t_eq((select shares_confirmed from estates where id = 'eeee0000-0000-0000-0000-000000000001'), false, 'endret andel nullstiller bekreftelsen');
+select t_eq((select count(*)::int from estate_events where estate_id = 'eeee0000-0000-0000-0000-000000000001' and kind = 'shares_unconfirmed' and data->>'reason' = 'heirs_changed'), 1, 'nullstillingen logges');
+update estates set name = 'Evas bo' where id = 'eeee0000-0000-0000-0000-000000000001';
+select t_eq((select name from estates where id = 'eeee0000-0000-0000-0000-000000000001'), 'Evas bo', 'admin kan fortsatt endre navnet på boet');
 do $$ begin
   perform anonymize_estate_events(auth.uid());
   raise exception 'FAIL: klienten kunne anonymisere loggen';
@@ -300,6 +347,16 @@ do $$ begin
   perform assign_items('eeee0000-0000-0000-0000-000000000001', '[{"item_id":"11110000-0000-0000-0000-000000000001","user_id":"00000000-0000-0000-0000-0000000000f1"}]', 'manual');
   raise exception 'FAIL: medlem kunne tildele via assign_items';
 exception when insufficient_privilege then raise notice 'OK   medlem kan ikke tildele via assign_items';
+end $$;
+do $$ begin
+  perform set_agreed_values('eeee0000-0000-0000-0000-000000000001', '[{"item_id":"11110000-0000-0000-0000-000000000001","value":1,"source":"manual"}]');
+  raise exception 'FAIL: medlem kunne sette fordelingsverdi';
+exception when insufficient_privilege then raise notice 'OK   medlem kan ikke sette fordelingsverdi';
+end $$;
+do $$ begin
+  insert into items (estate_id, title, added_by, agreed_value) values ('eeee0000-0000-0000-0000-000000000001', 'Med verdi', auth.uid(), 5);
+  raise exception 'FAIL: ny gjenstand med fordelingsverdi ble lagret';
+exception when insufficient_privilege then raise notice 'OK   ny gjenstand kan ikke ha fordelingsverdi';
 end $$;
 do $$ begin
   perform draw_lot('11110000-0000-0000-0000-000000000001');
@@ -358,6 +415,13 @@ exception when insufficient_privilege then raise notice 'OK   demo kan ikke endr
 end $$;
 with d as (delete from items returning 1) select t_eq((select count(*)::int from d), 0, 'demo kan ikke slette gjenstander');
 with d as (delete from estate_members where user_id <> auth.uid() returning 1) select t_eq((select count(*)::int from d), 0, 'demo kan ikke fjerne andre medlemmer');
+select t_eq((select count(*)::int from items where estate_id = 'deed0001-0000-0000-0000-000000000001' and agreed_value is not null) > 0
+  and not exists (select 1 from items where estate_id = 'deed0001-0000-0000-0000-000000000001' and estimated_value ~ '^[0-9]+$' and agreed_value is null), true, 'demoen har fordelingsverdier fra anslagene');
+do $$ begin
+  perform set_agreed_values('deed0001-0000-0000-0000-000000000001', '[{"item_id":"face0001-0000-0000-0000-000000000001","value":1,"source":"manual"}]');
+  raise exception 'FAIL: demo kunne endre fordelingsverdi';
+exception when insufficient_privilege then raise notice 'OK   demo kan ikke endre fordelingsverdi';
+end $$;
 do $$ begin
   perform vote_item_value('face0001-0000-0000-0000-000000000001', 'agree');
   raise exception 'FAIL: demo kunne stemme';

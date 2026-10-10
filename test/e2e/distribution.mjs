@@ -127,6 +127,51 @@ await check('F2 «Dine valg» viser hvor mange av mine ønsker andre også har',
   await page.waitForFunction(() => document.activeElement?.dataset?.tab === 'contested', null, { timeout: 5000 })
 }, { fixtures: asMember(withReasons) })
 
+// ── F3: fordelingsverdi adskilt fra AI-anslaget, og bekreftede arveandeler ─────
+await check('F3 Gjenstandssiden: fordelingsverdi adskilt fra anslaget; «Bruk AI-anslaget» går til set_agreed_values', async page => {
+  const { rpc, patches } = watch(page)
+  await page.goto(`${BASE}/estate/${EST}/item/${ITEM}`)
+  await page.getByRole('heading', { name: 'Fordelingsverdi (foreslått)' }).waitFor()
+  await page.getByText(/Ingen fordelingsverdi ennå/).waitFor()
+  await page.getByText('Verdiestimat (veiledende)').waitFor()
+  await page.getByRole('button', { name: /^Bruk AI-anslaget/ }).click()
+  await page.getByText('Fordelingsverdien er lagret').waitFor()
+  const c = rpc.find(x => x.name === 'set_agreed_values')
+  assert(c?.body.p_estate === EST && c.body.p_values[0].value === 1500 && c.body.p_values[0].source === 'ai', `feil kall: ${JSON.stringify(c?.body)}`)
+  assert(!patches.some(b => 'agreed_value' in b), 'fordelingsverdien ble skrevet direkte')
+  const v = await axe(page)
+  assert(!v.length, v.join('; '))
+}, { fixtures: contested, rpc: { set_agreed_values: { body: { updated: 1 } } } })
+
+await check('F3 Arving ser fordelingsverdien, men kan ikke sette den', async page => {
+  await page.goto(`${BASE}/estate/${EST}/item/${ITEM}`)
+  await page.getByRole('heading', { name: 'Fordelingsverdi (foreslått)' }).waitFor()
+  assert(await page.getByRole('button', { name: /Bruk AI-anslaget|Sett fordelingsverdi|^Endre$/ }).count() === 0, 'arving fikk knapper for å sette verdien')
+}, { fixtures: asMember({ ...contested, items: contested.items.map(i => (i.id === ITEM ? { ...i, agreed_value: 1200, agreed_value_source: 'manual' } : i)) }) })
+
+await check('F3 Jevn fordeling: «Bruk AI-anslaget som fordelingsverdi» for gjenstandene som mangler', async page => {
+  const { rpc } = watch(page)
+  await page.goto(`${BASE}/estate/${EST}/conflicts`)
+  await page.getByRole('button', { name: /Jevn verdifordeling|Lik verdi/ }).first().click()
+  await page.getByRole('button', { name: 'Bruk AI-anslaget som fordelingsverdi (2)' }).click()
+  await page.getByText('AI-anslagene er brukt som foreslått fordelingsverdi').waitFor()
+  const c = rpc.find(x => x.name === 'set_agreed_values')
+  assert(c?.body.p_values.length === 2 && c.body.p_values.every(v => v.source === 'ai' && v.value === 1500), `feil kall: ${JSON.stringify(c?.body)}`)
+  await page.getByText(/beslutningsstøtte, ikke en fasit/).waitFor()
+}, { fixtures: contested, rpc: { set_agreed_values: { body: { updated: 2 } } } })
+
+await check('F3 Arvinger: administrator bekrefter at andelene gjelder innbo og løsøre (confirm_shares)', async page => {
+  const { rpc } = watch(page)
+  await page.goto(`${BASE}/estate/${EST}/heirs`)
+  await page.getByRole('button', { name: 'Bekreft at andelene gjelder innbo og løsøre' }).click()
+  await page.getByText('Andelene brukes når innbo og løsøre fordeles').waitFor()
+  const c = rpc.find(x => x.name === 'confirm_shares')
+  assert(c?.body.p_estate === EST && c.body.p_confirmed === true, `feil kall: ${JSON.stringify(c?.body)}`)
+}, { fixtures: { ...contested, estates: [{ ...FIXTURES.estates[0], split_mode: 'custom', shares_confirmed: false }],
+  heirs: [{ id: 'h1', estate_id: EST, name: 'Test', email: 'test@test.no', relationship: 'Barn', percentage: 60, user_id: UID, created_at: now },
+    { id: 'h2', estate_id: EST, name: 'Kari', email: 'kari@test.no', relationship: 'Barn', percentage: 40, user_id: U2, created_at: now }] },
+  rpc: { confirm_shares: { body: { ok: true } } } })
+
 await browser.close()
 console.log(results.join('\n'))
 process.exit(results.some(r => r.startsWith('FAIL')) ? 1 : 0)
