@@ -42,5 +42,16 @@ begin
   return new;
 end;
 $$;
+-- Kontosletting: uten svarene over (versjonen fra 20261017)
+create or replace function public.anonymize_estate_events(p_user uuid)
+returns int language plpgsql security definer set search_path = public as $$
+declare n int;
+begin
+  update estate_events set data = replace(data::text, p_user::text, '00000000-0000-0000-0000-000000000000')::jsonb
+  where data::text like '%' || p_user::text || '%';
+  get diagnostics n = row_count;
+  return n;
+end;
+$$;
 notify pgrst, 'reload schema';
 commit;
