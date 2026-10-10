@@ -46,6 +46,10 @@ export default function StatusPage({ session }) {
         </div>
       </div>
 
+      <button onClick={() => navigate(`/estate/${id}/fordeling`)} style={{ width:'100%', marginBottom:'24px', minHeight:'44px', padding:'10px 14px', background:'#fff', border:'1px solid #9A8B78', borderRadius:'10px', cursor:'pointer', color:'#3A2F26', fontSize:'0.875rem', fontFamily:'Karla, sans-serif', textAlign:'left' }}>
+        {L('Se fordelingen – per arving, og utkast som PDF', 'See the distribution – per heir, and a draft as PDF')} →
+      </button>
+
       {steps.length === 0 ? (
         <div style={{ background:'#DCE3D2', border:'1px solid #B8C8A8', borderRadius:'12px', padding:'24px', textAlign:'center' }}>
           <div style={{ fontFamily:'Fraunces, serif', fontSize:'1.125rem', color:'#3A2F26', marginBottom:'4px' }}>{L('Alt er klart', 'All done')}</div>

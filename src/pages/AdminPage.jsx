@@ -234,11 +234,17 @@ export default function AdminPage({ session, profile, onToast }) {
         {estate.status === 'closed' ? (
           <button onClick={() => setClosed(false)} style={{ padding:'9px 18px', background:'none', border:'1px solid #D9CFC0', borderRadius:'8px', cursor:'pointer', color:'#5C4530', fontSize:'0.875rem', fontFamily:'Karla, sans-serif' }}>{L('Åpne boet igjen', 'Reopen the estate')}</button>
         ) : confirmClose ? (
+          <>
+          <p role="status" style={{ fontSize:'0.8125rem', color:'#3A2F26', background:'#FBF9F5', border:'1px solid #D9CFC0', borderRadius:'8px', padding:'10px 12px', marginBottom:'12px', lineHeight:1.6 }}>
+            {L('Før dere avslutter: se over fordelingen og last ned protokollen. Etter 12 måneder slettes alt.', 'Before you close: review the distribution and download the record. Everything is deleted after 12 months.')}{' '}
+            <button onClick={() => navigate(`/estate/${id}/fordeling`)} style={{ background:'none', border:'none', padding:0, color:'#5F6E52', textDecoration:'underline', cursor:'pointer', fontSize:'0.8125rem', fontFamily:'Karla, sans-serif' }}>{L('Se fordelingen', 'See the distribution')}</button>
+          </p>
           <div style={{ display:'flex', gap:'10px', alignItems:'center', flexWrap:'wrap' }}>
             <span style={{ fontSize:'0.8125rem', color:'#8B3A3A' }}>{L('Avslutte boet?', 'Close the estate?')}</span>
             <button onClick={() => setClosed(true)} style={{ padding:'8px 16px', background:'#8B3A3A', color:'#fff', border:'none', borderRadius:'8px', cursor:'pointer', fontSize:'0.8125rem', fontFamily:'Karla, sans-serif' }}>{L('Ja, avslutt', 'Yes, close it')}</button>
             <button onClick={() => setConfirmClose(false)} style={{ padding:'8px 16px', background:'none', border:'1px solid #D9CFC0', borderRadius:'8px', cursor:'pointer', color:'#5C4530', fontSize:'0.8125rem', fontFamily:'Karla, sans-serif' }}>{L('Avbryt', 'Cancel')}</button>
           </div>
+          </>
         ) : (
           <button onClick={() => setConfirmClose(true)} style={{ padding:'9px 18px', background:'none', border:'1px solid #8B3A3A', borderRadius:'8px', cursor:'pointer', color:'#8B3A3A', fontSize:'0.875rem', fontFamily:'Karla, sans-serif' }}>{L('Avslutt boet…', 'Close the estate…')}</button>
         )}

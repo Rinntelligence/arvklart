@@ -203,6 +203,38 @@ await check('F4 Arving ser valgene, men kan ikke endre dem', async page => {
   assert(await page.getByRole('button', { name: /^(Selg|Gi bort|Kast)$/ }).count() === 0, 'arving fikk valgknapper')
 }, { fixtures: asMember(unwanted) })
 
+// ── F5: oversikten over fordelingen og utkast som PDF ──────────────────────────
+const overview = {
+  ...contested, interests: contested.interests.filter(x => x.item_id === 'it-2'),
+  items: [
+    item(ITEM, 'Gyngestol', { status: 'assigned', assigned_to: UID, agreed_value: 3000, interests: [] }),
+    item('it-3', 'Klokke', { status: 'assigned', assigned_to: U2, agreed_value: 1000, interests: [] }),
+    item('it-2', 'Maleri', { interests: bothWant }),
+    item('u-2', 'Kristallglass', { interests: [], disposition: 'donate' }),
+  ],
+}
+await check('F5 Fordelingen: per arving med sum og avvik fra lik andel, det som ikke er avklart, og utkast som PDF', async page => {
+  await page.goto(`${BASE}/estate/${EST}/fordeling`)
+  await page.getByRole('heading', { name: 'Fordelingen', exact: true }).waitFor()
+  await page.getByText('1 gjenstand er ikke avklart ennå').waitFor()
+  await page.getByRole('region', { name: 'Kari' }).getByText(/ca\. .*1.?000.* mindre enn en lik andel/).waitFor()
+  await page.getByRole('region', { name: 'Test' }).getByText(/mer enn en lik andel/).waitFor()
+  await page.getByText('Gis bort: 1').waitFor()
+  await page.getByText('Maleri – ønskes av 2').waitFor()
+  const [download] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'Last ned utkast (PDF)' }).click()])
+  assert(/^fordeling-utkast-\d{4}-\d{2}-\d{2}\.pdf$/.test(download.suggestedFilename()), `filnavn: ${download.suggestedFilename()}`)
+  const v = await axe(page)
+  assert(!v.length, v.join('; '))
+}, { fixtures: overview })
+
+await check('F5 Avslutt boet: påminnelse om å se fordelingen og laste ned protokollen', async page => {
+  await page.goto(`${BASE}/estate/${EST}/admin`)
+  await page.getByRole('button', { name: 'Avslutt boet…' }).click()
+  await page.getByText(/Før dere avslutter: se over fordelingen og last ned protokollen/).waitFor()
+  await page.getByRole('button', { name: 'Se fordelingen' }).click()
+  await page.waitForURL(`**/estate/${EST}/fordeling`)
+}, { fixtures: overview })
+
 await browser.close()
 console.log(results.join('\n'))
 process.exit(results.some(r => r.startsWith('FAIL')) ? 1 : 0)
