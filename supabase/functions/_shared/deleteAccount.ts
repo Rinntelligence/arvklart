@@ -78,6 +78,8 @@ export async function deleteAccountData(admin: SupabaseClient, userId: string) {
   for (const table of ['interests', 'item_passes', 'comments', 'feedback', 'estate_members', 'profiles']) {
     must(await admin.from(table).delete().eq('user_id', userId))
   }
+  // Fordelingsloggen: brukerens id fjernes fra hendelsenes innhold (avsender settes til null når brukeren slettes)
+  must(await admin.rpc('anonymize_estate_events', { p_user: userId }))
   const { error } = await admin.auth.admin.deleteUser(userId)
   if (error) throw error
   return { deleted_estates: deletedEstates, shared_estates: shared.length, items_scrubbed: scrubbed }

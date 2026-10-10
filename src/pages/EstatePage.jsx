@@ -6,6 +6,7 @@ import { loadStatusExtras } from '../lib/decisions'
 import { formatNOK } from '../lib/format'
 import { removeImages, itemImageUrls } from '../lib/images'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
+import { dispositionLabel } from '../lib/disposition'
 import { L, locale } from '../lib/lang'
 import { categoryLabel } from '../lib/categories'
 import { Modal } from '../components/UI'
@@ -97,6 +98,7 @@ export default function EstatePage({ session, profile, onToast, isDemo }) {
   const filtered = getFiltered().filter(matches)
 
   const myCount = myItems.length
+  const myContested = myItems.filter(isContested).length
   const contested = items.filter(isContested).length
   const unwanted = items.filter(i => i.status !== 'assigned' && !i.interests?.length).length
   const assigned = items.filter(i => i.status === 'assigned').length
@@ -157,6 +159,15 @@ export default function EstatePage({ session, profile, onToast, isDemo }) {
   const btnPrimary = { ...btn, background:'#3A2F26', border:'1px solid #3A2F26', color:'#FBF9F5' }
   const sectionLabel = { fontSize:'0.8125rem', fontWeight:'500', marginBottom:'10px', textTransform:'uppercase', letterSpacing:'0.5px' }
   // «Se mine ønsker»: vis listen med bare dine ønsker, og flytt dit (ellers skjer endringen utenfor skjermen)
+  // «Snakk sammen først»: gjenstandene flere ønsker, med begrunnelsene på hver gjenstand
+  const showContested = () => {
+    setTab('items'); setFilterStatus('contested'); setQuery('')
+    requestAnimationFrame(() => {
+      tabsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      tabsRef.current?.querySelector('[data-tab="contested"]')?.focus({ preventScroll: true })
+    })
+  }
+
   const showMine = () => {
     setTab('items'); setFilterStatus('mine'); setQuery('')
     requestAnimationFrame(() => {
@@ -218,6 +229,11 @@ export default function EstatePage({ session, profile, onToast, isDemo }) {
                 <div style={{ fontSize:'0.9375rem', color:'#3A2F26' }}>{myCount === 0 ? L('Du har ikke ønsket noe ennå', 'You have not wished for anything yet') : L(`${myCount === 1 ? 'gjenstand' : 'gjenstander'} du ønsker`, `${myCount === 1 ? 'item' : 'items'} you want`)}</div>
               </div>
               {myCount > 0 && <button onClick={showMine} style={{ ...btn, minHeight:'44px' }}>{L('Se mine ønsker', 'See my wishes')}</button>}
+              {myContested > 0 && (
+                <button onClick={showContested} style={{ ...btn, minHeight:'44px' }}>
+                  {L(`${myContested} ønskes også av andre – snakk sammen`, `${myContested} also wanted by others – talk first`)}
+                </button>
+              )}
             </div>
           </div>
         </section>
@@ -241,6 +257,11 @@ export default function EstatePage({ session, profile, onToast, isDemo }) {
               </span>
             ))}
           </div>
+          {assigned > 0 && (
+            <button onClick={() => navigate(`/estate/${id}/fordeling`)} style={{ marginTop:'10px', background:'none', border:'none', padding:0, minHeight:'44px', color:'#5F6E52', textDecoration:'underline', cursor:'pointer', fontSize:'0.875rem', fontFamily:'Karla, sans-serif' }}>
+              {L('Se fordelingen per arving', 'See the distribution per heir')}
+            </button>
+          )}
         </div>
       )}
 
@@ -445,6 +466,7 @@ function ItemCard({ item, userId, onClick, onDelete, myRole, isDemo, showReason 
           : <span style={{ position:'absolute', left:'10px', bottom:'8px', fontSize:'0.6875rem', color:'#75604B' }}>{cat.emoji} {categoryLabel(cat.label)}</span>}
         {count > 1 && !isAssigned && <span style={{ position:'absolute', top:'8px', right:'8px', background:'#5F6E52', color:'#fff', fontSize:'0.6875rem', padding:'2px 8px', borderRadius:'10px' }}>{L(`${count} vil ha`, `${count} want it`)}</span>}
         {isAssigned && <span style={{ position:'absolute', top:'8px', right:'8px', background:'#5F6E52', color:'#fff', fontSize:'0.6875rem', padding:'2px 8px', borderRadius:'10px' }}>{L('Tildelt', 'Assigned')}</span>}
+        {!isAssigned && item.disposition && <span style={{ position:'absolute', top:'8px', right:'8px', background:'#FBF9F5', color:'#3A2F26', border:'1px solid #D9CFC0', fontSize:'0.6875rem', padding:'2px 8px', borderRadius:'10px' }}>{dispositionLabel(item.disposition)}</span>}
       </div>
 
       <div style={{ padding:'10px 12px 12px' }}>

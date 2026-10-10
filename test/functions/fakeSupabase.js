@@ -2,7 +2,7 @@
 // Støtter bare det de bruker: select/eq/lt/order/range/maybeSingle/single, count (head), insert, update, delete,
 // og Storage list (sider sortert på navn, mapper og filer), copy og remove. Alle endringer logges i `mutations`.
 
-export function fakeSupabase({ tables = {}, storage = {}, failRemove = () => false, failCopy = () => false, onList = () => {}, failInsert = false, failDeleteUser = false } = {}) {
+export function fakeSupabase({ tables = {}, storage = {}, failRemove = () => false, failCopy = () => false, onList = () => {}, failInsert = false, failDeleteUser = false, rpcResults = {} } = {}) {
   const db = Object.fromEntries(Object.entries(tables).map(([t, rows]) => [t, rows.map(r => ({ ...r }))]))
   const buckets = Object.fromEntries(Object.entries(storage).map(([b, files]) => [b, new Map(Object.entries(files))]))
   const mutations = []
@@ -112,7 +112,10 @@ export function fakeSupabase({ tables = {}, storage = {}, failRemove = () => fal
     deletedUsers.push(id); mutations.push({ op: 'deleteUser', id }); return { data: {}, error: null }
   } } }
 
-  return { client: { from: query, storage: storageApi, auth }, db, buckets, mutations, deletedUsers }
+  // Databasefunksjoner: registreres i mutations og svarer med rpcResults[navn] (standard: data null, ingen feil)
+  const rpc = async (name, args) => { mutations.push({ op: 'rpc', name, args }); return rpcResults[name] ?? { data: null, error: null } }
+
+  return { client: { from: query, storage: storageApi, auth, rpc }, db, buckets, mutations, deletedUsers }
 }
 
 // Mange filer i en mappe: { 'mappe/f0000.jpg': {...}, ... }
