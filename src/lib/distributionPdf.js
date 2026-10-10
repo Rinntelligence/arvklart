@@ -50,8 +50,8 @@ export function buildDistributionPdf({ estateName, summary, kind = 'draft', gene
   }[kind]
   text(status, { bold: true, color: ESPRESSO, gap: 1 })
   text(`${L('Laget', 'Generated')} ${fmtDate(generatedAt)}${version ? ` · ${L('versjon', 'version')} ${version.version_no} (${L('lagt frem', 'proposed')} ${fmtDate(version.created_at)})` : ''}`, { color: LATTE, gap: 2 })
-  text(L('Verdiene er fordelingsverdier familien har satt, adskilt fra AI-anslag. Verdiutjevningen er beslutningsstøtte, ikke en juridisk fasit. Godkjenninger er registrerte godkjenninger i Arvklart, ikke juridisk verifiserte elektroniske signaturer.',
-    'The values are distribution values set by the family, separate from AI estimates. The value balance is decision support, not a legal answer. Approvals are registered approvals in Arvklart, not legally verified electronic signatures.'), { size: 9, color: LATTE, gap: 2 })
+  text(L('Verdiene er fordelingsverdier familien har satt, adskilt fra AI-anslag. Verdiutjevningen er beslutningsstøtte, ikke en juridisk fasit. Godkjenninger er registrerte godkjenninger i Arvklart, ikke juridisk verifiserte elektroniske signaturer. Fullmakter og vergemål er registrert og bekreftet av familien, ikke kontrollert juridisk av Arvklart.',
+    'The values are distribution values set by the family, separate from AI estimates. The value balance is decision support, not a legal answer. Approvals are registered approvals in Arvklart, not legally verified electronic signatures. Powers of attorney and guardianships are registered and confirmed by the family, not checked legally by Arvklart.'), { size: 9, color: LATTE, gap: 2 })
 
   const notSettled = summary.pending.length + summary.unwanted.undecided.length
   if (notSettled) {

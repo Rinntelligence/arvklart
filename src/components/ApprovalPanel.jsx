@@ -92,7 +92,7 @@ export default function ApprovalPanel({ estateId, userId, isAdmin, isDemo, close
           {canRespond && mine.map(h => (
             <div key={h.heir_id} style={{ marginTop: '14px', borderTop: '1px solid #E8DFD0', paddingTop: '12px' }}>
               <p style={{ ...small, fontWeight: 600, color: '#3A2F26' }}>
-                {h.user_id === userId ? L('Ditt svar', 'Your response') : L(`Svar for ${h.name} (som bekreftet representant)`, `Respond for ${h.name} (as confirmed representative)`)}
+                {h.user_id === userId ? L('Ditt svar', 'Your response') : L(`Svar for ${h.name} (som registrert representant)`, `Respond for ${h.name} (as registered representative)`)}
               </p>
               <p style={small}>{L('Godkjenningen gjelder fordelingen slik den står i denne versjonen. Det som ikke er avklart, omfattes ikke.', 'The approval applies to the distribution as it stands in this version. What is not settled is not covered.')}</p>
               {objecting === h.heir_id ? (

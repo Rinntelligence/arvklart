@@ -31,7 +31,7 @@ const when = t => new Date(t).toLocaleString(locale(), { day: 'numeric', month: 
 
 // Status for én beslutningstaker i et forslag, til siden og protokollen
 export function heirStatusText(h, nameOf) {
-  const via = h.via_representative ? L(` av ${h.responder_email || nameOf(h.responder)} som representant`, ` by ${h.responder_email || nameOf(h.responder)} as representative`) : h.responder_email ? ` (${h.responder_email})` : ''
+  const via = h.via_representative ? L(` av ${h.responder_email || nameOf(h.responder)} som registrert representant`, ` by ${h.responder_email || nameOf(h.responder)} as registered representative`) : h.responder_email ? ` (${h.responder_email})` : ''
   if (h.decision === 'approve') return L(`Godkjent ${when(h.at)}${via}`, `Approved ${when(h.at)}${via}`)
   if (h.decision === 'object') return L(`Ikke enig ${when(h.at)}: «${h.reason}»`, `Disagrees ${when(h.at)}: «${h.reason}»`)
   if (!h.user_id && !h.representative) return L('Har ikke konto i Arvklart og ingen bekreftet representant – kan ikke svare digitalt', 'Has no Arvklart account and no confirmed representative – cannot respond digitally')

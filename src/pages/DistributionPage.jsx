@@ -47,7 +47,7 @@ export default function DistributionPage({ session, onToast, isDemo }) {
       const fromSnapshot = (pdfKind === 'final' || pdfKind === 'paper') && version?.snapshot
       const summary = fromSnapshot ? summarizeDistribution(snapshotInput(version.snapshot)) : s
       const deciders = (status?.heirs || []).map(h => ({ name: h.name, statusText: pdfKind === 'paper' ? null : heirStatusText(h, nameOf),
-        representation: h.representative ? L(`Representant (${h.representative.kind}): ${nameOf(h.representative.user_id)}, bekreftet av en annen beslutningstaker`, `Representative (${h.representative.kind}): ${nameOf(h.representative.user_id)}, confirmed by another decision-maker`) : null }))
+        representation: h.representative ? L(`${h.representative.kind === 'verge' ? 'Verge' : 'Fullmektig'}: ${nameOf(h.representative.user_id)}. Registrert i Arvklart og bekreftet av en annen beslutningstaker; fullmakten eller vergemålet er ikke kontrollert juridisk av Arvklart.`, `${h.representative.kind === 'verge' ? 'Guardian' : 'Proxy'}: ${nameOf(h.representative.user_id)}. Registered in Arvklart and confirmed by another decision-maker; the power of attorney or guardianship has not been checked legally by Arvklart.`) : null }))
       const doc = buildDistributionPdf({ estateName: data.estate?.name, summary, kind: pdfKind, version, deciders })
       doc.save(`${pdfKind === 'final' ? L('fordeling-godkjent', 'distribution-approved') : pdfKind === 'paper' ? L('fordeling-til-signering', 'distribution-for-signing') : L('fordeling-utkast', 'distribution-draft')}-${new Date().toISOString().slice(0, 10)}.pdf`)
     } catch {
