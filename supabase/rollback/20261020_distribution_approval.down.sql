@@ -31,8 +31,7 @@ drop function if exists public.confirm_decider_removal(uuid);
 drop function if exists public.set_must_approve(uuid, boolean, text);
 drop function if exists public.is_estate_decider(uuid, uuid);
 alter table public.heirs drop column if exists exclusion_requested_by, drop column if exists exclusion_reason, drop column if exists exclusion_requested_at, drop column if exists must_approve;
-create or replace function public.protected_heir_columns()
-returns text[] language sql immutable as $$ select array['user_id', 'linked_via', 'linked_at', 'estate_id'] $$;
+delete from public.protected_columns where table_name = 'heirs' and column_name in ('must_approve', 'exclusion_requested_by', 'exclusion_reason', 'exclusion_requested_at');
 select public.apply_update_grants('heirs', public.protected_heir_columns());
 create or replace function public.guard_heir_insert()
 returns trigger language plpgsql security definer set search_path = public as $$

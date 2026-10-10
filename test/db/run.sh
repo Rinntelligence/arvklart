@@ -33,6 +33,12 @@ done
 # Migrasjonene skal tåle å kjøres to ganger
 for f in supabase/migrations/2026100[7-9]*.sql supabase/migrations/2026101*.sql supabase/migrations/2026102*.sql; do "${PSQL[@]}" < "$f" >/dev/null 2>&1 || { echo "Kan ikke kjøres på nytt: $f"; exit 1; }; done
 
+# En eldre migrering kjørt på nytt etter en nyere skal aldri åpne beskyttede kolonner igjen (protected_columns)
+"${PSQL[@]}" < supabase/migrations/20261018_agreed_value_and_shares.sql >/dev/null 2>&1 || { echo "Kan ikke kjøres på nytt: 20261018"; exit 1; }
+OPEN=$("${PSQL[@]}" -tA -c "select count(*) from protected_columns where has_column_privilege('authenticated', format('public.%I', table_name), column_name, 'UPDATE')")
+if [ "$OPEN" != "0" ]; then echo "Beskyttede kolonner ble åpnet igjen av en eldre migrering: $OPEN"; exit 1; fi
+for f in supabase/migrations/20261019*.sql supabase/migrations/2026102*.sql; do "${PSQL[@]}" < "$f" >/dev/null 2>&1 || { echo "Kan ikke kjøres på nytt: $f"; exit 1; }; done
+
 echo "Tilgangsregler:"
 OUT=$("${PSQL[@]}" < test/db/rls.sql 2>&1 || true)
 echo "$OUT" | grep -oE "(OK|FAIL) .*|ERROR: .*" | sed 's/^/  /'

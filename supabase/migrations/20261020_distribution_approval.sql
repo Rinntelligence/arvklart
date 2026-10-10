@@ -28,10 +28,9 @@ alter table public.heirs add column if not exists exclusion_requested_by uuid re
 alter table public.heirs add column if not exists exclusion_reason text;
 alter table public.heirs add column if not exists exclusion_requested_at timestamptz;
 
-create or replace function public.protected_heir_columns()
-returns text[] language sql immutable as $$
-  select array['user_id', 'linked_via', 'linked_at', 'estate_id', 'must_approve', 'exclusion_requested_by', 'exclusion_reason', 'exclusion_requested_at']
-$$;
+insert into public.protected_columns (table_name, column_name) values
+  ('heirs', 'must_approve'), ('heirs', 'exclusion_requested_by'), ('heirs', 'exclusion_reason'), ('heirs', 'exclusion_requested_at')
+on conflict do nothing;
 select public.apply_update_grants('heirs', public.protected_heir_columns());
 
 -- Ny arving: rådgiverroller er ikke beslutningstakere; alle andre er det. Koblingen settes aldri ved insert.
