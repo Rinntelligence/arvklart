@@ -41,3 +41,12 @@ test('ingen vil ha, ikke avklart og om fordelingen er komplett', () => {
   const done = summarizeDistribution({ items: [items[0], items[1]], members })
   assert.equal(done.complete, true)
 })
+
+test('protokollen fra et godkjent forslag bruker øyeblikksbildet', async () => {
+  const { snapshotInput } = await import('../../src/lib/distributionSummary.js')
+  const snap = { member_names: { k: 'Kari' }, items: [{ id: 'a', title: 'Stol', status: 'assigned', assigned_to: 'k', agreed_value: 500, wanted_by: 0 }, { id: 'b', title: 'Vase', status: 'active', wanted_by: 2 }], heirs: [] }
+  const s = summarizeDistribution(snapshotInput(snap))
+  assert.equal(s.perHeir[0].name, 'Kari')
+  assert.equal(s.perHeir[0].sum, 500)
+  assert.equal(s.pending.length, 1)
+})

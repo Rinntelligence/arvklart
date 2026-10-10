@@ -14,6 +14,7 @@ drop function if exists public.unassign_item(uuid);
 drop function if exists public.draw_lot(uuid);
 drop function if exists public.anonymize_estate_events(uuid);
 drop function if exists public.require_estate_admin(uuid);
+drop function if exists public.estate_is_open(uuid);
 drop function if exists public.log_estate_event(uuid, uuid, text, jsonb);
 drop table if exists public.estate_events;
 -- reset_demo_estate() sletter loggen bare hvis tabellen finnes, så den virker videre uten endring.

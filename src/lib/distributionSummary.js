@@ -51,3 +51,15 @@ export function diffText(h, { totalKnown, weighted }) {
   const amount = formatNOK(Math.abs(h.diff))
   return h.diff > 0 ? L(`ca. ${amount} mer enn ${of}`, `about ${amount} more than ${of}`) : L(`ca. ${amount} mindre enn ${of}`, `about ${amount} less than ${of}`)
 }
+
+// Et godkjent forslag lagrer tilstanden (distribution_versions.snapshot). Dette gjør den om til samme
+// form som summarizeDistribution bruker, så protokollen lages fra det som faktisk ble godkjent.
+export function snapshotInput(snapshot = {}) {
+  const names = snapshot.member_names || {}
+  return {
+    items: (snapshot.items || []).map(i => ({ ...i, interests: Array.from({ length: i.wanted_by || 0 }, () => ({})) })),
+    members: Object.entries(names).map(([user_id, display_name]) => ({ user_id, profiles: { display_name } })),
+    heirs: snapshot.heirs || [],
+    estate: { shares_confirmed: snapshot.shares_confirmed, split_mode: snapshot.split_mode },
+  }
+}

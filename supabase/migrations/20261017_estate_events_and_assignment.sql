@@ -34,7 +34,9 @@ grant select on public.estate_events to authenticated;
 -- Intern: skriver én hendelse. Ikke tilgjengelig for klienter.
 create or replace function public.log_estate_event(p_estate uuid, p_item uuid, p_kind text, p_data jsonb default '{}'::jsonb)
 returns void language sql security definer set search_path = public as $$
-  insert into estate_events (estate_id, item_id, actor, kind, data) values (p_estate, p_item, auth.uid(), p_kind, coalesce(p_data, '{}'::jsonb))
+  -- Ingenting logges for et bo som slettes (kaskadesletting av arvinger, ønsker osv.); loggen slettes med boet
+  insert into estate_events (estate_id, item_id, actor, kind, data)
+  select p_estate, p_item, auth.uid(), p_kind, coalesce(p_data, '{}'::jsonb) where exists (select 1 from estates where id = p_estate)
 $$;
 revoke all on function public.log_estate_event(uuid, uuid, text, jsonb) from public, anon, authenticated;
 
