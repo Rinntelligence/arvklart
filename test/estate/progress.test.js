@@ -98,6 +98,15 @@ describe('buildRemainingSteps', () => {
   })
 })
 
+describe('buildRemainingSteps: forslag til fordeling', () => {
+  test('et forslag som venter på mitt svar står først og lenker til fordelingen', () => {
+    const steps = buildRemainingSteps({ estateId: 'e', userId: 'k', items: [], members: [], passes: [], heirs: [], tasks: [], proposal: { needsMyResponse: true } })
+    assert.equal(steps[0].key, 'respond')
+    assert.equal(steps[0].path, '/estate/e/fordeling')
+    assert.equal(buildRemainingSteps({ estateId: 'e', userId: 'k', items: [], members: [], passes: [], heirs: [], tasks: [] }).length, 0)
+  })
+})
+
 describe('getStatusBreakdown', () => {
   test('hver gjenstand havner i nøyaktig én gruppe', () => {
     const items = [

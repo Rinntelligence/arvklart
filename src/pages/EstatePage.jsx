@@ -257,6 +257,11 @@ export default function EstatePage({ session, profile, onToast, isDemo }) {
               </span>
             ))}
           </div>
+          {assigned > 0 && (
+            <button onClick={() => navigate(`/estate/${id}/fordeling`)} style={{ marginTop:'10px', background:'none', border:'none', padding:0, minHeight:'44px', color:'#5F6E52', textDecoration:'underline', cursor:'pointer', fontSize:'0.875rem', fontFamily:'Karla, sans-serif' }}>
+              {L('Se fordelingen per arving', 'See the distribution per heir')}
+            </button>
+          )}
         </div>
       )}
 
