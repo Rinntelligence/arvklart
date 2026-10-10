@@ -286,3 +286,11 @@ END $$;
 --   12 gjenstander, 5 konflikter, 4 med én interessert, 2 ingen vil ha
 -- Åpne demoen fra forsiden («Test ut demo»).
 -- ============================================================
+
+-- Fordelingsverdier (F3, 20261018): demoens anslag brukes som fordelingsverdi, så jevn fordeling kan prøves,
+-- og arvingene er koblet til demokontoene (som når de blir med via invitasjonen).
+UPDATE items SET agreed_value = estimated_value::numeric, agreed_value_source = 'ai'
+WHERE estate_id = 'deed0001-0000-0000-0000-000000000001' AND agreed_value IS NULL AND estimated_value ~ '^[0-9]+(\.[0-9]+)?$';
+UPDATE heirs h SET user_id = u.id, linked_via = 'existing_member', linked_at = now()
+FROM auth.users u
+WHERE h.estate_id = 'deed0001-0000-0000-0000-000000000001' AND h.user_id IS NULL AND lower(h.email) = lower(u.email);

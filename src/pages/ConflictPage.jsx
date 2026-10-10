@@ -5,7 +5,7 @@ import { loadStatusExtras } from '../lib/decisions'
 import { getUndecided, isContested } from '../lib/estateProgress'
 import { parseNOK, formatNOK as formatAmount } from '../lib/format'
 import { L } from '../lib/lang'
-import { equalValueResolutions, itemsWithoutValue, valueTotal } from '../lib/distribution'
+import { equalValueResolutions, itemsWithoutValue, valueTotal, confirmedWeights, aiEstimate, itemValue } from '../lib/distribution'
 import StoredImage from '../components/StoredImage'
 import { assignItems, drawLot } from '../lib/assignments'
 import TalkFirstList from '../components/TalkFirstList'
@@ -46,15 +46,21 @@ export default function ConflictPage({ session, onToast }) {
   const [undecided, setUndecided] = useState([])
   const [assignedItems, setAssignedItems] = useState([])
   const [allItems, setAllItems] = useState([])
+  const [heirs, setHeirs] = useState([])
+  const [estate, setEstate] = useState(null)
+  const [settingValues, setSettingValues] = useState(false)
   const [withdrawn, setWithdrawn] = useState({}) // «Trekk ønsket mitt»: itemId → begrunnelse, til angring
   const [myRole, setMyRole] = useState('member')
 
   const load = async () => {
-    const [{ data: its }, extras, { data: mem }] = await Promise.all([
+    const [{ data: its }, extras, { data: mem }, { data: est }] = await Promise.all([
       getItems(id),
       loadStatusExtras(id),
       supabase.from('estate_members').select('role').eq('estate_id', id).eq('user_id', session.user.id).maybeSingle(),
+      supabase.from('estates').select('split_mode, shares_confirmed').eq('id', id).maybeSingle(),
     ])
+    setHeirs(extras.heirs)
+    setEstate(est || null)
     const ms = extras.members
     const memberIds = new Set(ms.map(m => m.user_id))
     // Interesser fra tidligere medlemmer teller ikke med i fordelingen
@@ -79,7 +85,10 @@ export default function ConflictPage({ session, onToast }) {
   // Ukjent verdi er ikke 0 (src/lib/distribution.js): mangler noe verdi, regnes ikke jevn fordeling ut
   const alreadyAssigned = (userId) => valueTotal(assignedItems.filter(i => i.assigned_to === userId))
   const missingValues = itemsWithoutValue(items, assignedItems)
-  const computeEqualResolutions = () => equalValueResolutions(items, members.map(m => m.user_id), assignedItems)
+  // Bekreftede arveandeler (src/lib/distribution.js): ellers lik deling
+  const weights = confirmedWeights(heirs, estate)
+  const computeEqualResolutions = () => equalValueResolutions(items, members.map(m => m.user_id), assignedItems, weights)
+  const canUseAi = missingValues.filter(i => aiEstimate(i) !== null)
 
   useEffect(() => {
     if (mode === 'equal' && items.length && members.length) {
@@ -89,7 +98,17 @@ export default function ConflictPage({ session, onToast }) {
       setSnakePos(0)
       setDraftStarted(false)
     }
-  }, [mode])
+  }, [mode, items, assignedItems, members, heirs, estate])
+
+  // «Bruk AI-anslaget som fordelingsverdi» for gjenstandene som mangler fordelingsverdi (administrator, logges)
+  const useAiAsValue = async () => {
+    setSettingValues(true)
+    const { error } = await supabase.rpc('set_agreed_values', { p_estate: id, p_values: canUseAi.map(i => ({ item_id: i.id, value: aiEstimate(i), source: 'ai' })) })
+    setSettingValues(false)
+    if (error) { onToast(L('Kunne ikke sette fordelingsverdiene. Prøv igjen.', 'Could not set the distribution values. Please try again.'), 'error'); return }
+    onToast(L('AI-anslagene er brukt som foreslått fordelingsverdi', 'The AI estimates are used as the proposed distribution value'))
+    load()
+  }
 
   const drawLottery = async (item) => {
     if (animating) return
@@ -508,17 +527,25 @@ export default function ConflictPage({ session, onToast }) {
 
       {/* JEVN VERDIFORDELING */}
       {mode === 'equal' && missingValues.length > 0 && (
-        <div role="status" style={{ background:'#F3E3D3', border:'1px solid #C9AE8E', borderRadius:'12px', padding:'18px 20px', marginBottom:'20px', color:'#3A2F26', lineHeight:1.6 }}>
-          <div style={{ fontWeight:'600', marginBottom:'6px' }}>{L('Jevn verdifordeling trenger en verdi på alle gjenstandene', 'Equal value distribution needs a value on every item')}</div>
+        <div role="status" style={{ background:'#FBF9F5', border:'1px solid #D9CFC0', borderRadius:'12px', padding:'18px 20px', marginBottom:'20px', color:'#3A2F26', lineHeight:1.6 }}>
+          <div style={{ fontWeight:'600', marginBottom:'6px' }}>
+            {L(`${missingValues.length} ${missingValues.length === 1 ? 'gjenstand mangler' : 'gjenstander mangler'} fordelingsverdi og er ikke med i den jevne fordelingen`,
+              `${missingValues.length} ${missingValues.length === 1 ? 'item lacks' : 'items lack'} a distribution value and ${missingValues.length === 1 ? 'is' : 'are'} not included in the equal distribution`)}
+          </div>
           <p style={{ fontSize:'0.875rem', marginBottom:'10px' }}>
-            {L('En gjenstand uten verdi ville blitt regnet som gratis. Sett en verdi dere er enige om på disse. 0 kr er en gyldig verdi hvis dere mener den ikke har verdi.', 'An item without a value would count as free. Set a value you agree on for these. NOK 0 is a valid value if you think it has no value.')}
+            {L('De kan fordeles på annen måte, eller få en fordelingsverdi først. En manglende verdi regnes aldri som 0 kr; 0 kr må settes eksplisitt.', 'They can be divided another way, or be given a distribution value first. A missing value is never counted as 0 kr; 0 kr must be set explicitly.')}
           </p>
+          {canUseAi.length > 0 && (
+            <button onClick={useAiAsValue} disabled={settingValues} style={{ minHeight:'44px', padding:'8px 14px', marginBottom:'10px', background:'#5F6E52', color:'#fff', border:'none', borderRadius:'8px', cursor:'pointer', fontSize:'0.875rem', fontFamily:'Karla, sans-serif' }}>
+              {L(`Bruk AI-anslaget som fordelingsverdi (${canUseAi.length})`, `Use the AI estimate as distribution value (${canUseAi.length})`)}
+            </button>
+          )}
           <ul style={{ listStyle:'none', padding:0, margin:0, display:'flex', flexDirection:'column', gap:'6px' }}>
             {missingValues.map(it => (
               <li key={it.id} style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:'10px', flexWrap:'wrap', fontSize:'0.875rem' }}>
-                <span>{it.title}{it.status === 'assigned' ? L(' (tildelt tidligere)', ' (assigned earlier)') : ''}</span>
-                <button onClick={() => navigate(`/estate/${id}/item/${it.id}/edit`)} style={{ minHeight:'44px', padding:'8px 14px', background:'#fff', border:'1px solid #9A8B78', borderRadius:'8px', cursor:'pointer', fontSize:'0.875rem', fontFamily:'Karla, sans-serif', color:'#3A2F26' }}>
-                  {L(`Sett verdi på ${it.title}`, `Set value for ${it.title}`)}
+                <span>{it.title}{it.status === 'assigned' ? L(' (tildelt tidligere)', ' (assigned earlier)') : ''}{aiEstimate(it) !== null ? ` · ${L('AI-anslag', 'AI estimate')} ${formatNOK(aiEstimate(it))}` : ''}</span>
+                <button onClick={() => navigate(`/estate/${id}/item/${it.id}`)} style={{ minHeight:'44px', padding:'8px 14px', background:'#fff', border:'1px solid #9A8B78', borderRadius:'8px', cursor:'pointer', fontSize:'0.8125rem', fontFamily:'Karla, sans-serif', color:'#3A2F26' }}>
+                  {L(`Sett fordelingsverdi på ${it.title}`, `Set distribution value for ${it.title}`)}
                 </button>
               </li>
             ))}
@@ -526,7 +553,7 @@ export default function ConflictPage({ session, onToast }) {
         </div>
       )}
 
-      {mode === 'equal' && missingValues.length === 0 && (
+      {mode === 'equal' && (
         <div>
           <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(240px, 1fr))', gap:'16px', marginBottom:'20px' }}>
             {memberTotals.map(m => (
@@ -548,7 +575,7 @@ export default function ConflictPage({ session, onToast }) {
                     {m.assignedItems.map(item => (
                       <div key={item.id} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', fontSize:'0.75rem', color:'#5C4530', padding:'6px 8px', background:'#FBF9F5', borderRadius:'6px' }}>
                         <span style={{ lineHeight:1.3 }}>{item.title}</span>
-                        <span style={{ color:'#5F6E52', flexShrink:0, marginLeft:'8px' }}>{formatNOK(item.estimated_value) || '—'}</span>
+                        <span style={{ color:'#5F6E52', flexShrink:0, marginLeft:'8px' }}>{formatNOK(itemValue(item)) || '—'}</span>
                       </div>
                     ))}
                   </div>
@@ -557,7 +584,11 @@ export default function ConflictPage({ session, onToast }) {
             ))}
           </div>
           <div style={{ background:'#E8DFD0', border:'1px solid #D9CFC0', borderRadius:'10px', padding:'14px 18px', fontSize:'0.8125rem', color:'#5C4530', marginBottom:'20px', lineHeight:1.6 }}>
-            {L('Algoritmen sorterer gjenstandene etter synkende verdi og gir neste gjenstand til den av de interesserte som har lavest total så langt – medregnet det hver arving allerede har fått tildelt i boet. Alle gjenstandene må ha en verdi; 0 kr er en gyldig verdi.', 'The algorithm sorts the items by descending value and gives the next item to the interested heir with the lowest total so far – including what each heir has already been assigned in the estate. Every item needs a value; NOK 0 is a valid value.')}
+            {L('Forslag til jevn fordeling – beslutningsstøtte, ikke en fasit. Gjenstandene med fordelingsverdi sorteres etter synkende verdi, og neste gjenstand går til den av de interesserte som har lavest sum så langt, medregnet det hver arving allerede har fått. Fordelingsverdiene er foreslåtte til dere har godkjent fordelingen.',
+              'A proposal for an equal distribution – decision support, not a final answer. Items with a distribution value are sorted by descending value, and the next item goes to the interested heir with the lowest sum so far, including what each heir has already received. The distribution values are proposals until you have approved the distribution.')}
+            {' '}{weights
+              ? L('Fordelingen er vektet etter arveandelene dere har bekreftet.', 'The distribution is weighted by the inheritance shares you have confirmed.')
+              : L('Alle regnes likt; arveandeler brukes bare når administrator har bekreftet at de gjelder innbo og løsøre (under «Arvinger»).', 'Everyone counts equally; inheritance shares are only used when the administrator has confirmed that they apply to household contents (under «Heirs»).')}
           </div>
           <button onClick={() => setResolutions(computeEqualResolutions())} style={{ padding:'9px 18px', background:'none', border:'1px solid #D9CFC0', borderRadius:'8px', cursor:'pointer', fontSize:'0.8125rem', fontFamily:'Karla, sans-serif', color:'#5C4530', marginBottom:'20px' }}>
             {L('Kjør på nytt', 'Run again')}

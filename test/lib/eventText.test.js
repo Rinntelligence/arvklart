@@ -16,3 +16,9 @@ test('ønsker og nei takk; ukjente og slettede brukere får en fast tekst', () =
   assert.equal(eventText({ kind: 'pass_added', actor: 'x', data: { user_id: 'x' } }, nameOf), 'tidligere medlem sa nei takk')
   assert.equal(eventText({ kind: 'wish_removed', actor: null, data: { user_id: DELETED_USER } }, nameOf), 'slettet bruker trakk ønsket sitt')
 })
+
+test('fordelingsverdi og arveandeler', () => {
+  assert.match(eventText({ kind: 'agreed_value_set', actor: 'b', data: { value: 1200, source: 'ai' } }, nameOf), /^Lars satte fordelingsverdi .*1.?200.* fra AI-anslaget$/)
+  assert.equal(eventText({ kind: 'agreed_value_set', actor: 'b', data: { value: null } }, nameOf), 'Lars fjernet fordelingsverdien')
+  assert.equal(eventText({ kind: 'shares_unconfirmed', actor: null, data: { reason: 'heirs_changed' } }, nameOf), 'Bekreftelsen av arveandelene ble nullstilt fordi arvelisten ble endret')
+})
