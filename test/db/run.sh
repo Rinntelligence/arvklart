@@ -31,7 +31,7 @@ for f in ${FILES[@]}; do
   "${PSQL[@]}" < "$f" >/dev/null 2>/tmp/arvklart-sql.err || { echo "Feil i $f:"; cat /tmp/arvklart-sql.err; exit 1; }
 done
 # Migrasjonene skal tåle å kjøres to ganger
-for f in supabase/migrations/2026100[7-9]*.sql supabase/migrations/2026101*.sql supabase/migrations/2026102*.sql; do "${PSQL[@]}" < "$f" >/dev/null 2>&1 || { echo "Kan ikke kjøres på nytt: $f"; exit 1; }; done
+for f in supabase/migrations/2026100[7-9]*.sql supabase/migrations/2026101*.sql supabase/migrations/2026102*.sql; do [ -f "$f" ] || continue; "${PSQL[@]}" < "$f" >/dev/null 2>&1 || { echo "Kan ikke kjøres på nytt: $f"; exit 1; }; done
 
 # En eldre migrering kjørt på nytt etter en nyere skal aldri åpne beskyttede kolonner igjen (protected_columns)
 "${PSQL[@]}" < supabase/migrations/20261018_agreed_value_and_shares.sql >/dev/null 2>&1 || { echo "Kan ikke kjøres på nytt: 20261018"; exit 1; }
