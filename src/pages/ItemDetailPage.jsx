@@ -10,7 +10,9 @@ import ReasonEditor from '../components/ReasonEditor'
 import AnalysisDetails from '../components/AnalysisDetails'
 import AiCorrectionsForm from '../components/AiCorrectionsForm'
 import MarketCompare from '../components/MarketCompare'
+import ItemHistory from '../components/ItemHistory'
 import { withCorrections } from '../lib/aiCorrections'
+import { assignItems, unassignItem } from '../lib/assignments'
 import StoredImage from '../components/StoredImage'
 
 const tc = c => { if(!c)return'#FBF9F5'; const r=parseInt(c.slice(1,3),16),g=parseInt(c.slice(3,5),16),b=parseInt(c.slice(5,7),16); return(0.299*r+0.587*g+0.114*b)/255>0.55?'#3A2F26':'#FBF9F5' }
@@ -145,14 +147,15 @@ export default function ItemDetailPage({ session, profile, onToast, isDemo }) {
 
   const handleAssign = async (userId) => {
     const ok = await run(
-      () => supabase.from('items').update({ assigned_to: userId, status: 'assigned' }).eq('id', itemId).neq('status', 'assigned'),
+      // Er gjenstanden allerede tildelt (av en annen samtidig), hoppes den over og regnes som ikke tildelt
+      async () => { const r = await assignItems(id, [{ item_id: itemId, user_id: userId }], 'manual'); return r.error || r.data?.assigned ? r : { error: 'skipped' } },
       L('Gjenstand tildelt', 'Item assigned'), L('Kunne ikke tildele. Bare administratorer kan tildele gjenstander.', 'Could not assign. Only administrators can assign items.'),
     )
     if (ok) setShowAssign(false)
   }
 
   const handleUnassign = () => run(
-    () => supabase.from('items').update({ assigned_to: null, status: 'active' }).eq('id', itemId),
+    () => unassignItem(itemId),
     L('Tildelingen er angret', 'The assignment has been undone'), L('Kunne ikke angre tildelingen.', 'Could not undo the assignment.'),
   )
 
@@ -316,6 +319,9 @@ export default function ItemDetailPage({ session, profile, onToast, isDemo }) {
 
         {/* Sammenligninger og verdianslag: valgfritt; søkelenker og liste for alle, endringer for admin og den som la inn */}
         <MarketCompare item={item} userId={session.user.id} canEdit={canCorrect} onChanged={load} onToast={onToast} />
+
+        {/* Fordelingsloggen for gjenstanden (tildeling, loddtrekning, ønsker) – kan ikke endres i appen */}
+        <ItemHistory itemId={itemId} members={members} refreshKey={`${item.status}:${item.assigned_to}:${item.interests?.length || 0}`} />
 
         {isAssigned ? (
           <div style={{ padding:'16px', background:'#DCE3D2', border:'1px solid #B8C8A8', borderRadius:'10px', marginBottom:'24px', display:'flex', justifyContent:'space-between', alignItems:'center', gap:'12px', flexWrap:'wrap' }}>

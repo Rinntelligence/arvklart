@@ -7,6 +7,7 @@ import { parseNOK, formatNOK as formatAmount } from '../lib/format'
 import { L } from '../lib/lang'
 import { equalValueResolutions, itemsWithoutValue, valueTotal } from '../lib/distribution'
 import StoredImage from '../components/StoredImage'
+import { assignItems, drawLot } from '../lib/assignments'
 
 const PALETTE = ['#5F6E52','#8B9A7D','#A97C3F','#7A8B6E','#9C8267','#6E8B87']
 
@@ -93,9 +94,13 @@ export default function ConflictPage({ session, onToast }) {
       await new Promise(r => setTimeout(r, 450))
     }
     setCountdown('!')
-    await new Promise(r => setTimeout(r, 350))
-    const winner = interested[Math.floor(Math.random() * interested.length)]
-    setResolutions(prev => ({ ...prev, [item.id]: winner }))
+    // Loddet trekkes av databasen blant dem som ønsker gjenstanden, og trekningen logges (også om den gjøres på nytt)
+    const [{ data, error }] = await Promise.all([drawLot(item.id), new Promise(r => setTimeout(r, 350))])
+    if (error || !data?.winner || !interested.includes(data.winner)) {
+      onToast(L('Kunne ikke trekke lodd. Prøv igjen.', 'Could not draw lots. Please try again.'), 'error')
+    } else {
+      setResolutions(prev => ({ ...prev, [item.id]: data.winner }))
+    }
     setAnimating(null)
     setCountdown(null)
   }
@@ -150,19 +155,14 @@ export default function ConflictPage({ session, onToast }) {
     })
   }
 
-  // Tildeler bare gjenstander som fortsatt er ledige, så en annen som fordeler samtidig ikke overskrives.
+  // Alt tildeles i én transaksjon i databasen, med metoden logget. Gjenstander som en annen har tildelt
+  // i mellomtiden, hoppes over. Etter loddtrekning må tildelingen være lik databasens trekning.
   const apply = async () => {
     setApplying(true)
-    let count = 0
-    let failed = 0
-    for (const [itemId, userId] of Object.entries(resolutions)) {
-      const { data, error } = await supabase.from('items')
-        .update({ assigned_to: userId, status: 'assigned' })
-        .eq('id', itemId).neq('status', 'assigned')
-        .select('id')
-      if (!error && data?.length) count++
-      else failed++
-    }
+    const list = Object.entries(resolutions).map(([item_id, user_id]) => ({ item_id, user_id }))
+    const { data, error } = await assignItems(id, list, mode)
+    const count = error ? 0 : data?.assigned || 0
+    const failed = list.length - count
     setApplying(false)
     if (failed) onToast(L(`${count} tildelt. ${failed} kunne ikke tildeles – de kan allerede være tildelt.`, `${count} assigned. ${failed} could not be assigned – they may already be assigned.`), 'error')
     else onToast(L(`${count} ${count === 1 ? 'gjenstand' : 'gjenstander'} tildelt`, `${count} ${count === 1 ? 'item' : 'items'} assigned`))

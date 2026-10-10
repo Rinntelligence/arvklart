@@ -70,13 +70,28 @@ test('gjenstander med kategorier (getItems) og utenforstående ser ingenting', a
   assert.deepEqual(outside.data, [])
 })
 
-test('tildeling bare når ledig, og antall rader kommer tilbake (ConflictPage.apply)', async () => {
+test('tildeling via assign_items: bare ledige gjenstander, direkte oppdatering avvises (ConflictPage.apply)', async () => {
   const db = as('mona')
   const item = 'face0005-0000-0000-0000-000000000005'
-  const first = await db.from('items').update({ assigned_to: USERS.mona[0], status: 'assigned' }).eq('id', item).neq('status', 'assigned').select('id')
-  assert.equal(first.error, null); assert.equal(first.data.length, 1)
-  const second = await db.from('items').update({ assigned_to: USERS.owner[0], status: 'assigned' }).eq('id', item).neq('status', 'assigned').select('id')
-  assert.equal(second.error, null); assert.equal(second.data.length, 0)
+  const direct = await db.from('items').update({ assigned_to: USERS.mona[0], status: 'assigned' }).eq('id', item).select('id')
+  assert.equal(direct.error?.code, '42501')
+  const first = await db.rpc('assign_items', { p_estate: DEMO, p_assignments: [{ item_id: item, user_id: USERS.mona[0] }], p_method: 'manual' })
+  assert.equal(first.error, null); assert.equal(first.data.assigned, 1)
+  const second = await db.rpc('assign_items', { p_estate: DEMO, p_assignments: [{ item_id: item, user_id: USERS.owner[0] }], p_method: 'manual' })
+  assert.equal(second.error, null); assert.equal(second.data.assigned, 0); assert.deepEqual(second.data.skipped, [item])
+  const events = await db.from('estate_events').select('kind, data').eq('item_id', item)
+  assert.ok(events.data.some(e => e.kind === 'assigned' && e.data.method === 'manual'))
+  const undo = await db.rpc('unassign_item', { p_item: item })
+  assert.equal(undo.data.ok, true)
+})
+
+test('loddtrekning via draw_lot gir en av dem som ønsker gjenstanden', async () => {
+  const db = as('mona')
+  const item = 'face0004-0000-0000-0000-000000000004'
+  const { data, error } = await db.rpc('draw_lot', { p_item: item })
+  assert.equal(error, null)
+  const wanters = await db.from('interests').select('user_id').eq('item_id', item)
+  assert.ok(wanters.data.map(w => w.user_id).includes(data.winner))
 })
 
 test('sletting gir tom liste når man ikke har lov (EstatePage.confirmDelete)', async () => {

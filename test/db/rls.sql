@@ -73,6 +73,11 @@ do $$ begin
   raise exception 'FAIL: kunne opprette tildelt gjenstand';
 exception when insufficient_privilege then raise notice 'OK   kan ikke opprette en allerede tildelt gjenstand';
 end $$;
+do $$ begin
+  insert into items (estate_id, title, added_by, value_agree_count, value_voter_ids) values ('eeee0000-0000-0000-0000-000000000001', 'Falske stemmer', auth.uid(), 5, array['00000000-0000-0000-0000-0000000000e1'::uuid]);
+  raise exception 'FAIL: kunne opprette gjenstand med andres stemmer';
+exception when insufficient_privilege then raise notice 'OK   en ny gjenstand kan bare ha skaperens egen stemme';
+end $$;
 insert into interests (item_id, user_id) values ('11110000-0000-0000-0000-000000000001', auth.uid());
 -- Begrunnelsen på eget ønske kan legges til, endres og fjernes (20261010_interests_reason_update.sql)
 with u as (update interests set reason = 'Husker den fra hytta' where item_id = '11110000-0000-0000-0000-000000000001' and user_id = auth.uid() returning 1)
@@ -243,15 +248,64 @@ reset role;
 -- Eva (admin): tildeler, fjerner medlem
 select t_as('eva@test.no'); set role authenticated;
 select t_eq((select count(*)::int from storage.objects where bucket_id = 'estate-docs'), 1, 'medlem ser boets filer');
-update items set assigned_to = '00000000-0000-0000-0000-0000000000f1'::uuid, status = 'assigned' where id = '11110000-0000-0000-0000-000000000001';
+-- F1 (20261017): tildeling bare via databasefunksjonene, og alt logges
+do $$ begin
+  update items set assigned_to = '00000000-0000-0000-0000-0000000000f1'::uuid, status = 'assigned' where id = '11110000-0000-0000-0000-000000000001';
+  raise exception 'FAIL: admin kunne tildele med direkte oppdatering';
+exception when insufficient_privilege then raise notice 'OK   heller ikke admin kan tildele med direkte oppdatering';
+end $$;
+select t_eq((assign_items('eeee0000-0000-0000-0000-000000000001', '[{"item_id":"11110000-0000-0000-0000-000000000001","user_id":"00000000-0000-0000-0000-0000000000f1"}]', 'manual'))->>'assigned', '1', 'admin kan tildele via assign_items');
 select t_eq((select status from items where id = '11110000-0000-0000-0000-000000000001'), 'assigned', 'admin kan tildele');
-update items set assigned_to = null, status = 'active' where id = '11110000-0000-0000-0000-000000000001';
+select t_eq((assign_items('eeee0000-0000-0000-0000-000000000001', '[{"item_id":"11110000-0000-0000-0000-000000000001","user_id":"00000000-0000-0000-0000-0000000000f1"}]', 'manual'))->'skipped'->>0, '11110000-0000-0000-0000-000000000001', 'en gjenstand som allerede er tildelt, hoppes over');
+select t_eq((select count(*)::int from estate_events where item_id = '11110000-0000-0000-0000-000000000001' and kind = 'assigned' and data->>'method' = 'manual' and actor = auth.uid()), 1, 'tildelingen logges med metode og hvem som gjorde det');
+do $$ begin
+  perform assign_items('eeee0000-0000-0000-0000-000000000001', '[{"item_id":"11110000-0000-0000-0000-000000000003","user_id":"00000000-0000-0000-0000-0000000000a9"}]', 'manual');
+  raise exception 'FAIL: kunne tildele til en som ikke er medlem';
+exception when invalid_parameter_value then raise notice 'OK   kan bare tildele til medlemmer av boet';
+end $$;
+select t_eq((unassign_item('11110000-0000-0000-0000-000000000001'))->>'ok', 'true', 'admin kan angre tildelingen via unassign_item');
+select t_eq((select count(*)::int from estate_events where item_id = '11110000-0000-0000-0000-000000000001' and kind = 'unassigned'), 1, 'angringen logges');
+select t_eq((draw_lot('11110000-0000-0000-0000-000000000001'))->>'winner', '00000000-0000-0000-0000-0000000000f1', 'loddtrekningen skjer i databasen blant dem som ønsker gjenstanden');
+do $$ begin
+  perform assign_items('eeee0000-0000-0000-0000-000000000001', '[{"item_id":"11110000-0000-0000-0000-000000000001","user_id":"00000000-0000-0000-0000-0000000000e1"}]', 'lottery');
+  raise exception 'FAIL: loddtrekningen kunne byttes ut med en annen mottaker';
+exception when invalid_parameter_value then raise notice 'OK   tildeling etter loddtrekning må være lik siste trekning';
+end $$;
+select t_eq((assign_items('eeee0000-0000-0000-0000-000000000001', '[{"item_id":"11110000-0000-0000-0000-000000000001","user_id":"00000000-0000-0000-0000-0000000000f1"}]', 'lottery'))->>'assigned', '1', 'vinneren av loddtrekningen kan tildeles');
+select t_eq((select data->>'draw_no' || ':' || jsonb_array_length(data->'candidates') from estate_events where item_id = '11110000-0000-0000-0000-000000000001' and kind = 'lottery_draw'), '1:1', 'trekningen logges med kandidater og nummer');
+select unassign_item('11110000-0000-0000-0000-000000000001');
+do $$ begin
+  perform anonymize_estate_events(auth.uid());
+  raise exception 'FAIL: klienten kunne anonymisere loggen';
+exception when insufficient_privilege then raise notice 'OK   klienten kan ikke endre loggen via anonymize_estate_events';
+end $$;
 update items set marked_for_disposal = true, estimated_value = '100' where id = '11110000-0000-0000-0000-000000000001';
 select t_eq((select marked_for_disposal::text || ':' || estimated_value::text from items where id = '11110000-0000-0000-0000-000000000001'), 'true:100', 'admin kan merke for kast og endre verdi');
-update items set assigned_to = '00000000-0000-0000-0000-0000000000f1'::uuid, status = 'assigned' where id = '11110000-0000-0000-0000-000000000003';
+select assign_items('eeee0000-0000-0000-0000-000000000001', '[{"item_id":"11110000-0000-0000-0000-000000000003","user_id":"00000000-0000-0000-0000-0000000000f1"}]', 'manual');
 reset role;
 select t_as('frank@test.no'); set role authenticated;
 with d as (delete from items where id = '11110000-0000-0000-0000-000000000003' returning 1) select t_eq((select count(*)::int from d), 0, 'kan ikke slette egen gjenstand etter at den er tildelt');
+select t_eq((select count(*)::int > 0 from estate_events where estate_id = 'eeee0000-0000-0000-0000-000000000001'), true, 'medlem ser boets logg');
+do $$ begin
+  insert into estate_events (estate_id, kind) values ('eeee0000-0000-0000-0000-000000000001', 'falsk');
+  raise exception 'FAIL: medlem kunne skrive i loggen';
+exception when insufficient_privilege then raise notice 'OK   medlem kan ikke skrive i loggen';
+end $$;
+do $$ begin
+  delete from estate_events;
+  raise exception 'FAIL: medlem kunne slette loggen';
+exception when insufficient_privilege then raise notice 'OK   medlem kan ikke slette eller endre loggen';
+end $$;
+do $$ begin
+  perform assign_items('eeee0000-0000-0000-0000-000000000001', '[{"item_id":"11110000-0000-0000-0000-000000000001","user_id":"00000000-0000-0000-0000-0000000000f1"}]', 'manual');
+  raise exception 'FAIL: medlem kunne tildele via assign_items';
+exception when insufficient_privilege then raise notice 'OK   medlem kan ikke tildele via assign_items';
+end $$;
+do $$ begin
+  perform draw_lot('11110000-0000-0000-0000-000000000001');
+  raise exception 'FAIL: medlem kunne trekke lodd';
+exception when insufficient_privilege then raise notice 'OK   medlem kan ikke trekke lodd';
+end $$;
 do $$ begin
   insert into interests (item_id, user_id) values ('11110000-0000-0000-0000-000000000003', auth.uid());
   raise exception 'FAIL: ønske på tildelt gjenstand ble lagret';
@@ -276,6 +330,14 @@ select t_eq((select count(*)::int from estate_members where estate_id = 'eeee000
 select t_eq((select count(*)::int from interests), 0, 'det fjernede medlemmets interesser er borte');
 update estates set status = 'closed', closed_at = now() where id = 'eeee0000-0000-0000-0000-000000000001';
 select t_eq((select status from estates where id = 'eeee0000-0000-0000-0000-000000000001'), 'closed', 'admin kan avslutte boet');
+do $$ begin
+  perform assign_items('eeee0000-0000-0000-0000-000000000001', '[{"item_id":"11110000-0000-0000-0000-000000000001","user_id":"00000000-0000-0000-0000-0000000000e1"}]', 'manual');
+  raise exception 'FAIL: kunne tildele i et avsluttet bo';
+exception when insufficient_privilege then raise notice 'OK   ingen tildeling i et avsluttet bo';
+end $$;
+reset role;
+select t_as('outsider@test.no'); set role authenticated;
+select t_eq((select count(*)::int from estate_events), 0, 'utenforstående ser ingen logg');
 reset role;
 
 -- Demo: Mona kan vise interesse og fordele, men ikke endre boet
@@ -287,7 +349,7 @@ with u as (update interests set reason = 'Fin til hytta' where item_id = 'face00
   select t_eq((select count(*)::int from u), 1, 'demo kan endre begrunnelsen på eget ønske');
 insert into item_passes (item_id, user_id) values ('face0010-0000-0000-0000-000000000010', auth.uid());
 update items set marked_for_disposal = true where id = 'face0012-0000-0000-0000-000000000012';
-update items set assigned_to = auth.uid(), status = 'assigned' where id = 'face0002-0000-0000-0000-000000000002';
+select assign_items('deed0001-0000-0000-0000-000000000001', jsonb_build_array(jsonb_build_object('item_id', 'face0002-0000-0000-0000-000000000002', 'user_id', auth.uid())), 'manual');
 select t_eq((select status from items where id = 'face0002-0000-0000-0000-000000000002'), 'assigned', 'demo kan prøve tildeling');
 do $$ begin
   update items set title = 'Hacket' where id = 'face0001-0000-0000-0000-000000000001';
@@ -325,6 +387,7 @@ select t_eq((select column_default::text from information_schema.columns where t
 -- Nullstilling av demoen
 select reset_demo_estate();
 select t_eq((select count(*)::int from interests where item_id::text like 'face%'), 18, 'nullstilling gjenoppretter alle interesser');
+select t_eq((select count(*)::int from estate_events where estate_id = 'deed0001-0000-0000-0000-000000000001'), 0, 'nullstilling tømmer demoens logg');
 select t_eq((select count(*)::int from items where estate_id = 'deed0001-0000-0000-0000-000000000001' and (status = 'assigned' or marked_for_disposal)), 0, 'nullstilling fjerner tildelinger og kast');
 select t_eq((select count(*)::int from item_passes p join auth.users u on u.id = p.user_id where u.email = 'mona.demo@heirsplit.no'), 0, 'Mona må selv ta stilling etter nullstilling');
 -- Alle andre har tatt stilling til alt: 12 gjenstander × 3 andre medlemmer
