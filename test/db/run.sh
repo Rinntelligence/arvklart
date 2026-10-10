@@ -31,7 +31,7 @@ for f in ${FILES[@]}; do
   "${PSQL[@]}" < "$f" >/dev/null 2>/tmp/arvklart-sql.err || { echo "Feil i $f:"; cat /tmp/arvklart-sql.err; exit 1; }
 done
 # Migrasjonene skal tåle å kjøres to ganger
-for f in supabase/migrations/2026100[7-9]*.sql supabase/migrations/2026101*.sql; do "${PSQL[@]}" < "$f" >/dev/null 2>&1 || { echo "Kan ikke kjøres på nytt: $f"; exit 1; }; done
+for f in supabase/migrations/2026100[7-9]*.sql supabase/migrations/2026101*.sql supabase/migrations/2026102*.sql; do "${PSQL[@]}" < "$f" >/dev/null 2>&1 || { echo "Kan ikke kjøres på nytt: $f"; exit 1; }; done
 
 echo "Tilgangsregler:"
 OUT=$("${PSQL[@]}" < test/db/rls.sql 2>&1 || true)
