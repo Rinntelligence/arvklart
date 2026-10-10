@@ -115,6 +115,21 @@ do $$ begin
   raise exception 'FAIL: medlem kunne merke for kast';
 exception when insufficient_privilege then raise notice 'OK   medlem kan ikke merke gjenstander for kast';
 end $$;
+-- Stemmer på verdi skrives bare via vote_item_value() (20261016_value_votes_and_wish_guard.sql)
+do $$ begin
+  update items set value_agree_count = 99 where id = '11110000-0000-0000-0000-000000000001';
+  raise exception 'FAIL: medlem kunne skrive stemmetelleren direkte';
+exception when insufficient_privilege then raise notice 'OK   stemmetellerne kan ikke skrives direkte';
+end $$;
+do $$ begin
+  update items set value_suggestions = '[{"name":"Falsk","value":1}]' where id = '11110000-0000-0000-0000-000000000001';
+  raise exception 'FAIL: medlem kunne skrive verdiforslag direkte';
+exception when insufficient_privilege then raise notice 'OK   verdiforslag kan ikke skrives direkte';
+end $$;
+select t_eq((vote_item_value('11110000-0000-0000-0000-000000000001', 'disagree', 1800))->>'ok', 'true', 'medlem kan stemme med eget verdiforslag');
+select t_eq((vote_item_value('11110000-0000-0000-0000-000000000001', 'agree'))->>'reason', 'already_voted', 'bare én stemme per person');
+select t_eq((select value_disagree_count || ':' || jsonb_array_length(value_suggestions) || ':' || (value_suggestions->-1->>'name') from items where id = '11110000-0000-0000-0000-000000000001'),
+  '1:1:Frank', 'stemmen og forslaget lagres med navnet fra profilen');
 update items set title = 'Stol i eik', estimated_value = estimated_value where id = '11110000-0000-0000-0000-000000000001';
 select t_eq((select title from items where id = '11110000-0000-0000-0000-000000000001'), 'Stol i eik', 'medlem kan fortsatt rette tittel når verdien er uendret');
 insert into items (id, estate_id, title, added_by) values ('11110000-0000-0000-0000-000000000003', 'eeee0000-0000-0000-0000-000000000001', 'Klokke', auth.uid());
@@ -237,6 +252,16 @@ update items set assigned_to = '00000000-0000-0000-0000-0000000000f1'::uuid, sta
 reset role;
 select t_as('frank@test.no'); set role authenticated;
 with d as (delete from items where id = '11110000-0000-0000-0000-000000000003' returning 1) select t_eq((select count(*)::int from d), 0, 'kan ikke slette egen gjenstand etter at den er tildelt');
+do $$ begin
+  insert into interests (item_id, user_id) values ('11110000-0000-0000-0000-000000000003', auth.uid());
+  raise exception 'FAIL: ønske på tildelt gjenstand ble lagret';
+exception when insufficient_privilege then raise notice 'OK   ønsker kan ikke registreres på tildelte gjenstander';
+end $$;
+do $$ begin
+  insert into item_passes (item_id, user_id) values ('11110000-0000-0000-0000-000000000003', auth.uid());
+  raise exception 'FAIL: nei takk på tildelt gjenstand ble lagret';
+exception when insufficient_privilege then raise notice 'OK   nei takk kan ikke registreres på tildelte gjenstander';
+end $$;
 reset role;
 select t_as('eva@test.no'); set role authenticated;
 do $$ begin
@@ -271,6 +296,11 @@ exception when insufficient_privilege then raise notice 'OK   demo kan ikke endr
 end $$;
 with d as (delete from items returning 1) select t_eq((select count(*)::int from d), 0, 'demo kan ikke slette gjenstander');
 with d as (delete from estate_members where user_id <> auth.uid() returning 1) select t_eq((select count(*)::int from d), 0, 'demo kan ikke fjerne andre medlemmer');
+do $$ begin
+  perform vote_item_value('face0001-0000-0000-0000-000000000001', 'agree');
+  raise exception 'FAIL: demo kunne stemme';
+exception when insufficient_privilege then raise notice 'OK   demo kan ikke stemme på verdi';
+end $$;
 do $$ begin
   insert into comments (item_id, user_id, content) values ('face0001-0000-0000-0000-000000000001', auth.uid(), 'spam');
   raise exception 'FAIL: demo kunne kommentere';

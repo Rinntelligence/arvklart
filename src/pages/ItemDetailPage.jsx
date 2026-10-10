@@ -121,42 +121,16 @@ export default function ItemDetailPage({ session, profile, onToast, isDemo }) {
 
   const undoPass = () => run(() => removePass(itemId, session.user.id), L('Angret', 'Undone'), L('Kunne ikke angre. Prøv igjen.', 'Could not undo. Please try again.'))
 
-  // Stemmene lagres på gjenstanden. Oppdateringen krever at tellerne er uendret siden vi leste dem,
-  // så to som stemmer samtidig ikke overskriver hverandre; da leses gjenstanden på nytt.
+  // Stemmen lagres av databasen (vote_item_value): én stemme per person, og ingen kan endre andres
   const handleEstimateVote = async (vote, suggested) => {
     if (busy) return
     const suggestedValue = parseNOK(suggested)
     if (vote === 'disagree' && suggested && suggestedValue === null) { onToast(L('Skriv estimatet som et beløp, f.eks. 1500', 'Enter the estimate as an amount, e.g. 1500'), 'error'); return }
     setBusy(true)
-    let current = item
-    for (let attempt = 0; attempt < 3; attempt++) {
-      const voterIds = current.value_voter_ids || []
-      if (voterIds.includes(session.user.id)) break
-      const agreeBefore = current.value_agree_count || 0
-      const disagreeBefore = current.value_disagree_count || 0
-      const updateData = {
-        value_agree_count: agreeBefore + (vote === 'agree' ? 1 : 0),
-        value_disagree_count: disagreeBefore + (vote === 'disagree' ? 1 : 0),
-        value_voter_ids: [...voterIds, session.user.id],
-      }
-      if (vote === 'disagree' && suggestedValue !== null) {
-        updateData.value_suggestions = [...(current.value_suggestions || []), {
-          user_id: session.user.id,
-          name: profile?.display_name || L('Ukjent', 'Unknown'),
-          value: suggestedValue,
-        }]
-      }
-      let query = supabase.from('items').update(updateData).eq('id', itemId)
-      query = current.value_agree_count == null ? query.is('value_agree_count', null) : query.eq('value_agree_count', agreeBefore)
-      query = current.value_disagree_count == null ? query.is('value_disagree_count', null) : query.eq('value_disagree_count', disagreeBefore)
-      const { data, error } = await query.select('id')
-      if (error) { setBusy(false); onToast(L('Kunne ikke lagre stemmen. Prøv igjen.', 'Could not save your vote. Please try again.'), 'error'); return }
-      if (data?.length) { setBusy(false); onToast(L('Stemme registrert', 'Vote registered')); load(); return }
-      const { data: fresh } = await getItem(itemId)
-      if (!fresh) break
-      current = fresh
-    }
+    const { data, error } = await supabase.rpc('vote_item_value', { p_item: itemId, p_vote: vote, p_value: vote === 'disagree' ? suggestedValue : null })
     setBusy(false)
+    if (error) { onToast(L('Kunne ikke lagre stemmen. Prøv igjen.', 'Could not save your vote. Please try again.'), 'error'); return }
+    if (data?.ok) onToast(L('Stemme registrert', 'Vote registered'))
     load()
   }
 

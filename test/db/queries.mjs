@@ -108,17 +108,25 @@ test('profil-upsert kan ikke sette founder (upsertProfile)', async () => {
   assert.equal(data.email, 'outsider@test.no')
 })
 
-test('stemme med optimistisk låsing (ItemDetailPage.handleEstimateVote)', async () => {
+// F0 (20261016): kolonnerettigheter på items. Vanlige endringer virker som før; stemmer går via RPC.
+test('admin kan fortsatt rette tittel og verdi via PostgREST (kolonnerettigheter)', async () => {
   const db = as('owner')
   const item = 'face0003-0000-0000-0000-000000000003'
-  const vote = (before) => {
-    let q = db.from('items').update({ value_agree_count: (before ?? 0) + 1 }).eq('id', item)
-    q = before == null ? q.is('value_agree_count', null) : q.eq('value_agree_count', before)
-    return q.select('id')
-  }
-  const { data: before } = await db.from('items').select('value_agree_count').eq('id', item).single()
-  const start = before.value_agree_count
-  assert.equal((await vote(start)).data.length, 1)
-  assert.equal((await vote(start)).data.length, 0) // utdatert lesing → ingen overskriving
-  assert.equal((await vote((start ?? 0) + 1)).data.length, 1)
+  const before = await db.from('items').select('title, estimated_value').eq('id', item).single()
+  const upd = await db.from('items').update({ title: 'Mahognibokhylle', estimated_value: '5000' }).eq('id', item).select('id')
+  assert.equal(upd.error, null)
+  assert.equal(upd.data.length, 1)
+  await db.from('items').update({ title: before.data.title, estimated_value: before.data.estimated_value }).eq('id', item)
+})
+
+test('stemmetelleren kan ikke skrives direkte, men stemmen lagres via vote_item_value', async () => {
+  const db = as('owner')
+  const item = 'face0004-0000-0000-0000-000000000004'
+  const direct = await db.from('items').update({ value_agree_count: 50 }).eq('id', item).select('id')
+  assert.equal(direct.error?.code, '42501')
+  const vote = await db.rpc('vote_item_value', { p_item: item, p_vote: 'agree', p_value: null })
+  assert.equal(vote.error, null)
+  assert.equal(vote.data.ok, true)
+  const again = await db.rpc('vote_item_value', { p_item: item, p_vote: 'agree', p_value: null })
+  assert.equal(again.data.reason, 'already_voted')
 })
