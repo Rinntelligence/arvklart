@@ -334,6 +334,20 @@ await check('F6 Arvinger: en annen beslutningstaker kan bekrefte en representasj
   heir_representatives: [{ id: 'rep-1', estate_id: EST, heir_id: 'heir-gunn', user_id: U2, kind: 'fullmakt', basis: 'Skriftlig fullmakt datert 1. oktober', created_by: U2, verified_at: null, revoked_at: null }] })),
   rpc: { verify_representative: { body: { ok: true } } } })
 
+await check('F6 Bekreftet fullmakt vises som registrert og bekreftet av familien, ikke juridisk kontrollert', async page => {
+  await page.goto(`${BASE}/estate/${EST}/heirs`)
+  await page.getByText('Bekreftet av en annen beslutningstaker i Arvklart.').waitFor()
+  await page.getByText(/Arvklart har ikke kontrollert fullmakten eller vergemålet juridisk/).waitFor()
+  assert(!(await page.getByText(/juridisk (verifisert|godkjent|gyldig)/i).count()), 'fullmakten framstilles som juridisk verifisert')
+}, { fixtures: f6({ heirs: [...heirsF6, { id: 'heir-gunn', estate_id: EST, name: 'Gunn', email: null, relationship: 'Barn', percentage: 0, user_id: null, must_approve: true, created_at: now }], heir_representatives: [{ id: 'rep-1', estate_id: EST, heir_id: 'heir-gunn', user_id: UID, kind: 'fullmakt', basis: 'Skriftlig fullmakt datert 1. oktober', created_by: U2, verified_at: now, verified_by: U2, revoked_at: null }] }) })
+
+await check('F6 Representant svarer «som registrert representant»', async page => {
+  await page.goto(`${BASE}/estate/${EST}/fordeling`)
+  await page.getByText('Svar for Gunn (som registrert representant)').waitFor()
+  assert(!(await page.getByText(/bekreftet representant\)/).count()), 'gammel tekst «som bekreftet representant» vises')
+}, { fixtures: f6({ distribution_versions: [version], heirs: [...heirsF6, { id: 'heir-gunn', estate_id: EST, name: 'Gunn', email: null, relationship: 'Barn', percentage: 0, user_id: null, must_approve: true, created_at: now }], heir_representatives: [{ id: 'rep-1', estate_id: EST, heir_id: 'heir-gunn', user_id: UID, kind: 'fullmakt', basis: 'Skriftlig fullmakt datert 1. oktober', created_by: U2, verified_at: now, verified_by: U2, revoked_at: null }] }),
+  rpc: { distribution_status: st('pending', [hMe(), hKari(), { heir_id: 'heir-gunn', name: 'Gunn', user_id: null, representative: { id: 'rep-1', user_id: UID, kind: 'fullmakt' }, decision: null }]) } })
+
 await browser.close()
 console.log(results.join('\n'))
 process.exit(results.some(r => r.startsWith('FAIL')) ? 1 : 0)

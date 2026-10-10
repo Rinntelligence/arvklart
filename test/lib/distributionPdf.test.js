@@ -14,7 +14,7 @@ const textOf = doc => doc.output()
 
 test('utkast: vannmerke, delvis fordeling og det som ikke er avklart står for seg', () => {
   const pdf = textOf(buildDistributionPdf({ estateName: 'Testbo', summary: summarizeDistribution({ items, members }), kind: 'draft' }))
-  for (const s of ['UTKAST', 'Delvis fordeling', 'Ikke avklart', 'Gyngestol', 'Gis bort', 'Maleri', 'ikke juridisk verifiserte elektroniske signaturer']) assert.ok(pdf.includes(s), `mangler «${s}»`)
+  for (const s of ['UTKAST', 'Delvis fordeling', 'Ikke avklart', 'Gyngestol', 'Gis bort', 'Maleri', 'ikke juridisk verifiserte elektroniske signaturer', 'ikke kontrollert juridisk av Arvklart']) assert.ok(pdf.includes(s), `mangler «${s}»`)
 })
 
 test('papirversjon har signaturfelt; endelig versjon sier registrert godkjenning', () => {
