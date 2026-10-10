@@ -57,10 +57,7 @@ revoke all on function public.require_estate_admin(uuid) from public, anon, auth
 
 -- ── Beskytt tildelingen ─────────────────────────────────────────────────────────
 
-create or replace function public.protected_item_columns()
-returns text[] language sql immutable as $$
-  select array['value_agree_count', 'value_disagree_count', 'value_voter_ids', 'value_suggestions', 'assigned_to', 'status']
-$$;
+insert into public.protected_columns (table_name, column_name) values ('items', 'assigned_to'), ('items', 'status') on conflict do nothing;
 select public.apply_item_update_grants();
 
 -- Ny gjenstand: ingen tildeling og høyst egen stemme (opprettelsen kan ta med skaperens egen vurdering)
