@@ -44,6 +44,26 @@ export function eventText(e, nameOf) {
     case 'shares_unconfirmed': return d.reason === 'heirs_changed'
       ? L('Bekreftelsen av arveandelene ble nullstilt fordi arvelisten ble endret', 'The confirmation of the shares was reset because the list of heirs changed')
       : L(`${who} trakk bekreftelsen av arveandelene`, `${who} withdrew the confirmation of the shares`)
+    case 'disposition_set': {
+      const label = { sell: L('selges', 'be sold'), donate: L('gis bort', 'be given away'), discard: L('kastes', 'be discarded') }[d.disposition]
+      if (d.reason === 'assigned') return L('Disponeringen ble fjernet fordi gjenstanden ble tildelt en arving', 'The disposition was removed because the item was assigned to an heir')
+      return label ? L(`${who} foreslo at gjenstanden skal ${label}`, `${who} proposed that the item should ${label}`) : L(`${who} satte gjenstanden tilbake til «ikke bestemt»`, `${who} set the item back to «not decided»`)
+    }
+    case 'heir_added': return L(`${who} la ${d.name} til på arvelisten${d.must_approve ? '' : ' (godkjenner ikke)'}`, `${who} added ${d.name} to the list of heirs${d.must_approve ? '' : ' (does not approve)'}`)
+    case 'heir_removed': return L(`${who} fjernet ${d.name} fra arvelisten`, `${who} removed ${d.name} from the list of heirs`)
+    case 'heir_changed': return L(`${who} endret ${d.name} på arvelisten`, `${who} changed ${d.name} on the list of heirs`)
+    case 'decider_added': return L(`${who} gjorde ${d.name} til beslutningstaker`, `${who} made ${d.name} a decision-maker`)
+    case 'decider_removal_requested': return L(`${who} ba om at ${d.name} ikke skal godkjenne fordelingen («${d.reason}»)`, `${who} requested that ${d.name} should not approve the distribution («${d.reason}»)`)
+    case 'decider_removed': return d.by_self
+      ? L(`${d.name} valgte å ikke godkjenne fordelingen («${d.reason}»)`, `${d.name} chose not to approve the distribution («${d.reason}»)`)
+      : L(`${who} bekreftet at ${d.name} ikke skal godkjenne fordelingen`, `${who} confirmed that ${d.name} should not approve the distribution`)
+    case 'representative_added': return L(`${who} registrerte ${nameOf(d.user_id)} som ${d.kind === 'verge' ? 'verge' : 'fullmektig'} for ${d.name} (ubekreftet)`, `${who} registered ${nameOf(d.user_id)} as ${d.kind === 'verge' ? 'guardian' : 'proxy'} for ${d.name} (unconfirmed)`)
+    case 'representative_verified': return L(`${who} bekreftet representasjonen for ${nameOf(d.user_id)}`, `${who} confirmed the representation for ${nameOf(d.user_id)}`)
+    case 'representative_revoked': return L(`${who} trakk representasjonen for ${nameOf(d.user_id)}`, `${who} withdrew the representation for ${nameOf(d.user_id)}`)
+    case 'distribution_proposed': return L(`${who} la frem forslag til fordeling (versjon ${d.version_no})`, `${who} proposed the distribution (version ${d.version_no})`)
+    case 'distribution_approved_by': return L(`Godkjenning registrert for ${d.name}${d.via_representative ? ' (via representant)' : ''}`, `Approval registered for ${d.name}${d.via_representative ? ' (via representative)' : ''}`)
+    case 'distribution_objected_by': return L(`${d.name} er ikke enig i forslaget`, `${d.name} disagrees with the proposal`)
+    case 'distribution_approved': return L(`Fordelingen (versjon ${d.version_no}) er godkjent av alle beslutningstakerne`, `The distribution (version ${d.version_no}) has been approved by all decision-makers`)
     default: return L('Endring registrert', 'Change recorded')
   }
 }

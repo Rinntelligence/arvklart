@@ -298,6 +298,28 @@ do $$ begin
   raise exception 'FAIL: admin kunne koble en arving til en konto';
 exception when insufficient_privilege then raise notice 'OK   admin kan ikke koble arving og konto selv';
 end $$;
+-- Samme e-post på to arvinger i et bo: ingen kobling, og én konto kan aldri kobles til to arvinger
+reset role;
+insert into auth.users (id, email) values ('00000000-0000-0000-0000-0000000000d1', 'delt@test.no');
+insert into estates (id, name, owner_id, invite_code) values ('eeee0000-0000-0000-0000-0000000000d0', 'Delt e-post', (select id from auth.users where email = 'eva@test.no'), 'DELT01');
+insert into heirs (id, estate_id, name, email) values
+  ('dddd0000-0000-0000-0000-0000000000a1', 'eeee0000-0000-0000-0000-0000000000d0', 'Tvilling A', 'delt@test.no'),
+  ('dddd0000-0000-0000-0000-0000000000a2', 'eeee0000-0000-0000-0000-0000000000d0', 'Tvilling B', ' Delt@test.no');
+select t_as('delt@test.no'); set role authenticated;
+select estate_name from join_estate('delt01');
+reset role;
+select t_eq((select count(*)::int from estate_members where estate_id = 'eeee0000-0000-0000-0000-0000000000d0' and user_id = '00000000-0000-0000-0000-0000000000d1'), 1, 'delt e-post: blir med i boet');
+select t_eq((select count(*)::int from heirs where estate_id = 'eeee0000-0000-0000-0000-0000000000d0' and user_id is not null), 0, 'delt e-post: ingen arving kobles (vi vet ikke hvem som logget inn)');
+update heirs set user_id = '00000000-0000-0000-0000-0000000000d1' where id = 'dddd0000-0000-0000-0000-0000000000a1';
+do $$ begin
+  update heirs set user_id = '00000000-0000-0000-0000-0000000000d1' where id = 'dddd0000-0000-0000-0000-0000000000a2';
+  raise exception 'FAIL: én konto ble koblet til to arvinger i samme bo';
+exception when unique_violation then raise notice 'OK   én konto kan bare kobles til én arving per bo';
+end $$;
+-- Et bo med arvinger kan slettes (kaskadesletting logger ikke til et bo som ikke finnes lenger)
+delete from estates where id = 'eeee0000-0000-0000-0000-0000000000d0';
+select t_eq((select count(*)::int from heirs where estate_id = 'eeee0000-0000-0000-0000-0000000000d0'), 0, 'et bo med arvinger og logg kan slettes');
+select t_as('eva@test.no'); set role authenticated;
 do $$ begin
   insert into heirs (estate_id, name, user_id) values ('eeee0000-0000-0000-0000-000000000001', 'Falsk kobling', auth.uid());
   raise exception 'FAIL: kunne opprette arving med kobling';
@@ -321,6 +343,28 @@ select t_eq((select shares_confirmed from estates where id = 'eeee0000-0000-0000
 select t_eq((select count(*)::int from estate_events where estate_id = 'eeee0000-0000-0000-0000-000000000001' and kind = 'shares_unconfirmed' and data->>'reason' = 'heirs_changed'), 1, 'nullstillingen logges');
 update estates set name = 'Evas bo' where id = 'eeee0000-0000-0000-0000-000000000001';
 select t_eq((select name from estates where id = 'eeee0000-0000-0000-0000-000000000001'), 'Evas bo', 'admin kan fortsatt endre navnet på boet');
+-- F4 (20261019): disponering av gjenstander ingen vil ha
+do $$ begin
+  update items set disposition = 'discard' where id = '11110000-0000-0000-0000-000000000001';
+  raise exception 'FAIL: admin kunne skrive disponering direkte';
+exception when insufficient_privilege then raise notice 'OK   disponering kan ikke skrives direkte';
+end $$;
+select t_eq((set_dispositions('eeee0000-0000-0000-0000-000000000001', '[{"item_id":"11110000-0000-0000-0000-000000000001","disposition":"donate"}]'))->>'updated', '1', 'admin kan sette disponering via set_dispositions');
+select t_eq((select disposition from items where id = '11110000-0000-0000-0000-000000000001'), 'donate', 'disponeringen er lagret');
+select t_eq((select data->>'disposition' from estate_events where item_id = '11110000-0000-0000-0000-000000000001' and kind = 'disposition_set' order by id desc limit 1), 'donate', 'disponeringen logges');
+do $$ begin
+  perform set_dispositions('eeee0000-0000-0000-0000-000000000001', '[{"item_id":"11110000-0000-0000-0000-000000000001","disposition":"brenn"}]');
+  raise exception 'FAIL: ukjent disponering ble godtatt';
+exception when invalid_parameter_value then raise notice 'OK   disponering må være selg, gi bort eller kast';
+end $$;
+select assign_items('eeee0000-0000-0000-0000-000000000001', '[{"item_id":"11110000-0000-0000-0000-000000000001","user_id":"00000000-0000-0000-0000-0000000000f1"}]', 'manual');
+select t_eq((select coalesce(disposition, 'uavklart') from items where id = '11110000-0000-0000-0000-000000000001'), 'uavklart', 'tildeling til en arving fjerner disponeringen');
+do $$ begin
+  perform set_dispositions('eeee0000-0000-0000-0000-000000000001', '[{"item_id":"11110000-0000-0000-0000-000000000001","disposition":"sell"}]');
+  raise exception 'FAIL: tildelt gjenstand fikk disponering';
+exception when invalid_parameter_value then raise notice 'OK   tildelte gjenstander kan ikke disponeres';
+end $$;
+select unassign_item('11110000-0000-0000-0000-000000000001');
 do $$ begin
   perform anonymize_estate_events(auth.uid());
   raise exception 'FAIL: klienten kunne anonymisere loggen';
@@ -357,6 +401,16 @@ do $$ begin
   insert into items (estate_id, title, added_by, agreed_value) values ('eeee0000-0000-0000-0000-000000000001', 'Med verdi', auth.uid(), 5);
   raise exception 'FAIL: ny gjenstand med fordelingsverdi ble lagret';
 exception when insufficient_privilege then raise notice 'OK   ny gjenstand kan ikke ha fordelingsverdi';
+end $$;
+do $$ begin
+  perform set_dispositions('eeee0000-0000-0000-0000-000000000001', '[{"item_id":"11110000-0000-0000-0000-000000000001","disposition":"discard"}]');
+  raise exception 'FAIL: medlem kunne sette disponering';
+exception when insufficient_privilege then raise notice 'OK   medlem kan ikke sette disponering';
+end $$;
+do $$ begin
+  insert into items (estate_id, title, added_by, disposition) values ('eeee0000-0000-0000-0000-000000000001', 'Med disponering', auth.uid(), 'discard');
+  raise exception 'FAIL: ny gjenstand med disponering ble lagret';
+exception when insufficient_privilege then raise notice 'OK   ny gjenstand kan ikke ha disponering';
 end $$;
 do $$ begin
   perform draw_lot('11110000-0000-0000-0000-000000000001');
@@ -422,6 +476,7 @@ do $$ begin
   raise exception 'FAIL: demo kunne endre fordelingsverdi';
 exception when insufficient_privilege then raise notice 'OK   demo kan ikke endre fordelingsverdi';
 end $$;
+select t_eq((set_dispositions('deed0001-0000-0000-0000-000000000001', '[{"item_id":"face0010-0000-0000-0000-000000000010","disposition":"donate"}]'))->>'updated', '1', 'demo kan prøve disponering i demoboet');
 do $$ begin
   perform vote_item_value('face0001-0000-0000-0000-000000000001', 'agree');
   raise exception 'FAIL: demo kunne stemme';
@@ -452,6 +507,7 @@ select t_eq((select column_default::text from information_schema.columns where t
 select reset_demo_estate();
 select t_eq((select count(*)::int from interests where item_id::text like 'face%'), 18, 'nullstilling gjenoppretter alle interesser');
 select t_eq((select count(*)::int from estate_events where estate_id = 'deed0001-0000-0000-0000-000000000001'), 0, 'nullstilling tømmer demoens logg');
+select t_eq((select count(*)::int from items where estate_id = 'deed0001-0000-0000-0000-000000000001' and disposition is not null), 0, 'nullstilling fjerner disponeringene');
 select t_eq((select count(*)::int from items where estate_id = 'deed0001-0000-0000-0000-000000000001' and (status = 'assigned' or marked_for_disposal)), 0, 'nullstilling fjerner tildelinger og kast');
 select t_eq((select count(*)::int from item_passes p join auth.users u on u.id = p.user_id where u.email = 'mona.demo@heirsplit.no'), 0, 'Mona må selv ta stilling etter nullstilling');
 -- Alle andre har tatt stilling til alt: 12 gjenstander × 3 andre medlemmer
@@ -559,3 +615,164 @@ begin
   delete from ai_usage where session_id in ('frank-fylt', 'frank-bo', 'frank-uten-bo');
   delete from estate_members where estate_id = evas_bo and user_id = frank;
 end $$;
+
+-- ═══ F6 (20261020): beslutningstakere, representasjon, forslag og godkjenning ═══
+-- Eget bo: Olav (admin, owner@test.no), Eva og Frank (medlemmer) og Gunn (arving uten konto).
+select t_as(null);
+insert into estates (id, name, owner_id, invite_code) values ('f6f60000-0000-0000-0000-000000000001', 'Godkjenningsbo', '00000000-0000-0000-0000-00000000000a', 'F6F6F6');
+insert into estate_members (estate_id, user_id, role) values
+  ('f6f60000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-00000000000a', 'admin'),
+  ('f6f60000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-0000000000e1', 'member'),
+  ('f6f60000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-0000000000f1', 'member');
+insert into heirs (id, estate_id, name, email, relationship, user_id, linked_via) values
+  ('f6f60000-0000-0000-0000-0000000000a1', 'f6f60000-0000-0000-0000-000000000001', 'Olav', 'owner@test.no', 'Barn', '00000000-0000-0000-0000-00000000000a', 'existing_member'),
+  ('f6f60000-0000-0000-0000-0000000000a2', 'f6f60000-0000-0000-0000-000000000001', 'Eva', 'eva@test.no', 'Barn', '00000000-0000-0000-0000-0000000000e1', 'existing_member'),
+  ('f6f60000-0000-0000-0000-0000000000a3', 'f6f60000-0000-0000-0000-000000000001', 'Frank', 'frank@test.no', 'Barn', '00000000-0000-0000-0000-0000000000f1', 'existing_member'),
+  ('f6f60000-0000-0000-0000-0000000000a4', 'f6f60000-0000-0000-0000-000000000001', 'Gunn', 'gunn@test.no', 'Barn', null, null);
+insert into items (id, estate_id, title, added_by, status, assigned_to, agreed_value) values
+  ('f6f60000-0000-0000-0000-0000000000b1', 'f6f60000-0000-0000-0000-000000000001', 'Kommode', '00000000-0000-0000-0000-00000000000a', 'assigned', '00000000-0000-0000-0000-0000000000e1', 2000),
+  ('f6f60000-0000-0000-0000-0000000000b2', 'f6f60000-0000-0000-0000-000000000001', 'Lampe', '00000000-0000-0000-0000-00000000000a', 'active', null, null);
+
+select t_as('owner@test.no'); set role authenticated;
+-- Admin kan ikke fjerne en beslutningstaker alene
+do $$ begin
+  update heirs set must_approve = false where id = 'f6f60000-0000-0000-0000-0000000000a4';
+  raise exception 'FAIL: admin kunne fjerne beslutningstaker direkte';
+exception when insufficient_privilege then raise notice 'OK   must_approve kan ikke endres direkte, heller ikke av admin';
+end $$;
+select t_eq((set_must_approve('f6f60000-0000-0000-0000-0000000000a4', false, 'Er ikke arving'))->>'pending', 'true', 'admin kan bare be om at en beslutningstaker tas ut');
+select t_eq((select must_approve from heirs where id = 'f6f60000-0000-0000-0000-0000000000a4'), true, 'forespørselen alene endrer ingenting');
+do $$ begin
+  perform confirm_decider_removal('f6f60000-0000-0000-0000-0000000000a4');
+  raise exception 'FAIL: admin kunne bekrefte sin egen forespørsel';
+exception when insufficient_privilege then raise notice 'OK   den som ba om å ta ut en beslutningstaker, kan ikke bekrefte selv';
+end $$;
+do $$ begin
+  delete from heirs where id = 'f6f60000-0000-0000-0000-0000000000a2';
+  raise exception 'FAIL: admin kunne slette en koblet beslutningstaker';
+exception when insufficient_privilege then raise notice 'OK   en beslutningstaker med konto kan ikke slettes fra arvelisten';
+end $$;
+do $$ begin
+  insert into heirs (estate_id, name, relationship, must_approve) values ('f6f60000-0000-0000-0000-000000000001', 'Rådgiver Rolf', 'Advokat', true);
+end $$;
+select t_eq((select must_approve from heirs where name = 'Rådgiver Rolf'), false, 'rådgiverroller er ikke beslutningstakere fra start');
+select t_eq((select must_approve from heirs where name = 'Rådgiver Rolf' and false) is null, true, 'admin kan ikke velge must_approve ved opprettelse');
+delete from heirs where name = 'Rådgiver Rolf';
+-- Forslag 1: Gunn har verken konto eller representant
+select set_config('test.v1', (propose_distribution('f6f60000-0000-0000-0000-000000000001'))->>'id', false);
+select t_eq((distribution_status(current_setting('test.v1')::uuid))->>'state', 'not_digitally_approvable', 'arving uten konto og representant: kan ikke godkjennes digitalt');
+select t_eq((select jsonb_array_length(required) from distribution_versions where id = current_setting('test.v1')::uuid), 4, 'forslaget fryser alle fire beslutningstakere');
+do $$ begin
+  delete from heirs where id = 'f6f60000-0000-0000-0000-0000000000a4';
+  raise exception 'FAIL: admin kunne slette en beslutningstaker som står i et forslag';
+exception when insufficient_privilege then raise notice 'OK   en beslutningstaker i et forslag kan ikke slettes';
+end $$;
+-- Admin registrerer seg selv som fullmektig for Gunn: ubekreftet, kan ikke bekrefte selv eller svare
+select set_config('test.rep', add_representative('f6f60000-0000-0000-0000-0000000000a4', auth.uid(), 'fullmakt', 'Muntlig avtale med Gunn')::text, false);
+do $$ begin
+  perform verify_representative(current_setting('test.rep')::uuid);
+  raise exception 'FAIL: admin kunne bekrefte sin egen fullmakt';
+exception when insufficient_privilege then raise notice 'OK   representanten kan ikke bekrefte sin egen representasjon';
+end $$;
+select t_eq((distribution_status(current_setting('test.v1')::uuid))->>'state', 'outdated', 'ny representasjon gjør forslaget utdatert');
+do $$ begin
+  perform respond_distribution(current_setting('test.v1')::uuid, 'f6f60000-0000-0000-0000-0000000000a1', 'approve');
+  raise exception 'FAIL: kunne svare på et utdatert forslag';
+exception when invalid_parameter_value then raise notice 'OK   et utdatert forslag kan ikke godkjennes';
+end $$;
+select set_config('test.v2', (propose_distribution('f6f60000-0000-0000-0000-000000000001'))->>'id', false);
+do $$ begin
+  perform respond_distribution(current_setting('test.v2')::uuid, 'f6f60000-0000-0000-0000-0000000000a4', 'approve');
+  raise exception 'FAIL: kunne godkjenne gjennom ubekreftet representasjon';
+exception when insufficient_privilege then raise notice 'OK   ubekreftet representasjon kan ikke godkjenne';
+end $$;
+do $$ begin
+  perform respond_distribution(current_setting('test.v2')::uuid, 'f6f60000-0000-0000-0000-0000000000a2', 'approve');
+  raise exception 'FAIL: admin kunne svare for Eva';
+exception when insufficient_privilege then raise notice 'OK   ingen kan svare for en annen beslutningstaker';
+end $$;
+do $$ begin
+  insert into distribution_responses (version_id, heir_id, heir_name, decision) values (current_setting('test.v2')::uuid, 'f6f60000-0000-0000-0000-0000000000a2', 'Eva', 'approve');
+  raise exception 'FAIL: kunne skrive svar direkte';
+exception when insufficient_privilege then raise notice 'OK   svar kan ikke skrives direkte';
+end $$;
+do $$ begin
+  update distribution_versions set approved_at = now() where id = current_setting('test.v2')::uuid;
+  raise exception 'FAIL: kunne markere forslaget som godkjent direkte';
+exception when insufficient_privilege then raise notice 'OK   forslaget kan ikke markeres som godkjent direkte';
+end $$;
+reset role;
+
+-- Eva (en annen beslutningstaker) bekrefter fullmakten; forslag 3 lages etter det
+select t_as('eva@test.no'); set role authenticated;
+select t_eq((verify_representative(current_setting('test.rep')::uuid))->>'ok', 'true', 'en annen beslutningstaker kan bekrefte representasjonen');
+reset role;
+select t_as('owner@test.no'); set role authenticated;
+select set_config('test.v3', (propose_distribution('f6f60000-0000-0000-0000-000000000001'))->>'id', false);
+select t_eq((respond_distribution(current_setting('test.v3')::uuid, 'f6f60000-0000-0000-0000-0000000000a1', 'approve'))->>'state', 'pending', 'beslutningstakeren kan godkjenne for seg selv');
+select t_eq((respond_distribution(current_setting('test.v3')::uuid, 'f6f60000-0000-0000-0000-0000000000a4', 'approve'))->>'approved', '2', 'bekreftet representant kan godkjenne for den representerte');
+select t_eq((select representative_id is not null and responder_email = 'owner@test.no' from distribution_responses where heir_id = 'f6f60000-0000-0000-0000-0000000000a4' and version_id = current_setting('test.v3')::uuid), true, 'svaret viser representasjon og hvilken konto som svarte');
+reset role;
+select t_as('eva@test.no'); set role authenticated;
+do $$ begin
+  perform respond_distribution(current_setting('test.v3')::uuid, 'f6f60000-0000-0000-0000-0000000000a2', 'object', '');
+  raise exception 'FAIL: innsigelse uten begrunnelse ble godtatt';
+exception when invalid_parameter_value then raise notice 'OK   innsigelse krever begrunnelse';
+end $$;
+select t_eq((respond_distribution(current_setting('test.v3')::uuid, 'f6f60000-0000-0000-0000-0000000000a2', 'object', 'Lampen bør være med', 'f6f60000-0000-0000-0000-0000000000b2'))->>'state', 'objected', 'innsigelse med begrunnelse og gjenstand');
+select t_eq((respond_distribution(current_setting('test.v3')::uuid, 'f6f60000-0000-0000-0000-0000000000a2', 'approve'))->>'state', 'pending', 'et nytt svar erstatter det forrige i statusen');
+select t_eq((select count(*)::int from distribution_responses where heir_id = 'f6f60000-0000-0000-0000-0000000000a2'), 2, 'tidligere svar er bevart (append-only)');
+reset role;
+select t_as('frank@test.no'); set role authenticated;
+select t_eq((respond_distribution(current_setting('test.v3')::uuid, 'f6f60000-0000-0000-0000-0000000000a3', 'approve'))->>'state', 'approved', 'fordelingen er godkjent når alle beslutningstakerne har godkjent');
+reset role;
+select t_as(null);
+do $$ begin
+  update distribution_responses set decision = 'object' where version_id = current_setting('test.v3')::uuid;
+  raise exception 'FAIL: et registrert svar kunne endres';
+exception when insufficient_privilege then raise notice 'OK   registrerte svar kan ikke endres, heller ikke av databaseeieren';
+end $$;
+do $$ begin
+  update distribution_versions set snapshot = '{}' where id = current_setting('test.v3')::uuid;
+  raise exception 'FAIL: en godkjent versjon kunne endres';
+exception when insufficient_privilege then raise notice 'OK   en godkjent versjon kan ikke endres';
+end $$;
+-- Kontosletting (fremmednøkler og anonymisering) kan nulle ut hvem som svarte, men ikke endre svaret
+update distribution_responses set responder = null where responder = '00000000-0000-0000-0000-0000000000f1';
+select anonymize_estate_events('00000000-0000-0000-0000-0000000000e1');
+select t_eq((select count(*)::int from distribution_responses where responder = '00000000-0000-0000-0000-0000000000e1' and responder_email is not null), 0, 'kontosletting fjerner e-posten i svarene');
+select t_eq((select count(*)::int from distribution_responses where version_id = current_setting('test.v3')::uuid and decision = 'approve'), 4, 'svarene står (godkjenningene er boets dokumentasjon)');
+do $$ begin
+  update distribution_responses set responder = '00000000-0000-0000-0000-0000000000a9' where responder is null;
+  raise exception 'FAIL: hvem som svarte kunne byttes ut';
+exception when insufficient_privilege then raise notice 'OK   hvem som svarte kan nulles ut, men ikke byttes';
+end $$;
+select t_as('owner@test.no'); set role authenticated;
+select set_agreed_values('f6f60000-0000-0000-0000-000000000001', '[{"item_id":"f6f60000-0000-0000-0000-0000000000b1","value":2500,"source":"manual"}]');
+select t_eq((distribution_status(current_setting('test.v3')::uuid))->>'outdated', 'true', 'endring etter godkjenning vises som utdatert (krever ny godkjenning)');
+reset role;
+-- Frank bekrefter at Gunn tas ut (forespørselen fra admin), og tar seg selv ut
+select t_as('frank@test.no'); set role authenticated;
+select t_eq((confirm_decider_removal('f6f60000-0000-0000-0000-0000000000a4'))->>'ok', 'true', 'en annen beslutningstaker kan bekrefte at en arving tas ut');
+select t_eq((set_must_approve('f6f60000-0000-0000-0000-0000000000a3', false, 'Jeg avstår'))->>'must_approve', 'false', 'en arving kan selv ta seg ut som beslutningstaker');
+reset role;
+select t_as('outsider@test.no'); set role authenticated;
+select t_eq((select count(*)::int from distribution_versions) + (select count(*)::int from distribution_responses) + (select count(*)::int from heir_representatives), 0, 'utenforstående ser ingen forslag, svar eller representanter');
+do $$ begin
+  perform respond_distribution(current_setting('test.v3')::uuid, 'f6f60000-0000-0000-0000-0000000000a2', 'approve');
+  raise exception 'FAIL: utenforstående kunne svare';
+exception when insufficient_privilege then raise notice 'OK   utenforstående kan ikke svare';
+end $$;
+reset role;
+-- Demo: Mona kan legge frem og svare for seg selv, men ingen simulerte godkjenninger
+select t_as('mona.demo@heirsplit.no'); set role authenticated;
+select set_config('test.demo', (propose_distribution('deed0001-0000-0000-0000-000000000001'))->>'id', false);
+select t_eq((respond_distribution(current_setting('test.demo')::uuid, (select id from heirs where estate_id = 'deed0001-0000-0000-0000-000000000001' and user_id = auth.uid()), 'approve'))->>'state', 'pending', 'demo: Monas godkjenning gjør ikke forslaget godkjent (ingen simulerte svar)');
+do $$ begin
+  perform add_representative((select id from heirs where estate_id = 'deed0001-0000-0000-0000-000000000001' and name like 'Kari%'), auth.uid(), 'fullmakt', 'Demo-forsøk på fullmakt');
+  raise exception 'FAIL: demo kunne registrere representant';
+exception when insufficient_privilege then raise notice 'OK   demo kan ikke registrere representanter';
+end $$;
+reset role;
+select reset_demo_estate();
+select t_eq((select count(*)::int from distribution_versions where estate_id = 'deed0001-0000-0000-0000-000000000001'), 0, 'nullstilling fjerner demoens forslag og svar');

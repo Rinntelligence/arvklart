@@ -52,7 +52,7 @@ export const loadStatusExtras = async (estateId) => {
   const [{ data: members }, passes, { data: heirs }, { data: tasks }] = await Promise.all([
     getEstateMembers(estateId),
     getEstatePasses(estateId),
-    supabase.from('heirs').select('id, name, email, relationship, percentage, user_id').eq('estate_id', estateId),
+    supabase.from('heirs').select('id, name, email, relationship, percentage, user_id, must_approve, exclusion_requested_by, exclusion_reason').eq('estate_id', estateId),
     supabase.from('tasks').select('id, completed').eq('estate_id', estateId),
   ])
   return { members: members || [], passes, heirs: heirs || [], tasks: tasks || [] }

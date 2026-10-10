@@ -24,6 +24,8 @@ import HeirsPage from './pages/HeirsPage'
 import GoodwillPage from './pages/GoodwillPage'
 import { JoinPage, CategoriesPage, PrivacyPage, AccountPage } from './pages/OtherPages'
 import ConflictPage from './pages/ConflictPage'
+import UnwantedPage from './pages/UnwantedPage'
+import DistributionPage from './pages/DistributionPage'
 import StatusPage from './pages/StatusPage'
 import ContactPage from './pages/ContactPage'
 import { getPendingSave, clearPendingSave } from './lib/wizardEstate'
@@ -210,6 +212,8 @@ export default function App() {
           <Route path="/estate/:id/goodwill" element={notForDemo(<GoodwillPage {...p} />)} />
           <Route path="/estate/:id/heirs" element={<HeirsPage {...p} />} />
           <Route path="/estate/:id/conflicts" element={<ConflictPage {...p} />} />
+          <Route path="/estate/:id/ingen-vil-ha" element={<UnwantedPage {...p} />} />
+          <Route path="/estate/:id/fordeling" element={<DistributionPage {...p} />} />
           <Route path="/estate/:id/status" element={<StatusPage {...p} />} />
           <Route path="/join/:code" element={<JoinPage session={session} onToast={showToast} />} />
           <Route path="/founder" element={<FounderGate><FounderPage session={session} onToast={showToast} /></FounderGate>} />
