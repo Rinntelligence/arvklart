@@ -6,6 +6,7 @@ import { loadStatusExtras } from '../lib/decisions'
 import { formatNOK } from '../lib/format'
 import { removeImages, itemImageUrls } from '../lib/images'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
+import { dispositionLabel } from '../lib/disposition'
 import { L, locale } from '../lib/lang'
 import { categoryLabel } from '../lib/categories'
 import { Modal } from '../components/UI'
@@ -460,6 +461,7 @@ function ItemCard({ item, userId, onClick, onDelete, myRole, isDemo, showReason 
           : <span style={{ position:'absolute', left:'10px', bottom:'8px', fontSize:'0.6875rem', color:'#75604B' }}>{cat.emoji} {categoryLabel(cat.label)}</span>}
         {count > 1 && !isAssigned && <span style={{ position:'absolute', top:'8px', right:'8px', background:'#5F6E52', color:'#fff', fontSize:'0.6875rem', padding:'2px 8px', borderRadius:'10px' }}>{L(`${count} vil ha`, `${count} want it`)}</span>}
         {isAssigned && <span style={{ position:'absolute', top:'8px', right:'8px', background:'#5F6E52', color:'#fff', fontSize:'0.6875rem', padding:'2px 8px', borderRadius:'10px' }}>{L('Tildelt', 'Assigned')}</span>}
+        {!isAssigned && item.disposition && <span style={{ position:'absolute', top:'8px', right:'8px', background:'#FBF9F5', color:'#3A2F26', border:'1px solid #D9CFC0', fontSize:'0.6875rem', padding:'2px 8px', borderRadius:'10px' }}>{dispositionLabel(item.disposition)}</span>}
       </div>
 
       <div style={{ padding:'10px 12px 12px' }}>

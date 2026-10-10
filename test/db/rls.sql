@@ -321,6 +321,28 @@ select t_eq((select shares_confirmed from estates where id = 'eeee0000-0000-0000
 select t_eq((select count(*)::int from estate_events where estate_id = 'eeee0000-0000-0000-0000-000000000001' and kind = 'shares_unconfirmed' and data->>'reason' = 'heirs_changed'), 1, 'nullstillingen logges');
 update estates set name = 'Evas bo' where id = 'eeee0000-0000-0000-0000-000000000001';
 select t_eq((select name from estates where id = 'eeee0000-0000-0000-0000-000000000001'), 'Evas bo', 'admin kan fortsatt endre navnet på boet');
+-- F4 (20261019): disponering av gjenstander ingen vil ha
+do $$ begin
+  update items set disposition = 'discard' where id = '11110000-0000-0000-0000-000000000001';
+  raise exception 'FAIL: admin kunne skrive disponering direkte';
+exception when insufficient_privilege then raise notice 'OK   disponering kan ikke skrives direkte';
+end $$;
+select t_eq((set_dispositions('eeee0000-0000-0000-0000-000000000001', '[{"item_id":"11110000-0000-0000-0000-000000000001","disposition":"donate"}]'))->>'updated', '1', 'admin kan sette disponering via set_dispositions');
+select t_eq((select disposition from items where id = '11110000-0000-0000-0000-000000000001'), 'donate', 'disponeringen er lagret');
+select t_eq((select data->>'disposition' from estate_events where item_id = '11110000-0000-0000-0000-000000000001' and kind = 'disposition_set' order by id desc limit 1), 'donate', 'disponeringen logges');
+do $$ begin
+  perform set_dispositions('eeee0000-0000-0000-0000-000000000001', '[{"item_id":"11110000-0000-0000-0000-000000000001","disposition":"brenn"}]');
+  raise exception 'FAIL: ukjent disponering ble godtatt';
+exception when invalid_parameter_value then raise notice 'OK   disponering må være selg, gi bort eller kast';
+end $$;
+select assign_items('eeee0000-0000-0000-0000-000000000001', '[{"item_id":"11110000-0000-0000-0000-000000000001","user_id":"00000000-0000-0000-0000-0000000000f1"}]', 'manual');
+select t_eq((select coalesce(disposition, 'uavklart') from items where id = '11110000-0000-0000-0000-000000000001'), 'uavklart', 'tildeling til en arving fjerner disponeringen');
+do $$ begin
+  perform set_dispositions('eeee0000-0000-0000-0000-000000000001', '[{"item_id":"11110000-0000-0000-0000-000000000001","disposition":"sell"}]');
+  raise exception 'FAIL: tildelt gjenstand fikk disponering';
+exception when invalid_parameter_value then raise notice 'OK   tildelte gjenstander kan ikke disponeres';
+end $$;
+select unassign_item('11110000-0000-0000-0000-000000000001');
 do $$ begin
   perform anonymize_estate_events(auth.uid());
   raise exception 'FAIL: klienten kunne anonymisere loggen';
@@ -357,6 +379,16 @@ do $$ begin
   insert into items (estate_id, title, added_by, agreed_value) values ('eeee0000-0000-0000-0000-000000000001', 'Med verdi', auth.uid(), 5);
   raise exception 'FAIL: ny gjenstand med fordelingsverdi ble lagret';
 exception when insufficient_privilege then raise notice 'OK   ny gjenstand kan ikke ha fordelingsverdi';
+end $$;
+do $$ begin
+  perform set_dispositions('eeee0000-0000-0000-0000-000000000001', '[{"item_id":"11110000-0000-0000-0000-000000000001","disposition":"discard"}]');
+  raise exception 'FAIL: medlem kunne sette disponering';
+exception when insufficient_privilege then raise notice 'OK   medlem kan ikke sette disponering';
+end $$;
+do $$ begin
+  insert into items (estate_id, title, added_by, disposition) values ('eeee0000-0000-0000-0000-000000000001', 'Med disponering', auth.uid(), 'discard');
+  raise exception 'FAIL: ny gjenstand med disponering ble lagret';
+exception when insufficient_privilege then raise notice 'OK   ny gjenstand kan ikke ha disponering';
 end $$;
 do $$ begin
   perform draw_lot('11110000-0000-0000-0000-000000000001');
@@ -422,6 +454,7 @@ do $$ begin
   raise exception 'FAIL: demo kunne endre fordelingsverdi';
 exception when insufficient_privilege then raise notice 'OK   demo kan ikke endre fordelingsverdi';
 end $$;
+select t_eq((set_dispositions('deed0001-0000-0000-0000-000000000001', '[{"item_id":"face0010-0000-0000-0000-000000000010","disposition":"donate"}]'))->>'updated', '1', 'demo kan prøve disponering i demoboet');
 do $$ begin
   perform vote_item_value('face0001-0000-0000-0000-000000000001', 'agree');
   raise exception 'FAIL: demo kunne stemme';
@@ -452,6 +485,7 @@ select t_eq((select column_default::text from information_schema.columns where t
 select reset_demo_estate();
 select t_eq((select count(*)::int from interests where item_id::text like 'face%'), 18, 'nullstilling gjenoppretter alle interesser');
 select t_eq((select count(*)::int from estate_events where estate_id = 'deed0001-0000-0000-0000-000000000001'), 0, 'nullstilling tømmer demoens logg');
+select t_eq((select count(*)::int from items where estate_id = 'deed0001-0000-0000-0000-000000000001' and disposition is not null), 0, 'nullstilling fjerner disponeringene');
 select t_eq((select count(*)::int from items where estate_id = 'deed0001-0000-0000-0000-000000000001' and (status = 'assigned' or marked_for_disposal)), 0, 'nullstilling fjerner tildelinger og kast');
 select t_eq((select count(*)::int from item_passes p join auth.users u on u.id = p.user_id where u.email = 'mona.demo@heirsplit.no'), 0, 'Mona må selv ta stilling etter nullstilling');
 -- Alle andre har tatt stilling til alt: 12 gjenstander × 3 andre medlemmer

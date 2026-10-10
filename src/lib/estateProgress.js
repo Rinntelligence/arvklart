@@ -74,11 +74,15 @@ export const buildRemainingSteps = ({ estateId, userId, items, members, passes, 
 
   const deciding = decidingMembers(members, heirs)
   const everyonePassed = i => deciding.length > 0 && deciding.every(m => passes.some(p => p.item_id === i.id && p.user_id === m.user_id))
-  const unwanted = open.filter(i => !i.interests?.length && !i.marked_for_disposal && everyonePassed(i))
+  // Uavklart = ingen valgt disponering (salg, gave eller kassering). Et gammelt kastemerke
+  // (marked_for_disposal) er ikke et vedtak, så de gjenstandene står som uavklarte.
+  const unwanted = open.filter(i => !i.interests?.length && !i.disposition && everyonePassed(i))
   if (unwanted.length) steps.push({
     key: 'unwanted',
     title: L(`${item(unwanted.length)} vil ingen ha`, `No one wants ${item(unwanted.length)}`),
-    detail: L('Bestem om de skal selges, doneres eller kastes', 'Decide whether to sell, donate or discard them'),
+    detail: L('Bestem sammen om de skal selges, gis bort eller kastes', 'Decide together whether to sell, give away or discard them'),
+    path: `/estate/${estateId}/ingen-vil-ha`,
+    pathLabel: L('Bestem', 'Decide'),
   })
 
   const openTasks = tasks.filter(t => !t.completed)

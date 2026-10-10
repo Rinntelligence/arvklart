@@ -172,6 +172,37 @@ await check('F3 Arvinger: administrator bekrefter at andelene gjelder innbo og l
     { id: 'h2', estate_id: EST, name: 'Kari', email: 'kari@test.no', relationship: 'Barn', percentage: 40, user_id: U2, created_at: now }] },
   rpc: { confirm_shares: { body: { ok: true } } } })
 
+// ── F4: gjenstander ingen vil ha ────────────────────────────────────────────────
+const unwanted = {
+  ...contested, interests: [],
+  items: [item('u-1', 'Symaskin', { interests: [], marked_for_disposal: true }), item('u-2', 'Kristallglass', { interests: [] }), item('u-3', 'Lampe', { interests: [], disposition: 'sell' })],
+}
+await check('F4 Ingen vil ha: administrator velger per gjenstand og for alle; gammelt kastemerke er uavklart', async page => {
+  const { rpc, patches } = watch(page)
+  await page.goto(`${BASE}/estate/${EST}/ingen-vil-ha`)
+  await page.getByRole('heading', { name: 'Ingen vil ha' }).waitFor()
+  await page.getByText('Tidligere merket for kast. Det er ikke et vedtak; velg sammen.').waitFor()
+  await page.getByText('Selges (foreløpig)').waitFor()
+  await page.getByRole('group', { name: 'Hva skal skje med Symaskin?' }).getByRole('button', { name: 'Gi bort' }).click()
+  await page.getByText('Valget er registrert', { exact: true }).waitFor()
+  const one = rpc.find(c => c.name === 'set_dispositions')
+  assert(one?.body.p_values.length === 1 && one.body.p_values[0].item_id === 'u-1' && one.body.p_values[0].disposition === 'donate', `feil kall: ${JSON.stringify(one?.body)}`)
+  await page.getByRole('group', { name: /Samme valg for alle/ }).getByRole('button', { name: 'Selg' }).click()
+  await page.getByText('Valget er registrert for alle').waitFor()
+  const all = rpc.filter(c => c.name === 'set_dispositions')[1]
+  assert(all?.body.p_values.map(v => v.item_id).join() === 'u-1,u-2' && all.body.p_values.every(v => v.disposition === 'sell'), `feil bulk: ${JSON.stringify(all?.body)}`)
+  assert(!patches.some(b => 'disposition' in b || 'marked_for_disposal' in b), 'disponeringen ble skrevet direkte')
+  const v = await axe(page)
+  assert(!v.length, v.join('; '))
+}, { fixtures: unwanted, rpc: { set_dispositions: { body: { updated: 1 } } } })
+
+await check('F4 Arving ser valgene, men kan ikke endre dem', async page => {
+  await page.goto(`${BASE}/estate/${EST}/ingen-vil-ha`)
+  await page.getByText('Selges (foreløpig)').waitFor()
+  await page.getByText(/Administratoren registrerer valgene/).waitFor()
+  assert(await page.getByRole('button', { name: /^(Selg|Gi bort|Kast)$/ }).count() === 0, 'arving fikk valgknapper')
+}, { fixtures: asMember(unwanted) })
+
 await browser.close()
 console.log(results.join('\n'))
 process.exit(results.some(r => r.startsWith('FAIL')) ? 1 : 0)

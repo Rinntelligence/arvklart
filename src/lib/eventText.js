@@ -44,6 +44,11 @@ export function eventText(e, nameOf) {
     case 'shares_unconfirmed': return d.reason === 'heirs_changed'
       ? L('Bekreftelsen av arveandelene ble nullstilt fordi arvelisten ble endret', 'The confirmation of the shares was reset because the list of heirs changed')
       : L(`${who} trakk bekreftelsen av arveandelene`, `${who} withdrew the confirmation of the shares`)
+    case 'disposition_set': {
+      const label = { sell: L('selges', 'be sold'), donate: L('gis bort', 'be given away'), discard: L('kastes', 'be discarded') }[d.disposition]
+      if (d.reason === 'assigned') return L('Disponeringen ble fjernet fordi gjenstanden ble tildelt en arving', 'The disposition was removed because the item was assigned to an heir')
+      return label ? L(`${who} foreslo at gjenstanden skal ${label}`, `${who} proposed that the item should ${label}`) : L(`${who} satte gjenstanden tilbake til «ikke bestemt»`, `${who} set the item back to «not decided»`)
+    }
     default: return L('Endring registrert', 'Change recorded')
   }
 }
