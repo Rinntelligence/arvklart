@@ -81,13 +81,13 @@ const contested = {
   interests: [ITEM, 'it-2'].flatMap(item_id => [UID, U2].map(user_id => ({ id: `${item_id}-${user_id}`, item_id, user_id, created_at: now }))),
 }
 
-await check('Jevn verdifordeling: ukjent verdi teller ikke som 0, og gjenstanden listes med «Sett verdi»', async page => {
+await check('Jevn verdifordeling: ukjent fordelingsverdi teller ikke som 0 og sperrer ikke de andre (F3)', async page => {
   await page.goto(`${BASE}/estate/${EST}/conflicts`)
   await page.getByRole('button', { name: /Jevn verdifordeling|Lik verdi/ }).first().click()
-  await page.getByText('Jevn verdifordeling trenger en verdi på alle gjenstandene').waitFor()
-  await page.getByRole('button', { name: 'Sett verdi på Maleri' }).waitFor()
-  assert(await page.getByRole('button', { name: /Bekreft og tildel/ }).count() === 0, 'tildeling kan bekreftes selv om verdi mangler')
-}, { fixtures: contested })
+  await page.getByText('1 gjenstand mangler fordelingsverdi og er ikke med i den jevne fordelingen').waitFor()
+  await page.getByRole('button', { name: 'Sett fordelingsverdi på Maleri' }).waitFor()
+  await page.getByRole('button', { name: /Bekreft og tildel \(1\)/ }).waitFor()
+}, { fixtures: { ...contested, items: contested.items.map(i => (i.id === ITEM ? { ...i, agreed_value: 1500, agreed_value_source: 'ai' } : i)) } })
 
 await check('Invitasjon i ett skjermbilde: kortet vises etter «Legg til arving», med melding, SMS og e-post', async page => {
   await page.goto(`${BASE}/estate/${EST}/heirs`)

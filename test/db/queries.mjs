@@ -145,3 +145,34 @@ test('stemmetelleren kan ikke skrives direkte, men stemmen lagres via vote_item_
   const again = await db.rpc('vote_item_value', { p_item: item, p_vote: 'agree', p_value: null })
   assert.equal(again.data.reason, 'already_voted')
 })
+
+// F3 (20261018): fordelingsverdi bare via set_agreed_values; AI-anslaget er urørt
+test('fordelingsverdi via set_agreed_values; direkte skriving avvises og AI-anslaget endres ikke', async () => {
+  const db = as('owner')
+  const item = 'face0003-0000-0000-0000-000000000003'
+  const before = await db.from('items').select('estimated_value, agreed_value').eq('id', item).single()
+  const direct = await db.from('items').update({ agreed_value: 1 }).eq('id', item).select('id')
+  assert.equal(direct.error?.code, '42501')
+  const set = await db.rpc('set_agreed_values', { p_estate: DEMO, p_values: [{ item_id: item, value: 4200, source: 'manual' }] })
+  assert.equal(set.error, null)
+  const after = await db.from('items').select('estimated_value, agreed_value, agreed_value_source').eq('id', item).single()
+  assert.equal(Number(after.data.agreed_value), 4200)
+  assert.equal(after.data.estimated_value, before.data.estimated_value)
+  await db.rpc('set_agreed_values', { p_estate: DEMO, p_values: [{ item_id: item, value: before.data.agreed_value === null ? null : Number(before.data.agreed_value), source: 'ai' }] })
+})
+
+// F6 (20261020): forslag og svar via RPC; svar kan ikke skrives direkte
+test('forslag og svar via RPC (propose_distribution, respond_distribution, distribution_status)', async () => {
+  const db = as('mona')
+  const p = await db.rpc('propose_distribution', { p_estate: DEMO })
+  assert.equal(p.error, null)
+  const heir = await db.from('heirs').select('id').eq('estate_id', DEMO).eq('user_id', USERS.mona[0]).single()
+  const direct = await db.from('distribution_responses').insert({ version_id: p.data.id, heir_id: heir.data.id, heir_name: 'x', decision: 'approve' })
+  assert.equal(direct.error?.code, '42501')
+  const r = await db.rpc('respond_distribution', { p_version: p.data.id, p_heir: heir.data.id, p_decision: 'approve', p_reason: null, p_item: null })
+  assert.equal(r.error, null)
+  assert.equal(r.data.approved, 1)
+  assert.notEqual(r.data.state, 'approved', 'demoen legger ikke inn svar for de andre')
+  const st = await db.rpc('distribution_status', { p_version: p.data.id })
+  assert.equal(st.data.heirs.find(h => h.heir_id === heir.data.id).responder_email, 'mona.demo@heirsplit.no')
+})
