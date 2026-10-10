@@ -15,5 +15,6 @@ drop function if exists public.vote_item_value(uuid, text, numeric);
 drop function if exists public.item_is_open(uuid);
 drop function if exists public.apply_item_update_grants();
 drop function if exists public.protected_item_columns();
+drop table if exists public.protected_columns;
 notify pgrst, 'reload schema';
 commit;

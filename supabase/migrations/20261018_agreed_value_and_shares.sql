@@ -41,11 +41,7 @@ do $$ begin
   end if;
 end $$;
 
-create or replace function public.protected_item_columns()
-returns text[] language sql immutable as $$
-  select array['value_agree_count', 'value_disagree_count', 'value_voter_ids', 'value_suggestions', 'assigned_to', 'status',
-               'agreed_value', 'agreed_value_source']
-$$;
+insert into public.protected_columns (table_name, column_name) values ('items', 'agreed_value'), ('items', 'agreed_value_source') on conflict do nothing;
 select public.apply_item_update_grants();
 
 create or replace function public.guard_item_insert()
@@ -115,8 +111,13 @@ where h.user_id is null and m.estate_id = h.estate_id and lower(trim(h.email)) =
   and not exists (select 1 from public.heirs h2 where h2.estate_id = h.estate_id and h2.user_id = u.id);
 
 -- Arvelisten: admin kan ikke sette koblingen (eller bekreftelsen under) selv
+insert into public.protected_columns (table_name, column_name) values
+  ('heirs', 'user_id'), ('heirs', 'linked_via'), ('heirs', 'linked_at'), ('heirs', 'estate_id')
+on conflict do nothing;
 create or replace function public.protected_heir_columns()
-returns text[] language sql immutable as $$ select array['user_id', 'linked_via', 'linked_at', 'estate_id'] $$;
+returns text[] language sql stable security definer set search_path = public as $$
+  select coalesce(array_agg(column_name order by column_name), '{}') from protected_columns where table_name = 'heirs'
+$$;
 select public.apply_update_grants('heirs', public.protected_heir_columns());
 
 -- Koblingen kan ikke settes ved insert heller
@@ -175,7 +176,10 @@ grant execute on function public.join_estate(text) to authenticated;
 alter table public.estates add column if not exists shares_confirmed boolean not null default false;
 alter table public.estates add column if not exists shares_confirmed_at timestamptz;
 alter table public.estates add column if not exists shares_confirmed_by uuid references auth.users(id) on delete set null;
-select public.apply_update_grants('estates', array['shares_confirmed', 'shares_confirmed_at', 'shares_confirmed_by', 'owner_id']);
+insert into public.protected_columns (table_name, column_name) values
+  ('estates', 'shares_confirmed'), ('estates', 'shares_confirmed_at'), ('estates', 'shares_confirmed_by'), ('estates', 'owner_id')
+on conflict do nothing;
+select public.apply_update_grants('estates', (select array_agg(column_name) from public.protected_columns where table_name = 'estates'));
 
 create or replace function public.confirm_shares(p_estate uuid, p_confirmed boolean)
 returns jsonb language plpgsql security definer set search_path = public as $$

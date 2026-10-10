@@ -2,10 +2,8 @@
 -- bekreftede andeler, og gir update på hele heirs/estates igjen. Deploy forrige frontend først.
 -- Fordelingsverdiene og koblingene slettes – ta en kopi hvis de skal beholdes.
 begin;
-create or replace function public.protected_item_columns()
-returns text[] language sql immutable as $$
-  select array['value_agree_count', 'value_disagree_count', 'value_voter_ids', 'value_suggestions', 'assigned_to', 'status']
-$$;
+delete from public.protected_columns where (table_name = 'items' and column_name in ('agreed_value', 'agreed_value_source'))
+  or table_name in ('heirs', 'estates');
 drop trigger if exists reset_shares_on_heir_change on public.heirs;
 drop function if exists public.reset_shares_on_heir_change();
 drop function if exists public.confirm_shares(uuid, boolean);

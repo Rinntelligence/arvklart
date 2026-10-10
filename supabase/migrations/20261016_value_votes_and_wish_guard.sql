@@ -12,10 +12,22 @@
 
 -- ── Kolonnerettigheter ──────────────────────────────────────────────────────────
 
--- Kolonnene klientene ikke kan oppdatere direkte. Utvides av senere migreringer.
+-- Kolonnene klientene ikke kan oppdatere direkte, per tabell. Migreringer legger bare TIL rader (on conflict
+-- do nothing), så en ny kjøring av en eldre migrering aldri fjerner en beskyttelse en senere har lagt til.
+create table if not exists public.protected_columns (
+  table_name text not null,
+  column_name text not null,
+  primary key (table_name, column_name)
+);
+alter table public.protected_columns enable row level security;
+revoke all on public.protected_columns from anon, authenticated;
+insert into public.protected_columns (table_name, column_name) values
+  ('items', 'value_agree_count'), ('items', 'value_disagree_count'), ('items', 'value_voter_ids'), ('items', 'value_suggestions')
+on conflict do nothing;
+
 create or replace function public.protected_item_columns()
-returns text[] language sql immutable as $$
-  select array['value_agree_count', 'value_disagree_count', 'value_voter_ids', 'value_suggestions']
+returns text[] language sql stable security definer set search_path = public as $$
+  select coalesce(array_agg(column_name order by column_name), '{}') from protected_columns where table_name = 'items'
 $$;
 
 -- Gir update på alle kolonner unntatt de beskyttede. Kolonnelisten leses fra databasen, så kolonner som
