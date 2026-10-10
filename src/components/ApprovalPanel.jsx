@@ -92,7 +92,7 @@ export default function ApprovalPanel({ estateId, userId, isAdmin, isDemo, close
           {canRespond && mine.map(h => (
             <div key={h.heir_id} style={{ marginTop: '14px', borderTop: '1px solid #E8DFD0', paddingTop: '12px' }}>
               <p style={{ ...small, fontWeight: 600, color: '#3A2F26' }}>
-                {h.user_id === userId ? L('Ditt svar', 'Your response') : L(`Svar for ${h.name} (som bekreftet representant)`, `Respond for ${h.name} (as confirmed representative)`)}
+                {h.user_id === userId ? L('Ditt svar', 'Your response') : L(`Svar for ${h.name} (som registrert representant)`, `Respond for ${h.name} (as registered representative)`)}
               </p>
               <p style={small}>{L('Godkjenningen gjelder fordelingen slik den står i denne versjonen. Det som ikke er avklart, omfattes ikke.', 'The approval applies to the distribution as it stands in this version. What is not settled is not covered.')}</p>
               {objecting === h.heir_id ? (
@@ -117,6 +117,10 @@ export default function ApprovalPanel({ estateId, userId, isAdmin, isDemo, close
               )}
             </div>
           ))}
+
+          {canRespond && !mine.length && !isDemo && (status?.heirs || []).some(h => !h.user_id) && (
+            <p style={{ ...small, marginTop: '10px' }}>{L('Står du på arvelisten, men kan ikke svare? Koble kontoen din til arvingen under «Arvinger» («Dette er meg»).', 'Are you on the list of heirs but cannot respond? Link your account to the heir under «Heirs» («This is me»).')}</p>
+          )}
 
           {isDemo && mine.some(h => h.decision === 'approve') && status?.state !== 'approved' && (
             <p style={{ ...small, marginTop: '10px', fontStyle: 'italic' }}>{L('I et ekte bo må alle arvingene godkjenne selv. Demoen legger ikke inn svar for de andre.', 'In a real estate every heir must approve themselves. The demo does not add responses for the others.')}</p>

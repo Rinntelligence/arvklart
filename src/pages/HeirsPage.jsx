@@ -276,7 +276,7 @@ export default function HeirsPage({ session, profile, onToast, isDemo }) {
       })()}
 
       {/* Hvem godkjenner fordelingen (F6): beslutningstakere og representanter */}
-      <DecidersPanel estateId={id} heirs={heirs} members={memberList} userId={session.user.id} isAdmin={myRole === 'admin'} isDemo={isDemo} onChanged={load} onToast={onToast} />
+      <DecidersPanel estateId={id} heirs={heirs} members={memberList} userId={session.user.id} userEmail={session.user.email} inviteCode={inviteCode} isAdmin={myRole === 'admin'} isDemo={isDemo} onChanged={load} onToast={onToast} />
 
       {/* Fordelingskalkulator */}
       <div style={{ background:'#fff', border:'1px solid #D9CFC0', borderRadius:'12px', padding:'24px', marginBottom:'20px' }}>

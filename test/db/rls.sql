@@ -316,6 +316,13 @@ do $$ begin
   raise exception 'FAIL: én konto ble koblet til to arvinger i samme bo';
 exception when unique_violation then raise notice 'OK   én konto kan bare kobles til én arving per bo';
 end $$;
+-- Administrator som selv står på arvelisten (aldri invitert), kobler seg med boets kode («Dette er meg»)
+insert into estate_members (estate_id, user_id, role) values ('eeee0000-0000-0000-0000-0000000000d0', (select id from auth.users where email = 'eva@test.no'), 'admin') on conflict do nothing;
+insert into heirs (id, estate_id, name, email) values ('dddd0000-0000-0000-0000-0000000000a3', 'eeee0000-0000-0000-0000-0000000000d0', 'Eva', 'eva@test.no');
+select t_as('eva@test.no'); set role authenticated;
+select estate_name from join_estate('DELT01');
+reset role;
+select t_eq((select linked_via from heirs where id = 'dddd0000-0000-0000-0000-0000000000a3'), 'join_estate', 'medlem som står på arvelisten, kobles med boets kode');
 -- Et bo med arvinger kan slettes (kaskadesletting logger ikke til et bo som ikke finnes lenger)
 delete from estates where id = 'eeee0000-0000-0000-0000-0000000000d0';
 select t_eq((select count(*)::int from heirs where estate_id = 'eeee0000-0000-0000-0000-0000000000d0'), 0, 'et bo med arvinger og logg kan slettes');
