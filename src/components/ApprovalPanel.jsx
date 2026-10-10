@@ -118,6 +118,10 @@ export default function ApprovalPanel({ estateId, userId, isAdmin, isDemo, close
             </div>
           ))}
 
+          {canRespond && !mine.length && !isDemo && (status?.heirs || []).some(h => !h.user_id) && (
+            <p style={{ ...small, marginTop: '10px' }}>{L('Står du på arvelisten, men kan ikke svare? Koble kontoen din til arvingen under «Arvinger» («Dette er meg»).', 'Are you on the list of heirs but cannot respond? Link your account to the heir under «Heirs» («This is me»).')}</p>
+          )}
+
           {isDemo && mine.some(h => h.decision === 'approve') && status?.state !== 'approved' && (
             <p style={{ ...small, marginTop: '10px', fontStyle: 'italic' }}>{L('I et ekte bo må alle arvingene godkjenne selv. Demoen legger ikke inn svar for de andre.', 'In a real estate every heir must approve themselves. The demo does not add responses for the others.')}</p>
           )}

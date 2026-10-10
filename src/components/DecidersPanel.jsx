@@ -8,7 +8,10 @@ import { setMustApprove, confirmDeciderRemoval, addRepresentative, verifyReprese
 //  • en arving kan selv ta seg ut; administrator kan bare be om det, og en annen beslutningstaker må bekrefte
 //  • en representant registrert av administrator er ubekreftet til en annen beslutningstaker (ikke
 //    representanten eller den som registrerte den) bekrefter den; ubekreftet representasjon kan ikke svare
-export default function DecidersPanel({ estateId, heirs, members, userId, isAdmin, isDemo, onChanged, onToast }) {
+// Koble egen konto: et medlem hvis e-post står på nøyaktig én arving som ikke er koblet, kan koble seg selv.
+// Det går via join_estate() med boets kode, samme kontroll som når en arving blir med via invitasjonen
+// (e-posten fra innloggingen). Administrator kan ikke koble andre.
+export default function DecidersPanel({ estateId, heirs, members, userId, userEmail, inviteCode, isAdmin, isDemo, onChanged, onToast }) {
   const [reps, setReps] = useState([])
   const [busy, setBusy] = useState(false)
   const [asking, setAsking] = useState(null) // { heirId, mode: 'remove' | 'self' }
@@ -24,6 +27,10 @@ export default function DecidersPanel({ estateId, heirs, members, userId, isAdmi
 
   const nameOf = id => members.find(m => m.user_id === id)?.profiles?.display_name || L('tidligere medlem', 'former member')
   const iAmDecider = heirs.some(h => h.user_id === userId && h.must_approve)
+  const myEmail = (userEmail || '').trim().toLowerCase()
+  const isMine = h => !!myEmail && (h.email || '').trim().toLowerCase() === myEmail
+  const iAmLinked = heirs.some(h => h.user_id === userId)
+  const myRows = heirs.filter(isMine)
   const run = async (fn, ok) => {
     setBusy(true)
     const { error } = await fn()
@@ -60,6 +67,15 @@ export default function DecidersPanel({ estateId, heirs, members, userId, isAdmi
                 <span style={{ ...small, color: h.must_approve ? '#3A5A30' : '#75604B' }}>{h.must_approve ? L('Skal godkjenne', 'Approves') : L('Godkjenner ikke', 'Does not approve')}</span>
               </div>
               <p style={small}>{h.user_id ? L('Har konto i Arvklart (koblet da arvingen ble med)', 'Has an Arvklart account (linked when the heir joined)') : L('Har ikke blitt med ennå', 'Has not joined yet')}</p>
+              {!h.user_id && !iAmLinked && !isDemo && isMine(h) && myRows.length === 1 && inviteCode && (
+                <div style={{ marginTop: '8px' }}>
+                  <p style={small}>{L('E-posten din står på denne arvingen. Koble kontoen din for å kunne godkjenne fordelingen.', 'Your email is on this heir. Link your account to be able to approve the distribution.')}</p>
+                  <button onClick={() => run(() => supabase.rpc('join_estate', { p_code: inviteCode }), L('Kontoen din er koblet til arvingen', 'Your account is linked to the heir'))} disabled={busy} style={{ ...btn, marginTop: '6px' }}>{L('Dette er meg – koble kontoen min', 'This is me – link my account')}</button>
+                </div>
+              )}
+              {!h.user_id && !iAmLinked && isMine(h) && myRows.length > 1 && (
+                <p style={{ ...small, color: '#8A4B2A' }}>{L('E-posten din står på flere arvinger, så Arvklart kan ikke vite hvem av dem du er. Rett e-posten på arvingen som ikke er deg, eller registrer en representant.', 'Your email is on several heirs, so Arvklart cannot tell which of them you are. Correct the email on the heir who is not you, or register a representative.')}</p>
+              )}
               {h.exclusion_requested_by && <p style={{ ...small, color: '#8A4B2A' }}>{L(`Det er bedt om at ${h.name} ikke skal godkjenne: «${h.exclusion_reason}». Gjelder først når en annen beslutningstaker bekrefter.`, `It has been requested that ${h.name} should not approve: «${h.exclusion_reason}». Takes effect only when another decision-maker confirms.`)}</p>}
               {r && <p style={small}>{L(`${nameOf(r.user_id)} er registrert som ${r.kind === 'verge' ? 'verge' : 'fullmektig'} (${r.basis}). `, `${nameOf(r.user_id)} is registered as ${r.kind === 'verge' ? 'guardian' : 'proxy'} (${r.basis}). `)}
                 <strong>{r.verified_at ? L('Bekreftet av en annen beslutningstaker i Arvklart.', 'Confirmed by another decision-maker in Arvklart.') : L('Ubekreftet – kan ikke svare før en annen beslutningstaker bekrefter.', 'Unconfirmed – cannot respond until another decision-maker confirms.')}</strong>
