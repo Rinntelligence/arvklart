@@ -298,6 +298,28 @@ do $$ begin
   raise exception 'FAIL: admin kunne koble en arving til en konto';
 exception when insufficient_privilege then raise notice 'OK   admin kan ikke koble arving og konto selv';
 end $$;
+-- Samme e-post på to arvinger i et bo: ingen kobling, og én konto kan aldri kobles til to arvinger
+reset role;
+insert into auth.users (id, email) values ('00000000-0000-0000-0000-0000000000d1', 'delt@test.no');
+insert into estates (id, name, owner_id, invite_code) values ('eeee0000-0000-0000-0000-0000000000d0', 'Delt e-post', (select id from auth.users where email = 'eva@test.no'), 'DELT01');
+insert into heirs (id, estate_id, name, email) values
+  ('dddd0000-0000-0000-0000-0000000000a1', 'eeee0000-0000-0000-0000-0000000000d0', 'Tvilling A', 'delt@test.no'),
+  ('dddd0000-0000-0000-0000-0000000000a2', 'eeee0000-0000-0000-0000-0000000000d0', 'Tvilling B', ' Delt@test.no');
+select t_as('delt@test.no'); set role authenticated;
+select estate_name from join_estate('delt01');
+reset role;
+select t_eq((select count(*)::int from estate_members where estate_id = 'eeee0000-0000-0000-0000-0000000000d0' and user_id = '00000000-0000-0000-0000-0000000000d1'), 1, 'delt e-post: blir med i boet');
+select t_eq((select count(*)::int from heirs where estate_id = 'eeee0000-0000-0000-0000-0000000000d0' and user_id is not null), 0, 'delt e-post: ingen arving kobles (vi vet ikke hvem som logget inn)');
+update heirs set user_id = '00000000-0000-0000-0000-0000000000d1' where id = 'dddd0000-0000-0000-0000-0000000000a1';
+do $$ begin
+  update heirs set user_id = '00000000-0000-0000-0000-0000000000d1' where id = 'dddd0000-0000-0000-0000-0000000000a2';
+  raise exception 'FAIL: én konto ble koblet til to arvinger i samme bo';
+exception when unique_violation then raise notice 'OK   én konto kan bare kobles til én arving per bo';
+end $$;
+-- Et bo med arvinger kan slettes (kaskadesletting logger ikke til et bo som ikke finnes lenger)
+delete from estates where id = 'eeee0000-0000-0000-0000-0000000000d0';
+select t_eq((select count(*)::int from heirs where estate_id = 'eeee0000-0000-0000-0000-0000000000d0'), 0, 'et bo med arvinger og logg kan slettes');
+select t_as('eva@test.no'); set role authenticated;
 do $$ begin
   insert into heirs (estate_id, name, user_id) values ('eeee0000-0000-0000-0000-000000000001', 'Falsk kobling', auth.uid());
   raise exception 'FAIL: kunne opprette arving med kobling';

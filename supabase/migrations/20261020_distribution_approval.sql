@@ -196,6 +196,8 @@ declare
   v_estate uuid := coalesce(new.estate_id, old.estate_id);
 begin
   if tg_op = 'DELETE' then
+    -- Hele boet slettes (kaskade): ingen sperre og ingen logg
+    if not exists (select 1 from estates where id = old.estate_id) then return old; end if;
     if coalesce(auth.role(), '') = 'authenticated' and old.must_approve
        and (old.user_id is not null or exists (select 1 from distribution_versions v where v.estate_id = old.estate_id and v.required @> jsonb_build_array(jsonb_build_object('heir_id', old.id)))) then
       raise exception 'Arvingen er beslutningstaker og kan ikke slettes. Be om at arvingen tas ut som beslutningstaker først.' using errcode = '42501';

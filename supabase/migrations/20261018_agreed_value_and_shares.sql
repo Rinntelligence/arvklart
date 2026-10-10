@@ -108,7 +108,11 @@ create index if not exists heirs_user_idx on public.heirs (user_id) where user_i
 update public.heirs h set user_id = u.id, linked_via = 'existing_member', linked_at = now()
 from public.estate_members m join auth.users u on u.id = m.user_id
 where h.user_id is null and m.estate_id = h.estate_id and lower(trim(h.email)) = lower(trim(u.email))
-  and not exists (select 1 from public.heirs h2 where h2.estate_id = h.estate_id and h2.user_id = u.id);
+  and not exists (select 1 from public.heirs h2 where h2.estate_id = h.estate_id and h2.user_id = u.id)
+  -- Står e-posten på flere arvinger i boet, kobles ingen: det ville gitt én konto flere godkjenninger
+  and (select count(*) from public.heirs h3 where h3.estate_id = h.estate_id and lower(trim(h3.email)) = lower(trim(h.email))) = 1;
+-- Én konto kan høyst være koblet til én arving per bo
+create unique index if not exists heirs_estate_user_uniq on public.heirs (estate_id, user_id) where user_id is not null;
 
 -- Arvelisten: admin kan ikke sette koblingen (eller bekreftelsen under) selv
 insert into public.protected_columns (table_name, column_name) values
@@ -141,6 +145,7 @@ declare
   v_email text := lower(trim(coalesce(auth.email(), '')));
   v_estate estates%rowtype;
   v_heir uuid;
+  v_same int;
 begin
   if v_uid is null then
     raise exception 'not_authenticated';
@@ -152,14 +157,16 @@ begin
   select h.id into v_heir from heirs h
   where h.estate_id = v_estate.id and v_email <> '' and lower(trim(h.email)) = v_email
   order by (h.user_id = v_uid) desc nulls last, h.user_id nulls first limit 1;
+  select count(*) into v_same from heirs h where h.estate_id = v_estate.id and v_email <> '' and lower(trim(h.email)) = v_email;
   if not exists (select 1 from estate_members m where m.estate_id = v_estate.id and m.user_id = v_uid) then
     if v_heir is null then
       raise exception 'not_invited';
     end if;
     insert into estate_members (estate_id, user_id, role) values (v_estate.id, v_uid, 'member');
   end if;
-  -- Arvingen kobles til kontoen som logget inn med e-posten (én gang; en kobling overstyres aldri)
-  if v_heir is not null and not exists (select 1 from heirs hx where hx.estate_id = v_estate.id and hx.user_id = v_uid) then
+  -- Arvingen kobles til kontoen som logget inn med e-posten (én gang; en kobling overstyres aldri).
+  -- Står e-posten på flere arvinger, kobles ingen: vi vet ikke hvem av dem som logget inn.
+  if v_heir is not null and v_same = 1 and not exists (select 1 from heirs hx where hx.estate_id = v_estate.id and hx.user_id = v_uid) then
     update heirs hu set user_id = v_uid, linked_via = 'join_estate', linked_at = now() where hu.id = v_heir and hu.user_id is null;
     if found then
       perform public.log_estate_event(v_estate.id, null, 'heir_linked', jsonb_build_object('heir_id', v_heir, 'user_id', v_uid));
