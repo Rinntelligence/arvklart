@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { getEstate, getItems } from '../lib/supabase'
 import { buildRemainingSteps } from '../lib/estateProgress'
 import { loadStatusExtras } from '../lib/decisions'
+import { proposalForMe } from '../lib/approval'
 import { L } from '../lib/lang'
 
 export default function StatusPage({ session }) {
@@ -17,10 +18,10 @@ export default function StatusPage({ session }) {
     (async () => {
       const [{ data: est }, { data: its }] = await Promise.all([getEstate(id), getItems(id)])
       const all = its || []
-      const extras = await loadStatusExtras(id)
+      const [extras, proposal] = await Promise.all([loadStatusExtras(id), proposalForMe(id, session.user.id).catch(() => null)])
       setEstate(est)
       setItems(all)
-      setSteps(buildRemainingSteps({ estateId: id, userId: session.user.id, items: all, ...extras }))
+      setSteps(buildRemainingSteps({ estateId: id, userId: session.user.id, items: all, ...extras, proposal }))
       setLoading(false)
     })()
   }, [id])

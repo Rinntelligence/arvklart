@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase, getEstateMembers } from '../lib/supabase'
 import { WIZARD_TAG } from '../lib/wizardEstate'
+import DecidersPanel from '../components/DecidersPanel'
 import { L, locale } from '../lib/lang'
 import { Modal } from '../components/UI'
 import InviteCard from '../components/InviteCard'
@@ -30,6 +31,7 @@ export default function HeirsPage({ session, profile, onToast, isDemo }) {
   const [saving, setSaving] = useState(false)
   const [inviteCode, setInviteCode] = useState('')
   const [memberEmails, setMemberEmails] = useState([])
+  const [memberList, setMemberList] = useState([])
   const [copied, setCopied] = useState('')
   const [emailEdit, setEmailEdit] = useState(null)
   const [confirmHeir, setConfirmHeir] = useState(null)
@@ -51,6 +53,7 @@ export default function HeirsPage({ session, profile, onToast, isDemo }) {
     setInviteCode(es?.invite_code || '')
     setEstateName(es?.name || '')
     setMemberEmails((members || []).map(m => normEmail(m.profiles?.email)).filter(Boolean))
+    setMemberList(members || [])
     if (es?.total_value) setTotalValue(es.total_value.toString())
     if (es?.split_mode) setSplitMode(es.split_mode)
     setSharesConfirmed(!!es?.shares_confirmed)
@@ -271,6 +274,9 @@ export default function HeirsPage({ session, profile, onToast, isDemo }) {
           </section>
         )
       })()}
+
+      {/* Hvem godkjenner fordelingen (F6): beslutningstakere og representanter */}
+      <DecidersPanel estateId={id} heirs={heirs} members={memberList} userId={session.user.id} isAdmin={myRole === 'admin'} isDemo={isDemo} onChanged={load} onToast={onToast} />
 
       {/* Fordelingskalkulator */}
       <div style={{ background:'#fff', border:'1px solid #D9CFC0', borderRadius:'12px', padding:'24px', marginBottom:'20px' }}>

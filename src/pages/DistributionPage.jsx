@@ -5,24 +5,29 @@ import { loadStatusExtras } from '../lib/decisions'
 import { L } from '../lib/lang'
 import { formatNOK } from '../lib/format'
 import { itemValue } from '../lib/distribution'
-import { summarizeDistribution, diffText } from '../lib/distributionSummary'
+import { summarizeDistribution, diffText, snapshotInput } from '../lib/distributionSummary'
+import { makeNameOf } from '../lib/eventText'
+import { heirStatusText } from '../lib/approval'
+import ApprovalPanel from '../components/ApprovalPanel'
 import { dispositionLabel } from '../lib/dispositionLabels'
 
 // «Fordelingen»: oversikt slik den står nå – per arving, gjenstander ingen vil ha og det som ikke er avklart –
-// og nedlasting av protokollen som utkast (PDF). Verdiutjevningen er beslutningsstøtte. Forslag og
-// godkjenning kommer i F6.
+// forslag og godkjenning (F6), og protokollen som PDF (utkast, endelig fra det godkjente forslaget, eller
+// papirversjon når forslaget ikke kan godkjennes digitalt). Verdiutjevningen er beslutningsstøtte.
 export default function DistributionPage({ session, onToast, isDemo }) {
   const { id } = useParams()
   const navigate = useNavigate()
   const [data, setData] = useState(null)
+  const [proposal, setProposal] = useState({ version: null, status: null })
 
   useEffect(() => {
     (async () => {
-      const [{ data: items }, extras, { data: estate }] = await Promise.all([
+      const [{ data: items }, extras, { data: estate }, { data: mem }] = await Promise.all([
         getItems(id), loadStatusExtras(id),
         supabase.from('estates').select('name, split_mode, shares_confirmed, status').eq('id', id).maybeSingle(),
+        supabase.from('estate_members').select('role').eq('estate_id', id).eq('user_id', session.user.id).maybeSingle(),
       ])
-      setData({ items: items || [], members: extras.members, heirs: extras.heirs, estate })
+      setData({ items: items || [], members: extras.members, heirs: extras.heirs, estate, isAdmin: mem?.role === 'admin' })
     })()
   }, [id])
 
@@ -30,11 +35,21 @@ export default function DistributionPage({ session, onToast, isDemo }) {
   const s = summarizeDistribution(data)
   const notSettled = s.pending.length + s.unwanted.undecided.length
 
+  const nameOf = makeNameOf(data.members)
+  const { version, status } = proposal
+  // Endelig protokoll lages fra det godkjente forslaget; papirversjon fra forslaget når det ikke kan godkjennes digitalt
+  const pdfKind = isDemo ? 'demo' : status?.state === 'approved' ? 'final' : status?.state === 'not_digitally_approvable' ? 'paper' : 'draft'
+  const pdfLabel = { final: L('Last ned godkjent protokoll (PDF)', 'Download the approved record (PDF)'), paper: L('Last ned protokoll for signering på papir (PDF)', 'Download the record for signing on paper (PDF)'),
+    draft: L('Last ned utkast (PDF)', 'Download draft (PDF)'), demo: L('Last ned utkast (PDF)', 'Download draft (PDF)') }[pdfKind]
   const download = async () => {
     try {
       const { buildDistributionPdf } = await import('../lib/distributionPdf')
-      const doc = buildDistributionPdf({ estateName: data.estate?.name, summary: s, kind: isDemo ? 'demo' : 'draft' })
-      doc.save(`${L('fordeling-utkast', 'distribution-draft')}-${new Date().toISOString().slice(0, 10)}.pdf`)
+      const fromSnapshot = (pdfKind === 'final' || pdfKind === 'paper') && version?.snapshot
+      const summary = fromSnapshot ? summarizeDistribution(snapshotInput(version.snapshot)) : s
+      const deciders = (status?.heirs || []).map(h => ({ name: h.name, statusText: pdfKind === 'paper' ? null : heirStatusText(h, nameOf),
+        representation: h.representative ? L(`Representant (${h.representative.kind}): ${nameOf(h.representative.user_id)}, bekreftet av en annen beslutningstaker`, `Representative (${h.representative.kind}): ${nameOf(h.representative.user_id)}, confirmed by another decision-maker`) : null }))
+      const doc = buildDistributionPdf({ estateName: data.estate?.name, summary, kind: pdfKind, version, deciders })
+      doc.save(`${pdfKind === 'final' ? L('fordeling-godkjent', 'distribution-approved') : pdfKind === 'paper' ? L('fordeling-til-signering', 'distribution-for-signing') : L('fordeling-utkast', 'distribution-draft')}-${new Date().toISOString().slice(0, 10)}.pdf`)
     } catch {
       onToast(L('Kunne ikke lage PDF-en. Prøv igjen.', 'Could not create the PDF. Please try again.'), 'error')
     }
@@ -61,9 +76,12 @@ export default function DistributionPage({ session, onToast, isDemo }) {
         </p>
         <p style={small}>{L(`${s.itemCount} gjenstander i alt · ${formatNOK(s.totalKnown)} i fordelingsverdi tildelt`, `${s.itemCount} items in total · ${formatNOK(s.totalKnown)} in distribution value assigned`)}</p>
         <button onClick={download} style={{ marginTop: '10px', minHeight: '44px', padding: '8px 14px', background: '#fff', border: '1px solid #9A8B78', borderRadius: '8px', cursor: 'pointer', fontSize: '0.875rem', fontFamily: 'Karla, sans-serif', color: '#3A2F26' }}>
-          {L('Last ned utkast (PDF)', 'Download draft (PDF)')}
+          {pdfLabel}
         </button>
       </div>
+
+      <ApprovalPanel estateId={id} userId={session.user.id} isAdmin={data.isAdmin} isDemo={isDemo} closed={data.estate?.status === 'closed'}
+        items={data.items} nameOf={nameOf} onVersion={(v, st) => setProposal({ version: v, status: st })} onToast={onToast} />
 
       <h2 style={h2}>{L('Per arving', 'Per heir')}</h2>
       {!s.weighted && s.totalKnown > 0 && <p style={{ ...small, marginBottom: '10px' }}>{L('Sammenlignet med en lik andel. Arveandeler brukes bare når administrator har bekreftet dem under «Arvinger».', 'Compared with an equal share. Inheritance shares are only used when the administrator has confirmed them under «Heirs».')}</p>}

@@ -32,8 +32,16 @@ export const getUndecided = (items, members, passes, heirs = []) => {
 }
 
 // Gjenstående steg i fornuftig rekkefølge. Bare steg som ikke er ferdige tas med.
-export const buildRemainingSteps = ({ estateId, userId, items, members, passes, heirs, tasks }) => {
+// proposal: { needsMyResponse } når et forslag til fordeling venter på svar fra meg (F6)
+export const buildRemainingSteps = ({ estateId, userId, items, members, passes, heirs, tasks, proposal = null }) => {
   const steps = []
+  if (proposal?.needsMyResponse) steps.push({
+    key: 'respond',
+    title: L('Du har et forslag til fordeling å svare på', 'You have a proposed distribution to respond to'),
+    detail: L('Godkjenn fordelingen eller si fra hva du ikke er enig i', 'Approve the distribution or say what you disagree with'),
+    path: `/estate/${estateId}/fordeling`,
+    pathLabel: L('Svar', 'Respond'),
+  })
   const open = items.filter(i => i.status !== 'assigned')
   const count = (n, one, many) => `${n} ${n === 1 ? one : many}`
   const item = n => count(n, L('gjenstand', 'item'), L('gjenstander', 'items'))

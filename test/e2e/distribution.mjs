@@ -235,6 +235,105 @@ await check('F5 Avslutt boet: påminnelse om å se fordelingen og laste ned prot
   await page.waitForURL(`**/estate/${EST}/fordeling`)
 }, { fixtures: overview })
 
+// ── F6: forslag og godkjenning ──────────────────────────────────────────────────
+const H1 = 'heir-me', H2 = 'heir-kari'
+const heirsF6 = [
+  { id: H1, estate_id: EST, name: 'Test', email: 'test@test.no', relationship: 'Barn', percentage: 50, user_id: UID, must_approve: true, created_at: now },
+  { id: H2, estate_id: EST, name: 'Kari', email: 'kari@test.no', relationship: 'Barn', percentage: 50, user_id: U2, must_approve: true, created_at: now },
+]
+const version = { id: 'v-1', estate_id: EST, version_no: 1, created_at: now, approved_at: null, required: [{ heir_id: H1 }, { heir_id: H2 }],
+  snapshot: { items: [{ id: ITEM, title: 'Gyngestol', status: 'assigned', assigned_to: UID, agreed_value: 3000 }, { id: 'it-2', title: 'Maleri', status: 'active', wanted_by: 2 }], member_names: { [UID]: 'Test', [U2]: 'Kari' } } }
+const st = (state, heirs, extra = {}) => ({ body: { id: 'v-1', version_no: 1, state, outdated: false, approved_at: null, created_at: now, required: 2, approved: heirs.filter(h => h.decision === 'approve').length, objections: 0, heirs, ...extra } })
+const hMe = (extra = {}) => ({ heir_id: H1, name: 'Test', user_id: UID, representative: null, decision: null, ...extra })
+const hKari = (extra = {}) => ({ heir_id: H2, name: 'Kari', user_id: U2, representative: null, decision: 'approve', at: now, responder: U2, responder_email: 'kari@test.no', via_representative: false, ...extra })
+const f6 = (extra = {}) => ({ ...overview, heirs: heirsF6, ...extra })
+
+await check('F6 Admin legger frem forslag (propose_distribution) når ingen forslag finnes', async page => {
+  const { rpc } = watch(page)
+  await page.goto(`${BASE}/estate/${EST}/fordeling`)
+  await page.getByRole('heading', { name: 'Godkjenning' }).waitFor()
+  await page.getByText(/ikke en juridisk verifisert elektronisk signatur/).waitFor()
+  await page.getByRole('button', { name: 'Legg frem forslag' }).click()
+  await page.getByText(/Forslaget er lagt frem/).waitFor()
+  assert(rpc.some(c => c.name === 'propose_distribution' && c.body.p_estate === EST), 'propose_distribution ble ikke kalt')
+}, { fixtures: f6({ distribution_versions: [] }), rpc: { propose_distribution: { body: { id: 'v-1', version_no: 1 } } } })
+
+await check('F6 Beslutningstaker godkjenner for seg selv; delvis fordeling sies tydelig', async page => {
+  const { rpc } = watch(page)
+  await page.goto(`${BASE}/estate/${EST}/fordeling`)
+  await page.getByText('Venter på svar').waitFor()
+  await page.getByText(/Delvis fordeling: 1 gjenstand er ikke avklart og omfattes ikke av godkjenningen/).waitFor()
+  await page.getByText(/Kari.*Godkjent/).first().waitFor()
+  await page.getByRole('button', { name: 'Godkjenn fordelingen' }).click()
+  await page.getByText('Godkjenningen din er registrert').waitFor()
+  const c = rpc.find(x => x.name === 'respond_distribution')
+  assert(c?.body.p_version === 'v-1' && c.body.p_heir === H1 && c.body.p_decision === 'approve', `feil svar: ${JSON.stringify(c?.body)}`)
+  const v = await axe(page)
+  assert(!v.length, v.join('; '))
+}, { fixtures: f6({ distribution_versions: [version] }), rpc: { distribution_status: st('pending', [hMe(), hKari()]), respond_distribution: st('pending', [hMe({ decision: 'approve' }), hKari()]) } })
+
+await check('F6 «Jeg er ikke enig» krever begrunnelse og kan knyttes til en gjenstand', async page => {
+  const { rpc } = watch(page)
+  await page.goto(`${BASE}/estate/${EST}/fordeling`)
+  await page.getByRole('button', { name: 'Jeg er ikke enig' }).click()
+  assert(await page.getByRole('button', { name: 'Send innsigelsen' }).isDisabled(), 'kunne sende uten begrunnelse')
+  await page.getByLabel('Hva er du ikke enig i?').fill('Maleriet bør vurderes på nytt')
+  await page.getByLabel(/Gjelder det en bestemt gjenstand/).selectOption({ label: 'Maleri' })
+  await page.getByRole('button', { name: 'Send innsigelsen' }).click()
+  await page.getByText('Innsigelsen din er registrert').waitFor()
+  const c = rpc.find(x => x.name === 'respond_distribution')
+  assert(c?.body.p_decision === 'object' && c.body.p_reason === 'Maleriet bør vurderes på nytt' && c.body.p_item === 'it-2', `feil innsigelse: ${JSON.stringify(c?.body)}`)
+}, { fixtures: f6({ distribution_versions: [version] }), rpc: { distribution_status: st('pending', [hMe(), hKari()]), respond_distribution: st('objected', [hMe({ decision: 'object', reason: 'x' }), hKari()]) } })
+
+await check('F6 Godkjent av alle: endelig protokoll fra det godkjente forslaget', async page => {
+  await page.goto(`${BASE}/estate/${EST}/fordeling`)
+  await page.getByText('Godkjent av alle').waitFor()
+  assert(await page.getByRole('button', { name: 'Godkjenn fordelingen' }).count() === 0, 'kunne svare på et godkjent forslag')
+  const [download] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'Last ned godkjent protokoll (PDF)' }).click()])
+  assert(/^fordeling-godkjent-/.test(download.suggestedFilename()), download.suggestedFilename())
+}, { fixtures: f6({ distribution_versions: [{ ...version, approved_at: now }] }), rpc: { distribution_status: st('approved', [hMe({ decision: 'approve', at: now }), hKari()], { approved_at: now }) } })
+
+await check('F6 Arving uten konto: kan ikke godkjennes digitalt, protokoll for signering på papir', async page => {
+  await page.goto(`${BASE}/estate/${EST}/fordeling`)
+  await page.getByText('Kan ikke godkjennes digitalt ennå').first().waitFor()
+  await page.getByText(/Har ikke konto i Arvklart og ingen bekreftet representant/).waitFor()
+  const [download] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'Last ned protokoll for signering på papir (PDF)' }).click()])
+  assert(/^fordeling-til-signering-/.test(download.suggestedFilename()), download.suggestedFilename())
+}, { fixtures: f6({ distribution_versions: [version] }), rpc: { distribution_status: st('not_digitally_approvable', [hMe(), hKari({ user_id: null, decision: null })]) } })
+
+await check('F6 Utdatert forslag: kan ikke svares på, admin kan legge frem ny versjon', async page => {
+  await page.goto(`${BASE}/estate/${EST}/fordeling`)
+  await page.getByText(/Fordelingen er endret etter at forslaget ble lagt frem. Alle må godkjenne en ny versjon./).waitFor()
+  assert(await page.getByRole('button', { name: 'Godkjenn fordelingen' }).count() === 0, 'kunne svare på et utdatert forslag')
+  await page.getByRole('button', { name: 'Legg frem ny versjon' }).waitFor()
+}, { fixtures: f6({ distribution_versions: [version] }), rpc: { distribution_status: st('outdated', [hMe(), hKari()], { outdated: true }) } })
+
+await check('F6 Arvinger: admin kan bare be om at en beslutningstaker tas ut, og registrere (ubekreftet) representant', async page => {
+  const { rpc } = watch(page)
+  await page.goto(`${BASE}/estate/${EST}/heirs`)
+  await page.getByRole('heading', { name: 'Hvem godkjenner fordelingen' }).waitFor()
+  const kariRow = page.locator('li', { hasText: 'Kari' }).filter({ hasText: 'Skal godkjenne' })
+  await kariRow.getByRole('button', { name: 'Be om at arvingen ikke skal godkjenne' }).click()
+  await kariRow.getByLabel('Begrunnelse (vises for alle)').fill('Kari har gitt avkall på arv')
+  await kariRow.getByRole('button', { name: 'Lagre' }).click()
+  await page.getByText(/En annen beslutningstaker må bekrefte/).waitFor()
+  const c = rpc.find(x => x.name === 'set_must_approve')
+  assert(c?.body.p_heir === H2 && c.body.p_value === false && c.body.p_reason === 'Kari har gitt avkall på arv', `feil kall: ${JSON.stringify(c?.body)}`)
+  const v = await axe(page)
+  assert(!v.length, v.join('; '))
+}, { fixtures: f6(), rpc: { set_must_approve: { body: { ok: true, pending: true } } } })
+
+await check('F6 Arvinger: en annen beslutningstaker kan bekrefte en representasjon admin har registrert', async page => {
+  const { rpc } = watch(page)
+  await page.goto(`${BASE}/estate/${EST}/heirs`)
+  await page.getByText(/Ubekreftet – kan ikke svare før en annen beslutningstaker bekrefter/).waitFor()
+  await page.getByRole('button', { name: 'Bekreft representasjonen' }).click()
+  await page.getByText('Representasjonen er bekreftet').waitFor()
+  assert(rpc.some(x => x.name === 'verify_representative' && x.body.p_rep === 'rep-1'), 'verify_representative ble ikke kalt')
+}, { fixtures: asMember(f6({ heirs: [...heirsF6, { id: 'heir-gunn', estate_id: EST, name: 'Gunn', email: null, relationship: 'Barn', percentage: 0, user_id: null, must_approve: true, created_at: now }],
+  heir_representatives: [{ id: 'rep-1', estate_id: EST, heir_id: 'heir-gunn', user_id: U2, kind: 'fullmakt', basis: 'Skriftlig fullmakt datert 1. oktober', created_by: U2, verified_at: null, revoked_at: null }] })),
+  rpc: { verify_representative: { body: { ok: true } } } })
+
 await browser.close()
 console.log(results.join('\n'))
 process.exit(results.some(r => r.startsWith('FAIL')) ? 1 : 0)
