@@ -14,6 +14,7 @@ import { applyCorrections, normalizeAnalysis, type Analysis } from '../_shared/a
 import {
   buildQueries, compute, explain, identityOf, matchAndFilter, publicReference, readUserReferences, searchLinks, specificityOf, type Reference,
 } from '../_shared/market.ts'
+import { configuredProviders, fetchReferences } from '../_shared/marketProviders.ts'
 import {
   ESTIMATE_SCHEMA_V2, VALUATION_VERSION, conditionGuidance, describeItem, finalizeEstimate, insufficientWithoutCall, validateEstimateV2, valuationSystem,
 } from '../_shared/valuation.ts'
@@ -88,7 +89,9 @@ Deno.serve(async (req) => {
     const identity = identityOf(analysis, input.title)
     const specificity = specificityOf(identity)
     const queries = buildQueries(identity, analysis?.search_query ?? null, input.title)
-    const market = compute(matchAndFilter(references, identity), specificity)
+    // Automatiske kilder (M2): ingen er koblet på før tilgangen er avklart, så listen er tom og ingenting hentes
+    const fetched = await fetchReferences(configuredProviders(), queries)
+    const market = compute(matchAndFilter([...references, ...fetched.references], identity), specificity)
     const marketPart = {
       queries, links: searchLinks(queries[0] ?? ''), references: market.references.map(publicReference), stats: market.stats,
     }
