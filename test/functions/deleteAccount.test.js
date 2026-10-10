@@ -40,7 +40,7 @@ const setup = (opts = {}) => fakeSupabase({
 
 describe('kontosletting', { skip }, () => {
   test('eget bo slettes; delt bo beholdes med ny administrator og eier', async () => {
-    const { client, db, deletedUsers } = setup()
+    const { client, db, deletedUsers, mutations } = setup()
     const r = await mod.deleteAccountData(client, ME)
     assert.deepEqual(r, { deleted_estates: 1, shared_estates: 1, items_scrubbed: 1 })
     assert.ok(!db.estates.some(e => e.id === OWN), 'eget bo skal være slettet')
@@ -48,6 +48,9 @@ describe('kontosletting', { skip }, () => {
     assert.equal(shared.owner_id, KARI, 'eldste medlem blir eier')
     assert.equal(db.estate_members.find(m => m.user_id === KARI).role, 'admin', 'eldste medlem blir administrator')
     assert.deepEqual(deletedUsers, [ME])
+    const order = mutations.map(m => m.op === 'rpc' ? `rpc:${m.name}` : m.op)
+    assert.ok(order.indexOf('rpc:anonymize_estate_events') > -1 && order.indexOf('rpc:anonymize_estate_events') < order.indexOf('deleteUser'), 'loggen anonymiseres før brukeren slettes')
+    assert.deepEqual(mutations.find(m => m.op === 'rpc').args, { p_user: ME })
   })
 
   test('brukeren fjernes fra gjenstander i delte bo; andres data er urørt', async () => {

@@ -144,6 +144,21 @@ await check('Rett AI-opplysninger, administrator: også på andres gjenstand', a
   await page.getByRole('button', { name: 'Rett opplysningene' }).waitFor()
 }, withAi(asAdmin))
 
+// F0: stemmen på verdi lagres av databasen (vote_item_value), ikke ved å skrive tellerne direkte
+await check('Stem på verdi: «Uenig» med eget forslag sendes til vote_item_value, ingen direkte oppdatering av gjenstanden', async page => {
+  const sent = patches(page)
+  const rpc = []
+  page.on('request', r => { if (r.url().includes('/rest/v1/rpc/vote_item_value')) rpc.push(JSON.parse(r.postData() || '{}')) })
+  await page.goto(`${BASE}/estate/${EST}/item/${OTHERS}`)
+  await page.getByRole('button', { name: 'Uenig', exact: true }).click()
+  await page.getByPlaceholder('Ditt estimat (NOK)').fill('1 800')
+  await page.getByRole('button', { name: 'Send inn' }).click()
+  await page.getByText('Stemme registrert').waitFor()
+  assert(rpc.length === 1, `forventet ett kall til vote_item_value, fikk ${rpc.length}`)
+  assert(rpc[0].p_item === OTHERS && rpc[0].p_vote === 'disagree' && rpc[0].p_value === 1800, `feil innhold: ${JSON.stringify(rpc[0])}`)
+  assert(!sent.some(b => 'value_agree_count' in b || 'value_voter_ids' in b || 'value_suggestions' in b), 'stemmen ble skrevet direkte på gjenstanden')
+}, { ...asMember, rpc: { vote_item_value: { body: { ok: true } } } })
+
 await browser.close()
 console.log(results.join('\n'))
 process.exit(results.some(r => r.startsWith('FAIL')) ? 1 : 0)

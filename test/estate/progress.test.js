@@ -77,6 +77,15 @@ describe('buildRemainingSteps', () => {
     const passes = [pass('b', 'o'), pass('c', 'k'), pass('c', 'o')]
     const keys = buildRemainingSteps({ ...base, items, passes }).map(s => s.key)
     assert.deepEqual(keys, ['conflicts', 'single', 'unwanted'])
+    assert.equal(buildRemainingSteps({ ...base, items, passes }).find(s => s.key === 'unwanted').path, '/estate/e/ingen-vil-ha')
+  })
+
+  test('ingen vil ha: et gammelt kastemerke er ikke en beslutning, en valgt disponering er det', () => {
+    const passes = [pass('c', 'k'), pass('c', 'o')]
+    const marked = buildRemainingSteps({ ...base, items: [{ id: 'c', interests: [], marked_for_disposal: true }], passes }).map(s => s.key)
+    assert.deepEqual(marked, ['unwanted'])
+    const decided = buildRemainingSteps({ ...base, items: [{ id: 'c', interests: [], disposition: 'donate' }], passes }).map(s => s.key)
+    assert.deepEqual(decided, [])
   })
 
   test('arvinger som ikke har blitt med og åpne oppgaver', () => {
@@ -86,6 +95,15 @@ describe('buildRemainingSteps', () => {
     assert.equal(steps[0].key, 'join')
     assert.equal(steps[0].detail, 'Per, Lise')
     assert.equal(steps[1].title, '1 oppgave i sjekklisten er ikke fullført')
+  })
+})
+
+describe('buildRemainingSteps: forslag til fordeling', () => {
+  test('et forslag som venter på mitt svar står først og lenker til fordelingen', () => {
+    const steps = buildRemainingSteps({ estateId: 'e', userId: 'k', items: [], members: [], passes: [], heirs: [], tasks: [], proposal: { needsMyResponse: true } })
+    assert.equal(steps[0].key, 'respond')
+    assert.equal(steps[0].path, '/estate/e/fordeling')
+    assert.equal(buildRemainingSteps({ estateId: 'e', userId: 'k', items: [], members: [], passes: [], heirs: [], tasks: [] }).length, 0)
   })
 })
 
