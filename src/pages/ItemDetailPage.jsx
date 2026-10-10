@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import { getItem, removeInterest, getComments, addComment, deleteComment, getEstateMembers, supabase } from '../lib/supabase'
 import { getPasses, addPass, removePass, addInterestClearingPass } from '../lib/decisions'
 import { formatNOK, parseNOK } from '../lib/format'
@@ -10,7 +10,10 @@ import ReasonEditor from '../components/ReasonEditor'
 import AnalysisDetails from '../components/AnalysisDetails'
 import AiCorrectionsForm from '../components/AiCorrectionsForm'
 import MarketCompare from '../components/MarketCompare'
+import ItemHistory from '../components/ItemHistory'
+import AgreedValue from '../components/AgreedValue'
 import { withCorrections } from '../lib/aiCorrections'
+import { assignItems, unassignItem } from '../lib/assignments'
 import StoredImage from '../components/StoredImage'
 
 const tc = c => { if(!c)return'#FBF9F5'; const r=parseInt(c.slice(1,3),16),g=parseInt(c.slice(3,5),16),b=parseInt(c.slice(5,7),16); return(0.299*r+0.587*g+0.114*b)/255>0.55?'#3A2F26':'#FBF9F5' }
@@ -36,7 +39,13 @@ export default function ItemDetailPage({ session, profile, onToast, isDemo }) {
   const [showSuggestInput, setShowSuggestInput] = useState(false)
   const [busy, setBusy] = useState(false)
   const [correcting, setCorrecting] = useState(false)
+  const [withdrawn, setWithdrawn] = useState(null) // { reason } etter «Trekk ønsket mitt», til angring
   const commentsEndRef = useRef(null)
+  const location = useLocation()
+  // Lenken «Kommenter» (…#kommentarer) ruller ned til kommentarfeltet når siden er lastet
+  useEffect(() => {
+    if (!loading && location.hash === '#kommentarer') document.getElementById('kommentarer')?.scrollIntoView({ block: 'start' })
+  }, [loading, location.hash])
 
   const load = async () => {
     const [{ data: it }, { data: cms }, { data: mems }, { data: mem }, ps] = await Promise.all([
@@ -73,6 +82,7 @@ export default function ItemDetailPage({ session, profile, onToast, isDemo }) {
   const myInterest = item.interests?.find(x => x.user_id === session.user.id)
   const myPass = passes.some(p => p.user_id === session.user.id)
   const isAssigned = item.status === 'assigned'
+  const contested = !isAssigned && (item.interests?.length || 0) > 1
   const isAdmin = myRole === 'admin'
   const canEdit = !isDemo
   // Den som la inn gjenstanden kan slette den bare før den er tildelt (håndheves også i databasen)
@@ -112,6 +122,18 @@ export default function ItemDetailPage({ session, profile, onToast, isDemo }) {
     if (ok) { setShowReason(false); setReason('') }
   }
 
+  // «Snakk sammen først» (K4): når flere ønsker samme gjenstand, kan man trekke sitt eget ønske så de
+  // andre kan få den. Det kan angres (ønsket og begrunnelsen legges inn igjen). Begge deler logges.
+  const withdrawWish = async () => {
+    const saved = { reason: myInterest?.reason || '' }
+    const ok = await run(() => removeInterest(itemId, session.user.id), L('Du har trukket ønsket ditt', 'You have withdrawn your wish'), L('Kunne ikke trekke ønsket. Prøv igjen.', 'Could not withdraw your wish. Please try again.'))
+    if (ok) setWithdrawn(saved)
+  }
+  const undoWithdraw = async () => {
+    const ok = await run(() => addInterestClearingPass(itemId, session.user.id, withdrawn?.reason || ''), L('Ønsket ditt er lagt inn igjen', 'Your wish has been added again'), L('Kunne ikke angre. Gjenstanden kan allerede være tildelt.', 'Could not undo. The item may already be assigned.'))
+    if (ok) setWithdrawn(null)
+  }
+
   const confirmWithdraw = async () => {
     const ok = await run(() => removeInterest(itemId, session.user.id), L('Interesse trukket tilbake', 'Interest withdrawn'), L('Kunne ikke trekke interessen. Prøv igjen.', 'Could not withdraw your interest. Please try again.'))
     if (ok) setShowWithdrawConfirm(false)
@@ -121,42 +143,16 @@ export default function ItemDetailPage({ session, profile, onToast, isDemo }) {
 
   const undoPass = () => run(() => removePass(itemId, session.user.id), L('Angret', 'Undone'), L('Kunne ikke angre. Prøv igjen.', 'Could not undo. Please try again.'))
 
-  // Stemmene lagres på gjenstanden. Oppdateringen krever at tellerne er uendret siden vi leste dem,
-  // så to som stemmer samtidig ikke overskriver hverandre; da leses gjenstanden på nytt.
+  // Stemmen lagres av databasen (vote_item_value): én stemme per person, og ingen kan endre andres
   const handleEstimateVote = async (vote, suggested) => {
     if (busy) return
     const suggestedValue = parseNOK(suggested)
     if (vote === 'disagree' && suggested && suggestedValue === null) { onToast(L('Skriv estimatet som et beløp, f.eks. 1500', 'Enter the estimate as an amount, e.g. 1500'), 'error'); return }
     setBusy(true)
-    let current = item
-    for (let attempt = 0; attempt < 3; attempt++) {
-      const voterIds = current.value_voter_ids || []
-      if (voterIds.includes(session.user.id)) break
-      const agreeBefore = current.value_agree_count || 0
-      const disagreeBefore = current.value_disagree_count || 0
-      const updateData = {
-        value_agree_count: agreeBefore + (vote === 'agree' ? 1 : 0),
-        value_disagree_count: disagreeBefore + (vote === 'disagree' ? 1 : 0),
-        value_voter_ids: [...voterIds, session.user.id],
-      }
-      if (vote === 'disagree' && suggestedValue !== null) {
-        updateData.value_suggestions = [...(current.value_suggestions || []), {
-          user_id: session.user.id,
-          name: profile?.display_name || L('Ukjent', 'Unknown'),
-          value: suggestedValue,
-        }]
-      }
-      let query = supabase.from('items').update(updateData).eq('id', itemId)
-      query = current.value_agree_count == null ? query.is('value_agree_count', null) : query.eq('value_agree_count', agreeBefore)
-      query = current.value_disagree_count == null ? query.is('value_disagree_count', null) : query.eq('value_disagree_count', disagreeBefore)
-      const { data, error } = await query.select('id')
-      if (error) { setBusy(false); onToast(L('Kunne ikke lagre stemmen. Prøv igjen.', 'Could not save your vote. Please try again.'), 'error'); return }
-      if (data?.length) { setBusy(false); onToast(L('Stemme registrert', 'Vote registered')); load(); return }
-      const { data: fresh } = await getItem(itemId)
-      if (!fresh) break
-      current = fresh
-    }
+    const { data, error } = await supabase.rpc('vote_item_value', { p_item: itemId, p_vote: vote, p_value: vote === 'disagree' ? suggestedValue : null })
     setBusy(false)
+    if (error) { onToast(L('Kunne ikke lagre stemmen. Prøv igjen.', 'Could not save your vote. Please try again.'), 'error'); return }
+    if (data?.ok) onToast(L('Stemme registrert', 'Vote registered'))
     load()
   }
 
@@ -171,14 +167,15 @@ export default function ItemDetailPage({ session, profile, onToast, isDemo }) {
 
   const handleAssign = async (userId) => {
     const ok = await run(
-      () => supabase.from('items').update({ assigned_to: userId, status: 'assigned' }).eq('id', itemId).neq('status', 'assigned'),
+      // Er gjenstanden allerede tildelt (av en annen samtidig), hoppes den over og regnes som ikke tildelt
+      async () => { const r = await assignItems(id, [{ item_id: itemId, user_id: userId }], 'manual'); return r.error || r.data?.assigned ? r : { error: 'skipped' } },
       L('Gjenstand tildelt', 'Item assigned'), L('Kunne ikke tildele. Bare administratorer kan tildele gjenstander.', 'Could not assign. Only administrators can assign items.'),
     )
     if (ok) setShowAssign(false)
   }
 
   const handleUnassign = () => run(
-    () => supabase.from('items').update({ assigned_to: null, status: 'active' }).eq('id', itemId),
+    () => unassignItem(itemId),
     L('Tildelingen er angret', 'The assignment has been undone'), L('Kunne ikke angre tildelingen.', 'Could not undo the assignment.'),
   )
 
@@ -246,6 +243,8 @@ export default function ItemDetailPage({ session, profile, onToast, isDemo }) {
         <p style={{ color:'#75604B', fontSize:'0.8125rem', marginBottom:'8px' }}>
           {L('Lagt inn av', 'Added by')} {item.added_by_name || L('ukjent', 'unknown')} · {new Date(item.created_at).toLocaleDateString(locale(), { day:'numeric', month:'long', year:'numeric' })}
         </p>
+        {/* Fordelingsverdien (F3): adskilt fra anslaget og forslagene under; settes bare av administrator */}
+        <AgreedValue item={item} estateId={id} canEdit={isAdmin && !isDemo} onChanged={load} onToast={onToast} />
         {item.estimated_value && (() => {
           const voterIds = item.value_voter_ids || []
           const hasVoted = voterIds.includes(session.user.id)
@@ -253,7 +252,7 @@ export default function ItemDetailPage({ session, profile, onToast, isDemo }) {
           const suggestions = item.value_suggestions || []
           return (
             <div style={{ background:'#DCE3D2', border:'1px solid #B8C8A8', borderRadius:'10px', padding:'14px', marginBottom:'12px' }}>
-              <div style={{ fontSize:'0.75rem', color:'#3A5A30', fontWeight:'500', marginBottom:'4px' }}>{L('Verdiestimat', 'Value estimate')}</div>
+              <div style={{ fontSize:'0.75rem', color:'#3A5A30', fontWeight:'500', marginBottom:'4px' }}>{L('Verdiestimat (veiledende)', 'Value estimate (indicative)')}</div>
               <div style={{ fontSize:'1.25rem', color:'#3A2F26', fontFamily:'Fraunces, serif', marginBottom:'8px' }}>
                 {formatNOK(item.estimated_value)}
               </div>
@@ -343,6 +342,9 @@ export default function ItemDetailPage({ session, profile, onToast, isDemo }) {
         {/* Sammenligninger og verdianslag: valgfritt; søkelenker og liste for alle, endringer for admin og den som la inn */}
         <MarketCompare item={item} userId={session.user.id} canEdit={canCorrect} onChanged={load} onToast={onToast} />
 
+        {/* Fordelingsloggen for gjenstanden (tildeling, loddtrekning, ønsker) – kan ikke endres i appen */}
+        <ItemHistory itemId={itemId} members={members} refreshKey={`${item.status}:${item.assigned_to}:${item.interests?.length || 0}`} />
+
         {isAssigned ? (
           <div style={{ padding:'16px', background:'#DCE3D2', border:'1px solid #B8C8A8', borderRadius:'10px', marginBottom:'24px', display:'flex', justifyContent:'space-between', alignItems:'center', gap:'12px', flexWrap:'wrap' }}>
             <div style={{ fontSize:'0.875rem', color:'#3A2F26', fontWeight:'500' }}>
@@ -398,7 +400,7 @@ export default function ItemDetailPage({ session, profile, onToast, isDemo }) {
         <div style={{ borderTop:'1px solid #E8DFD0', paddingTop:'20px', marginBottom:'16px' }}>
           <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'14px' }}>
             <h3 style={{ fontSize:'0.8125rem', color:'#75604B', fontWeight:'400', textTransform:'uppercase', letterSpacing:'1px' }}>
-              {L('Interesserte', 'Interested')} ({item.interests?.length || 0})
+              {contested ? L('Flere ønsker denne', 'Several want this') : L('Interesserte', 'Interested')} ({item.interests?.length || 0})
             </h3>
             {isAdmin && !isAssigned && item.interests?.length > 0 && (
               <button onClick={() => setShowAssign(!showAssign)} style={{ fontSize:'0.8125rem', color:'#5F6E52', background:'none', border:'1px solid #B8C8A8', padding:'5px 12px', borderRadius:'6px', cursor:'pointer', fontFamily:'Karla, sans-serif' }}>
@@ -420,6 +422,18 @@ export default function ItemDetailPage({ session, profile, onToast, isDemo }) {
               ))}
             </div>
           )}
+          {contested && (
+            <p style={{ fontSize:'0.8125rem', color:'#5C4530', lineHeight:1.6, margin:'-6px 0 12px' }}>
+              {L('Snakk sammen først: se hvorfor hver enkelt ønsker den. Kanskje noen vil la en annen få den. Dere kan skrive i kommentarfeltet under.',
+                'Talk first: see why each of you wants it. Perhaps someone will let another have it. You can write in the comments below.')}
+            </p>
+          )}
+          {withdrawn && !isAssigned && (
+            <div role="status" style={{ display:'flex', alignItems:'center', gap:'10px', flexWrap:'wrap', padding:'12px 14px', background:'#DCE3D2', border:'1px solid #B8C8A8', borderRadius:'10px', marginBottom:'12px', fontSize:'0.8125rem', color:'#3A2F26' }}>
+              <span style={{ flex:1 }}>{L('Du har trukket ønsket ditt, så de andre kan få den.', 'You have withdrawn your wish so the others can have it.')}</span>
+              <button onClick={undoWithdraw} disabled={busy} style={{ padding:'8px 14px', minHeight:'40px', background:'#fff', border:'1px solid #B8C8A8', borderRadius:'8px', cursor:'pointer', fontSize:'0.8125rem', fontFamily:'Karla, sans-serif', color:'#3A2F26' }}>{L('Angre', 'Undo')}</button>
+            </div>
+          )}
           {!item.interests?.length ? (
             <div>
               <p style={{ color:'#75604B', fontSize:'0.875rem', fontStyle:'italic', marginBottom:'16px' }}>{L('Ingen har vist interesse ennå.', 'No one has shown interest yet.')}</p>
@@ -437,6 +451,11 @@ export default function ItemDetailPage({ session, profile, onToast, isDemo }) {
                       {x.user_id === session.user.id && <span style={{ color:'#75604B', fontSize:'0.75rem', fontWeight:'400', marginLeft:'6px' }}>{L('(deg)', '(you)')}</span>}
                     </div>
                     {x.reason && <div style={{ fontSize:'0.8125rem', color:'#5C4530', fontStyle:'italic', lineHeight:1.6 }}>"{x.reason}"</div>}
+                    {contested && x.user_id === session.user.id && (
+                      <button onClick={withdrawWish} disabled={busy} style={{ marginTop:'8px', padding:'8px 14px', minHeight:'40px', background:'#fff', border:'1px solid #D9CFC0', borderRadius:'8px', cursor:'pointer', fontSize:'0.8125rem', fontFamily:'Karla, sans-serif', color:'#5C4530' }}>
+                        {L('Trekk ønsket mitt', 'Withdraw my wish')}
+                      </button>
+                    )}
                   </div>
                 </div>
               ))}
@@ -462,7 +481,7 @@ export default function ItemDetailPage({ session, profile, onToast, isDemo }) {
       </div>
 
       <div style={{ background:'#fff', border:'1px solid #D9CFC0', borderRadius:'14px', padding:'24px' }}>
-        <h3 style={{ fontFamily:'Fraunces, serif', fontSize:'1.125rem', fontWeight:'400', color:'#3A2F26', marginBottom:'16px' }}>
+        <h3 id="kommentarer" style={{ fontFamily:'Fraunces, serif', fontSize:'1.125rem', fontWeight:'400', color:'#3A2F26', marginBottom:'16px' }}>
           {L('Kommentarer', 'Comments')} ({comments.length})
         </h3>
         <div style={{ display:'flex', flexDirection:'column', gap:'12px', marginBottom:'16px', maxHeight:'360px', overflowY:'auto' }}>

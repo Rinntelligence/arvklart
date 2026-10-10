@@ -70,13 +70,28 @@ test('gjenstander med kategorier (getItems) og utenforstående ser ingenting', a
   assert.deepEqual(outside.data, [])
 })
 
-test('tildeling bare når ledig, og antall rader kommer tilbake (ConflictPage.apply)', async () => {
+test('tildeling via assign_items: bare ledige gjenstander, direkte oppdatering avvises (ConflictPage.apply)', async () => {
   const db = as('mona')
   const item = 'face0005-0000-0000-0000-000000000005'
-  const first = await db.from('items').update({ assigned_to: USERS.mona[0], status: 'assigned' }).eq('id', item).neq('status', 'assigned').select('id')
-  assert.equal(first.error, null); assert.equal(first.data.length, 1)
-  const second = await db.from('items').update({ assigned_to: USERS.owner[0], status: 'assigned' }).eq('id', item).neq('status', 'assigned').select('id')
-  assert.equal(second.error, null); assert.equal(second.data.length, 0)
+  const direct = await db.from('items').update({ assigned_to: USERS.mona[0], status: 'assigned' }).eq('id', item).select('id')
+  assert.equal(direct.error?.code, '42501')
+  const first = await db.rpc('assign_items', { p_estate: DEMO, p_assignments: [{ item_id: item, user_id: USERS.mona[0] }], p_method: 'manual' })
+  assert.equal(first.error, null); assert.equal(first.data.assigned, 1)
+  const second = await db.rpc('assign_items', { p_estate: DEMO, p_assignments: [{ item_id: item, user_id: USERS.owner[0] }], p_method: 'manual' })
+  assert.equal(second.error, null); assert.equal(second.data.assigned, 0); assert.deepEqual(second.data.skipped, [item])
+  const events = await db.from('estate_events').select('kind, data').eq('item_id', item)
+  assert.ok(events.data.some(e => e.kind === 'assigned' && e.data.method === 'manual'))
+  const undo = await db.rpc('unassign_item', { p_item: item })
+  assert.equal(undo.data.ok, true)
+})
+
+test('loddtrekning via draw_lot gir en av dem som ønsker gjenstanden', async () => {
+  const db = as('mona')
+  const item = 'face0004-0000-0000-0000-000000000004'
+  const { data, error } = await db.rpc('draw_lot', { p_item: item })
+  assert.equal(error, null)
+  const wanters = await db.from('interests').select('user_id').eq('item_id', item)
+  assert.ok(wanters.data.map(w => w.user_id).includes(data.winner))
 })
 
 test('sletting gir tom liste når man ikke har lov (EstatePage.confirmDelete)', async () => {
@@ -108,17 +123,56 @@ test('profil-upsert kan ikke sette founder (upsertProfile)', async () => {
   assert.equal(data.email, 'outsider@test.no')
 })
 
-test('stemme med optimistisk låsing (ItemDetailPage.handleEstimateVote)', async () => {
+// F0 (20261016): kolonnerettigheter på items. Vanlige endringer virker som før; stemmer går via RPC.
+test('admin kan fortsatt rette tittel og verdi via PostgREST (kolonnerettigheter)', async () => {
   const db = as('owner')
   const item = 'face0003-0000-0000-0000-000000000003'
-  const vote = (before) => {
-    let q = db.from('items').update({ value_agree_count: (before ?? 0) + 1 }).eq('id', item)
-    q = before == null ? q.is('value_agree_count', null) : q.eq('value_agree_count', before)
-    return q.select('id')
-  }
-  const { data: before } = await db.from('items').select('value_agree_count').eq('id', item).single()
-  const start = before.value_agree_count
-  assert.equal((await vote(start)).data.length, 1)
-  assert.equal((await vote(start)).data.length, 0) // utdatert lesing → ingen overskriving
-  assert.equal((await vote((start ?? 0) + 1)).data.length, 1)
+  const before = await db.from('items').select('title, estimated_value').eq('id', item).single()
+  const upd = await db.from('items').update({ title: 'Mahognibokhylle', estimated_value: '5000' }).eq('id', item).select('id')
+  assert.equal(upd.error, null)
+  assert.equal(upd.data.length, 1)
+  await db.from('items').update({ title: before.data.title, estimated_value: before.data.estimated_value }).eq('id', item)
+})
+
+test('stemmetelleren kan ikke skrives direkte, men stemmen lagres via vote_item_value', async () => {
+  const db = as('owner')
+  const item = 'face0004-0000-0000-0000-000000000004'
+  const direct = await db.from('items').update({ value_agree_count: 50 }).eq('id', item).select('id')
+  assert.equal(direct.error?.code, '42501')
+  const vote = await db.rpc('vote_item_value', { p_item: item, p_vote: 'agree', p_value: null })
+  assert.equal(vote.error, null)
+  assert.equal(vote.data.ok, true)
+  const again = await db.rpc('vote_item_value', { p_item: item, p_vote: 'agree', p_value: null })
+  assert.equal(again.data.reason, 'already_voted')
+})
+
+// F3 (20261018): fordelingsverdi bare via set_agreed_values; AI-anslaget er urørt
+test('fordelingsverdi via set_agreed_values; direkte skriving avvises og AI-anslaget endres ikke', async () => {
+  const db = as('owner')
+  const item = 'face0003-0000-0000-0000-000000000003'
+  const before = await db.from('items').select('estimated_value, agreed_value').eq('id', item).single()
+  const direct = await db.from('items').update({ agreed_value: 1 }).eq('id', item).select('id')
+  assert.equal(direct.error?.code, '42501')
+  const set = await db.rpc('set_agreed_values', { p_estate: DEMO, p_values: [{ item_id: item, value: 4200, source: 'manual' }] })
+  assert.equal(set.error, null)
+  const after = await db.from('items').select('estimated_value, agreed_value, agreed_value_source').eq('id', item).single()
+  assert.equal(Number(after.data.agreed_value), 4200)
+  assert.equal(after.data.estimated_value, before.data.estimated_value)
+  await db.rpc('set_agreed_values', { p_estate: DEMO, p_values: [{ item_id: item, value: before.data.agreed_value === null ? null : Number(before.data.agreed_value), source: 'ai' }] })
+})
+
+// F6 (20261020): forslag og svar via RPC; svar kan ikke skrives direkte
+test('forslag og svar via RPC (propose_distribution, respond_distribution, distribution_status)', async () => {
+  const db = as('mona')
+  const p = await db.rpc('propose_distribution', { p_estate: DEMO })
+  assert.equal(p.error, null)
+  const heir = await db.from('heirs').select('id').eq('estate_id', DEMO).eq('user_id', USERS.mona[0]).single()
+  const direct = await db.from('distribution_responses').insert({ version_id: p.data.id, heir_id: heir.data.id, heir_name: 'x', decision: 'approve' })
+  assert.equal(direct.error?.code, '42501')
+  const r = await db.rpc('respond_distribution', { p_version: p.data.id, p_heir: heir.data.id, p_decision: 'approve', p_reason: null, p_item: null })
+  assert.equal(r.error, null)
+  assert.equal(r.data.approved, 1)
+  assert.notEqual(r.data.state, 'approved', 'demoen legger ikke inn svar for de andre')
+  const st = await db.rpc('distribution_status', { p_version: p.data.id })
+  assert.equal(st.data.heirs.find(h => h.heir_id === heir.data.id).responder_email, 'mona.demo@heirsplit.no')
 })
