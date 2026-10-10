@@ -8,6 +8,8 @@ import { L } from '../lib/lang'
 import { equalValueResolutions, itemsWithoutValue, valueTotal } from '../lib/distribution'
 import StoredImage from '../components/StoredImage'
 import { assignItems, drawLot } from '../lib/assignments'
+import TalkFirstList from '../components/TalkFirstList'
+import { makeNameOf } from '../lib/eventText'
 
 const PALETTE = ['#5F6E52','#8B9A7D','#A97C3F','#7A8B6E','#9C8267','#6E8B87']
 
@@ -43,6 +45,8 @@ export default function ConflictPage({ session, onToast }) {
   const [applying, setApplying] = useState(false)
   const [undecided, setUndecided] = useState([])
   const [assignedItems, setAssignedItems] = useState([])
+  const [allItems, setAllItems] = useState([])
+  const [withdrawn, setWithdrawn] = useState({}) // «Trekk ønsket mitt»: itemId → begrunnelse, til angring
   const [myRole, setMyRole] = useState('member')
 
   const load = async () => {
@@ -57,6 +61,7 @@ export default function ConflictPage({ session, onToast }) {
     const all = (its || []).map(i => ({ ...i, interests: (i.interests || []).filter(x => memberIds.has(x.user_id)) }))
     setItems(all.filter(isContested))
     setAssignedItems(all.filter(i => i.status === 'assigned'))
+    setAllItems(all)
     setMembers(ms)
     setMyRole(mem?.role || 'member')
     setUndecided(getUndecided(all, ms, extras.passes, extras.heirs))
@@ -67,6 +72,7 @@ export default function ConflictPage({ session, onToast }) {
   useEffect(() => { load() }, [id])
 
   const getMember = (userId) => members.find(m => m.user_id === userId)
+  const nameOf = makeNameOf(members)
   const memberColor = (userId) => PALETTE[members.findIndex(m => m.user_id === userId) % PALETTE.length]
 
   // Det hver arving allerede har fått tildelt, er utgangspunktet for den jevne fordelingen.
@@ -226,6 +232,16 @@ export default function ConflictPage({ session, onToast }) {
     )
   }
 
+  const talkFirst = <TalkFirstList items={items} allItems={allItems} nameOf={nameOf} myUserId={session.user.id} estateId={id} onChanged={load} onToast={onToast} withdrawn={withdrawn} setWithdrawn={setWithdrawn} />
+
+  if (!items.length && Object.keys(withdrawn).length) return (
+    <div style={{ maxWidth:'560px', margin:'0 auto', padding:'28px 16px 60px', fontFamily:'Karla, sans-serif' }}>
+      <button onClick={() => navigate(`/estate/${id}`)} style={{ background:'none', border:'none', color:'#75604B', cursor:'pointer', fontSize:'0.8125rem', padding:'0 0 16px', fontFamily:'Karla, sans-serif' }}>{L('← Tilbake til boet', '← Back to the estate')}</button>
+      <p style={{ color:'#5C4530', fontSize:'0.875rem', lineHeight:1.6, marginBottom:'16px' }}>{L('Ingen gjenstander ønskes av flere lenger.', 'No items are wanted by several people any more.')}</p>
+      {talkFirst}
+    </div>
+  )
+
   if (!items.length) return (
     <div style={{ maxWidth:'560px', margin:'0 auto', padding:'60px 16px', textAlign:'center', fontFamily:'Karla, sans-serif' }}>
       <h2 style={{ fontFamily:'Fraunces, serif', fontSize:'1.5rem', fontWeight:'400', color:'#3A2F26', marginBottom:'8px' }}>{L('Ingen konflikter', 'No conflicts')}</h2>
@@ -241,16 +257,7 @@ export default function ConflictPage({ session, onToast }) {
       <p style={{ color:'#5C4530', fontSize:'0.875rem', lineHeight:1.6, marginBottom:'24px' }}>
         {L('Alle har tatt stilling. Det er administratoren av boet som gjennomfører loddtrekning eller fordeling, gjerne mens dere er samlet.', 'Everyone has decided. The estate administrator carries out the draw or distribution, ideally while you are together.')}
       </p>
-      <div style={{ display:'flex', flexDirection:'column', gap:'10px' }}>
-        {items.map(item => (
-          <div key={item.id} style={{ background:'#fff', border:'1px solid #D9CFC0', borderRadius:'12px', padding:'14px 16px' }}>
-            <div style={{ fontSize:'0.875rem', color:'#3A2F26', fontWeight:'500', marginBottom:'4px' }}>{item.title}</div>
-            <div style={{ fontSize:'0.75rem', color:'#75604B' }}>
-              {L('Vil ha:', 'Wanted by:')} {(item.interests || []).map(x => x.user_id === session.user.id ? L('deg', 'you') : getMember(x.user_id)?.profiles?.display_name || '?').join(', ')}
-            </div>
-          </div>
-        ))}
-      </div>
+      {talkFirst}
     </div>
   )
 
@@ -278,6 +285,12 @@ export default function ConflictPage({ session, onToast }) {
       </div>
 
       {/* Mode selector */}
+      <details open style={{ marginBottom:'24px' }}>
+        <summary style={{ cursor:'pointer', fontSize:'0.875rem', color:'#5C4530', padding:'10px 0', minHeight:'44px', boxSizing:'border-box' }}>
+          {L(`Snakk sammen først: begrunnelsene for ${items.length} ${items.length === 1 ? 'gjenstand' : 'gjenstander'}`, `Talk first: the reasons for ${items.length} ${items.length === 1 ? 'item' : 'items'}`)}
+        </summary>
+        {talkFirst}
+      </details>
       <div className="cf-modes" style={{ display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:'10px', marginBottom:'28px' }}>
         {[
           { id: 'lottery', title: L('Loddtrekning', 'Lottery'), desc: L('Tilfeldig trekk per gjenstand — rettferdig for emosjonelle gjenstander', 'Random draw per item — fair for sentimental items') },

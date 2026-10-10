@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import { getItem, removeInterest, getComments, addComment, deleteComment, getEstateMembers, supabase } from '../lib/supabase'
 import { getPasses, addPass, removePass, addInterestClearingPass } from '../lib/decisions'
 import { formatNOK, parseNOK } from '../lib/format'
@@ -38,7 +38,13 @@ export default function ItemDetailPage({ session, profile, onToast, isDemo }) {
   const [showSuggestInput, setShowSuggestInput] = useState(false)
   const [busy, setBusy] = useState(false)
   const [correcting, setCorrecting] = useState(false)
+  const [withdrawn, setWithdrawn] = useState(null) // { reason } etter «Trekk ønsket mitt», til angring
   const commentsEndRef = useRef(null)
+  const location = useLocation()
+  // Lenken «Kommenter» (…#kommentarer) ruller ned til kommentarfeltet når siden er lastet
+  useEffect(() => {
+    if (!loading && location.hash === '#kommentarer') document.getElementById('kommentarer')?.scrollIntoView({ block: 'start' })
+  }, [loading, location.hash])
 
   const load = async () => {
     const [{ data: it }, { data: cms }, { data: mems }, { data: mem }, ps] = await Promise.all([
@@ -75,6 +81,7 @@ export default function ItemDetailPage({ session, profile, onToast, isDemo }) {
   const myInterest = item.interests?.find(x => x.user_id === session.user.id)
   const myPass = passes.some(p => p.user_id === session.user.id)
   const isAssigned = item.status === 'assigned'
+  const contested = !isAssigned && (item.interests?.length || 0) > 1
   const isAdmin = myRole === 'admin'
   const canEdit = !isDemo
   // Den som la inn gjenstanden kan slette den bare før den er tildelt (håndheves også i databasen)
@@ -112,6 +119,18 @@ export default function ItemDetailPage({ session, profile, onToast, isDemo }) {
     if (!showReason) { setShowReason(true); return }
     const ok = await run(() => addInterestClearingPass(itemId, session.user.id, reason.trim()), L('Interesse registrert', 'Interest registered'), L('Kunne ikke registrere interessen. Prøv igjen.', 'Could not register your interest. Please try again.'))
     if (ok) { setShowReason(false); setReason('') }
+  }
+
+  // «Snakk sammen først» (K4): når flere ønsker samme gjenstand, kan man trekke sitt eget ønske så de
+  // andre kan få den. Det kan angres (ønsket og begrunnelsen legges inn igjen). Begge deler logges.
+  const withdrawWish = async () => {
+    const saved = { reason: myInterest?.reason || '' }
+    const ok = await run(() => removeInterest(itemId, session.user.id), L('Du har trukket ønsket ditt', 'You have withdrawn your wish'), L('Kunne ikke trekke ønsket. Prøv igjen.', 'Could not withdraw your wish. Please try again.'))
+    if (ok) setWithdrawn(saved)
+  }
+  const undoWithdraw = async () => {
+    const ok = await run(() => addInterestClearingPass(itemId, session.user.id, withdrawn?.reason || ''), L('Ønsket ditt er lagt inn igjen', 'Your wish has been added again'), L('Kunne ikke angre. Gjenstanden kan allerede være tildelt.', 'Could not undo. The item may already be assigned.'))
+    if (ok) setWithdrawn(null)
   }
 
   const confirmWithdraw = async () => {
@@ -378,7 +397,7 @@ export default function ItemDetailPage({ session, profile, onToast, isDemo }) {
         <div style={{ borderTop:'1px solid #E8DFD0', paddingTop:'20px', marginBottom:'16px' }}>
           <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'14px' }}>
             <h3 style={{ fontSize:'0.8125rem', color:'#75604B', fontWeight:'400', textTransform:'uppercase', letterSpacing:'1px' }}>
-              {L('Interesserte', 'Interested')} ({item.interests?.length || 0})
+              {contested ? L('Flere ønsker denne', 'Several want this') : L('Interesserte', 'Interested')} ({item.interests?.length || 0})
             </h3>
             {isAdmin && !isAssigned && item.interests?.length > 0 && (
               <button onClick={() => setShowAssign(!showAssign)} style={{ fontSize:'0.8125rem', color:'#5F6E52', background:'none', border:'1px solid #B8C8A8', padding:'5px 12px', borderRadius:'6px', cursor:'pointer', fontFamily:'Karla, sans-serif' }}>
@@ -400,6 +419,18 @@ export default function ItemDetailPage({ session, profile, onToast, isDemo }) {
               ))}
             </div>
           )}
+          {contested && (
+            <p style={{ fontSize:'0.8125rem', color:'#5C4530', lineHeight:1.6, margin:'-6px 0 12px' }}>
+              {L('Snakk sammen først: se hvorfor hver enkelt ønsker den. Kanskje noen vil la en annen få den. Dere kan skrive i kommentarfeltet under.',
+                'Talk first: see why each of you wants it. Perhaps someone will let another have it. You can write in the comments below.')}
+            </p>
+          )}
+          {withdrawn && !isAssigned && (
+            <div role="status" style={{ display:'flex', alignItems:'center', gap:'10px', flexWrap:'wrap', padding:'12px 14px', background:'#DCE3D2', border:'1px solid #B8C8A8', borderRadius:'10px', marginBottom:'12px', fontSize:'0.8125rem', color:'#3A2F26' }}>
+              <span style={{ flex:1 }}>{L('Du har trukket ønsket ditt, så de andre kan få den.', 'You have withdrawn your wish so the others can have it.')}</span>
+              <button onClick={undoWithdraw} disabled={busy} style={{ padding:'8px 14px', minHeight:'40px', background:'#fff', border:'1px solid #B8C8A8', borderRadius:'8px', cursor:'pointer', fontSize:'0.8125rem', fontFamily:'Karla, sans-serif', color:'#3A2F26' }}>{L('Angre', 'Undo')}</button>
+            </div>
+          )}
           {!item.interests?.length ? (
             <div>
               <p style={{ color:'#75604B', fontSize:'0.875rem', fontStyle:'italic', marginBottom:'16px' }}>{L('Ingen har vist interesse ennå.', 'No one has shown interest yet.')}</p>
@@ -417,6 +448,11 @@ export default function ItemDetailPage({ session, profile, onToast, isDemo }) {
                       {x.user_id === session.user.id && <span style={{ color:'#75604B', fontSize:'0.75rem', fontWeight:'400', marginLeft:'6px' }}>{L('(deg)', '(you)')}</span>}
                     </div>
                     {x.reason && <div style={{ fontSize:'0.8125rem', color:'#5C4530', fontStyle:'italic', lineHeight:1.6 }}>"{x.reason}"</div>}
+                    {contested && x.user_id === session.user.id && (
+                      <button onClick={withdrawWish} disabled={busy} style={{ marginTop:'8px', padding:'8px 14px', minHeight:'40px', background:'#fff', border:'1px solid #D9CFC0', borderRadius:'8px', cursor:'pointer', fontSize:'0.8125rem', fontFamily:'Karla, sans-serif', color:'#5C4530' }}>
+                        {L('Trekk ønsket mitt', 'Withdraw my wish')}
+                      </button>
+                    )}
                   </div>
                 </div>
               ))}
@@ -442,7 +478,7 @@ export default function ItemDetailPage({ session, profile, onToast, isDemo }) {
       </div>
 
       <div style={{ background:'#fff', border:'1px solid #D9CFC0', borderRadius:'14px', padding:'24px' }}>
-        <h3 style={{ fontFamily:'Fraunces, serif', fontSize:'1.125rem', fontWeight:'400', color:'#3A2F26', marginBottom:'16px' }}>
+        <h3 id="kommentarer" style={{ fontFamily:'Fraunces, serif', fontSize:'1.125rem', fontWeight:'400', color:'#3A2F26', marginBottom:'16px' }}>
           {L('Kommentarer', 'Comments')} ({comments.length})
         </h3>
         <div style={{ display:'flex', flexDirection:'column', gap:'12px', marginBottom:'16px', maxHeight:'360px', overflowY:'auto' }}>

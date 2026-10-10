@@ -1,7 +1,16 @@
 // Akseptansetester for fordelingsfasen (F1–F6) i Chromium med simulert Supabase. Databasen håndhever
 // reglene (test/db/rls.sql); her sjekkes at appen bruker de sikre databasefunksjonene og viser det riktige.
 // Kjøres av test/e2e/run.sh.
+import { createRequire } from 'node:module'
 import { BASE, EST, UID, ITEM, FIXTURES, now, category, launch, checker, assert } from './fixtures.mjs'
+const AXE = createRequire(import.meta.url).resolve('axe-core/axe.min.js')
+const axe = async page => {
+  await page.addScriptTag({ path: AXE })
+  return page.evaluate(async () => {
+    const r = await window.axe.run(document, { runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'] } })
+    return r.violations.filter(v => ['serious', 'critical'].includes(v.impact)).map(v => `${v.id}: ${v.nodes.slice(0, 2).map(n => n.target.join(' ')).join(' | ')}`)
+  })
+}
 
 const browser = await launch()
 const results = []
@@ -69,6 +78,54 @@ await check('F1 Historikk på gjenstandssiden viser loggen med navn og metode', 
   { id: 2, estate_id: EST, item_id: ITEM, actor: UID, kind: 'lottery_draw', data: { candidates: [UID, U2], winner: U2, draw_no: 1 }, created_at: now },
   { id: 1, estate_id: EST, item_id: ITEM, actor: U2, kind: 'wish_added', data: { user_id: U2 }, created_at: now },
 ] } })
+
+// ── F2: «Snakk sammen først» og «Trekk ønsket mitt» ───────────────────────────
+const asMember = fx => ({ ...fx, estate_members: [{ ...members[0], role: 'member' }, { ...members[1], role: 'admin' }] })
+const withReasons = {
+  ...contested,
+  interests: contested.interests.map(x => ({ ...x, reason: x.user_id === UID ? 'Husker den fra hytta' : 'Mamma satt alltid i den' })),
+}
+const requests = page => {
+  const seen = []
+  page.on('request', r => { if (r.url().includes('/rest/v1/interests')) seen.push({ method: r.method(), url: r.url(), body: r.postData() }) })
+  return seen
+}
+
+await check('F2 Gjenstandssiden: «Flere ønsker denne» med begrunnelser, «Trekk ønsket mitt» og angre', async page => {
+  const seen = requests(page)
+  await page.goto(`${BASE}/estate/${EST}/item/${ITEM}`)
+  await page.getByText(/^Flere ønsker denne \(2\)$/).waitFor()
+  await page.getByText(/Snakk sammen først: se hvorfor hver enkelt ønsker den/).waitFor()
+  await page.getByText('"Mamma satt alltid i den"').waitFor()
+  await page.getByRole('button', { name: 'Trekk ønsket mitt' }).click()
+  await page.getByText('Du har trukket ønsket ditt, så de andre kan få den.').waitFor()
+  assert(seen.some(r => r.method === 'DELETE' && r.url.includes(`item_id=eq.${ITEM}`) && r.url.includes(`user_id=eq.${UID}`)), 'eget ønske ble ikke slettet')
+  await page.getByRole('button', { name: 'Angre', exact: true }).click()
+  await page.getByText('Ønsket ditt er lagt inn igjen').waitFor()
+  const re = seen.find(r => r.method === 'POST')
+  assert(re && JSON.parse(re.body).reason === 'Husker den fra hytta', `angringen la ikke inn begrunnelsen igjen: ${re?.body}`)
+  const v = await axe(page)
+  assert(!v.length, v.join('; '))
+}, { fixtures: asMember(withReasons) })
+
+await check('F2 Løsningsmetoder for arving: begrunnelsene side om side, bare eget ønske kan trekkes', async page => {
+  const seen = requests(page)
+  await page.goto(`${BASE}/estate/${EST}/conflicts`)
+  await page.getByRole('heading', { name: 'Snakk sammen først' }).waitFor()
+  await page.getByText('«Mamma satt alltid i den»').first().waitFor()
+  assert(await page.getByRole('button', { name: 'Trekk ønsket mitt' }).count() === 2, 'forventet én knapp per gjenstand jeg ønsker')
+  await page.getByRole('button', { name: 'Trekk ønsket mitt' }).first().click()
+  await page.getByText('Du har trukket ønsket ditt').waitFor()
+  assert(seen.filter(r => r.method === 'DELETE').every(r => r.url.includes(`user_id=eq.${UID}`)), 'et annet ønske enn mitt ble forsøkt slettet')
+  const v = await axe(page)
+  assert(!v.length, v.join('; '))
+}, { fixtures: asMember(withReasons) })
+
+await check('F2 «Dine valg» viser hvor mange av mine ønsker andre også har', async page => {
+  await page.goto(`${BASE}/estate/${EST}`)
+  await page.getByRole('button', { name: '2 ønskes også av andre – snakk sammen' }).click()
+  await page.waitForFunction(() => document.activeElement?.dataset?.tab === 'contested', null, { timeout: 5000 })
+}, { fixtures: asMember(withReasons) })
 
 await browser.close()
 console.log(results.join('\n'))

@@ -97,6 +97,7 @@ export default function EstatePage({ session, profile, onToast, isDemo }) {
   const filtered = getFiltered().filter(matches)
 
   const myCount = myItems.length
+  const myContested = myItems.filter(isContested).length
   const contested = items.filter(isContested).length
   const unwanted = items.filter(i => i.status !== 'assigned' && !i.interests?.length).length
   const assigned = items.filter(i => i.status === 'assigned').length
@@ -157,6 +158,15 @@ export default function EstatePage({ session, profile, onToast, isDemo }) {
   const btnPrimary = { ...btn, background:'#3A2F26', border:'1px solid #3A2F26', color:'#FBF9F5' }
   const sectionLabel = { fontSize:'0.8125rem', fontWeight:'500', marginBottom:'10px', textTransform:'uppercase', letterSpacing:'0.5px' }
   // «Se mine ønsker»: vis listen med bare dine ønsker, og flytt dit (ellers skjer endringen utenfor skjermen)
+  // «Snakk sammen først»: gjenstandene flere ønsker, med begrunnelsene på hver gjenstand
+  const showContested = () => {
+    setTab('items'); setFilterStatus('contested'); setQuery('')
+    requestAnimationFrame(() => {
+      tabsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      tabsRef.current?.querySelector('[data-tab="contested"]')?.focus({ preventScroll: true })
+    })
+  }
+
   const showMine = () => {
     setTab('items'); setFilterStatus('mine'); setQuery('')
     requestAnimationFrame(() => {
@@ -218,6 +228,11 @@ export default function EstatePage({ session, profile, onToast, isDemo }) {
                 <div style={{ fontSize:'0.9375rem', color:'#3A2F26' }}>{myCount === 0 ? L('Du har ikke ønsket noe ennå', 'You have not wished for anything yet') : L(`${myCount === 1 ? 'gjenstand' : 'gjenstander'} du ønsker`, `${myCount === 1 ? 'item' : 'items'} you want`)}</div>
               </div>
               {myCount > 0 && <button onClick={showMine} style={{ ...btn, minHeight:'44px' }}>{L('Se mine ønsker', 'See my wishes')}</button>}
+              {myContested > 0 && (
+                <button onClick={showContested} style={{ ...btn, minHeight:'44px' }}>
+                  {L(`${myContested} ønskes også av andre – snakk sammen`, `${myContested} also wanted by others – talk first`)}
+                </button>
+              )}
             </div>
           </div>
         </section>
