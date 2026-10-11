@@ -69,3 +69,15 @@ test('protokollen fra et godkjent forslag bruker øyeblikksbildet (personer), og
   const o = summarizeDistribution(snapshotInput(old))
   assert.deepEqual([o.perHeir[0].name, o.perHeir[0].sum], ['Kari', 500])
 })
+
+test('eldre tildeling uten bekreftet person vises under kontoen; slettet konto vises som det, ikke som 0 eller borte', () => {
+  const items = [
+    it('a', { status: 'assigned', assigned_to: 'adm', agreed_value: 700 }),
+    it('b', { status: 'assigned', assigned_to: null, agreed_value: null }),
+  ]
+  const s = summarizeDistribution({ items, members, heirs })
+  const legacy = s.perHeir.find(h => h.user_id === 'adm'), gone = s.perHeir.find(h => h.unconfirmed && !h.user_id)
+  assert.deepEqual([legacy.name, legacy.unconfirmed, legacy.sum], ['Admin uten arv', true, 700])
+  assert.deepEqual([gone.name, gone.items.length], ['Konto som er slettet', 1])
+  assert.equal(s.hasRecipients, true)
+})

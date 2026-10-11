@@ -26,6 +26,7 @@ export function eventText(e, nameOf) {
     // Fra 20261021 står mottakeren som person på listen (d.name); eldre hendelser har bare kontoen (d.to/d.from)
     case 'assigned': return L(`${who} tildelte gjenstanden til ${d.name || nameOf(d.to)} (${methodLabel(d.method)})`, `${who} assigned the item to ${d.name || nameOf(d.to)} (${methodLabel(d.method)})`)
     case 'unassigned': return L(`${who} angret tildelingen til ${d.name || nameOf(d.from)}`, `${who} undid the assignment to ${d.name || nameOf(d.from)}`)
+    case 'assignment_confirmed': return L(`${who} bekreftet at ${d.name} skal ha gjenstanden`, `${who} confirmed that ${d.name} should have the item`)
     case 'heir_receives_set': return d.value
       ? L(`${who} registrerte at ${d.name} kan få gjenstander`, `${who} registered that ${d.name} can receive items`)
       : L(`${who} registrerte at ${d.name} ikke skal få gjenstander`, `${who} registered that ${d.name} will not receive items`)

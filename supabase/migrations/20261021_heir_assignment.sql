@@ -19,6 +19,10 @@
 -- 4. En representant som mister kontoen, beholder registreringen i historikken (user_id settes til null),
 --    men kan ikke svare eller bekreftes.
 -- 5. Øyeblikksbildet lagrer ikke lenger kontonavn (member_names); mottakerne står med navn fra listen.
+-- 6. Eldre tildelinger som ikke kan kobles til en person, endres ikke. De står som tildelt (assigned_to) til
+--    familien bekrefter mottakeren (confirm_assignment_recipient). Et forslag kan ikke legges frem før alle
+--    tildelinger har en bekreftet person. Slettes kontoen en eldre tildeling peker på, står gjenstanden
+--    fortsatt som tildelt, men uten kjent mottaker, til familien bekrefter.
 --
 -- Forutsetning i produksjon: ingen forslag utenom demoen (avtrykket endres). Kan kjøres flere ganger.
 
@@ -219,6 +223,34 @@ begin
 end;
 $$;
 
+-- Eldre tildelinger (før 20261021) som ikke kunne kobles til en person, og tildelinger der kontoen senere
+-- er slettet, står som tildelt uten bekreftet person. De endres aldri automatisk. Familien (administrator)
+-- bekrefter hvem som skal ha gjenstanden; valget logges med kontoen den var tildelt fra.
+create or replace function public.confirm_assignment_recipient(p_item uuid, p_heir uuid)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare
+  v_item items%rowtype;
+  v_heir heirs%rowtype;
+begin
+  select * into v_item from items where id = p_item for update;
+  if not found then raise exception 'Fant ikke gjenstanden' using errcode = '42501'; end if;
+  perform public.require_estate_admin(v_item.estate_id);
+  if public.is_demo_user() then raise exception 'Demokontoen kan ikke endre dette' using errcode = '42501'; end if;
+  if coalesce(v_item.status, 'active') <> 'assigned' or v_item.assigned_heir_id is not null then
+    raise exception 'Gjenstanden har allerede en bekreftet mottaker' using errcode = '22023';
+  end if;
+  select * into v_heir from heirs where id = p_heir and estate_id = v_item.estate_id;
+  if not found then raise exception 'Mottakeren står ikke på listen over personer i boet' using errcode = '22023'; end if;
+  if not v_heir.receives_items then raise exception '% er ikke registrert som mottaker av gjenstander', v_heir.name using errcode = '22023'; end if;
+  update items set assigned_heir_id = v_heir.id, assigned_to = v_heir.user_id where id = p_item;
+  perform public.log_estate_event(v_item.estate_id, p_item, 'assignment_confirmed',
+    jsonb_build_object('heir_id', v_heir.id, 'name', v_heir.name, 'previous_account', v_item.assigned_to));
+  return jsonb_build_object('ok', true);
+end;
+$$;
+revoke all on function public.confirm_assignment_recipient(uuid, uuid) from public, anon;
+grant execute on function public.confirm_assignment_recipient(uuid, uuid) to authenticated;
+
 -- Loddtrekning blant mottakerne som ønsker gjenstanden (ønske → konto → person med «Kan få gjenstander»).
 -- Tildeler ikke: resultatet bekreftes med assign_items(…, 'lottery'). Hver trekning logges.
 create or replace function public.draw_lot(p_item uuid)
@@ -362,6 +394,10 @@ begin
   select coalesce(jsonb_agg(jsonb_build_object('heir_id', id, 'name', name, 'user_id', user_id) order by name, id), '[]'::jsonb)
     into v_required from heirs where estate_id = p_estate and must_approve;
   if jsonb_array_length(v_required) = 0 then raise exception 'Ingen beslutningstakere på arvelisten' using errcode = '22023'; end if;
+  -- Alle tildelinger må ha en bekreftet person, så alle vet hvem som får hva
+  if exists (select 1 from items where estate_id = p_estate and status = 'assigned' and assigned_heir_id is null) then
+    raise exception 'Noen gjenstander er tildelt uten en bekreftet person på listen. Bekreft mottakeren først.' using errcode = '22023';
+  end if;
   select coalesce(max(version_no), 0) + 1 into v_no from distribution_versions where estate_id = p_estate;
   v_state := public.distribution_state(p_estate);
   -- Øyeblikksbildet: innholdet + antall ønsker per gjenstand (bare til visning, ikke i avtrykket)

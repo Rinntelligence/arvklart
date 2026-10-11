@@ -274,6 +274,7 @@ await check('F6 Beslutningstaker godkjenner for seg selv; delvis fordeling sies 
   await page.getByText('Godkjenningen din er registrert').waitFor()
   const c = rpc.find(x => x.name === 'respond_distribution')
   assert(c?.body.p_version === 'v-1' && c.body.p_heir === H1 && c.body.p_decision === 'approve', `feil svar: ${JSON.stringify(c?.body)}`)
+  await page.waitForLoadState('networkidle') // panelet lastes på nytt etter svaret; mål når det står stille
   const v = await axe(page)
   assert(!v.length, v.join('; '))
 }, { fixtures: f6({ distribution_versions: [version] }), rpc: { distribution_status: st('pending', [hMe(), hKari()]), respond_distribution: st('pending', [hMe({ decision: 'approve' }), hKari()]) } })
@@ -435,6 +436,50 @@ await check('Arvinger: representant som har slettet kontoen, kan ikke bekreftes 
 await check('Løsningsmetoder: uten personer som kan få gjenstander vises veien til «Arvinger»', async page => {
   await page.goto(`${BASE}/estate/${EST}/conflicts`)
   await page.getByText(/Før gjenstandene kan fordeles, må dere legge inn hvem som kan få gjenstander/).waitFor()
+}, { fixtures: { ...contested, heirs: [] } })
+
+// ── Eldre tildelinger uten bekreftet person (før 20261021) ───────────────────────
+const legacyItem = item('it-old', 'Kommode', { status: 'assigned', assigned_to: cato.user_id, assigned_heir_id: null, agreed_value: 1200, interests: [] })
+const legacyFx = { ...overview, heirs: [...heirsF6, gunn], estate_members: [...members, { estate_id: EST, user_id: cato.user_id, role: 'admin', joined_at: now, profiles: cato }],
+  profiles: [me, kari, cato], items: [...overview.items, legacyItem] }
+
+await check('Eldre tildeling: vises tydelig med kontoen, familien bekrefter mottakeren (ingen gjetting)', async page => {
+  const { rpc } = watch(page)
+  await page.goto(`${BASE}/estate/${EST}/item/it-old`)
+  await page.getByText('Tildelt kontoen til Cato').waitFor()
+  await page.getByText(/Mottakeren er ikke bekreftet som en person på listen/).waitFor()
+  await page.getByRole('button', { name: 'Bekreft mottaker' }).click()
+  await page.getByRole('button', { name: 'Gunn', exact: true }).click()
+  await page.getByText('Mottakeren er bekreftet').waitFor()
+  const c = rpc.find(x => x.name === 'confirm_assignment_recipient')
+  assert(c?.body.p_item === 'it-old' && c.body.p_heir === 'heir-gunn', `feil kall: ${JSON.stringify(c?.body)}`)
+  assert(!rpc.some(x => x.name === 'assign_items' || x.name === 'unassign_item'), 'tildelingen ble endret på annen måte')
+  const v = await axe(page)
+  assert(!v.length, v.join('; '))
+}, { fixtures: { ...legacyFx, items: [legacyItem] }, rpc: { confirm_assignment_recipient: { body: { ok: true } } } })
+
+await check('Eldre tildeling der kontoen er slettet: forklares uten teknisk feil', async page => {
+  await page.goto(`${BASE}/estate/${EST}/item/it-old`)
+  await page.getByText('Tildelt en konto som senere er slettet').waitFor()
+  await page.getByRole('button', { name: 'Bekreft mottaker' }).waitFor()
+}, { fixtures: { ...legacyFx, items: [{ ...legacyItem, assigned_to: null }] } })
+
+await check('Fordelingen: eldre tildeling vises under kontoen med vei til bekreftelse; forslag venter til den er bekreftet', async page => {
+  const { rpc } = watch(page)
+  await page.goto(`${BASE}/estate/${EST}/fordeling`)
+  const sec = page.getByRole('region', { name: 'Cato' })
+  await sec.getByText(/ikke bekreftet som en person på listen/).waitFor()
+  await sec.getByRole('button', { name: 'Kommode' }).waitFor()
+  await page.getByText(/Før forslaget kan legges frem, må familien bekrefte hvem som skal ha denne gjenstanden/).waitFor()
+  assert(await page.getByRole('button', { name: 'Legg frem forslag' }).isDisabled(), 'forslag kunne legges frem')
+  assert(!rpc.some(x => x.name === 'propose_distribution'), 'propose ble kalt')
+  const v = await axe(page)
+  assert(!v.length, v.join('; '))
+}, { fixtures: { ...legacyFx, distribution_versions: [] } })
+
+await check('Hva gjenstår: bo uten mottakere får «Legg inn hvem som kan få gjenstander» først', async page => {
+  await page.goto(`${BASE}/estate/${EST}/status`)
+  await page.getByText('Legg inn hvem som kan få gjenstander').waitFor()
 }, { fixtures: { ...contested, heirs: [] } })
 
 await browser.close()

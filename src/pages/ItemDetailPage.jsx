@@ -14,7 +14,7 @@ import ItemHistory from '../components/ItemHistory'
 import AgreedValue from '../components/AgreedValue'
 import { withCorrections } from '../lib/aiCorrections'
 import { assignItems, unassignItem } from '../lib/assignments'
-import { recipientsOf, recipientOf } from '../lib/recipients'
+import { recipientsOf, recipientOf, isUnconfirmedAssignment } from '../lib/recipients'
 import StoredImage from '../components/StoredImage'
 
 const tc = c => { if(!c)return'#FBF9F5'; const r=parseInt(c.slice(1,3),16),g=parseInt(c.slice(3,5),16),b=parseInt(c.slice(5,7),16); return(0.299*r+0.587*g+0.114*b)/255>0.55?'#3A2F26':'#FBF9F5' }
@@ -26,6 +26,7 @@ export default function ItemDetailPage({ session, profile, onToast, isDemo }) {
   const [comments, setComments] = useState([])
   const [members, setMembers] = useState([])
   const [heirs, setHeirs] = useState([]) // personene på listen; tildeling skjer til personen
+  const [showConfirm, setShowConfirm] = useState(false)
   const [myRole, setMyRole] = useState('member')
   const [loading, setLoading] = useState(true)
   const [reason, setReason] = useState('')
@@ -96,6 +97,8 @@ export default function ItemDetailPage({ session, profile, onToast, isDemo }) {
   const allImages = itemImageUrls(item)
   const recipient = recipientOf(item, heirs)
   const people = recipientsOf(heirs)
+  const unconfirmed = isUnconfirmedAssignment(item)
+  const accountName = members.find(m => m.user_id === item.assigned_to)?.profiles?.display_name || L('et tidligere medlem', 'a former member')
 
   // Kjører en handling én gang om gangen og viser feilen hvis den ikke gikk gjennom.
   const run = async (action, okMsg, errMsg) => {
@@ -177,6 +180,13 @@ export default function ItemDetailPage({ session, profile, onToast, isDemo }) {
       L('Gjenstand tildelt', 'Item assigned'), L('Kunne ikke tildele. Bare administratorer kan tildele gjenstander.', 'Could not assign. Only administrators can assign items.'),
     )
     if (ok) setShowAssign(false)
+  }
+
+  // Eldre tildeling uten bekreftet person: familien bekrefter mottakeren (logges, endres aldri automatisk)
+  const handleConfirm = async (heirId) => {
+    const ok = await run(() => supabase.rpc('confirm_assignment_recipient', { p_item: itemId, p_heir: heirId }),
+      L('Mottakeren er bekreftet', 'The recipient has been confirmed'), L('Kunne ikke bekrefte mottakeren. Prøv igjen.', 'Could not confirm the recipient. Please try again.'))
+    if (ok) setShowConfirm(false)
   }
 
   const handleUnassign = () => run(
@@ -350,7 +360,40 @@ export default function ItemDetailPage({ session, profile, onToast, isDemo }) {
         {/* Fordelingsloggen for gjenstanden (tildeling, loddtrekning, ønsker) – kan ikke endres i appen */}
         <ItemHistory itemId={itemId} members={members} refreshKey={`${item.status}:${item.assigned_heir_id}:${item.interests?.length || 0}`} />
 
-        {isAssigned ? (
+        {isAssigned && unconfirmed ? (
+          <div role="status" style={{ padding:'16px', background:'#FBF9F5', border:'1px solid #C8BEA0', borderRadius:'10px', marginBottom:'24px' }}>
+            <div style={{ fontSize:'0.875rem', color:'#3A2F26', fontWeight:'500', marginBottom:'4px' }}>
+              {item.assigned_to
+                ? L(`Tildelt kontoen til ${accountName}`, `Assigned to ${accountName}'s account`)
+                : L('Tildelt en konto som senere er slettet', 'Assigned to an account that has since been deleted')}
+            </div>
+            <p style={{ fontSize:'0.8125rem', color:'#5C4530', lineHeight:1.6, margin:0 }}>
+              {L('Mottakeren er ikke bekreftet som en person på listen over personer i boet. Familien bekrefter hvem som skal ha gjenstanden.', 'The recipient is not confirmed as a person on the list of people in the estate. The family confirms who should have the item.')}
+              {!isAdmin && ' ' + L('Det gjør administratoren av boet.', 'The estate administrator does this.')}
+            </p>
+            {isAdmin && !isDemo && !showConfirm && (
+              <button onClick={() => setShowConfirm(true)} style={{ marginTop:'10px', minHeight:'44px', padding:'8px 14px', background:'#5F6E52', color:'#fff', border:'none', borderRadius:'8px', cursor:'pointer', fontSize:'0.875rem', fontFamily:'Karla, sans-serif' }}>{L('Bekreft mottaker', 'Confirm recipient')}</button>
+            )}
+            {isAdmin && showConfirm && (
+              <div style={{ marginTop:'12px' }}>
+                <p style={{ fontSize:'0.8125rem', color:'#5C4530', marginBottom:'8px' }}>{L('Hvem skal ha den?', 'Who should have it?')}</p>
+                {!people.length && (
+                  <p style={{ fontSize:'0.8125rem', color:'#3A2F26', lineHeight:1.6 }}>
+                    {L('Legg først inn personene som kan få gjenstander under «Arvinger».', 'First add the people who can receive items under «Heirs».')}{' '}
+                    <button onClick={() => navigate(`/estate/${id}/heirs`)} style={{ background:'none', border:'none', padding:0, color:'#3A2F26', textDecoration:'underline', cursor:'pointer', fontSize:'0.8125rem', fontFamily:'Karla, sans-serif' }}>{L('Gå til «Arvinger»', 'Go to «Heirs»')}</button>
+                  </p>
+                )}
+                {people.map(h => (
+                  <button key={h.id} onClick={() => handleConfirm(h.id)} disabled={busy} style={{ display:'flex', alignItems:'center', gap:'10px', width:'100%', minHeight:'44px', padding:'10px 14px', background:'#fff', border:'1px solid #B8C8A8', borderRadius:'8px', cursor:'pointer', textAlign:'left', fontFamily:'Karla, sans-serif', marginBottom:'6px' }}>
+                    <span style={{ fontSize:'0.875rem', color:'#3A2F26' }}>{h.name}</span>
+                    {h.user_id && h.user_id === item.assigned_to && <span style={{ fontSize:'0.6875rem', color:'#3A5A30', marginLeft:'auto' }}>{L('kontoen den er tildelt', 'the account it is assigned to')}</span>}
+                  </button>
+                ))}
+                <button onClick={() => setShowConfirm(false)} style={{ minHeight:'40px', padding:'6px 12px', background:'none', border:'none', color:'#5C4530', textDecoration:'underline', cursor:'pointer', fontSize:'0.8125rem', fontFamily:'Karla, sans-serif' }}>{L('Avbryt', 'Cancel')}</button>
+              </div>
+            )}
+          </div>
+        ) : isAssigned ? (
           <div style={{ padding:'16px', background:'#DCE3D2', border:'1px solid #B8C8A8', borderRadius:'10px', marginBottom:'24px', display:'flex', justifyContent:'space-between', alignItems:'center', gap:'12px', flexWrap:'wrap' }}>
             <div style={{ fontSize:'0.875rem', color:'#3A2F26', fontWeight:'500' }}>
               {L('Tildelt', 'Assigned to')} {recipient?.user_id && recipient.user_id === session.user.id ? L('deg', 'you') : recipient?.name || L('en arving', 'an heir')}

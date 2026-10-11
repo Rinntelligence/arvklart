@@ -46,6 +46,16 @@ export const buildRemainingSteps = ({ estateId, userId, items, members, passes, 
   const count = (n, one, many) => `${n} ${n === 1 ? one : many}`
   const item = n => count(n, L('gjenstand', 'item'), L('gjenstander', 'items'))
 
+  // Tildeling skjer til personer på listen som kan få gjenstander (receives_items; standard ja, unntatt
+  // rådgiverroller). Uten mottakere er første steg å legge dem inn – også dem uten konto.
+  const recipients = heirs.filter(h => (h.receives_items ?? !ADVISOR_RELATIONSHIPS.includes(h.relationship)) === true)
+  if (!recipients.length && open.length) steps.push({
+    key: 'recipients',
+    title: L('Legg inn hvem som kan få gjenstander', 'Add who can receive items'),
+    detail: L('Før gjenstandene kan fordeles, må personene som skal få dem, stå på listen. Også personer uten konto kan legges inn.', 'Before the items can be distributed, the people who will receive them must be on the list. People without an account can be added too.'),
+    path: `/estate/${estateId}/heirs`,
+    pathLabel: L('Legg inn', 'Add'),
+  })
   const memberEmails = members.map(m => normEmail(m.profiles?.email)).filter(Boolean)
   const notJoined = heirs.filter(h => !h.email || !memberEmails.includes(normEmail(h.email)))
   if (notJoined.length) steps.push({
@@ -53,6 +63,16 @@ export const buildRemainingSteps = ({ estateId, userId, items, members, passes, 
     title: L(`${count(notJoined.length, 'arving', 'arvinger')} har ikke blitt med i boet`, `${count(notJoined.length, 'heir has', 'heirs have')} not joined the estate`),
     detail: notJoined.map(h => h.name).join(', '),
     path: `/estate/${estateId}/heirs`,
+  })
+
+  // Eldre tildelinger uten bekreftet person (eller der kontoen er slettet): familien bekrefter mottakeren
+  const unconfirmed = items.filter(i => i.status === 'assigned' && !i.assigned_heir_id)
+  if (unconfirmed.length) steps.push({
+    key: 'confirm_recipient',
+    title: L(`${item(unconfirmed.length)} mangler bekreftet mottaker`, `${item(unconfirmed.length)} ${unconfirmed.length === 1 ? 'lacks' : 'lack'} a confirmed recipient`),
+    detail: L('Tildelt en konto som ikke er bekreftet som en person på listen. Administrator bekrefter hvem som skal ha gjenstanden.', 'Assigned to an account that is not confirmed as a person on the list. The administrator confirms who should have the item.'),
+    path: unconfirmed.length === 1 ? `/estate/${estateId}/item/${unconfirmed[0].id}` : `/estate/${estateId}/fordeling`,
+    pathLabel: L('Bekreft', 'Confirm'),
   })
 
   const undecided = getUndecided(items, members, passes, heirs)

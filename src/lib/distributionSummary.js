@@ -27,7 +27,9 @@ export function summarizeDistribution({ items = [], members = [], heirs = [], es
       const mine = assigned.filter(i => recipientOf(i, heirs)?.id === h.id)
       return { heir_id: h.id, user_id: h.user_id || null, name: h.name, items: mine, receives: people.includes(h) }
     }),
-    ...orphanAccounts.map(uid => ({ heir_id: null, user_id: uid, name: uid ? accountName(uid) : L('Ukjent mottaker', 'Unknown recipient'),
+    // Tildelt en konto uten bekreftet person på listen (eldre tildeling, eller kontoen er slettet)
+    ...orphanAccounts.map(uid => ({ heir_id: null, user_id: uid, unconfirmed: true,
+      name: uid ? accountName(uid) : L('Konto som er slettet', 'Deleted account'),
       items: assigned.filter(i => !recipientOf(i, heirs) && (i.assigned_to || null) === uid), receives: false })),
   ].map(h => {
     const known = h.items.filter(i => itemValue(i) !== null)
@@ -52,6 +54,7 @@ export function summarizeDistribution({ items = [], members = [], heirs = [], es
     unwanted: { sell: byDisp('sell'), donate: byDisp('donate'), discard: byDisp('discard'), undecided: byDisp(null) },
     pending, // ønsket av noen, men ikke tildelt ennå
     complete: pending.length === 0 && byDisp(null).length === 0,
+    hasRecipients: people.length > 0,
     itemCount: items.length,
   }
 }

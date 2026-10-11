@@ -29,3 +29,8 @@ export const personOfUser = (userId, people = []) => (userId ? people.find(p => 
 export const interestedPeople = (item, people = []) =>
   (item?.interests || []).map(x => personOfUser(x.user_id, people)).filter(Boolean)
     .filter((p, i, a) => a.findIndex(q => q.id === p.id) === i)
+
+// Tildelt, men uten bekreftet person på listen: eldre tildeling som ikke kunne kobles, eller tildeling der
+// kontoen senere er slettet. Endres aldri automatisk; familien bekrefter mottakeren.
+export const isUnconfirmedAssignment = item => item?.status === 'assigned' && !item?.assigned_heir_id
+export const unconfirmedAssignments = (items = []) => items.filter(isUnconfirmedAssignment)

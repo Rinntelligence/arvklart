@@ -328,6 +328,7 @@ $$;
 drop trigger if exists guard_heir_receives on public.heirs;
 drop function if exists public.guard_heir_receives();
 drop function if exists public.set_receives_items(uuid, boolean);
+drop function if exists public.confirm_assignment_recipient(uuid, uuid);
 drop function if exists public.distribution_authority_hash(uuid);
 alter table public.distribution_versions drop column if exists authority_hash;
 delete from public.heir_representatives where user_id is null;

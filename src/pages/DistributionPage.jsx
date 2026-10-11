@@ -84,6 +84,12 @@ export default function DistributionPage({ session, onToast, isDemo }) {
         items={data.items} nameOf={nameOf} onVersion={(v, st) => setProposal({ version: v, status: st })} onToast={onToast} />
 
       <h2 style={h2}>{L('Per arving', 'Per heir')}</h2>
+      {!s.hasRecipients && (
+        <div style={{ ...card, background: '#FBF9F5' }}>
+          <p style={{ ...small, color: '#3A2F26' }}>{L('Ingen er registrert som mottakere ennå. Legg inn personene som skal få gjenstander – også dem som ikke har konto i Arvklart.', 'No one is registered as a recipient yet. Add the people who will receive items – including those without an Arvklart account.')}</p>
+          <button onClick={() => navigate(`/estate/${id}/heirs`)} style={{ marginTop: '10px', minHeight: '44px', padding: '8px 14px', background: '#5F6E52', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '0.875rem', fontFamily: 'Karla, sans-serif' }}>{L('Legg inn mottakere', 'Add recipients')}</button>
+        </div>
+      )}
       {!s.weighted && s.totalKnown > 0 && <p style={{ ...small, marginBottom: '10px' }}>{L('Sammenlignet med en lik andel. Arveandeler brukes bare når administrator har bekreftet dem under «Arvinger».', 'Compared with an equal share. Inheritance shares are only used when the administrator has confirmed them under «Heirs».')}</p>}
       {s.perHeir.map(h => (
         <section key={h.heir_id || h.user_id || h.name} aria-label={h.name} style={card}>
@@ -94,8 +100,18 @@ export default function DistributionPage({ session, onToast, isDemo }) {
           <p style={small}>
             {L(`${h.items.length} ${h.items.length === 1 ? 'gjenstand' : 'gjenstander'}`, `${h.items.length} ${h.items.length === 1 ? 'item' : 'items'}`)}
             {h.unknown > 0 && L(` · ${h.unknown} uten fordelingsverdi`, ` · ${h.unknown} without distribution value`)}
-            {s.totalKnown > 0 && ` · ${diffText(h, s)}`}
+            {s.totalKnown > 0 && !h.unconfirmed && ` · ${diffText(h, s)}`}
           </p>
+          {h.unconfirmed && (
+            <div style={{ marginTop: '8px' }}>
+              <p style={small}>{h.user_id
+                ? L('Tildelt kontoen, men ikke bekreftet som en person på listen. Bekreft hvem som skal ha gjenstanden:', 'Assigned to the account, but not confirmed as a person on the list. Confirm who should have the item:')
+                : L('Kontoen gjenstanden var tildelt, er slettet. Bekreft hvem som skal ha gjenstanden:', 'The account the item was assigned to has been deleted. Confirm who should have the item:')}</p>
+              <ul style={{ ...small, paddingLeft: '18px' }}>
+                {h.items.map(i => <li key={i.id}><button onClick={() => navigate(`/estate/${id}/item/${i.id}`)} style={{ background: 'none', border: 'none', padding: '4px 0', minHeight: '32px', color: '#3A2F26', textDecoration: 'underline', cursor: 'pointer', fontSize: '0.8125rem', fontFamily: 'Karla, sans-serif' }}>{i.title}</button></li>)}
+              </ul>
+            </div>
+          )}
           {h.items.length > 0 && (
             <details style={{ marginTop: '6px' }}>
               <summary style={{ cursor: 'pointer', fontSize: '0.8125rem', color: '#5C4530', minHeight: '44px', display: 'flex', alignItems: 'center' }}>{L('Vis gjenstandene', 'Show the items')}</summary>

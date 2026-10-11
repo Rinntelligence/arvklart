@@ -636,9 +636,9 @@ insert into heirs (id, estate_id, name, email, relationship, user_id, linked_via
   ('f6f60000-0000-0000-0000-0000000000a2', 'f6f60000-0000-0000-0000-000000000001', 'Eva', 'eva@test.no', 'Barn', '00000000-0000-0000-0000-0000000000e1', 'existing_member'),
   ('f6f60000-0000-0000-0000-0000000000a3', 'f6f60000-0000-0000-0000-000000000001', 'Frank', 'frank@test.no', 'Barn', '00000000-0000-0000-0000-0000000000f1', 'existing_member'),
   ('f6f60000-0000-0000-0000-0000000000a4', 'f6f60000-0000-0000-0000-000000000001', 'Gunn', 'gunn@test.no', 'Barn', null, null);
-insert into items (id, estate_id, title, added_by, status, assigned_to, agreed_value) values
-  ('f6f60000-0000-0000-0000-0000000000b1', 'f6f60000-0000-0000-0000-000000000001', 'Kommode', '00000000-0000-0000-0000-00000000000a', 'assigned', '00000000-0000-0000-0000-0000000000e1', 2000),
-  ('f6f60000-0000-0000-0000-0000000000b2', 'f6f60000-0000-0000-0000-000000000001', 'Lampe', '00000000-0000-0000-0000-00000000000a', 'active', null, null);
+insert into items (id, estate_id, title, added_by, status, assigned_to, assigned_heir_id, agreed_value) values
+  ('f6f60000-0000-0000-0000-0000000000b1', 'f6f60000-0000-0000-0000-000000000001', 'Kommode', '00000000-0000-0000-0000-00000000000a', 'assigned', '00000000-0000-0000-0000-0000000000e1', 'f6f60000-0000-0000-0000-0000000000a2', 2000),
+  ('f6f60000-0000-0000-0000-0000000000b2', 'f6f60000-0000-0000-0000-000000000001', 'Lampe', '00000000-0000-0000-0000-00000000000a', 'active', null, null, null);
 
 select t_as('owner@test.no'); set role authenticated;
 -- Admin kan ikke fjerne en beslutningstaker alene
@@ -942,6 +942,51 @@ exception when invalid_parameter_value then raise notice 'OK   svar avvises når
 end $$;
 select t_eq((distribution_status(current_setting('test.v7')::uuid))->>'state' || '/' || ((distribution_status(current_setting('test.v7')::uuid))->>'outdated'),
   (current_setting('test.v7before')::jsonb->>'state') || '/' || (current_setting('test.v7before')::jsonb->>'outdated'), 'endret e-post endrer ikke statusen til en godkjent fordeling');
+reset role;
+-- Eldre tildelinger (før 20261021) uten kobling til en person: står urørt, sperrer forslag, familien bekrefter
+select t_as(null);
+insert into auth.users (id, email) values ('f7f70000-0000-0000-0000-0000000000e2', 'leg7@test.no');
+insert into items (id, estate_id, title, added_by, status, assigned_to) values
+  ('f7f70000-0000-0000-0000-0000000000b5', 'f7f70000-0000-0000-0000-000000000001', 'Kommode (eldre)', 'f7f70000-0000-0000-0000-0000000000a1', 'assigned', 'f7f70000-0000-0000-0000-0000000000c1'),
+  ('f7f70000-0000-0000-0000-0000000000b6', 'f7f70000-0000-0000-0000-000000000001', 'Speil (eldre)', 'f7f70000-0000-0000-0000-0000000000a1', 'assigned', 'f7f70000-0000-0000-0000-0000000000e2');
+-- Engangskoblingen i migreringen gjetter ikke: kjørt på nytt, står eldre tildelinger uten person urørt
+update public.items i set assigned_heir_id = h.id from public.heirs h
+where i.assigned_heir_id is null and i.assigned_to is not null and h.estate_id = i.estate_id and h.user_id = i.assigned_to;
+select t_eq((select string_agg(coalesce(assigned_heir_id::text, '-') || '/' || assigned_to::text || '/' || status, ',' order by title) from items where id in ('f7f70000-0000-0000-0000-0000000000b5', 'f7f70000-0000-0000-0000-0000000000b6')),
+  '-/f7f70000-0000-0000-0000-0000000000c1/assigned,-/f7f70000-0000-0000-0000-0000000000e2/assigned', 'eldre tildelinger uten person står urørt med sin mottaker');
+-- Kontoen en eldre tildeling peker på, slettes: gjenstanden står fortsatt som tildelt (ikke omfordelt)
+delete from auth.users where id = 'f7f70000-0000-0000-0000-0000000000e2';
+select t_eq((select status || '/' || coalesce(assigned_to::text, 'slettet') || '/' || coalesce(assigned_heir_id::text, '-') from items where id = 'f7f70000-0000-0000-0000-0000000000b6'), 'assigned/slettet/-',
+  'kontosletting: eldre tildeling står som tildelt, uten kjent mottaker, til familien bekrefter');
+select t_as('anne7@test.no'); set role authenticated;
+do $$ begin
+  perform propose_distribution('f7f70000-0000-0000-0000-000000000001');
+  raise exception 'FAIL: forslag ble lagt frem med tildelinger uten bekreftet person';
+exception when invalid_parameter_value then raise notice 'OK   forslag kan ikke legges frem før alle tildelinger har en bekreftet person';
+end $$;
+reset role;
+select t_as('hege7@test.no'); set role authenticated;
+do $$ begin
+  perform confirm_assignment_recipient('f7f70000-0000-0000-0000-0000000000b5', 'f7f70000-0000-0000-0000-0000000000f5');
+  raise exception 'FAIL: medlem kunne bekrefte mottaker';
+exception when insufficient_privilege then raise notice 'OK   bare administrator kan bekrefte mottakeren';
+end $$;
+reset role;
+select t_as('anne7@test.no'); set role authenticated;
+select confirm_assignment_recipient('f7f70000-0000-0000-0000-0000000000b5', 'f7f70000-0000-0000-0000-0000000000f1');
+select t_eq((select assigned_heir_id::text || '/' || assigned_to::text from items where id = 'f7f70000-0000-0000-0000-0000000000b5'),
+  'f7f70000-0000-0000-0000-0000000000f1/f7f70000-0000-0000-0000-0000000000a1', 'familien bekrefter mottakeren (personen og kontoen)');
+select t_eq((select data->>'previous_account' from estate_events where item_id = 'f7f70000-0000-0000-0000-0000000000b5' and kind = 'assignment_confirmed'),
+  'f7f70000-0000-0000-0000-0000000000c1', 'bekreftelsen logges med kontoen den var tildelt fra');
+do $$ begin
+  perform confirm_assignment_recipient('f7f70000-0000-0000-0000-0000000000b5', 'f7f70000-0000-0000-0000-0000000000f2');
+  raise exception 'FAIL: en bekreftet tildeling kunne endres via bekreftelsen';
+exception when invalid_parameter_value then raise notice 'OK   en bekreftet tildeling endres bare ved å angre og tildele på nytt';
+end $$;
+select confirm_assignment_recipient('f7f70000-0000-0000-0000-0000000000b6', 'f7f70000-0000-0000-0000-0000000000f3');
+select t_eq((select assigned_heir_id::text || '/' || coalesce(assigned_to::text, 'ingen konto') from items where id = 'f7f70000-0000-0000-0000-0000000000b6'),
+  'f7f70000-0000-0000-0000-0000000000f3/ingen konto', 'mottaker for gjenstand der kontoen er slettet, kan bekreftes som person uten konto');
+select t_eq((propose_distribution('f7f70000-0000-0000-0000-000000000001')) ? 'id', true, 'når alle tildelinger har en bekreftet person, kan forslaget legges frem');
 reset role;
 -- Hele boet kan slettes (personer med tildelinger, forslag og svar)
 select t_as(null);
