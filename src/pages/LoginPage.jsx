@@ -19,6 +19,7 @@ export default function LoginPage({ onToast }) {
     if (msg.includes('Invalid login')) return L('Feil e-post eller passord', 'Wrong email or password')
     if (msg.includes('Email not confirmed')) return L('E-posten er ikke bekreftet ennå — sjekk innboksen din', 'Your email is not confirmed yet — check your inbox')
     if (msg.includes('already registered')) return L('E-posten er allerede registrert — logg inn i stedet', 'This email is already registered — log in instead')
+    if (msg.includes('known to be weak') || msg.includes('pwned')) return L('Passordet finnes i kjente datalekkasjer — velg et annet', 'This password appears in known data breaches — choose another one')
     if (msg.includes('Password should')) return L('Passordet må ha minst 6 tegn', 'The password must have at least 6 characters')
     if (msg.includes('rate limit') || msg.includes('security purposes')) return L('For mange forsøk — vent litt og prøv igjen', 'Too many attempts — wait a moment and try again')
     return msg

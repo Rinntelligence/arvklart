@@ -25,6 +25,16 @@ Kjør i SQL Editor, i denne rekkefølgen:
 - Kjør migrasjonen i SQL Editor **før** frontend som trenger den deployes.
 - `20261007_security_hardening.sql` fjerner alle policies på app-tabellene og lager dem på nytt. Nye policies legges derfor inn der, eller i en ny migrasjon. Ikke legg dem inn manuelt i dashboardet.
 - Test endringer lokalt med `npm run test:db` (krever Docker). Testen bygger databasen fra filene over og sjekker tilgangsreglene i `test/db/rls.sql`.
+- Nye funksjoner er stengt for klientene til de registreres i `client_functions` og `select apply_function_grants()` er kjørt (fra `20261022_function_grants.sql`, se CLAUDE.md). `test:db` feiler ellers.
+
+## Innstillinger i dashbordet (ikke i repoet)
+
+Fra sikkerhetsgjennomgangen 2026-10-11. Må settes for hånd i Supabase Dashboard:
+
+- **Authentication → Policies (Password security):** slå på *Leaked password protection* (HaveIBeenPwned; krever Pro-abonnement). Eksisterende passord berøres ikke; sjekken gjelder ved registrering og passordbytte, og appen viser «Passordet finnes i kjente datalekkasjer». Minste lengde er 6 tegn i appens tekster (`LoginPage`, `ResetPasswordPage`, `GuidePage`); økes den i dashbordet, må tekstene endres samtidig.
+- **Authentication → Sign In / Providers → Email:** *Confirm email* skal være på.
+- **Authentication → URL Configuration:** *Redirect URLs* skal bare inneholde `https://arvklart.no/**`, `https://www.arvklart.no/**` og eventuelt `http://localhost:5173/**`, ingen jokertegn for andre domener.
+- Kjør **Advisors → Security** etter hver migrering. Advarslene om «RLS enabled, no policy» for `founders`, `founder_audit_log`, `ai_usage`, `protected_columns`, `client_functions` og `cleanup_runs` er tilsiktet: tabellene brukes bare av databasefunksjoner og `service_role`.
 
 ## Edge-funksjoner
 

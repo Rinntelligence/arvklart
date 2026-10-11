@@ -256,6 +256,7 @@ function AuthModal({ startInLogin, request, onClose }) {
   const message = msg => {
     if (msg.includes('Invalid login')) return L('Feil e-post eller passord.', 'Wrong email or password.')
     if (msg.includes('already registered')) return L('E-posten er allerede registrert. Logg inn i stedet.', 'This email is already registered. Log in instead.')
+    if (msg.includes('known to be weak') || msg.includes('pwned')) return L('Passordet finnes i kjente datalekkasjer. Velg et annet.', 'This password appears in known data breaches. Choose another one.')
     if (msg.includes('Password should')) return L('Passordet må ha minst 6 tegn.', 'The password must have at least 6 characters.')
     if (msg.includes('Email not confirmed')) return null
     return msg
