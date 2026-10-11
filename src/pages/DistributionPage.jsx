@@ -86,7 +86,7 @@ export default function DistributionPage({ session, onToast, isDemo }) {
       <h2 style={h2}>{L('Per arving', 'Per heir')}</h2>
       {!s.weighted && s.totalKnown > 0 && <p style={{ ...small, marginBottom: '10px' }}>{L('Sammenlignet med en lik andel. Arveandeler brukes bare når administrator har bekreftet dem under «Arvinger».', 'Compared with an equal share. Inheritance shares are only used when the administrator has confirmed them under «Heirs».')}</p>}
       {s.perHeir.map(h => (
-        <section key={h.user_id} aria-label={h.name} style={card}>
+        <section key={h.heir_id || h.user_id || h.name} aria-label={h.name} style={card}>
           <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px', alignItems: 'baseline' }}>
             <h3 style={{ fontSize: '1rem', fontWeight: 600, color: '#3A2F26', margin: 0 }}>{h.name}</h3>
             <span style={{ fontFamily: 'Fraunces, serif', fontSize: '1.125rem', color: '#3A2F26' }}>{formatNOK(h.sum)}</span>

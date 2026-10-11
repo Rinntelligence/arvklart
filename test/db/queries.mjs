@@ -85,6 +85,23 @@ test('tildeling via assign_items: bare ledige gjenstander, direkte oppdatering a
   assert.equal(undo.data.ok, true)
 })
 
+test('tildeling til personen (heir_id); mottakerstatus og tildelingen kan ikke endres direkte (20261021)', async () => {
+  const db = as('mona')
+  const item = 'face0005-0000-0000-0000-000000000005'
+  const lars = await db.from('heirs').select('id, receives_items').eq('estate_id', DEMO).eq('email', 'lars.demo@heirsplit.no').single()
+  assert.equal(lars.data.receives_items, true)
+  const r = await db.rpc('assign_items', { p_estate: DEMO, p_assignments: [{ item_id: item, heir_id: lars.data.id }], p_method: 'manual' })
+  assert.equal(r.error, null); assert.equal(r.data.assigned, 1)
+  const it = await db.from('items').select('assigned_heir_id, status').eq('id', item).single()
+  assert.equal(it.data.assigned_heir_id, lars.data.id)
+  const direct = await db.from('items').update({ assigned_heir_id: null }).eq('id', item).select('id')
+  assert.equal(direct.error?.code, '42501')
+  const recv = await db.from('heirs').update({ receives_items: false }).eq('id', lars.data.id).select('id')
+  assert.equal(recv.error?.code, '42501')
+  const undo = await db.rpc('unassign_item', { p_item: item })
+  assert.equal(undo.data.ok, true)
+})
+
 test('loddtrekning via draw_lot gir en av dem som ønsker gjenstanden', async () => {
   const db = as('mona')
   const item = 'face0004-0000-0000-0000-000000000004'

@@ -4,7 +4,8 @@ import { latestVersion, versionStatus, proposeDistribution, respondDistribution,
 
 // Godkjenning av fordelingen (F6). Administrator legger frem et forslag; hver beslutningstaker godkjenner
 // eller sier fra selv (eller via en bekreftet representant). Reglene håndheves i databasen. Godkjenningene er
-// registrerte godkjenninger i Arvklart, ikke elektroniske signaturer. Uavklarte gjenstander omfattes ikke.
+// registrert i Arvklart av innloggede brukere, uten identitetsverifisering med BankID. Uavklarte gjenstander
+// omfattes ikke.
 export default function ApprovalPanel({ estateId, userId, isAdmin, isDemo, closed, items, nameOf, onVersion, onToast }) {
   const [version, setVersion] = useState(null)
   const [status, setStatus] = useState(null)
@@ -48,7 +49,7 @@ export default function ApprovalPanel({ estateId, userId, isAdmin, isDemo, close
 
   if (!loaded) return null
   const mine = (status?.heirs || []).filter(h => h.user_id === userId || h.representative?.user_id === userId)
-  const canRespond = status && !status.approved_at && !status.outdated && !closed
+  const canRespond = status && !status.approved_at && !status.outdated && !status.authority_changed && !closed
   const unsettled = version ? (version.snapshot?.items || []).filter(i => i.status !== 'assigned' && !i.disposition).length : 0
   const link = `${window.location.origin}/estate/${estateId}/fordeling`
   const shareText = L(`Fordelingen av innbo og løsøre er lagt frem i Arvklart. Se over og godkjenn eller si fra her: ${link}`, `The division of household contents has been proposed in Arvklart. Review it and approve or object here: ${link}`)
@@ -62,8 +63,8 @@ export default function ApprovalPanel({ estateId, userId, isAdmin, isDemo, close
     <section aria-labelledby="approval-title" style={{ marginTop: '28px' }}>
       <h2 id="approval-title" style={{ fontFamily: 'Fraunces, serif', fontSize: '1.25rem', fontWeight: 400, color: '#3A2F26', margin: '0 0 10px' }}>{L('Godkjenning', 'Approval')}</h2>
       <p style={{ ...small, marginBottom: '12px' }}>
-        {L('Fordelingen er endelig først når alle beslutningstakerne har godkjent den. Godkjenningen registreres i Arvklart; den er ikke en juridisk verifisert elektronisk signatur.',
-          'The distribution is final only when all decision-makers have approved it. The approval is registered in Arvklart; it is not a legally verified electronic signature.')}
+        {L('Fordelingen er godkjent når alle beslutningstakerne har godkjent den. Godkjenningen registreres i Arvklart med innloggingen din (e-post og passord). Arvklart verifiserer ikke identitet med BankID.',
+          'The distribution is approved when all decision-makers have approved it. The approval is registered in Arvklart with your sign-in (email and password). Arvklart does not verify identity with BankID.')}
       </p>
 
       {!version ? (
@@ -77,10 +78,12 @@ export default function ApprovalPanel({ estateId, userId, isAdmin, isDemo, close
           <p style={small}>{L(`Versjon ${version.version_no}, lagt frem ${new Date(version.created_at).toLocaleDateString(locale(), { day: 'numeric', month: 'long', year: 'numeric' })}`, `Version ${version.version_no}, proposed ${new Date(version.created_at).toLocaleDateString(locale(), { day: 'numeric', month: 'long', year: 'numeric' })}`)} · {L(`${status?.approved} av ${status?.required} har godkjent`, `${status?.approved} of ${status?.required} have approved`)}</p>
           {unsettled > 0 && <p style={{ ...small, marginTop: '6px', fontWeight: 600 }}>{L(`Delvis fordeling: ${unsettled} ${unsettled === 1 ? 'gjenstand er' : 'gjenstander er'} ikke avklart og omfattes ikke av godkjenningen.`, `Partial distribution: ${unsettled} ${unsettled === 1 ? 'item is' : 'items are'} not settled and not covered by the approval.`)}</p>}
           {status?.outdated && <p style={{ ...small, marginTop: '6px', color: '#8A4B2A' }}>{status.approved_at
-            ? L('Fordelingen er endret etter at den ble godkjent. Den godkjente versjonen står fast, men endringene krever en ny versjon som alle godkjenner.', 'The distribution has changed since it was approved. The approved version stands, but the changes require a new version that everyone approves.')
+            ? L('Fordelingen er endret etter at den ble godkjent. Den godkjente versjonen er lagret som dokumentasjon, men endringene krever en ny versjon som alle godkjenner.', 'The distribution has changed since it was approved. The approved version is kept as documentation, but the changes require a new version that everyone approves.')
             : L('Fordelingen er endret etter at forslaget ble lagt frem. Alle må godkjenne en ny versjon.', 'The distribution has changed since the proposal was made. Everyone must approve a new version.')}</p>}
+          {status?.authority_changed && !status?.outdated && <p style={{ ...small, marginTop: '6px', color: '#8A4B2A' }}>{L('E-post eller representasjon er endret etter at forslaget ble lagt frem. Administrator må legge frem en ny versjon før noen kan svare.', 'An email address or representation has changed since the proposal was made. The administrator must propose a new version before anyone can respond.')}</p>}
           {status?.state === 'not_digitally_approvable' && <p style={{ ...small, marginTop: '6px' }}>{L('Minst én beslutningstaker har ikke konto og ingen bekreftet representant. Forslaget kan ikke godkjennes digitalt; last ned protokollen for signering på papir, eller inviter arvingen.', 'At least one decision-maker has no account and no confirmed representative. The proposal cannot be approved digitally; download the record for signing on paper, or invite the heir.')}</p>}
 
+          {status?.deleted_accounts > 0 && <p style={{ ...small, marginTop: '6px' }}>{L(`${status.deleted_accounts === 1 ? 'Ett svar' : `${status.deleted_accounts} svar`} ble registrert av en konto som senere er slettet. Registreringen er bevart.`, `${status.deleted_accounts === 1 ? 'One response was' : `${status.deleted_accounts} responses were`} registered by an account that has since been deleted. The registration is kept.`)}</p>}
           <ul style={{ listStyle: 'none', padding: 0, margin: '12px 0 0', display: 'grid', gap: '6px' }}>
             {(status?.heirs || []).map(h => (
               <li key={h.heir_id} style={{ ...small, background: '#FBF9F5', border: '1px solid #E8DFD0', borderRadius: '8px', padding: '8px 10px' }}>
@@ -127,7 +130,7 @@ export default function ApprovalPanel({ estateId, userId, isAdmin, isDemo, close
           )}
 
           <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '14px' }}>
-            {isAdmin && !closed && (status?.outdated || status?.state === 'objected') && <button onClick={propose} disabled={busy} style={btn(true)}>{L('Legg frem ny versjon', 'Propose a new version')}</button>}
+            {isAdmin && !closed && (status?.outdated || status?.authority_changed || status?.state === 'objected') && <button onClick={propose} disabled={busy} style={btn(true)}>{L('Legg frem ny versjon', 'Propose a new version')}</button>}
             {!status?.approved_at && (
               <>
                 <a href={`mailto:?subject=${encodeURIComponent(L('Fordelingen i Arvklart', 'The distribution in Arvklart'))}&body=${encodeURIComponent(shareText)}`} style={{ ...btn(false), display: 'inline-flex', alignItems: 'center', textDecoration: 'none' }}>{L('Del lenke på e-post', 'Share link by email')}</a>

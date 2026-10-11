@@ -158,6 +158,7 @@ export default function HeirsPage({ session, profile, onToast, isDemo }) {
         <div>
           <h1 style={{ fontFamily:'Fraunces, serif', fontSize:'1.625rem', fontWeight:'400', color:'#3A2F26', marginBottom:'4px' }}>{L('Arvinger og fordeling', 'Heirs and distribution')}</h1>
           <p style={{ color:'#75604B', fontSize:'0.875rem' }}>{L('Administrer arvinger og beregn hvordan boet fordeles', 'Manage heirs and calculate how the estate is distributed')}</p>
+          <p style={{ color:'#75604B', fontSize:'0.8125rem', marginTop:'4px', lineHeight:1.5 }}>{L('Listen er familiens egen registrering. Arvklart avgjør ikke hvem som har arverett; er dere usikre, bør dere få juridisk råd.', 'The list is the family\'s own registration. Arvklart does not decide who is entitled to inherit; if you are unsure, get legal advice.')}</p>
         </div>
         {canEdit && <button onClick={() => setShowAdd(!showAdd)} aria-expanded={showAdd} aria-controls={showAdd ? 'add-heir-form' : undefined} style={{ padding:'9px 18px', background:'#3A2F26', color:'#FBF9F5', border:'none', borderRadius:'8px', cursor:'pointer', fontSize:'0.875rem', fontFamily:'Karla, sans-serif' }}>
           {L('+ Legg til arving', '+ Add heir')}

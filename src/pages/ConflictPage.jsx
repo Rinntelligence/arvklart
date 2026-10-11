@@ -10,6 +10,7 @@ import StoredImage from '../components/StoredImage'
 import { assignItems, drawLot } from '../lib/assignments'
 import TalkFirstList from '../components/TalkFirstList'
 import { makeNameOf } from '../lib/eventText'
+import { recipientsOf, recipientIdOf, interestedPeople, personOfUser } from '../lib/recipients'
 
 const PALETTE = ['#5F6E52','#8B9A7D','#A97C3F','#7A8B6E','#9C8267','#6E8B87']
 
@@ -71,27 +72,32 @@ export default function ConflictPage({ session, onToast }) {
     setMembers(ms)
     setMyRole(mem?.role || 'member')
     setUndecided(getUndecided(all, ms, extras.passes, extras.heirs))
-    setSnakeOrderIds(ms.map(m => m.user_id))
+    setSnakeOrderIds(recipientsOf(extras.heirs).map(h => h.id))
     setLoading(false)
   }
 
   useEffect(() => { load() }, [id])
 
+  // Ønskene er registrert av kontoer (medlemmer); fordelingen går til personene på listen som kan få
+  // gjenstander (src/lib/recipients.js), også personer uten konto. Brukerrollen gir ingen rett til gjenstander.
   const getMember = (userId) => members.find(m => m.user_id === userId)
   const nameOf = makeNameOf(members)
-  const memberColor = (userId) => PALETTE[members.findIndex(m => m.user_id === userId) % PALETTE.length]
+  const memberColor = (userId) => PALETTE[Math.max(0, members.findIndex(m => m.user_id === userId)) % PALETTE.length]
+  const people = recipientsOf(heirs)
+  const getPerson = (pid) => people.find(p => p.id === pid)
+  const personColor = (pid) => PALETTE[Math.max(0, people.findIndex(p => p.id === pid)) % PALETTE.length]
 
   // Det hver arving allerede har fått tildelt, er utgangspunktet for den jevne fordelingen.
   // Ukjent verdi er ikke 0 (src/lib/distribution.js): mangler noe verdi, regnes ikke jevn fordeling ut
-  const alreadyAssigned = (userId) => valueTotal(assignedItems.filter(i => i.assigned_to === userId))
+  const alreadyAssigned = (pid) => valueTotal(assignedItems.filter(i => recipientIdOf(i, heirs) === pid))
   const missingValues = itemsWithoutValue(items, assignedItems)
   // Bekreftede arveandeler (src/lib/distribution.js): ellers lik deling
   const weights = confirmedWeights(heirs, estate)
-  const computeEqualResolutions = () => equalValueResolutions(items, members.map(m => m.user_id), assignedItems, weights)
+  const computeEqualResolutions = () => equalValueResolutions(items, people, assignedItems, weights)
   const canUseAi = missingValues.filter(i => aiEstimate(i) !== null)
 
   useEffect(() => {
-    if (mode === 'equal' && items.length && members.length) {
+    if (mode === 'equal' && items.length && people.length) {
       setResolutions(computeEqualResolutions())
     } else if (mode !== 'equal') {
       setResolutions({})
@@ -112,7 +118,7 @@ export default function ConflictPage({ session, onToast }) {
 
   const drawLottery = async (item) => {
     if (animating) return
-    const interested = (item.interests || []).map(x => x.user_id)
+    const interested = interestedPeople(item, people).map(p => p.id)
     setAnimating(item.id)
     for (let i = 3; i >= 1; i--) {
       setCountdown(i)
@@ -121,10 +127,13 @@ export default function ConflictPage({ session, onToast }) {
     setCountdown('!')
     // Loddet trekkes av databasen blant dem som ønsker gjenstanden, og trekningen logges (også om den gjøres på nytt)
     const [{ data, error }] = await Promise.all([drawLot(item.id), new Promise(r => setTimeout(r, 350))])
-    if (error || !data?.winner || !interested.includes(data.winner)) {
-      onToast(L('Kunne ikke trekke lodd. Prøv igjen.', 'Could not draw lots. Please try again.'), 'error')
+    const winner = data?.winner_heir || personOfUser(data?.winner, people)?.id
+    if (error || !winner || !interested.includes(winner)) {
+      onToast(!interested.length
+        ? L('Ingen av dem som ønsker gjenstanden, står på listen over personer som kan få gjenstander.', 'None of those who want the item are on the list of people who can receive items.')
+        : L('Kunne ikke trekke lodd. Prøv igjen.', 'Could not draw lots. Please try again.'), 'error')
     } else {
-      setResolutions(prev => ({ ...prev, [item.id]: data.winner }))
+      setResolutions(prev => ({ ...prev, [item.id]: winner }))
     }
     setAnimating(null)
     setCountdown(null)
@@ -146,7 +155,8 @@ export default function ConflictPage({ session, onToast }) {
     return order[posInRound]
   }
 
-  const wantsAny = (userId, list) => list.some(i => i.interests?.some(x => x.user_id === userId))
+  const wants = (pid, item) => { const uid = getPerson(pid)?.user_id; return !!uid && !!item.interests?.some(x => x.user_id === uid) }
+  const wantsAny = (pid, list) => list.some(i => wants(pid, i))
 
   // Neste plass i rekkefølgen der arvingen fortsatt vil ha noe av det som er igjen.
   const nextPickPos = (fromPos, unclaimed) => {
@@ -164,7 +174,7 @@ export default function ConflictPage({ session, onToast }) {
   // Man kan bare velge blant gjenstandene man selv har vist interesse for.
   const snakePick = (itemId) => {
     const item = unclaimedItems.find(i => i.id === itemId)
-    if (!currentSnakeUser || !item?.interests?.some(x => x.user_id === currentSnakeUser)) return
+    if (!currentSnakeUser || !item || !wants(currentSnakeUser, item)) return
     setResolutions(prev => ({ ...prev, [itemId]: currentSnakeUser }))
     setSnakePos(nextPickPos(snakePos + 1, unclaimedItems.filter(i => i.id !== itemId)))
   }
@@ -184,7 +194,7 @@ export default function ConflictPage({ session, onToast }) {
   // i mellomtiden, hoppes over. Etter loddtrekning må tildelingen være lik databasens trekning.
   const apply = async () => {
     setApplying(true)
-    const list = Object.entries(resolutions).map(([item_id, user_id]) => ({ item_id, user_id }))
+    const list = Object.entries(resolutions).map(([item_id, heir_id]) => ({ item_id, heir_id }))
     const { data, error } = await assignItems(id, list, mode)
     const count = error ? 0 : data?.assigned || 0
     const failed = list.length - count
@@ -194,9 +204,9 @@ export default function ConflictPage({ session, onToast }) {
     navigate(`/estate/${id}`)
   }
 
-  const memberTotals = members.map((m, i) => {
-    const mine = items.filter(it => resolutions[it.id] === m.user_id)
-    const earlier = alreadyAssigned(m.user_id)
+  const memberTotals = people.map((m, i) => {
+    const mine = items.filter(it => resolutions[it.id] === m.id)
+    const earlier = alreadyAssigned(m.id)
     const now = valueTotal(mine)
     return { ...m, color: PALETTE[i % PALETTE.length], assignedItems: mine, earlier: earlier.sum, total: earlier.sum + now.sum, unknown: earlier.unknown + now.unknown }
   })
@@ -303,6 +313,13 @@ export default function ConflictPage({ session, onToast }) {
         </div>
       </div>
 
+      {!people.length && (
+        <div role="status" style={{ background:'#FBF9F5', border:'1px solid #D9CFC0', borderRadius:'12px', padding:'16px 20px', marginBottom:'20px', color:'#3A2F26', fontSize:'0.875rem', lineHeight:1.6 }}>
+          {L('Før gjenstandene kan fordeles, må dere legge inn hvem som kan få gjenstander under «Arvinger».', 'Before the items can be distributed, add who can receive items under «Heirs».')}{' '}
+          <button onClick={() => navigate(`/estate/${id}/heirs`)} style={{ background:'none', border:'none', padding:0, color:'#3A2F26', textDecoration:'underline', cursor:'pointer', fontSize:'0.875rem', fontFamily:'Karla, sans-serif' }}>{L('Gå til «Arvinger»', 'Go to «Heirs»')}</button>
+        </div>
+      )}
+
       {/* Mode selector */}
       <details open style={{ marginBottom:'24px' }}>
         <summary style={{ cursor:'pointer', fontSize:'0.875rem', color:'#5C4530', padding:'10px 0', minHeight:'44px', boxSizing:'border-box' }}>
@@ -339,7 +356,7 @@ export default function ConflictPage({ session, onToast }) {
           )}
           <div style={{ display:'flex', flexDirection:'column', gap:'12px' }}>
             {items.map(item => {
-              const winner = resolutions[item.id] ? getMember(resolutions[item.id]) : null
+              const winner = resolutions[item.id] ? getPerson(resolutions[item.id]) : null
               const isAnim = animating === item.id
               return (
                 <div key={item.id} style={{
@@ -374,8 +391,8 @@ export default function ConflictPage({ session, onToast }) {
                       <div>
                         <div style={{ fontSize:'0.6875rem', color:'#3A5A30', marginBottom:'6px' }}>{L('Vinner', 'Winner')}</div>
                         <div className="cf-winner" style={{ display:'flex', alignItems:'center', gap:'8px', justifyContent:'center' }}>
-                          <Avatar name={winner.profiles?.display_name} color={memberColor(winner.user_id)} size={34} />
-                          <span style={{ fontSize:'0.8125rem', fontWeight:'500', color:'#3A2F26' }}>{winner.profiles?.display_name}</span>
+                          <Avatar name={winner.name} color={personColor(winner.id)} size={34} />
+                          <span style={{ fontSize:'0.8125rem', fontWeight:'500', color:'#3A2F26' }}>{winner.name}</span>
                         </div>
                         <button onClick={() => setResolutions(p => { const n = { ...p }; delete n[item.id]; return n })}
                           style={{ marginTop:'8px', fontSize:'0.6875rem', color:'#75604B', background:'none', border:'none', cursor:'pointer', fontFamily:'Karla, sans-serif' }}>
@@ -407,12 +424,12 @@ export default function ConflictPage({ session, onToast }) {
           <p style={{ fontSize:'0.8125rem', color:'#75604B', marginBottom:'20px' }}>{L('Den som velger sist i én runde, velger først i neste. Slik blir det rettferdig for alle.', 'Whoever chooses last in one round chooses first in the next. That way it is fair to everyone.')}</p>
           <div style={{ display:'flex', flexDirection:'column', gap:'8px', marginBottom:'20px' }}>
             {snakeOrderIds.map((uid, i) => {
-              const m = getMember(uid)
+              const m = getPerson(uid)
               return (
                 <div key={uid} style={{ display:'flex', alignItems:'center', gap:'12px', padding:'12px 16px', background:'#FBF9F5', borderRadius:'8px', border:'1px solid #D9CFC0' }}>
                   <div style={{ width:'24px', height:'24px', borderRadius:'50%', background:PALETTE[i%PALETTE.length], display:'flex', alignItems:'center', justifyContent:'center', fontSize:'0.6875rem', color:'#fff', fontWeight:'700' }}>{i+1}</div>
-                  <Avatar name={m?.profiles?.display_name} color={PALETTE[i%PALETTE.length]} size={32} />
-                  <span style={{ fontSize:'0.875rem', color:'#3A2F26', flex:1 }}>{m?.profiles?.display_name || uid}</span>
+                  <Avatar name={m?.name} color={PALETTE[i%PALETTE.length]} size={32} />
+                  <span style={{ fontSize:'0.875rem', color:'#3A2F26', flex:1 }}>{m?.name || '?'}</span>
                 </div>
               )
             })}
@@ -432,13 +449,13 @@ export default function ConflictPage({ session, onToast }) {
         <div>
           {unclaimedItems.length > 0 ? (
             <div style={{ background:'#3A2F26', color:'#FBF9F5', borderRadius:'12px', padding:'20px 24px', marginBottom:'20px', display:'flex', alignItems:'center', gap:'16px' }}>
-              <Avatar name={getMember(currentSnakeUser)?.profiles?.display_name} color={memberColor(currentSnakeUser)} size={52} />
+              <Avatar name={getPerson(currentSnakeUser)?.name} color={personColor(currentSnakeUser)} size={52} />
               <div>
                 <div style={{ fontSize:'0.75rem', color:'#75604B', marginBottom:'3px' }}>
                   {L('Runde', 'Round')} {Math.floor(snakePos/snakeOrderIds.length)+1}, {L('valg', 'pick')} {(snakePos%snakeOrderIds.length)+1} {L('av', 'of')} {snakeOrderIds.length}
                 </div>
                 <div style={{ fontSize:'1.25rem', fontFamily:'Fraunces, serif' }}>
-                  {getMember(currentSnakeUser)?.profiles?.display_name || '?'} {L('velger nå…', 'is choosing…')}
+                  {getPerson(currentSnakeUser)?.name || '?'} {L('velger nå…', 'is choosing…')}
                 </div>
                 <div style={{ fontSize:'0.75rem', color:'#C8BEA0', marginTop:'3px' }}>{L('Klikk på en av de markerte gjenstandene – du kan bare velge det du har vist interesse for', 'Click one of the highlighted items – you can only pick items you have shown interest in')}</div>
               </div>
@@ -457,11 +474,11 @@ export default function ConflictPage({ session, onToast }) {
                 .filter(uid => wantsAny(uid, unclaimedItems))
                 .slice(0, Math.min(snakeOrderIds.length * 2, unclaimedItems.length + 3))
                 .map((uid, i) => {
-                const m = getMember(uid)
+                const m = getPerson(uid)
                 return (
                   <div key={i} style={{ display:'flex', alignItems:'center', gap:'5px', padding:'3px 10px', borderRadius:'20px', background:i===0?'#3A2F26':'#E8DFD0', color:i===0?'#FBF9F5':'#5C4530', fontSize:'0.75rem' }}>
-                    <Avatar name={m?.profiles?.display_name} color={memberColor(uid)} size={18} />
-                    {m?.profiles?.display_name}
+                    <Avatar name={m?.name} color={personColor(uid)} size={18} />
+                    {m?.name}
                   </div>
                 )
               })}
@@ -471,7 +488,7 @@ export default function ConflictPage({ session, onToast }) {
           {unclaimedItems.length > 0 && (
             <div className="cf-pick-grid" style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(190px, 1fr))', gap:'12px', marginBottom:'24px' }}>
               {unclaimedItems.map(item => {
-                const isMine = item.interests?.some(x => x.user_id === currentSnakeUser)
+                const isMine = wants(currentSnakeUser, item)
                 return (
                   <div key={item.id} onClick={() => snakePick(item.id)} style={{
                     background:isMine?'#DCE3D2':'#fff',
@@ -508,11 +525,11 @@ export default function ConflictPage({ session, onToast }) {
               <div style={{ fontSize:'0.75rem', color:'#75604B', fontWeight:'500', marginBottom:'10px', textTransform:'uppercase', letterSpacing:'0.5px' }}>{L('Valgt', 'Chosen')} ({resolvedCount})</div>
               <div style={{ display:'flex', flexDirection:'column', gap:'5px' }}>
                 {items.filter(i => resolutions[i.id]).map(item => {
-                  const m = getMember(resolutions[item.id])
+                  const m = getPerson(resolutions[item.id])
                   return (
                     <div key={item.id} style={{ display:'flex', alignItems:'center', gap:'8px', fontSize:'0.8125rem', color:'#5C4530' }}>
-                      <Avatar name={m?.profiles?.display_name} color={memberColor(resolutions[item.id])} size={22} />
-                      <span style={{ fontWeight:'500', minWidth:'80px' }}>{m?.profiles?.display_name}</span>
+                      <Avatar name={m?.name} color={personColor(resolutions[item.id])} size={22} />
+                      <span style={{ fontWeight:'500', minWidth:'80px' }}>{m?.name}</span>
                       <span style={{ color:'#75604B' }}>→</span>
                       <span style={{ flex:1 }}>{item.title}</span>
                       {formatNOK(item.estimated_value) && <span style={{ color:'#5F6E52', fontSize:'0.6875rem', whiteSpace:'nowrap' }}>{formatNOK(item.estimated_value)}</span>}
@@ -557,11 +574,11 @@ export default function ConflictPage({ session, onToast }) {
         <div>
           <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(240px, 1fr))', gap:'16px', marginBottom:'20px' }}>
             {memberTotals.map(m => (
-              <div key={m.user_id} style={{ background:'#fff', border:'1px solid #D9CFC0', borderRadius:'12px', padding:'20px' }}>
+              <div key={m.id} style={{ background:'#fff', border:'1px solid #D9CFC0', borderRadius:'12px', padding:'20px' }}>
                 <div style={{ display:'flex', alignItems:'center', gap:'12px', marginBottom:'14px' }}>
-                  <Avatar name={m.profiles?.display_name} color={m.color} size={44} />
+                  <Avatar name={m.name} color={m.color} size={44} />
                   <div>
-                    <div style={{ fontSize:'0.875rem', fontWeight:'500', color:'#3A2F26' }}>{m.profiles?.display_name}</div>
+                    <div style={{ fontSize:'0.875rem', fontWeight:'500', color:'#3A2F26' }}>{m.name}</div>
                     <div style={{ fontSize:'1.375rem', fontFamily:'Fraunces, serif', color:'#5F6E52' }}>
                       {formatNOK(m.total) || '—'}
                     </div>

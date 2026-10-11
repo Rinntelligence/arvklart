@@ -23,11 +23,16 @@ export function eventText(e, nameOf) {
   const d = e.data || {}
   const who = e.actor ? nameOf(e.actor) : L('Arvklart', 'Arvklart')
   switch (e.kind) {
-    case 'assigned': return L(`${who} tildelte gjenstanden til ${nameOf(d.to)} (${methodLabel(d.method)})`, `${who} assigned the item to ${nameOf(d.to)} (${methodLabel(d.method)})`)
-    case 'unassigned': return L(`${who} angret tildelingen til ${nameOf(d.from)}`, `${who} undid the assignment to ${nameOf(d.from)}`)
+    // Fra 20261021 står mottakeren som person på listen (d.name); eldre hendelser har bare kontoen (d.to/d.from)
+    case 'assigned': return L(`${who} tildelte gjenstanden til ${d.name || nameOf(d.to)} (${methodLabel(d.method)})`, `${who} assigned the item to ${d.name || nameOf(d.to)} (${methodLabel(d.method)})`)
+    case 'unassigned': return L(`${who} angret tildelingen til ${d.name || nameOf(d.from)}`, `${who} undid the assignment to ${d.name || nameOf(d.from)}`)
+    case 'heir_receives_set': return d.value
+      ? L(`${who} registrerte at ${d.name} kan få gjenstander`, `${who} registered that ${d.name} can receive items`)
+      : L(`${who} registrerte at ${d.name} ikke skal få gjenstander`, `${who} registered that ${d.name} will not receive items`)
     case 'lottery_draw': {
       const names = (d.candidates || []).map(nameOf).join(', ')
-      return L(`Loddtrekning nr. ${d.draw_no} blant ${names}: ${nameOf(d.winner)} ble trukket`, `Draw no. ${d.draw_no} among ${names}: ${nameOf(d.winner)} was drawn`)
+      const winner = d.winner_name || nameOf(d.winner)
+      return L(`Loddtrekning nr. ${d.draw_no} blant ${names}: ${winner} ble trukket`, `Draw no. ${d.draw_no} among ${names}: ${winner} was drawn`)
     }
     case 'wish_added': return L(`${nameOf(d.user_id)} ønsker denne`, `${nameOf(d.user_id)} wants this`)
     case 'wish_removed': return L(`${nameOf(d.user_id)} trakk ønsket sitt`, `${nameOf(d.user_id)} withdrew their wish`)
