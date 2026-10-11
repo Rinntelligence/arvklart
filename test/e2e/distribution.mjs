@@ -7,6 +7,7 @@ const AXE = createRequire(import.meta.url).resolve('axe-core/axe.min.js')
 const axe = async page => {
   await page.addScriptTag({ path: AXE })
   return page.evaluate(async () => {
+    await Promise.all(document.getAnimations().map(a => a.finished.catch(() => {}))) // mål fargene etter inn-animasjonen
     const r = await window.axe.run(document, { runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'] } })
     return r.violations.filter(v => ['serious', 'critical'].includes(v.impact)).map(v => `${v.id}: ${v.nodes.slice(0, 2).map(n => n.target.join(' ')).join(' | ')}`)
   })

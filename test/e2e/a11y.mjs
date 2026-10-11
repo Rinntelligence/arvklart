@@ -10,6 +10,7 @@ async function audit(page, path, ready) {
   await page.getByText(ready).first().waitFor({ timeout: 15000 })
   await page.addScriptTag({ path: AXE })
   return page.evaluate(async () => {
+    await Promise.all(document.getAnimations().map(a => a.finished.catch(() => {}))) // mål fargene etter inn-animasjonen
     const r = await window.axe.run(document, { runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'] } })
     return r.violations.filter(v => ['serious', 'critical'].includes(v.impact))
       .map(v => `${v.id} (${v.impact}): ${v.nodes.slice(0, 3).map(n => n.target.join(' ')).join(' | ')}`)
@@ -56,6 +57,7 @@ await check('axe: «Hva AI-en så» på gjenstandssiden', async page => {
   await page.getByText('Sett på bildet').waitFor()
   await page.addScriptTag({ path: AXE })
   const v = await page.evaluate(async () => {
+    await Promise.all(document.getAnimations().map(a => a.finished.catch(() => {}))) // mål fargene etter inn-animasjonen
     const r = await window.axe.run(document, { runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'] } })
     return r.violations.filter(v => ['serious', 'critical'].includes(v.impact)).map(v => `${v.id}: ${v.nodes.slice(0, 2).map(n => n.target.join(' ')).join(' | ')}`)
   })
@@ -69,6 +71,7 @@ await check('axe: «Sammenlign med markedet» åpnet, med skjemaet for en ny sam
   await page.getByLabel('Hva er det?').waitFor()
   await page.addScriptTag({ path: AXE })
   const v = await page.evaluate(async () => {
+    await Promise.all(document.getAnimations().map(a => a.finished.catch(() => {}))) // mål fargene etter inn-animasjonen
     const r = await window.axe.run(document, { runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'] } })
     return r.violations.filter(v => ['serious', 'critical'].includes(v.impact)).map(v => `${v.id}: ${v.nodes.slice(0, 2).map(n => n.target.join(' ')).join(' | ')}`)
   })
