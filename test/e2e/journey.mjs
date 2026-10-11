@@ -76,7 +76,9 @@ const contested = {
     { id: ITEM, estate_id: EST, title: 'Gyngestol', status: 'active', estimated_value: '1500', added_by: UID, created_at: now, category_id: 'c1', categories: category, interests: bothWant },
     { id: 'it-2', estate_id: EST, title: 'Maleri', status: 'active', estimated_value: null, added_by: UID, created_at: now, category_id: 'c1', categories: category, interests: bothWant },
   ],
-  heirs: [],
+  // Personene på listen som kan få gjenstander (koblet til kontoene)
+  heirs: [{ id: 'heir-me', estate_id: EST, name: 'Test', email: 'test@test.no', relationship: 'Barn', percentage: 0, user_id: UID, created_at: now },
+    { id: 'heir-kari', estate_id: EST, name: 'Kari', email: 'kari@test.no', relationship: 'Barn', percentage: 0, user_id: U2, created_at: now }],
   // getItems henter interessene fra egen tabell
   interests: [ITEM, 'it-2'].flatMap(item_id => [UID, U2].map(user_id => ({ id: `${item_id}-${user_id}`, item_id, user_id, created_at: now }))),
 }

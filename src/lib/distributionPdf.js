@@ -5,7 +5,8 @@
 //   'final'  – fra en godkjent versjon, med de registrerte godkjenningene
 //   'paper'  – forslaget kan ikke godkjennes digitalt (f.eks. arving uten konto): signaturfelt på papir
 //   'demo'   – demoen (vannmerke DEMO), aldri en ekte fordeling
-// Godkjenninger beskrives som registrerte godkjenninger i Arvklart, ikke som elektroniske signaturer.
+// Godkjenninger beskrives som registrert i Arvklart av innloggede brukere (e-post og passord), uten
+// identitetsverifisering med BankID. Vi sier ikke noe om juridisk gyldighet.
 // Det som ikke er avklart, står for seg og omfattes ikke av godkjenningen.
 import { jsPDF } from 'jspdf'
 import { L, locale } from './lang.js'
@@ -44,14 +45,15 @@ export function buildDistributionPdf({ estateName, summary, kind = 'draft', gene
   text(estateName || '', { size: 13, color: ESPRESSO, gap: 2 })
   const status = {
     draft: L('UTKAST – ikke godkjent. Viser fordelingen slik den står nå.', 'DRAFT – not approved. Shows the distribution as it stands now.'),
-    final: L('Godkjent: alle beslutningstakerne har registrert sin godkjenning i Arvklart.', 'Approved: all decision-makers have registered their approval in Arvklart.'),
+    final: L(`Godkjent versjon: alle beslutningstakerne har registrert sin godkjenning i Arvklart${version?.approved_at ? ` (fullført ${fmtDate(version.approved_at)})` : ''}. Protokollen dokumenterer denne versjonen.`,
+      `Approved version: all decision-makers have registered their approval in Arvklart${version?.approved_at ? ` (completed ${fmtDate(version.approved_at)})` : ''}. This record documents this version.`),
     paper: L('Ikke godkjent digitalt. Forslaget må godkjennes og signeres på papir av alle beslutningstakerne.', 'Not approved digitally. The proposal must be approved and signed on paper by all decision-makers.'),
     demo: L('DEMO – ikke en ekte fordeling.', 'DEMO – not a real distribution.'),
   }[kind]
   text(status, { bold: true, color: ESPRESSO, gap: 1 })
   text(`${L('Laget', 'Generated')} ${fmtDate(generatedAt)}${version ? ` · ${L('versjon', 'version')} ${version.version_no} (${L('lagt frem', 'proposed')} ${fmtDate(version.created_at)})` : ''}`, { color: LATTE, gap: 2 })
-  text(L('Verdiene er fordelingsverdier familien har satt, adskilt fra AI-anslag. Verdiutjevningen er beslutningsstøtte, ikke en juridisk fasit. Godkjenninger er registrerte godkjenninger i Arvklart, ikke juridisk verifiserte elektroniske signaturer. Fullmakter og vergemål er registrert og bekreftet av familien, ikke kontrollert juridisk av Arvklart.',
-    'The values are distribution values set by the family, separate from AI estimates. The value balance is decision support, not a legal answer. Approvals are registered approvals in Arvklart, not legally verified electronic signatures. Powers of attorney and guardianships are registered and confirmed by the family, not checked legally by Arvklart.'), { size: 9, color: LATTE, gap: 2 })
+  text(L('Verdiene er fordelingsverdier familien har satt, adskilt fra AI-anslag. Verdiutjevningen er beslutningsstøtte, ikke en juridisk fasit. Godkjenningene er registrert i Arvklart av innloggede brukere (e-post og passord). Arvklart verifiserer ikke identitet med BankID. Fullmakter og vergemål er registrert og bekreftet av familien selv; Arvklart har ikke kontrollert dem.',
+    'The values are distribution values set by the family, separate from AI estimates. The value balance is decision support, not a legal answer. Approvals are registered in Arvklart by signed-in users (email and password). Arvklart does not verify identity with BankID. Powers of attorney and guardianships are registered and confirmed by the family itself; Arvklart has not checked them.'), { size: 9, color: LATTE, gap: 2 })
 
   const notSettled = summary.pending.length + summary.unwanted.undecided.length
   if (notSettled) {

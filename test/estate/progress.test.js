@@ -52,10 +52,11 @@ describe('isContested', () => {
 })
 
 describe('buildRemainingSteps', () => {
-  const base = { estateId: 'e', userId: 'k', members: [kari, ola], passes: [], heirs: [], tasks: [] }
+  const listed = [{ id: 'K', name: 'Kari', email: 'kari@x.no', relationship: 'Barn' }, { id: 'O', name: 'Ola', email: 'ola@x.no', relationship: 'Barn' }]
+  const base = { estateId: 'e', userId: 'k', members: [kari, ola], passes: [], heirs: listed, tasks: [] }
 
   test('ferdig bo har ingen steg', () => {
-    const items = [{ id: 'a', interests: want('k'), status: 'assigned' }]
+    const items = [{ id: 'a', interests: want('k'), status: 'assigned', assigned_heir_id: 'K' }]
     assert.deepEqual(buildRemainingSteps({ ...base, items }), [])
   })
 
@@ -96,6 +97,21 @@ describe('buildRemainingSteps', () => {
     assert.equal(steps[0].detail, 'Per, Lise')
     assert.equal(steps[1].title, '1 oppgave i sjekklisten er ikke fullført')
   })
+  test('uten personer som kan få gjenstander: første steg er å legge dem inn (rådgiver teller ikke)', () => {
+    const items = [{ id: 'a', interests: [], status: 'active' }]
+    const steps = buildRemainingSteps({ ...base, items, heirs: [{ name: 'Rolf', relationship: 'Advokat' }] })
+    assert.equal(steps[0].key, 'recipients')
+    assert.equal(steps[0].path, '/estate/e/heirs')
+    assert.ok(!buildRemainingSteps({ ...base, items, heirs: [{ name: 'Kari', relationship: 'Barn' }] }).some(s => s.key === 'recipients'))
+  })
+
+  test('eldre tildeling uten bekreftet person: steg for å bekrefte mottakeren', () => {
+    const one = buildRemainingSteps({ ...base, heirs: [{ id: 'K', relationship: 'Barn' }], items: [{ id: 'a', interests: [], status: 'assigned', assigned_to: 'k' }] })
+    const step = one.find(s => s.key === 'confirm_recipient')
+    assert.equal(step.path, '/estate/e/item/a')
+    const two = buildRemainingSteps({ ...base, heirs: [{ id: 'K', relationship: 'Barn' }], items: [{ id: 'a', status: 'assigned' }, { id: 'b', status: 'assigned', assigned_to: null }] })
+    assert.equal(two.find(s => s.key === 'confirm_recipient').path, '/estate/e/fordeling')
+  })
 })
 
 describe('buildRemainingSteps: forslag til fordeling', () => {
@@ -118,4 +134,5 @@ describe('getStatusBreakdown', () => {
     ]
     assert.deepEqual(getStatusBreakdown(items), { assigned: 1, contested: 1, single: 1, none: 2 })
   })
+
 })

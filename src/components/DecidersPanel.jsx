@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { L } from '../lib/lang'
 import { setMustApprove, confirmDeciderRemoval, addRepresentative, verifyRepresentative, revokeRepresentative } from '../lib/approval'
+import { receivesItems } from '../lib/recipients'
 
 // «Hvem godkjenner fordelingen»: beslutningstakere på arvelisten og representanter (fullmakt/verge).
 // Reglene håndheves i databasen (20261020_distribution_approval.sql):
@@ -57,7 +58,7 @@ export default function DecidersPanel({ estateId, heirs, members, userId, userEm
         {heirs.map(h => {
           const r = reps.find(x => x.heir_id === h.id)
           const self = h.user_id && h.user_id === userId
-          const canVerify = r && !r.verified_at && iAmDecider && r.user_id !== userId && r.created_by !== userId && !isDemo
+          const canVerify = r && r.user_id && !r.verified_at && iAmDecider && r.user_id !== userId && r.created_by !== userId && !isDemo
           const canRevoke = r && (isAdmin || r.user_id === userId || self) && !isDemo
           const canConfirmRemoval = h.exclusion_requested_by && h.exclusion_requested_by !== userId && (iAmDecider || self) && !isDemo
           return (
@@ -77,7 +78,12 @@ export default function DecidersPanel({ estateId, heirs, members, userId, userEm
                 <p style={{ ...small, color: '#8A4B2A' }}>{L('E-posten din står på flere arvinger, så Arvklart kan ikke vite hvem av dem du er. Rett e-posten på arvingen som ikke er deg, eller registrer en representant.', 'Your email is on several heirs, so Arvklart cannot tell which of them you are. Correct the email on the heir who is not you, or register a representative.')}</p>
               )}
               {h.exclusion_requested_by && <p style={{ ...small, color: '#8A4B2A' }}>{L(`Det er bedt om at ${h.name} ikke skal godkjenne: «${h.exclusion_reason}». Gjelder først når en annen beslutningstaker bekrefter.`, `It has been requested that ${h.name} should not approve: «${h.exclusion_reason}». Takes effect only when another decision-maker confirms.`)}</p>}
-              {r && <p style={small}>{L(`${nameOf(r.user_id)} er registrert som ${r.kind === 'verge' ? 'verge' : 'fullmektig'} (${r.basis}). `, `${nameOf(r.user_id)} is registered as ${r.kind === 'verge' ? 'guardian' : 'proxy'} (${r.basis}). `)}
+              <p style={small}>{receivesItems(h) ? L('Kan få gjenstander', 'Can receive items') : L('Får ikke gjenstander', 'Does not receive items')}
+                {isAdmin && !isDemo && <>{' · '}<button onClick={() => run(() => supabase.rpc('set_receives_items', { p_heir: h.id, p_value: !receivesItems(h) }), receivesItems(h) ? L(`${h.name} får ikke gjenstander`, `${h.name} does not receive items`) : L(`${h.name} kan få gjenstander`, `${h.name} can receive items`))} disabled={busy}
+                  style={{ background: 'none', border: 'none', padding: 0, color: '#3A2F26', textDecoration: 'underline', cursor: 'pointer', fontSize: '0.8125rem', fontFamily: 'Karla, sans-serif' }}>{L('Endre', 'Change')}</button></>}
+              </p>
+              {r && !r.user_id && <p style={{ ...small, color: '#8A4B2A' }}>{L('Representantens konto er slettet. Representasjonen er bevart i historikken, men kan ikke brukes.', 'The representative\'s account has been deleted. The representation is kept in the history, but cannot be used.')}</p>}
+              {r && r.user_id && <p style={small}>{L(`${nameOf(r.user_id)} er registrert som ${r.kind === 'verge' ? 'verge' : 'fullmektig'} (${r.basis}). `, `${nameOf(r.user_id)} is registered as ${r.kind === 'verge' ? 'guardian' : 'proxy'} (${r.basis}). `)}
                 <strong>{r.verified_at ? L('Bekreftet av en annen beslutningstaker i Arvklart.', 'Confirmed by another decision-maker in Arvklart.') : L('Ubekreftet – kan ikke svare før en annen beslutningstaker bekrefter.', 'Unconfirmed – cannot respond until another decision-maker confirms.')}</strong>
                 {r.verified_at && L(' Bekreftelsen betyr at familien godtar representasjonen. Arvklart har ikke kontrollert fullmakten eller vergemålet juridisk.', ' The confirmation means the family accepts the representation. Arvklart has not checked the power of attorney or guardianship legally.')}</p>}
 
@@ -115,7 +121,7 @@ export default function DecidersPanel({ estateId, heirs, members, userId, userEm
                   </select>
                   <label htmlFor={`rep-basis-${h.id}`} style={{ ...small, fontWeight: 600 }}>{L('Grunnlag (f.eks. skriftlig fullmakt datert …, eller vergemål)', 'Basis (e.g. written power of attorney dated …, or guardianship)')}</label>
                   <input id={`rep-basis-${h.id}`} value={rep.basis} onChange={e => setRep(r0 => ({ ...r0, basis: e.target.value }))} maxLength={1000} style={field} />
-                  {rep.kind === 'verge' && <p style={small}>{L('For mindreårige gjelder egne regler for verge og eventuell interessekonflikt. Arvklart håndhever ikke dette.', 'Special rules apply to guardians of minors and possible conflicts of interest. Arvklart does not enforce these.')}</p>}
+                  <p style={small}>{L('Ved mindreårige, interessekonflikt eller usikker fullmakt kan det være nødvendig med særskilt avklaring, for eksempel verge oppnevnt av statsforvalteren. Familiens bekreftelse i Arvklart er ikke en juridisk kontroll.', 'For minors, conflicts of interest or uncertain authority, a separate clarification may be needed, for example a guardian appointed by the county governor. The family\'s confirmation in Arvklart is not a legal check.')}</p>
                   {rep.user === userId && <p style={{ ...small, color: '#8A4B2A' }}>{L('Du registrerer deg selv som representant. Det vises for alle og må bekreftes av en annen beslutningstaker.', 'You are registering yourself as representative. This is visible to everyone and must be confirmed by another decision-maker.')}</p>}
                   <div style={{ display: 'flex', gap: '8px' }}>
                     <button disabled={busy || !rep.user || rep.basis.trim().length < 10} onClick={() => run(() => addRepresentative(h.id, rep.user, rep.kind, rep.basis), L('Representanten er registrert. En annen beslutningstaker må bekrefte.', 'The representative is registered. Another decision-maker must confirm.'))} style={{ ...btn, background: '#5F6E52', color: '#fff', border: 'none' }}>{L('Registrer', 'Register')}</button>

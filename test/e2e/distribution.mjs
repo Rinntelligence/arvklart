@@ -27,8 +27,14 @@ const members = [
 ]
 const item = (id, title, extra = {}) => ({ id, estate_id: EST, title, status: 'active', estimated_value: '1500', added_by: UID, added_by_name: 'Test',
   created_at: now, category_id: 'c1', categories: category, interests: bothWant, comments: [], image_url: null, extra_images: [], ...extra })
+// Personene på listen (mottakere); begge er koblet til kontoene sine
+const H1 = 'heir-me', H2 = 'heir-kari'
+const heirsF6 = [
+  { id: H1, estate_id: EST, name: 'Test', email: 'test@test.no', relationship: 'Barn', percentage: 50, user_id: UID, must_approve: true, created_at: now },
+  { id: H2, estate_id: EST, name: 'Kari', email: 'kari@test.no', relationship: 'Barn', percentage: 50, user_id: U2, must_approve: true, created_at: now },
+]
 const contested = {
-  estate_members: members, profiles: [me, kari], heirs: [],
+  estate_members: members, profiles: [me, kari], heirs: heirsF6,
   items: [item(ITEM, 'Gyngestol'), item('it-2', 'Maleri')],
   interests: [ITEM, 'it-2'].flatMap(item_id => [UID, U2].map(user_id => ({ id: `${item_id}-${user_id}`, item_id, user_id, created_at: now }))),
 }
@@ -56,9 +62,9 @@ await check('F1 Loddtrekning: databasen trekker (draw_lot), og «Bekreft og tild
   await page.waitForURL(`**/estate/${EST}`)
   const draw = rpc.find(c => c.name === 'draw_lot'), assign = rpc.find(c => c.name === 'assign_items')
   assert(draw?.body.p_item === ITEM, 'loddet ble ikke trukket av databasen')
-  assert(assign?.body.p_method === 'lottery' && assign.body.p_assignments[0].user_id === U2 && assign.body.p_estate === EST, `feil tildeling: ${JSON.stringify(assign?.body)}`)
+  assert(assign?.body.p_method === 'lottery' && assign.body.p_assignments[0].heir_id === H2 && assign.body.p_estate === EST, `feil tildeling: ${JSON.stringify(assign?.body)}`)
   assert(!patches.some(b => 'assigned_to' in b || 'status' in b), 'tildelingen ble skrevet direkte på gjenstanden')
-}, { fixtures: contested, rpc: { draw_lot: { body: { winner: U2, candidates: [UID, U2], draw_no: 1 } }, assign_items: { body: { assigned: 1, skipped: [] } } } })
+}, { fixtures: contested, rpc: { draw_lot: { body: { winner: U2, winner_heir: H2, candidates: [UID, U2], candidate_heirs: [H1, H2], draw_no: 1 } }, assign_items: { body: { assigned: 1, skipped: [] } } } })
 
 await check('F1 Tildeling fra gjenstandssiden går via assign_items (manuelt), angring via unassign_item', async page => {
   const { rpc, patches } = watch(page)
@@ -67,7 +73,7 @@ await check('F1 Tildeling fra gjenstandssiden går via assign_items (manuelt), a
   await page.getByRole('button', { name: /Kari/ }).first().click()
   await page.getByText('Gjenstand tildelt').waitFor()
   const assign = rpc.find(c => c.name === 'assign_items')
-  assert(assign?.body.p_method === 'manual' && assign.body.p_assignments[0].item_id === ITEM && assign.body.p_assignments[0].user_id === U2, `feil kall: ${JSON.stringify(assign?.body)}`)
+  assert(assign?.body.p_method === 'manual' && assign.body.p_assignments[0].item_id === ITEM && assign.body.p_assignments[0].heir_id === H2, `feil kall: ${JSON.stringify(assign?.body)}`)
   assert(!patches.some(b => 'assigned_to' in b), 'tildelingen ble skrevet direkte')
 }, { fixtures: contested, rpc: { assign_items: { body: { assigned: 1, skipped: [] } } } })
 
@@ -211,8 +217,8 @@ await check('F4 Arving ser valgene, men kan ikke endre dem', async page => {
 const overview = {
   ...contested, interests: contested.interests.filter(x => x.item_id === 'it-2'),
   items: [
-    item(ITEM, 'Gyngestol', { status: 'assigned', assigned_to: UID, agreed_value: 3000, interests: [] }),
-    item('it-3', 'Klokke', { status: 'assigned', assigned_to: U2, agreed_value: 1000, interests: [] }),
+    item(ITEM, 'Gyngestol', { status: 'assigned', assigned_to: UID, assigned_heir_id: H1, agreed_value: 3000, interests: [] }),
+    item('it-3', 'Klokke', { status: 'assigned', assigned_to: U2, assigned_heir_id: H2, agreed_value: 1000, interests: [] }),
     item('it-2', 'Maleri', { interests: bothWant }),
     item('u-2', 'Kristallglass', { interests: [], disposition: 'donate' }),
   ],
@@ -240,13 +246,9 @@ await check('F5 Avslutt boet: påminnelse om å se fordelingen og laste ned prot
 }, { fixtures: overview })
 
 // ── F6: forslag og godkjenning ──────────────────────────────────────────────────
-const H1 = 'heir-me', H2 = 'heir-kari'
-const heirsF6 = [
-  { id: H1, estate_id: EST, name: 'Test', email: 'test@test.no', relationship: 'Barn', percentage: 50, user_id: UID, must_approve: true, created_at: now },
-  { id: H2, estate_id: EST, name: 'Kari', email: 'kari@test.no', relationship: 'Barn', percentage: 50, user_id: U2, must_approve: true, created_at: now },
-]
 const version = { id: 'v-1', estate_id: EST, version_no: 1, created_at: now, approved_at: null, required: [{ heir_id: H1 }, { heir_id: H2 }],
-  snapshot: { items: [{ id: ITEM, title: 'Gyngestol', status: 'assigned', assigned_to: UID, agreed_value: 3000 }, { id: 'it-2', title: 'Maleri', status: 'active', wanted_by: 2 }], member_names: { [UID]: 'Test', [U2]: 'Kari' } } }
+  snapshot: { items: [{ id: ITEM, title: 'Gyngestol', status: 'assigned', assigned_heir_id: H1, agreed_value: 3000 }, { id: 'it-2', title: 'Maleri', status: 'active', wanted_by: 2 }],
+    heirs: [{ id: H1, name: 'Test', receives_items: true }, { id: H2, name: 'Kari', receives_items: true }] } }
 const st = (state, heirs, extra = {}) => ({ body: { id: 'v-1', version_no: 1, state, outdated: false, approved_at: null, created_at: now, required: 2, approved: heirs.filter(h => h.decision === 'approve').length, objections: 0, heirs, ...extra } })
 const hMe = (extra = {}) => ({ heir_id: H1, name: 'Test', user_id: UID, representative: null, decision: null, ...extra })
 const hKari = (extra = {}) => ({ heir_id: H2, name: 'Kari', user_id: U2, representative: null, decision: 'approve', at: now, responder: U2, responder_email: 'kari@test.no', via_representative: false, ...extra })
@@ -256,7 +258,7 @@ await check('F6 Admin legger frem forslag (propose_distribution) når ingen fors
   const { rpc } = watch(page)
   await page.goto(`${BASE}/estate/${EST}/fordeling`)
   await page.getByRole('heading', { name: 'Godkjenning' }).waitFor()
-  await page.getByText(/ikke en juridisk verifisert elektronisk signatur/).waitFor()
+  await page.getByText(/Arvklart verifiserer ikke identitet med BankID/).waitFor()
   await page.getByRole('button', { name: 'Legg frem forslag' }).click()
   await page.getByText(/Forslaget er lagt frem/).waitFor()
   assert(rpc.some(c => c.name === 'propose_distribution' && c.body.p_estate === EST), 'propose_distribution ble ikke kalt')
@@ -272,6 +274,7 @@ await check('F6 Beslutningstaker godkjenner for seg selv; delvis fordeling sies 
   await page.getByText('Godkjenningen din er registrert').waitFor()
   const c = rpc.find(x => x.name === 'respond_distribution')
   assert(c?.body.p_version === 'v-1' && c.body.p_heir === H1 && c.body.p_decision === 'approve', `feil svar: ${JSON.stringify(c?.body)}`)
+  await page.waitForLoadState('networkidle') // panelet lastes på nytt etter svaret; mål når det står stille
   const v = await axe(page)
   assert(!v.length, v.join('; '))
 }, { fixtures: f6({ distribution_versions: [version] }), rpc: { distribution_status: st('pending', [hMe(), hKari()]), respond_distribution: st('pending', [hMe({ decision: 'approve' }), hKari()]) } })
@@ -367,6 +370,117 @@ await check('F6 Arvinger: e-post på flere arvinger kan ikke kobles, og det fork
   await page.getByText(/E-posten din står på flere arvinger/).first().waitFor()
   assert(!(await page.getByRole('button', { name: 'Dette er meg – koble kontoen min' }).count()), 'knappen vises selv om e-posten er tvetydig')
 }, { fixtures: f6({ heirs: [{ ...heirsF6[0], user_id: null }, heirsF6[1], { ...heirsF6[0], id: 'h-dup', name: 'Test 2', user_id: null }] }) })
+
+// ── Tildeling til personen (20261021) ────────────────────────────────────────────
+const gunn = { id: 'heir-gunn', estate_id: EST, name: 'Gunn', email: null, relationship: 'Barn', percentage: 0, user_id: null, created_at: now }
+const adv = { id: 'heir-adv', estate_id: EST, name: 'Advokat Rolf', email: 'rolf@test.no', relationship: 'Advokat', percentage: 0, user_id: null, receives_items: false, must_approve: false, created_at: now }
+const cato = { user_id: '11111111-0000-0000-0000-000000000003', display_name: 'Cato', avatar_color: '#9C8267', email: 'cato@test.no' }
+
+await check('Tildeling: velgeren viser personene som kan få gjenstander – også uten konto, ikke administrator utenfor listen', async page => {
+  const { rpc } = watch(page)
+  await page.goto(`${BASE}/estate/${EST}/item/${ITEM}`)
+  await page.getByRole('button', { name: /^Tildel/ }).first().click()
+  await page.getByText('Hvem skal ha den?').waitFor()
+  assert(await page.getByRole('button', { name: 'Gunn', exact: true }).count() === 1, 'personen uten konto mangler')
+  assert(await page.getByRole('button', { name: /Cato/ }).count() === 0, 'administrator som ikke står på listen, vises som mottaker')
+  assert(await page.getByRole('button', { name: /Advokat Rolf/ }).count() === 0, 'advokat uten mottakerstatus vises som mottaker')
+  await page.getByRole('button', { name: 'Gunn', exact: true }).click()
+  await page.getByText('Gjenstand tildelt').waitFor()
+  const a = rpc.find(c => c.name === 'assign_items')
+  assert(a?.body.p_assignments[0].heir_id === 'heir-gunn', `feil kall: ${JSON.stringify(a?.body)}`)
+  const v = await axe(page)
+  assert(!v.length, v.join('; '))
+}, { fixtures: { ...contested, heirs: [...heirsF6, gunn, adv], estate_members: [...members, { estate_id: EST, user_id: cato.user_id, role: 'admin', joined_at: now, profiles: cato }], profiles: [me, kari, cato] },
+  rpc: { assign_items: { body: { assigned: 1, skipped: [] } } } })
+
+await check('Fordelingen: tildelt person uten konto vises med navn; administrator utenfor listen vises ikke', async page => {
+  await page.goto(`${BASE}/estate/${EST}/fordeling`)
+  await page.getByRole('region', { name: 'Gunn' }).getByText(/1 gjenstand/).first().waitFor()
+  assert(await page.getByRole('region', { name: 'Cato' }).count() === 0, 'administrator uten plass på listen vises')
+}, { fixtures: { ...overview, heirs: [...heirsF6, gunn], estate_members: [...members, { estate_id: EST, user_id: cato.user_id, role: 'admin', joined_at: now, profiles: cato }], profiles: [me, kari, cato],
+  items: overview.items.map(i => (i.id === 'it-3' ? { ...i, assigned_to: null, assigned_heir_id: 'heir-gunn' } : i)) } })
+
+await check('Arvinger: mottakerstatus vises per person; administrator kan registrere en rådgiver som mottaker', async page => {
+  const { rpc } = watch(page)
+  await page.goto(`${BASE}/estate/${EST}/heirs`)
+  const row = page.getByRole('listitem').filter({ hasText: 'Advokat Rolf' })
+  await row.getByText('Får ikke gjenstander').waitFor()
+  await row.getByRole('button', { name: 'Endre' }).click()
+  await page.getByText('Advokat Rolf kan få gjenstander').waitFor()
+  assert(rpc.some(c => c.name === 'set_receives_items' && c.body.p_heir === 'heir-adv' && c.body.p_value === true), 'set_receives_items ble ikke kalt')
+  await page.getByText(/Arvklart avgjør ikke hvem som har arverett/).waitFor()
+}, { fixtures: f6({ heirs: [...heirsF6, adv] }), rpc: { set_receives_items: { body: { ok: true } } } })
+
+await check('Godkjenning: svar fra slettet konto står som registrert; ingen påstand om ugyldighet', async page => {
+  await page.goto(`${BASE}/estate/${EST}/fordeling`)
+  await page.getByText('Godkjent av alle').waitFor()
+  await page.getByText(/Ett svar ble registrert av en konto som senere er slettet\. Registreringen er bevart\./).waitFor()
+  await page.getByText(/kontoen er senere slettet; registreringen er bevart/).waitFor()
+}, { fixtures: f6({ distribution_versions: [{ ...version, approved_at: now }] }),
+  rpc: { distribution_status: st('approved', [hMe({ decision: 'approve', at: now }), hKari({ user_id: null, responder: null, responder_email: null, account_deleted: true })], { approved_at: now, deleted_accounts: 1 }) } })
+
+await check('Godkjenning: endret e-post eller representasjon mens forslaget venter – ingen kan svare, admin legger frem ny versjon', async page => {
+  await page.goto(`${BASE}/estate/${EST}/fordeling`)
+  await page.getByText(/E-post eller representasjon er endret etter at forslaget ble lagt frem/).waitFor()
+  assert(await page.getByRole('button', { name: 'Godkjenn fordelingen' }).count() === 0, 'kunne svare')
+  await page.getByRole('button', { name: 'Legg frem ny versjon' }).waitFor()
+}, { fixtures: f6({ distribution_versions: [version] }), rpc: { distribution_status: st('outdated', [hMe(), hKari({ decision: null })], { authority_changed: true }) } })
+
+await check('Arvinger: representant som har slettet kontoen, kan ikke bekreftes eller brukes', async page => {
+  await page.goto(`${BASE}/estate/${EST}/heirs`)
+  await page.getByText(/Representantens konto er slettet/).waitFor()
+  assert(await page.getByRole('button', { name: 'Bekreft representasjonen' }).count() === 0, 'kunne bekrefte representasjon uten konto')
+}, { fixtures: asMember(f6({ heirs: [...heirsF6, gunn],
+  heir_representatives: [{ id: 'rep-x', estate_id: EST, heir_id: 'heir-gunn', user_id: null, kind: 'verge', basis: 'Oppnevnt verge, vedtak', created_by: U2, verified_at: null, revoked_at: null }] })) })
+
+await check('Løsningsmetoder: uten personer som kan få gjenstander vises veien til «Arvinger»', async page => {
+  await page.goto(`${BASE}/estate/${EST}/conflicts`)
+  await page.getByText(/Før gjenstandene kan fordeles, må dere legge inn hvem som kan få gjenstander/).waitFor()
+}, { fixtures: { ...contested, heirs: [] } })
+
+// ── Eldre tildelinger uten bekreftet person (før 20261021) ───────────────────────
+const legacyItem = item('it-old', 'Kommode', { status: 'assigned', assigned_to: cato.user_id, assigned_heir_id: null, agreed_value: 1200, interests: [] })
+const legacyFx = { ...overview, heirs: [...heirsF6, gunn], estate_members: [...members, { estate_id: EST, user_id: cato.user_id, role: 'admin', joined_at: now, profiles: cato }],
+  profiles: [me, kari, cato], items: [...overview.items, legacyItem] }
+
+await check('Eldre tildeling: vises tydelig med kontoen, familien bekrefter mottakeren (ingen gjetting)', async page => {
+  const { rpc } = watch(page)
+  await page.goto(`${BASE}/estate/${EST}/item/it-old`)
+  await page.getByText('Tildelt kontoen til Cato').waitFor()
+  await page.getByText(/Mottakeren er ikke bekreftet som en person på listen/).waitFor()
+  await page.getByRole('button', { name: 'Bekreft mottaker' }).click()
+  await page.getByRole('button', { name: 'Gunn', exact: true }).click()
+  await page.getByText('Mottakeren er bekreftet').waitFor()
+  const c = rpc.find(x => x.name === 'confirm_assignment_recipient')
+  assert(c?.body.p_item === 'it-old' && c.body.p_heir === 'heir-gunn', `feil kall: ${JSON.stringify(c?.body)}`)
+  assert(!rpc.some(x => x.name === 'assign_items' || x.name === 'unassign_item'), 'tildelingen ble endret på annen måte')
+  const v = await axe(page)
+  assert(!v.length, v.join('; '))
+}, { fixtures: { ...legacyFx, items: [legacyItem] }, rpc: { confirm_assignment_recipient: { body: { ok: true } } } })
+
+await check('Eldre tildeling der kontoen er slettet: forklares uten teknisk feil', async page => {
+  await page.goto(`${BASE}/estate/${EST}/item/it-old`)
+  await page.getByText('Tildelt en konto som senere er slettet').waitFor()
+  await page.getByRole('button', { name: 'Bekreft mottaker' }).waitFor()
+}, { fixtures: { ...legacyFx, items: [{ ...legacyItem, assigned_to: null }] } })
+
+await check('Fordelingen: eldre tildeling vises under kontoen med vei til bekreftelse; forslag venter til den er bekreftet', async page => {
+  const { rpc } = watch(page)
+  await page.goto(`${BASE}/estate/${EST}/fordeling`)
+  const sec = page.getByRole('region', { name: 'Cato' })
+  await sec.getByText(/ikke bekreftet som en person på listen/).waitFor()
+  await sec.getByRole('button', { name: 'Kommode' }).waitFor()
+  await page.getByText(/Før forslaget kan legges frem, må familien bekrefte hvem som skal ha denne gjenstanden/).waitFor()
+  assert(await page.getByRole('button', { name: 'Legg frem forslag' }).isDisabled(), 'forslag kunne legges frem')
+  assert(!rpc.some(x => x.name === 'propose_distribution'), 'propose ble kalt')
+  const v = await axe(page)
+  assert(!v.length, v.join('; '))
+}, { fixtures: { ...legacyFx, distribution_versions: [] } })
+
+await check('Hva gjenstår: bo uten mottakere får «Legg inn hvem som kan få gjenstander» først', async page => {
+  await page.goto(`${BASE}/estate/${EST}/status`)
+  await page.getByText('Legg inn hvem som kan få gjenstander').waitFor()
+}, { fixtures: { ...contested, heirs: [] } })
 
 await browser.close()
 console.log(results.join('\n'))

@@ -11,6 +11,13 @@ test('tildeling, angring og loddtrekning med navn og metode', () => {
   assert.equal(eventText({ kind: 'lottery_draw', actor: 'b', data: { candidates: ['a', 'b'], winner: 'a', draw_no: 2 } }, nameOf), 'Loddtrekning nr. 2 blant Kari, Lars: Kari ble trukket')
 })
 
+test('tildeling til personen på listen: navnet fra listen, også uten konto og etter kontosletting', () => {
+  assert.equal(eventText({ kind: 'assigned', actor: 'b', data: { to: null, heir_id: 'g', name: 'Gunn', method: 'manual' } }, nameOf), 'Lars tildelte gjenstanden til Gunn (valgt av administrator)')
+  assert.equal(eventText({ kind: 'unassigned', actor: 'b', data: { from: null, heir_id: 'g', name: 'Gunn' } }, nameOf), 'Lars angret tildelingen til Gunn')
+  assert.equal(eventText({ kind: 'lottery_draw', actor: 'b', data: { candidates: ['a', 'b'], winner: DELETED_USER, winner_name: 'Kari', draw_no: 1 } }, nameOf), 'Loddtrekning nr. 1 blant Kari, Lars: Kari ble trukket')
+  assert.equal(eventText({ kind: 'heir_receives_set', actor: 'b', data: { name: 'Advokat Rolf', value: true } }, nameOf), 'Lars registrerte at Advokat Rolf kan få gjenstander')
+})
+
 test('ønsker og nei takk; ukjente og slettede brukere får en fast tekst', () => {
   assert.equal(eventText({ kind: 'wish_added', actor: 'a', data: { user_id: 'a' } }, nameOf), 'Kari ønsker denne')
   assert.equal(eventText({ kind: 'pass_added', actor: 'x', data: { user_id: 'x' } }, nameOf), 'tidligere medlem sa nei takk')

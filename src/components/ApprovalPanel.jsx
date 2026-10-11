@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react'
 import { L, locale } from '../lib/lang'
 import { latestVersion, versionStatus, proposeDistribution, respondDistribution, stateLabel, heirStatusText } from '../lib/approval'
+import { unconfirmedAssignments } from '../lib/recipients'
 
 // Godkjenning av fordelingen (F6). Administrator legger frem et forslag; hver beslutningstaker godkjenner
 // eller sier fra selv (eller via en bekreftet representant). Reglene håndheves i databasen. Godkjenningene er
-// registrerte godkjenninger i Arvklart, ikke elektroniske signaturer. Uavklarte gjenstander omfattes ikke.
+// registrert i Arvklart av innloggede brukere, uten identitetsverifisering med BankID. Uavklarte gjenstander
+// omfattes ikke.
 export default function ApprovalPanel({ estateId, userId, isAdmin, isDemo, closed, items, nameOf, onVersion, onToast }) {
   const [version, setVersion] = useState(null)
   const [status, setStatus] = useState(null)
@@ -28,7 +30,12 @@ export default function ApprovalPanel({ estateId, userId, isAdmin, isDemo, close
     setBusy(true)
     const { error } = await proposeDistribution(estateId)
     setBusy(false)
-    if (error) { onToast(L('Kunne ikke legge frem forslaget. Sjekk at arvelisten har beslutningstakere.', 'Could not propose the distribution. Check that the list of heirs has decision-makers.'), 'error'); return }
+    if (error) {
+      onToast(/bekreftet person/.test(error.message || '')
+        ? L('Noen gjenstander er tildelt uten en bekreftet person på listen. Bekreft mottakeren på gjenstanden først.', 'Some items are assigned without a confirmed person on the list. Confirm the recipient on the item first.')
+        : L('Kunne ikke legge frem forslaget. Sjekk at arvelisten har beslutningstakere.', 'Could not propose the distribution. Check that the list of heirs has decision-makers.'), 'error')
+      return
+    }
     onToast(L('Forslaget er lagt frem. Alle beslutningstakerne kan nå svare.', 'The proposal has been made. All decision-makers can now respond.'))
     load()
   }
@@ -48,13 +55,24 @@ export default function ApprovalPanel({ estateId, userId, isAdmin, isDemo, close
 
   if (!loaded) return null
   const mine = (status?.heirs || []).filter(h => h.user_id === userId || h.representative?.user_id === userId)
-  const canRespond = status && !status.approved_at && !status.outdated && !closed
+  const canRespond = status && !status.approved_at && !status.outdated && !status.authority_changed && !closed
   const unsettled = version ? (version.snapshot?.items || []).filter(i => i.status !== 'assigned' && !i.disposition).length : 0
   const link = `${window.location.origin}/estate/${estateId}/fordeling`
   const shareText = L(`Fordelingen av innbo og løsøre er lagt frem i Arvklart. Se over og godkjenn eller si fra her: ${link}`, `The division of household contents has been proposed in Arvklart. Review it and approve or object here: ${link}`)
 
   const box = { background: '#fff', border: '1px solid #D9CFC0', borderRadius: '12px', padding: '16px', marginBottom: '12px' }
   const small = { fontSize: '0.8125rem', color: '#5C4530', lineHeight: 1.6, margin: 0 }
+  // Alle tildelinger må ha en bekreftet person før et forslag kan legges frem (håndheves i databasen)
+  const unconfirmed = unconfirmedAssignments(items)
+  const confirmFirst = isAdmin && !closed && unconfirmed.length > 0 && (
+    <div style={{ marginTop: '10px' }}>
+      <p style={{ ...small, color: '#3A2F26' }}>{L(`Før forslaget kan legges frem, må familien bekrefte hvem som skal ha ${unconfirmed.length === 1 ? 'denne gjenstanden' : `disse ${unconfirmed.length} gjenstandene`}. De er tildelt en konto som ikke er bekreftet som en person på listen:`,
+        `Before the proposal can be made, the family must confirm who should have ${unconfirmed.length === 1 ? 'this item' : `these ${unconfirmed.length} items`}. They are assigned to an account that is not confirmed as a person on the list:`)}</p>
+      <ul style={{ ...small, paddingLeft: '18px', margin: '4px 0 0' }}>
+        {unconfirmed.map(i => <li key={i.id}><a href={`/estate/${estateId}/item/${i.id}`} style={{ color: '#3A2F26' }}>{i.title}</a></li>)}
+      </ul>
+    </div>
+  )
   const btn = (primary) => ({ minHeight: '44px', padding: '8px 14px', borderRadius: '8px', cursor: 'pointer', fontSize: '0.875rem', fontFamily: 'Karla, sans-serif',
     background: primary ? '#5F6E52' : '#fff', color: primary ? '#fff' : '#3A2F26', border: primary ? 'none' : '1px solid #9A8B78' })
 
@@ -62,14 +80,15 @@ export default function ApprovalPanel({ estateId, userId, isAdmin, isDemo, close
     <section aria-labelledby="approval-title" style={{ marginTop: '28px' }}>
       <h2 id="approval-title" style={{ fontFamily: 'Fraunces, serif', fontSize: '1.25rem', fontWeight: 400, color: '#3A2F26', margin: '0 0 10px' }}>{L('Godkjenning', 'Approval')}</h2>
       <p style={{ ...small, marginBottom: '12px' }}>
-        {L('Fordelingen er endelig først når alle beslutningstakerne har godkjent den. Godkjenningen registreres i Arvklart; den er ikke en juridisk verifisert elektronisk signatur.',
-          'The distribution is final only when all decision-makers have approved it. The approval is registered in Arvklart; it is not a legally verified electronic signature.')}
+        {L('Fordelingen er godkjent når alle beslutningstakerne har godkjent den. Godkjenningen registreres i Arvklart med innloggingen din (e-post og passord). Arvklart verifiserer ikke identitet med BankID.',
+          'The distribution is approved when all decision-makers have approved it. The approval is registered in Arvklart with your sign-in (email and password). Arvklart does not verify identity with BankID.')}
       </p>
 
       {!version ? (
         <div style={box}>
           <p style={small}>{L('Ingen forslag er lagt frem ennå.', 'No proposal has been made yet.')}</p>
-          {isAdmin && !closed && <button onClick={propose} disabled={busy} style={{ ...btn(true), marginTop: '10px' }}>{L('Legg frem forslag', 'Propose the distribution')}</button>}
+          {confirmFirst}
+          {isAdmin && !closed && <button onClick={propose} disabled={busy || unconfirmed.length > 0} style={{ ...btn(true), marginTop: '10px' }}>{L('Legg frem forslag', 'Propose the distribution')}</button>}
         </div>
       ) : (
         <div role="status" style={{ ...box, borderColor: status?.state === 'approved' ? '#B8C8A8' : '#D9CFC0', background: status?.state === 'approved' ? '#DCE3D2' : '#fff' }}>
@@ -77,10 +96,12 @@ export default function ApprovalPanel({ estateId, userId, isAdmin, isDemo, close
           <p style={small}>{L(`Versjon ${version.version_no}, lagt frem ${new Date(version.created_at).toLocaleDateString(locale(), { day: 'numeric', month: 'long', year: 'numeric' })}`, `Version ${version.version_no}, proposed ${new Date(version.created_at).toLocaleDateString(locale(), { day: 'numeric', month: 'long', year: 'numeric' })}`)} · {L(`${status?.approved} av ${status?.required} har godkjent`, `${status?.approved} of ${status?.required} have approved`)}</p>
           {unsettled > 0 && <p style={{ ...small, marginTop: '6px', fontWeight: 600 }}>{L(`Delvis fordeling: ${unsettled} ${unsettled === 1 ? 'gjenstand er' : 'gjenstander er'} ikke avklart og omfattes ikke av godkjenningen.`, `Partial distribution: ${unsettled} ${unsettled === 1 ? 'item is' : 'items are'} not settled and not covered by the approval.`)}</p>}
           {status?.outdated && <p style={{ ...small, marginTop: '6px', color: '#8A4B2A' }}>{status.approved_at
-            ? L('Fordelingen er endret etter at den ble godkjent. Den godkjente versjonen står fast, men endringene krever en ny versjon som alle godkjenner.', 'The distribution has changed since it was approved. The approved version stands, but the changes require a new version that everyone approves.')
+            ? L('Fordelingen er endret etter at den ble godkjent. Den godkjente versjonen er lagret som dokumentasjon, men endringene krever en ny versjon som alle godkjenner.', 'The distribution has changed since it was approved. The approved version is kept as documentation, but the changes require a new version that everyone approves.')
             : L('Fordelingen er endret etter at forslaget ble lagt frem. Alle må godkjenne en ny versjon.', 'The distribution has changed since the proposal was made. Everyone must approve a new version.')}</p>}
+          {status?.authority_changed && !status?.outdated && <p style={{ ...small, marginTop: '6px', color: '#8A4B2A' }}>{L('E-post eller representasjon er endret etter at forslaget ble lagt frem. Administrator må legge frem en ny versjon før noen kan svare.', 'An email address or representation has changed since the proposal was made. The administrator must propose a new version before anyone can respond.')}</p>}
           {status?.state === 'not_digitally_approvable' && <p style={{ ...small, marginTop: '6px' }}>{L('Minst én beslutningstaker har ikke konto og ingen bekreftet representant. Forslaget kan ikke godkjennes digitalt; last ned protokollen for signering på papir, eller inviter arvingen.', 'At least one decision-maker has no account and no confirmed representative. The proposal cannot be approved digitally; download the record for signing on paper, or invite the heir.')}</p>}
 
+          {status?.deleted_accounts > 0 && <p style={{ ...small, marginTop: '6px' }}>{L(`${status.deleted_accounts === 1 ? 'Ett svar' : `${status.deleted_accounts} svar`} ble registrert av en konto som senere er slettet. Registreringen er bevart.`, `${status.deleted_accounts === 1 ? 'One response was' : `${status.deleted_accounts} responses were`} registered by an account that has since been deleted. The registration is kept.`)}</p>}
           <ul style={{ listStyle: 'none', padding: 0, margin: '12px 0 0', display: 'grid', gap: '6px' }}>
             {(status?.heirs || []).map(h => (
               <li key={h.heir_id} style={{ ...small, background: '#FBF9F5', border: '1px solid #E8DFD0', borderRadius: '8px', padding: '8px 10px' }}>
@@ -127,7 +148,8 @@ export default function ApprovalPanel({ estateId, userId, isAdmin, isDemo, close
           )}
 
           <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '14px' }}>
-            {isAdmin && !closed && (status?.outdated || status?.state === 'objected') && <button onClick={propose} disabled={busy} style={btn(true)}>{L('Legg frem ny versjon', 'Propose a new version')}</button>}
+            {(status?.outdated || status?.authority_changed || status?.state === 'objected') && confirmFirst}
+            {isAdmin && !closed && (status?.outdated || status?.authority_changed || status?.state === 'objected') && unconfirmed.length === 0 && <button onClick={propose} disabled={busy} style={btn(true)}>{L('Legg frem ny versjon', 'Propose a new version')}</button>}
             {!status?.approved_at && (
               <>
                 <a href={`mailto:?subject=${encodeURIComponent(L('Fordelingen i Arvklart', 'The distribution in Arvklart'))}&body=${encodeURIComponent(shareText)}`} style={{ ...btn(false), display: 'inline-flex', alignItems: 'center', textDecoration: 'none' }}>{L('Del lenke på e-post', 'Share link by email')}</a>

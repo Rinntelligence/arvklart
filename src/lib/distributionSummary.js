@@ -6,24 +6,40 @@
 import { L } from './lang.js'
 import { formatNOK } from './format.js'
 import { itemValue, confirmedWeights } from './distribution.js'
-import { decidingMembers } from './estateProgress.js'
+import { recipientsOf, recipientOf } from './recipients.js'
 
 export function summarizeDistribution({ items = [], members = [], heirs = [], estate = null }) {
-  const name = id => members.find(m => m.user_id === id)?.profiles?.display_name || L('tidligere medlem', 'former member')
-  const deciders = decidingMembers(members, heirs)
+  // Per person på listen som kan få gjenstander (også uten konto). Brukerrollen teller ikke: en administrator
+  // vises bare når hen står på listen. Fra eldre data kan en tildeling peke på en konto uten person på
+  // listen; den vises da under kontonavnet, så ingenting forsvinner.
+  const accountName = id => members.find(m => m.user_id === id)?.profiles?.display_name || L('tidligere medlem', 'former member')
+  const people = recipientsOf(heirs)
   const assigned = items.filter(i => i.status === 'assigned')
-  const recipients = [...new Set([...deciders.map(m => m.user_id), ...assigned.map(i => i.assigned_to).filter(Boolean)])]
+  const extra = []
+  for (const i of assigned) {
+    const h = recipientOf(i, heirs)
+    if (h && !people.includes(h) && !extra.includes(h)) extra.push(h)
+  }
+  const orphanAccounts = [...new Set(assigned.filter(i => !recipientOf(i, heirs)).map(i => i.assigned_to || null))]
 
-  const perHeir = recipients.map(uid => {
-    const mine = assigned.filter(i => i.assigned_to === uid)
-    const known = mine.filter(i => itemValue(i) !== null)
-    return { user_id: uid, name: name(uid), items: mine, sum: known.reduce((a, i) => a + itemValue(i), 0), unknown: mine.length - known.length }
+  const perHeir = [
+    ...[...people, ...extra].map(h => {
+      const mine = assigned.filter(i => recipientOf(i, heirs)?.id === h.id)
+      return { heir_id: h.id, user_id: h.user_id || null, name: h.name, items: mine, receives: people.includes(h) }
+    }),
+    // Tildelt en konto uten bekreftet person på listen (eldre tildeling, eller kontoen er slettet)
+    ...orphanAccounts.map(uid => ({ heir_id: null, user_id: uid, unconfirmed: true,
+      name: uid ? accountName(uid) : L('Konto som er slettet', 'Deleted account'),
+      items: assigned.filter(i => !recipientOf(i, heirs) && (i.assigned_to || null) === uid), receives: false })),
+  ].map(h => {
+    const known = h.items.filter(i => itemValue(i) !== null)
+    return { ...h, sum: known.reduce((a, i) => a + itemValue(i), 0), unknown: h.items.length - known.length }
   })
   const totalKnown = perHeir.reduce((a, h) => a + h.sum, 0)
   const weights = confirmedWeights(heirs, estate)
-  const shareBase = deciders.length || perHeir.length
+  const shareBase = people.length || perHeir.length
   for (const h of perHeir) {
-    const share = weights ? (weights[h.user_id] || 0) : (deciders.some(m => m.user_id === h.user_id) ? 1 / shareBase : 0)
+    const share = weights ? (weights[h.heir_id] || 0) : (h.receives ? 1 / shareBase : 0)
     h.share = share
     h.target = Math.round(totalKnown * share)
     h.diff = Math.round(h.sum - h.target)
@@ -38,6 +54,7 @@ export function summarizeDistribution({ items = [], members = [], heirs = [], es
     unwanted: { sell: byDisp('sell'), donate: byDisp('donate'), discard: byDisp('discard'), undecided: byDisp(null) },
     pending, // ønsket av noen, men ikke tildelt ennå
     complete: pending.length === 0 && byDisp(null).length === 0,
+    hasRecipients: people.length > 0,
     itemCount: items.length,
   }
 }
@@ -55,6 +72,8 @@ export function diffText(h, { totalKnown, weighted }) {
 // Et godkjent forslag lagrer tilstanden (distribution_versions.snapshot). Dette gjør den om til samme
 // form som summarizeDistribution bruker, så protokollen lages fra det som faktisk ble godkjent.
 export function snapshotInput(snapshot = {}) {
+  // Nye øyeblikksbilder har personene (heirs) og assigned_heir_id. Eldre har kontonavn (member_names) og
+  // assigned_to; de brukes bare som reserve for tildelinger som ikke kan kobles til en person.
   const names = snapshot.member_names || {}
   return {
     items: (snapshot.items || []).map(i => ({ ...i, interests: Array.from({ length: i.wanted_by || 0 }, () => ({})) })),
