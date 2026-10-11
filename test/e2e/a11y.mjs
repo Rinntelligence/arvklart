@@ -19,6 +19,7 @@ async function audit(page, path, ready) {
 
 const PAGES = [
   { path: '/logg-inn', ready: /Logg inn/, loggedIn: false },
+  { path: '/', ready: /Test ut demo/, loggedIn: false }, // forsiden
   { path: '/', ready: 'Testbo' },
   { path: `/estate/${EST}`, ready: 'Gyngestol' },
   { path: `/estate/${EST}/item/${ITEM}`, ready: 'Gyngestol' },

@@ -324,7 +324,7 @@ export default function ConflictPage({ session, onToast }) {
             fontFamily:'Karla, sans-serif', transition:'all 0.15s',
           }}>
             <div style={{ fontSize:'0.8125rem', fontWeight:'500', marginBottom:'3px' }}>{m.title}</div>
-            <div style={{ fontSize:'0.6875rem', opacity:0.65, lineHeight:1.4 }}>{m.desc}</div>
+            <div style={{ fontSize:'0.6875rem', color:mode===m.id?'#E8DFD0':'#75604B', lineHeight:1.4 }}>{m.desc}</div>
           </button>
         ))}
       </div>

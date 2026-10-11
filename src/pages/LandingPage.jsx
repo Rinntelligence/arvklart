@@ -40,7 +40,7 @@ export default function LandingPage({ loggedIn = false }) {
           --lin:#F7F3EC; --snow:#FBF9F5; --sand:#E8DFD0; --sandgray:#D9CFC0;
           --latte:#C9AE8E; --coffee:#9C8267; --chestnut:#7A6146; --walnut:#5C4530;
           --espresso:#3A2F26; --bark:#2A211A;
-          --sage-mist:#DCE3D2; --sage-l:#A8B598; --sage:#8B9A7D; --sage-d:#5F6E52;
+          --sage-mist:#DCE3D2; --sage-l:#A8B598; --sage:#8B9A7D; --sage-d:#5F6E52; --sage-dd:#4F5D43;
           --text2:#7A6C5D;
         }
         .lp * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -118,6 +118,7 @@ export default function LandingPage({ loggedIn = false }) {
 
         .lp .features { background: var(--sand); padding: 110px 56px; }
         .lp .features-head { max-width: 640px; margin: 0 auto 76px; }
+        .lp .features-head .eyebrow { color: var(--sage-dd); } /* 5,3:1 på sand (sage-d gir 4,1:1) */
         .lp .features-head h2 { font-size: 2rem; font-weight: 400; line-height: 1.3; font-family: 'Fraunces', serif; }
         .lp .feature-grid {
           max-width: 1080px; margin: 0 auto;
@@ -125,9 +126,9 @@ export default function LandingPage({ loggedIn = false }) {
         }
         .lp .feature { padding: 0 34px 0 0; }
         .lp .feature + .feature { border-left: 1px solid var(--sandgray); padding-left: 34px; }
-        .lp .feature .num { font-family: 'Fraunces', serif; font-size: 0.9375rem; color: var(--sage-d); margin-bottom: 22px; }
+        .lp .feature .num { font-family: 'Fraunces', serif; font-size: 0.9375rem; color: var(--sage-dd); margin-bottom: 22px; }
         .lp .feature h3 { font-family: 'Fraunces', serif; font-weight: 400; font-size: 1.3125rem; margin-bottom: 14px; }
-        .lp .feature p { font-size: 0.9062rem; line-height: 1.65; color: var(--text2); }
+        .lp .feature p { font-size: 0.9062rem; line-height: 1.65; color: var(--walnut); }
 
         .lp .demo-section {
           background: var(--espresso); color: var(--snow);
@@ -155,7 +156,7 @@ export default function LandingPage({ loggedIn = false }) {
         .lp .demo-topbar img { height: 22px; }
         .lp .demo-body { padding: 28px 28px 32px; }
         .lp .demo-title { font-family: 'Fraunces', serif; font-size: 1.125rem; color: var(--espresso); margin-bottom: 4px; }
-        .lp .demo-sub { font-size: 0.75rem; color: var(--coffee); margin-bottom: 22px; }
+        .lp .demo-sub { font-size: 0.75rem; color: #75604B; margin-bottom: 22px; }
         .lp .demo-conflict {
           border: 1px solid var(--sandgray); border-radius: 10px;
           padding: 18px 20px; margin-bottom: 12px;
@@ -163,12 +164,12 @@ export default function LandingPage({ loggedIn = false }) {
           background: var(--lin);
         }
         .lp .demo-conflict-left h4 { font-size: 0.875rem; color: var(--espresso); margin-bottom: 3px; }
-        .lp .demo-conflict-left span { font-size: 0.75rem; color: var(--coffee); }
+        .lp .demo-conflict-left span { font-size: 0.75rem; color: #75604B; }
         .lp .demo-badge {
           font-size: 0.6875rem; padding: 4px 10px; border-radius: 20px;
-          background: var(--sage-mist); color: var(--sage-d);
+          background: var(--sage-mist); color: var(--sage-dd);
         }
-        .lp .demo-badge.orange { background: #F5E8D5; color: #A97C3F; }
+        .lp .demo-badge.orange { background: #F5E8D5; color: #8A5A1F; }
 
         footer.lp-footer {
           background: var(--bark); color: var(--sand); padding: 56px;
