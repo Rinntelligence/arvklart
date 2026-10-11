@@ -47,6 +47,9 @@ const watch = page => {
 await check('F1 Loddtrekning: databasen trekker (draw_lot), og «Bekreft og tildel» sender trekningen til assign_items', async page => {
   const { rpc, patches } = watch(page)
   await page.goto(`${BASE}/estate/${EST}/conflicts`)
+  await page.getByRole('button', { name: 'Trekk vinner' }).first().waitFor()
+  const v = await axe(page)
+  assert(!v.length, v.join('; '))
   await page.getByRole('button', { name: 'Trekk vinner' }).first().click()
   await page.getByText('Vinner').first().waitFor({ timeout: 10000 })
   await page.getByRole('button', { name: /Bekreft og tildel \(1\)/ }).click()
