@@ -39,6 +39,15 @@ OPEN=$("${PSQL[@]}" -tA -c "select count(*) from protected_columns where has_col
 if [ "$OPEN" != "0" ]; then echo "Beskyttede kolonner ble åpnet igjen av en eldre migrering: $OPEN"; exit 1; fi
 for f in supabase/migrations/20261019*.sql supabase/migrations/2026102*.sql; do "${PSQL[@]}" < "$f" >/dev/null 2>&1 || { echo "Kan ikke kjøres på nytt: $f"; exit 1; }; done
 
+# Ingen funksjon i public kan kalles av anon, og authenticated kan bare kalle dem i client_functions
+FNS="from pg_proc p where p.pronamespace = 'public'::regnamespace and not exists (select 1 from pg_depend d where d.classid = 'pg_proc'::regclass and d.objid = p.oid and d.deptype = 'e')"
+ANON=$("${PSQL[@]}" -tA -c "select string_agg(p.oid::regprocedure::text, ', ') $FNS and has_function_privilege('anon', p.oid, 'EXECUTE')")
+if [ -n "$ANON" ]; then echo "anon kan kalle funksjoner: $ANON"; exit 1; fi
+EXTRA=$("${PSQL[@]}" -tA -c "select string_agg(p.oid::regprocedure::text, ', ') $FNS and has_function_privilege('authenticated', p.oid, 'EXECUTE') and p.oid not in (select to_regprocedure(signature) from client_functions where to_regprocedure(signature) is not null)")
+if [ -n "$EXTRA" ]; then echo "authenticated kan kalle funksjoner som ikke står i client_functions (legg dem inn og kjør apply_function_grants()): $EXTRA"; exit 1; fi
+MISSING=$("${PSQL[@]}" -tA -c "select string_agg(signature, ', ') from client_functions where to_regprocedure(signature) is null")
+if [ -n "$MISSING" ]; then echo "client_functions viser til funksjoner som ikke finnes: $MISSING"; exit 1; fi
+
 echo "Tilgangsregler:"
 OUT=$("${PSQL[@]}" < test/db/rls.sql 2>&1 || true)
 echo "$OUT" | grep -oE "(OK|FAIL) .*|ERROR: .*" | sed 's/^/  /'

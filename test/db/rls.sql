@@ -242,7 +242,19 @@ exception when insufficient_privilege then raise notice 'OK   utenforstående ka
 end $$;
 reset role;
 select t_as(null); set role anon;
-select t_eq((select count(*)::int from profiles) + (select count(*)::int from estates), 0, 'anon ser ingenting');
+-- Hjelpefunksjonene i policyene er stengt for anon (20261021_function_grants.sql), så spørringen avvises
+do $$
+declare t text;
+begin
+  foreach t in array array['profiles', 'estates'] loop
+    begin
+      execute format('select count(*) from public.%I', t);
+      raise exception 'FAIL: anon kunne lese %', t;
+    exception when insufficient_privilege then null;
+    end;
+  end loop;
+  raise notice 'OK   anon ser ingenting';
+end $$;
 reset role;
 
 -- Eva (admin): tildeler, fjerner medlem
@@ -783,3 +795,58 @@ end $$;
 reset role;
 select reset_demo_estate();
 select t_eq((select count(*)::int from distribution_versions where estate_id = 'deed0001-0000-0000-0000-000000000001'), 0, 'nullstilling fjerner demoens forslag og svar');
+
+-- Funksjonsrettigheter og tabeller uten policies (20261021_function_grants.sql)
+select t_as(null); set role anon;
+do $$
+declare f text;
+begin
+  foreach f in array array['is_estate_member(''eeee0000-0000-0000-0000-000000000001'')', 'item_estate_id(''11110000-0000-0000-0000-000000000001'')',
+                           'estate_is_open(''eeee0000-0000-0000-0000-000000000001'')', 'distribution_status(gen_random_uuid())', 'is_demo_user()'] loop
+    begin
+      execute 'select public.' || f;
+      raise exception 'FAIL: anon kunne kalle %', f;
+    exception when insufficient_privilege then null;
+    end;
+  end loop;
+  raise notice 'OK   anon kan ikke kalle hjelpefunksjonene';
+end $$;
+do $$ begin
+  perform count(*) from items;
+  raise exception 'FAIL: anon kunne spørre etter gjenstander';
+exception when insufficient_privilege then raise notice 'OK   anon får ingen gjenstander (policyens hjelpefunksjon er stengt)';
+end $$;
+reset role;
+select t_as('frank@test.no'); set role authenticated;
+do $$
+declare f text;
+begin
+  foreach f in array array['estate_is_open(''eeee0000-0000-0000-0000-000000000001'')', 'is_estate_decider(''eeee0000-0000-0000-0000-000000000001'')',
+                           'is_founder()', 'guard_item_update()', 'sync_profile_founder_flag()', 'protected_item_columns()',
+                           'log_estate_event(''eeee0000-0000-0000-0000-000000000001'', null, ''x'')', 'apply_function_grants()',
+                           'apply_item_update_grants()', 'reset_demo_estate()', 'claim_ai_call(auth.uid(), null, ''x'', false)'] loop
+    begin
+      execute 'select public.' || f;
+      raise exception 'FAIL: authenticated kunne kalle %', f;
+    exception when insufficient_privilege then null;
+    end;
+  end loop;
+  raise notice 'OK   innloggede kan ikke kalle trigger- og interne funksjoner';
+end $$;
+select t_eq(is_estate_member('eeee0000-0000-0000-0000-000000000001') is not null and item_is_open('11110000-0000-0000-0000-000000000001') is not null, true, 'innloggede kan fortsatt bruke hjelpefunksjonene i policyene');
+do $$
+declare t text;
+begin
+  foreach t in array array['founders', 'founder_audit_log', 'ai_usage', 'protected_columns', 'client_functions'] loop
+    begin
+      execute format('select count(*) from public.%I', t);
+      raise exception 'FAIL: innlogget kunne lese %', t;
+    exception when insufficient_privilege then null;
+    end;
+  end loop;
+  raise notice 'OK   tabellene uten policies er stengt for klientene';
+end $$;
+reset role;
+select t_eq((select count(*)::int from pg_proc where oid in ('public.try_uuid(text)'::regprocedure, 'public.is_demo_user()'::regprocedure,
+  'public.protect_profile_fields()'::regprocedure, 'public.guard_distribution_immutable()'::regprocedure) and proconfig @> array['search_path=""']), 4,
+  'fast search_path på funksjonene som manglet det');
