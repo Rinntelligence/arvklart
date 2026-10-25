@@ -32,7 +32,6 @@ export default function FounderPage({ session, onToast }) {
   if (loadError) return <div style={{ padding:'80px', textAlign:'center', color:'#75604B', fontFamily:'Karla, sans-serif' }}>Ingen tilgang til dashboardet.</div>
 
   const planCounts = profiles.reduce((acc, p) => { acc[p.plan||'free']=(acc[p.plan||'free']||0)+1; return acc }, {})
-  const mrr = (planCounts.family||0)*9 + (planCounts.business||0)*99 + (planCounts.enterprise||0)*299
   const avgNps = feedback.filter(f=>f.nps_score).length ? (feedback.filter(f=>f.nps_score).reduce((a,f)=>a+f.nps_score,0)/feedback.filter(f=>f.nps_score).length).toFixed(1) : 'N/A'
 
   // Growth by month
@@ -67,10 +66,6 @@ export default function FounderPage({ session, onToast }) {
         <div>
           <h1 style={{ fontFamily:'Fraunces, serif', fontSize:'1.75rem', fontWeight:'400', color:'#3A2F26', marginBottom:'4px' }}>Founder Dashboard</h1>
           <p style={{ color:'#75604B', fontSize:'0.875rem' }}>Privat — kun synlig for deg</p>
-        </div>
-        <div style={{ background:'#DCE3D2', border:'1px solid #B8C8A8', borderRadius:'10px', padding:'12px 20px', textAlign:'center' }}>
-          <div style={{ fontSize:'1.5rem', color:'#3A2F26', fontFamily:'Fraunces, serif' }}>${mrr.toLocaleString()}</div>
-          <div style={{ fontSize:'0.75rem', color:'#3A5A30' }}>Est. MRR</div>
         </div>
       </div>
 

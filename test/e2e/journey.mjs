@@ -214,6 +214,28 @@ await check('Slett konto: feil gir en fast melding, ikke råtekst fra serveren',
   assert(await page.getByText(/foreign key|secret_stuff/).count() === 0, 'råtekst fra serveren vises')
 })
 
+await check('Bo-siden har snarvei til dokumentarkivet og sjekklisten', async page => {
+  await page.goto(`${BASE}/estate/${EST}`)
+  await page.getByRole('button', { name: /^Dokumenter/ }).click()
+  await page.waitForURL(`**/estate/${EST}/documents`)
+  await page.goto(`${BASE}/estate/${EST}`)
+  await page.getByRole('button', { name: /^Sjekkliste/ }).click()
+  await page.waitForURL(`**/estate/${EST}/tasks`)
+})
+
+await check('Demoen viser ikke snarveien til dokumentarkivet', async page => {
+  await page.goto(`${BASE}/estate/${EST}`)
+  await page.getByText(/Du ser på en/).waitFor() // demobanneret: økten er en demoøkt
+  await page.getByRole('button', { name: /^Sjekkliste/ }).waitFor()
+  assert(await page.getByRole('button', { name: /^Dokumenter/ }).count() === 0, 'demoen viser «Dokumenter»')
+}, { email: 'mona.demo@heirsplit.no' })
+
+await check('Innloggingen lover ikke kunder eller partnere som ikke finnes', async page => {
+  await page.goto(`${BASE}/logg-inn`)
+  await page.getByRole('heading', { name: 'Arvklart' }).waitFor()
+  assert(await page.getByText(/begravelsesbyrå|profesjonelle plattformen/i).count() === 0, 'udokumentert påstand vises')
+}, { loggedIn: false })
+
 await browser.close()
 console.log(results.join('\n'))
 process.exit(results.some(r => r.startsWith('FAIL')) ? 1 : 0)

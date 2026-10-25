@@ -72,7 +72,7 @@ export default function LoginPage({ onToast }) {
               <path d="M12 3v18M7 21h10M5 7h4M15 7h4M5 7L2.5 12a2.5 2.5 0 0 0 5 0L5 7zM19 7l-2.5 5a2.5 2.5 0 0 0 5 0L19 7z"/>
             </svg>
             <h1 style={{ fontFamily:'Fraunces, serif', fontSize:'1.875rem', fontWeight:'400', color:'#3A2F26', marginBottom:'10px' }}>Arvklart</h1>
-            <p style={{ color:'#75604B', fontSize:'0.9375rem', lineHeight:'1.6' }}>{L('Den profesjonelle plattformen for rettferdig fordeling av arv', 'The professional platform for fair distribution of inheritance')}</p>
+            <p style={{ color:'#75604B', fontSize:'0.9375rem', lineHeight:'1.6' }}>{L('Registrer, ønsk og fordel innbo og løsøre – samlet og dokumentert', 'Register, wish for and divide household contents – in one place, documented')}</p>
           </div>
 
           <div style={{ background:'#fff', border:'1px solid #D9CFC0', borderRadius:'14px', padding:'36px', boxShadow:'0 4px 32px rgba(0,0,0,0.06)' }}>
@@ -158,9 +158,6 @@ export default function LoginPage({ onToast }) {
             </p>
           </div>
 
-          <p style={{ textAlign:'center', marginTop:'20px', fontSize:'0.75rem', color:'#75604B' }}>
-            {L('Brukt av begravelsesbyråer, advokater og familier', 'Used by funeral homes, lawyers and families')}
-          </p>
           <div style={{ marginTop:'20px' }}><TextSizeControl /></div>
         </div>
       </div>
