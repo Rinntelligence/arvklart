@@ -81,7 +81,7 @@ export default function AdminPage({ session, profile, onToast }) {
     load()
   }
 
-  // Avsluttede bo oppbevares til administratoren ber Arvklart slette dem (se personvernerklæringen)
+  // Avsluttede bo oppbevares til de slettes på forespørsel (ingen automatisk sletting, se personvernerklæringen)
   const setClosed = async (closed) => {
     const { error } = await updateEstate(id, closed ? { status: 'closed', closed_at: new Date().toISOString() } : { status: 'active', closed_at: null })
     setConfirmClose(false)
@@ -226,8 +226,8 @@ export default function AdminPage({ session, profile, onToast }) {
         <h2 style={{ fontFamily:'Fraunces, serif', fontSize:'1.125rem', fontWeight:'400', color:'#3A2F26', marginBottom:'6px' }}>{estate.status === 'closed' ? L('Boet er avsluttet', 'The estate is closed') : L('Avslutt boet', 'Close the estate')}</h2>
         <p style={{ fontSize:'0.8125rem', color:'#75604B', marginBottom:'16px', lineHeight:'1.6' }}>
           {estate.status === 'closed'
-            ? `${L('Avsluttet', 'Closed')} ${estate.closed_at ? new Date(estate.closed_at).toLocaleDateString(locale(), { day:'numeric', month:'long', year:'numeric' }) : ''}. ${L('Boet oppbevares med bilder og dokumenter til du ber Arvklart slette det (admin@arvklart.no).', 'The estate is kept with its photos and documents until you ask Arvklart to delete it (admin@arvklart.no).')}`
-            : L('Når oppgjøret er ferdig, kan du avslutte boet. Det oppbevares da med bilder og dokumenter til du ber Arvklart slette det. Last ned det dere trenger før det.', 'When the settlement is finished, you can close the estate. It is then kept with its photos and documents until you ask Arvklart to delete it. Download what you need before then.')}
+            ? `${L('Avsluttet', 'Closed')} ${estate.closed_at ? new Date(estate.closed_at).toLocaleDateString(locale(), { day:'numeric', month:'long', year:'numeric' }) : ''}. ${L('Boet oppbevares med bilder og dokumenter til det slettes; det finnes ingen automatisk sletting. Du kan be Arvklart slette det (admin@arvklart.no). Vi kontrollerer at forespørselen kommer fra en administrator av boet før noe slettes. Slettingen gjelder hele boet for alle medlemmer og kan ikke angres.', 'The estate is kept with its photos and documents until it is deleted; there is no automatic deletion. You can ask Arvklart to delete it (admin@arvklart.no). We check that the request comes from an administrator of the estate before anything is deleted. The deletion applies to the whole estate for all members and cannot be undone.')}`
+            : L('Når oppgjøret er ferdig, kan du avslutte boet. Det oppbevares da med bilder og dokumenter til det slettes; det finnes ingen automatisk sletting. Last ned det dere trenger.', 'When the settlement is finished, you can close the estate. It is then kept with its photos and documents until it is deleted; there is no automatic deletion. Download what you need.')}
         </p>
         {estate.status === 'closed' ? (
           <button onClick={() => setClosed(false)} style={{ padding:'9px 18px', background:'none', border:'1px solid #D9CFC0', borderRadius:'8px', cursor:'pointer', color:'#5C4530', fontSize:'0.875rem', fontFamily:'Karla, sans-serif' }}>{L('Åpne boet igjen', 'Reopen the estate')}</button>

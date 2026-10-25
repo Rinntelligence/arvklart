@@ -207,7 +207,7 @@ export default function EstatePage({ session, profile, onToast, isDemo }) {
         <div style={{ background:'#E8DFD0', border:'1px solid #D9CFC0', borderRadius:'10px', padding:'12px 16px', marginBottom:'16px', fontSize:'0.8125rem', color:'#5C4530', lineHeight:1.5 }}>
           {L('Boet er avsluttet', 'This estate is closed')}
           {estate.closed_at && ` (${new Date(estate.closed_at).toLocaleDateString(locale(), { day:'numeric', month:'long', year:'numeric' })})`}.{' '}
-          {L('Det oppbevares med bilder og dokumenter til administratoren ber Arvklart slette det.', 'It is kept with its photos and documents until the administrator asks Arvklart to delete it.')}
+          {L('Det oppbevares med bilder og dokumenter til det slettes. Det finnes ingen automatisk sletting; administratoren kan be Arvklart slette boet.', 'It is kept with its photos and documents until it is deleted. There is no automatic deletion; the administrator can ask Arvklart to delete the estate.')}
         </div>
       )}
 
