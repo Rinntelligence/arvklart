@@ -65,5 +65,7 @@ docker run -d --name "$API" --network "container:$DB" \
   -e PGRST_SERVER_PORT=3000 postgrest/postgrest:v12.2.3 >/dev/null
 until curl -sf localhost:54330/ >/dev/null 2>&1; do sleep 1; done
 
+# Demoboet i kjent tilstand (bare syntetiske kontoer, ønsker og «nei takk» lagt inn), uavhengig av hva rls.sql gjorde
+"${PSQL[@]}" -q -c "select reset_demo_estate()" >/dev/null
 echo "Spørringer gjennom PostgREST:"
 node --test test/db/queries.mjs test/db/cleanup.mjs
