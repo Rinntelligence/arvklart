@@ -10,6 +10,9 @@
 --
 -- STEG 2: Kjør dette scriptet i SQL Editor, etter supabase/legacy/* og supabase/migrations/*.
 --
+-- STEG 3: Last opp bildene til gjenstandene (supabase/seed/demo-images/README.md):
+--   SUPABASE_URL=… SUPABASE_SERVICE_ROLE_KEY=… node supabase/seed/upload_demo_images.mjs --apply
+--
 -- Demokontoene er skrivebeskyttet i databasen (is_demo_user()); demoen nullstilles av
 -- reset_demo_estate() hver gang noen åpner den.
 -- ============================================================
@@ -20,6 +23,9 @@ DECLARE
   lars_id uuid;
   mona_id uuid;
   demo_emails text[] := ARRAY['kari.demo@heirsplit.no','lars.demo@heirsplit.no','mona.demo@heirsplit.no'];
+  -- Bildene ligger i den private bøtten (seed/demo-images, lastes opp med upload_demo_images.mjs). Appen bruker
+  -- bare stien etter /object/public/item-images/; bytt prosjektadressen hvis databasen er en annen.
+  img_base text := 'https://swmuztsejghweqmaogol.supabase.co/storage/v1/object/public/item-images/deed0001-0000-0000-0000-000000000001/';
 BEGIN
 
   -- Finn demo-brukernes IDs (Supabase tildeler dem når du oppretter via Dashboard)
@@ -94,84 +100,84 @@ BEGIN
    'Bestemors gyngestol',
    'Eiketre gyngestol fra 1960-tallet, håndlaget av bestefar Per. Har stått i stua i over 60 år. Original pute med blomstermønster.',
    'cafe0001-0000-0000-0000-000000000001',
-   'https://images.unsplash.com/photo-1506439773649-6e0eb8cfb237?w=600&q=80',
+   img_base || 'demo__face0001.jpg',
    8500, 'good', 'Demo', 'active'),
 
   ('face0002-0000-0000-0000-000000000002', 'deed0001-0000-0000-0000-000000000001',
    'Antikk eiketresbord',
    'Solid spisebord i eik, ca. 1920. Plass til 10 personer. Har vært familiens midtpunkt i tre generasjoner.',
    'cafe0001-0000-0000-0000-000000000001',
-   'https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=600&q=80',
+   img_base || 'demo__face0002.jpg',
    24000, 'fair', 'Demo', 'active'),
 
   ('face0003-0000-0000-0000-000000000003', 'deed0001-0000-0000-0000-000000000001',
    'Mahognibokkhylle fra 1940',
    'Stor bokhylle i mahogni med glassdører. Plass til ca. 300 bøker. Tilhørende boksamling medfølger.',
    'cafe0001-0000-0000-0000-000000000001',
-   'https://images.unsplash.com/photo-1481627834876-b7833e8f5570?w=600&q=80',
+   img_base || 'demo__face0003.jpg',
    4800, 'good', 'Demo', 'active'),
 
   ('face0004-0000-0000-0000-000000000004', 'deed0001-0000-0000-0000-000000000001',
    'Oljemaleri «Fjord i solnedgang»',
    'Signert oljemaleri av norsk maler K. Andreassen, 1978. 80×120 cm. Originalt pynteramme i gull.',
    'cafe0001-0000-0000-0000-000000000002',
-   'https://images.unsplash.com/photo-1579783902614-a3fb3927b6a5?w=600&q=80',
+   img_base || 'demo__face0004.jpg',
    35000, 'excellent', 'Demo', 'active'),
 
   ('face0005-0000-0000-0000-000000000005', 'deed0001-0000-0000-0000-000000000001',
    'Kinesisk porselesvase, Qing-dynastiet',
    'Blå og hvit porselensvase, antagelig fra Qing-dynastiet (1800-tall). Trolig kopi, men av høy kvalitet.',
    'cafe0001-0000-0000-0000-000000000002',
-   'https://images.unsplash.com/photo-1588345921523-c2dcdb7f1dcd?w=600&q=80',
+   NULL,
    6500, 'excellent', 'Demo', 'active'),
 
   ('face0006-0000-0000-0000-000000000006', 'deed0001-0000-0000-0000-000000000001',
    'Vintage Rolex Oyster (1962)',
    'Herreur i stål med originalt lær-armbånd. Kjøpt av Per Hansen i 1962. Originalkasse medfølger.',
    'cafe0001-0000-0000-0000-000000000003',
-   'https://images.unsplash.com/photo-1606800052052-a08af7148866?w=600&q=80',
+   img_base || 'demo__face0006.jpg',
    45000, 'fair', 'Demo', 'active'),
 
   ('face0007-0000-0000-0000-000000000007', 'deed0001-0000-0000-0000-000000000001',
    'Perle- og diamanthalskjede',
    'Hvitt gull med 18 søsterperler og diamantlås. Bryllupsgave til Astrid i 1961.',
    'cafe0001-0000-0000-0000-000000000003',
-   'https://images.unsplash.com/photo-1594736797933-d0401ba2fe65?w=600&q=80',
+   NULL,
    18000, 'excellent', 'Demo', 'active'),
 
   ('face0008-0000-0000-0000-000000000008', 'deed0001-0000-0000-0000-000000000001',
    'Bang & Olufsen musikksystem',
    'B&O Beosound stereo fra 2019. Høyttalere + forsterker + CD-spiller. Fungerer perfekt.',
    'cafe0001-0000-0000-0000-000000000004',
-   'https://images.unsplash.com/photo-1593305841991-05c297ba4575?w=600&q=80',
+   img_base || 'demo__face0008.jpg',
    12000, 'good', 'Demo', 'active'),
 
   ('face0009-0000-0000-0000-000000000009', 'deed0001-0000-0000-0000-000000000001',
    'Stavangerflint porselen (18 deler)',
    'Komplett middagsservise, 1960-modellen «Flint Blue». 18 deler. Noe slitasje, ingen sprekker.',
    'cafe0001-0000-0000-0000-000000000005',
-   'https://images.unsplash.com/photo-1577553698842-aba12d2d17e4?w=600&q=80',
+   NULL,
    3200, 'fair', 'Demo', 'active'),
 
   ('face0010-0000-0000-0000-000000000010', 'deed0001-0000-0000-0000-000000000001',
    'Kristallglass (Hadeland, 12 stk)',
    'Hvitvinsglass fra Hadeland Glassverk, 1970-tallet. 12 stykk, ingen mangler.',
    'cafe0001-0000-0000-0000-000000000005',
-   'https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=600&q=80',
+   img_base || 'demo__face0010.jpg',
    2400, 'excellent', 'Demo', 'active'),
 
   ('face0011-0000-0000-0000-000000000011', 'deed0001-0000-0000-0000-000000000001',
    'Familiealbum 1958–2010',
    'Tre innbundne fotoalbum med over 400 familiefoto. Inkluderer bryllupsbilder og barndomsbilder.',
    'cafe0001-0000-0000-0000-000000000006',
-   'https://images.unsplash.com/photo-1567026734534-2c90e2a6fde5?w=600&q=80',
+   NULL,
    NULL, 'good', 'Demo', 'active'),
 
   ('face0012-0000-0000-0000-000000000012', 'deed0001-0000-0000-0000-000000000001',
    'Husflid-sykmaskin (Singer, 1938)',
    'Elektrisk Singer-sykmaskin fra 1938. Sjelden modell. Fungerer med ny ledning.',
    'cafe0001-0000-0000-0000-000000000006',
-   'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=600&q=80',
+   img_base || 'demo__face0012.jpg',
    1200, 'fair', 'Demo', 'active')
 
   ON CONFLICT (id) DO NOTHING;
