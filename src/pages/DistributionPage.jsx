@@ -4,7 +4,9 @@ import { supabase, getItems } from '../lib/supabase'
 import { loadStatusExtras } from '../lib/decisions'
 import { L } from '../lib/lang'
 import { formatNOK } from '../lib/format'
-import { itemValue } from '../lib/distribution'
+import { itemValue, singleInterestAssignments } from '../lib/distribution'
+import { assignItems } from '../lib/assignments'
+import { Modal } from '../components/UI'
 import { summarizeDistribution, diffText, snapshotInput } from '../lib/distributionSummary'
 import { makeNameOf } from '../lib/eventText'
 import { heirStatusText } from '../lib/approval'
@@ -19,20 +21,48 @@ export default function DistributionPage({ session, onToast, isDemo }) {
   const navigate = useNavigate()
   const [data, setData] = useState(null)
   const [proposal, setProposal] = useState({ version: null, status: null })
+  const [singleOpen, setSingleOpen] = useState(false)
+  const [singleBusy, setSingleBusy] = useState(false)
 
-  useEffect(() => {
-    (async () => {
-      const [{ data: items }, extras, { data: estate }, { data: mem }] = await Promise.all([
-        getItems(id), loadStatusExtras(id),
-        supabase.from('estates').select('name, split_mode, shares_confirmed, status').eq('id', id).maybeSingle(),
-        supabase.from('estate_members').select('role').eq('estate_id', id).eq('user_id', session.user.id).maybeSingle(),
-      ])
-      setData({ items: items || [], members: extras.members, heirs: extras.heirs, estate, isAdmin: mem?.role === 'admin' })
-    })()
-  }, [id])
+  const fetchData = async () => {
+    const [{ data: items }, extras, { data: estate }, { data: mem }] = await Promise.all([
+      getItems(id), loadStatusExtras(id),
+      supabase.from('estates').select('name, split_mode, shares_confirmed, status').eq('id', id).maybeSingle(),
+      supabase.from('estate_members').select('role').eq('estate_id', id).eq('user_id', session.user.id).maybeSingle(),
+    ])
+    return { items: items || [], members: extras.members, heirs: extras.heirs, passes: extras.passes, estate, isAdmin: mem?.role === 'admin' }
+  }
+  const load = async () => setData(await fetchData())
+
+  useEffect(() => { load() }, [id])
+
+  // «Tildel alle som bare én ønsker»: bare avklarte gjenstander, til den ene personen som ønsker dem.
+  // Rett før tildelingen hentes alt på nytt; har noe endret seg, tildeles ingenting. Databasen sjekker det samme
+  // (assign_items med metoden 'single') og hopper over det som ikke lenger stemmer.
+  const assignSingles = async (shown) => {
+    setSingleBusy(true)
+    const fresh = await fetchData()
+    const now = singleInterestAssignments(fresh.items, fresh.members, fresh.passes, fresh.heirs).ready
+    const same = shown.every(r => now.some(n => n.item.id === r.item.id && n.heir.id === r.heir.id))
+    if (!same) {
+      setSingleBusy(false); setSingleOpen(false); setData(fresh)
+      onToast(L('Ønskene er endret – ingenting ble tildelt. Se over listen på nytt.', 'The wishes have changed – nothing was assigned. Please review the list again.'), 'error')
+      return
+    }
+    const { data: res, error } = await assignItems(id, shown.map(r => ({ item_id: r.item.id, heir_id: r.heir.id })), 'single')
+    setSingleBusy(false); setSingleOpen(false)
+    await load()
+    if (error) { onToast(L('Ingenting ble tildelt. Prøv igjen.', 'Nothing was assigned. Please try again.'), 'error'); return }
+    const n = res?.assigned || 0
+    const skipped = res?.skipped?.length || 0
+    if (skipped) onToast(L(`${n} tildelt. ${skipped} ble hoppet over fordi ønskene eller tildelingen var endret.`, `${n} assigned. ${skipped} skipped because the wishes or the assignment had changed.`), 'error')
+    else onToast(L(`${n} ${n === 1 ? 'gjenstand' : 'gjenstander'} tildelt`, `${n} ${n === 1 ? 'item' : 'items'} assigned`))
+  }
 
   if (!data) return <div style={{ padding: '80px', textAlign: 'center', color: '#75604B', fontFamily: 'Karla, sans-serif' }}>{L('Laster…', 'Loading…')}</div>
   const s = summarizeDistribution(data)
+  const canAssign = data.isAdmin && !isDemo && data.estate?.status !== 'closed'
+  const single = canAssign ? singleInterestAssignments(data.items, data.members, data.passes, data.heirs) : null
   const notSettled = s.pending.length + s.unwanted.undecided.length
 
   const nameOf = makeNameOf(data.members)
@@ -134,12 +164,47 @@ export default function DistributionPage({ session, onToast, isDemo }) {
         <>
           <h2 style={h2}>{L('Ønsket, men ikke tildelt ennå', 'Wanted, but not assigned yet')}</h2>
           <div style={card}>
+            {single && single.ready.length > 0 && (
+              <div style={{ marginBottom: '12px' }}>
+                <button onClick={() => setSingleOpen(true)} style={{ minHeight: '44px', padding: '8px 14px', background: '#5F6E52', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '0.875rem', fontFamily: 'Karla, sans-serif' }}>
+                  {L(`Tildel ${single.ready.length} ${single.ready.length === 1 ? 'gjenstand' : 'gjenstander'} som bare én ønsker`, `Assign ${single.ready.length} ${single.ready.length === 1 ? 'item' : 'items'} only one person wants`)}
+                </button>
+              </div>
+            )}
+            {single && single.waiting.length > 0 && (
+              <p style={{ ...small, marginBottom: '8px' }}>{L(`${single.waiting.length} ${single.waiting.length === 1 ? 'gjenstand' : 'gjenstander'} som bare én ønsker, venter på svar fra andre og tas ikke med. Manglende svar regnes ikke som nei takk.`, `${single.waiting.length} ${single.waiting.length === 1 ? 'item' : 'items'} only one person wants ${single.waiting.length === 1 ? 'is' : 'are'} waiting for answers from others and not included. Not answering is not counted as no thanks.`)}</p>
+            )}
+            {single && single.unlinked.length > 0 && (
+              <div style={{ marginBottom: '8px' }}>
+                <p style={small}>{L('Kan ikke tildeles automatisk, fordi den som ønsker gjenstanden, ikke står på listen som en person som kan få gjenstander:', 'Cannot be assigned automatically, because the person who wants the item is not on the list as someone who can receive items:')}</p>
+                <ul style={{ ...small, paddingLeft: '18px' }}>
+                  {single.unlinked.map(({ item }) => <li key={item.id}>{item.title}</li>)}
+                </ul>
+                <button onClick={() => navigate(`/estate/${id}/heirs`)} style={{ background: 'none', border: 'none', padding: 0, minHeight: '44px', color: '#5F6E52', textDecoration: 'underline', cursor: 'pointer', fontSize: '0.875rem', fontFamily: 'Karla, sans-serif' }}>{L('Gå til «Arvinger»', 'Go to «Heirs»')}</button>
+              </div>
+            )}
             <ul style={{ ...small, paddingLeft: '18px' }}>
               {s.pending.map(i => <li key={i.id}>{i.title} – {L(`ønskes av ${i.interests.length}`, `wanted by ${i.interests.length}`)}</li>)}
             </ul>
             <button onClick={() => navigate(`/estate/${id}/conflicts`)} style={{ marginTop: '8px', background: 'none', border: 'none', padding: 0, minHeight: '44px', color: '#5F6E52', textDecoration: 'underline', cursor: 'pointer', fontSize: '0.875rem', fontFamily: 'Karla, sans-serif' }}>{L('Gå til «Løsningsmetoder»', 'Go to «Resolution methods»')}</button>
           </div>
         </>
+      )}
+
+      {singleOpen && single && (
+        <Modal onClose={() => !singleBusy && setSingleOpen(false)} labelledBy="single-title" maxWidth={460}>
+          <h2 id="single-title" style={{ fontFamily: 'Fraunces, serif', fontSize: '1.25rem', fontWeight: 400, color: '#3A2F26', margin: '0 0 8px' }}>{L('Tildel det bare én ønsker', 'Assign what only one person wants')}</h2>
+          <p style={{ ...small, marginBottom: '10px' }}>{L('Alle som skal ta stilling, har svart på disse gjenstandene, og bare én ønsker hver av dem. Hver tildeling logges.', 'Everyone who should decide has answered on these items, and only one person wants each of them. Each assignment is logged.')}</p>
+          <ul style={{ ...small, paddingLeft: '18px', maxHeight: '40vh', overflowY: 'auto', marginBottom: '16px' }}>
+            {single.ready.map(r => <li key={r.item.id}>{r.item.title} → {r.heir.name}</li>)}
+          </ul>
+          <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+            <button onClick={() => setSingleOpen(false)} disabled={singleBusy} style={{ flex: '1 1 120px', minHeight: '44px', padding: '10px', background: 'none', border: '1px solid #9A8B78', borderRadius: '8px', cursor: 'pointer', color: '#5C4530', fontSize: '0.875rem', fontFamily: 'Karla, sans-serif' }}>{L('Avbryt', 'Cancel')}</button>
+            <button onClick={() => assignSingles(single.ready)} disabled={singleBusy} style={{ flex: '2 1 180px', minHeight: '44px', padding: '10px', background: '#3A2F26', color: '#FBF9F5', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '0.875rem', fontFamily: 'Karla, sans-serif' }}>
+              {singleBusy ? L('Tildeler…', 'Assigning…') : L(`Tildel ${single.ready.length}`, `Assign ${single.ready.length}`)}
+            </button>
+          </div>
+        </Modal>
       )}
     </div>
   )

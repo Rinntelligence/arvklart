@@ -9,6 +9,7 @@ export const DELETED_USER = '00000000-0000-0000-0000-000000000000'
 
 export const methodLabel = m => ({
   manual: L('valgt av administrator', 'chosen by the administrator'),
+  single: L('den eneste som ønsket den', 'the only one who wanted it'),
   lottery: L('etter loddtrekning', 'after drawing lots'),
   snake: L('i runder', 'in rounds'),
   equal: L('etter jevn verdifordeling', 'by equal value'),
@@ -24,7 +25,12 @@ export function eventText(e, nameOf) {
   const who = e.actor ? nameOf(e.actor) : L('Arvklart', 'Arvklart')
   switch (e.kind) {
     // Fra 20261021 står mottakeren som person på listen (d.name); eldre hendelser har bare kontoen (d.to/d.from)
-    case 'assigned': return L(`${who} tildelte gjenstanden til ${d.name || nameOf(d.to)} (${methodLabel(d.method)})`, `${who} assigned the item to ${d.name || nameOf(d.to)} (${methodLabel(d.method)})`)
+    // pending_responses (fra 20261023): kontoene som ikke hadde svart da gjenstanden ble tildelt. Ikke «nei takk».
+    case 'assigned': {
+      const n = Array.isArray(d.pending_responses) ? d.pending_responses.length : 0
+      const before = n ? L(` før alle hadde svart (${n} hadde ikke svart)`, ` before everyone had answered (${n} had not answered)`) : ''
+      return L(`${who} tildelte gjenstanden til ${d.name || nameOf(d.to)} (${methodLabel(d.method)})${before}`, `${who} assigned the item to ${d.name || nameOf(d.to)} (${methodLabel(d.method)})${before}`)
+    }
     case 'unassigned': return L(`${who} angret tildelingen til ${d.name || nameOf(d.from)}`, `${who} undid the assignment to ${d.name || nameOf(d.from)}`)
     case 'assignment_confirmed': return L(`${who} bekreftet at ${d.name} skal ha gjenstanden`, `${who} confirmed that ${d.name} should have the item`)
     case 'heir_receives_set': return d.value

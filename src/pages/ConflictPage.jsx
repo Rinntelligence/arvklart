@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase, getItems } from '../lib/supabase'
 import { loadStatusExtras } from '../lib/decisions'
-import { getUndecided, isContested } from '../lib/estateProgress'
+import { getUndecided, isContested, isSettled, pendingMembersFor } from '../lib/estateProgress'
 import { parseNOK, formatNOK as formatAmount } from '../lib/format'
 import { L } from '../lib/lang'
 import { equalValueResolutions, itemsWithoutValue, valueTotal, confirmedWeights, aiEstimate, itemValue } from '../lib/distribution'
@@ -33,7 +33,9 @@ const formatNOK = (v) => (parseNOK(v) === null ? null : formatAmount(v))
 export default function ConflictPage({ session, onToast }) {
   const { id } = useParams()
   const navigate = useNavigate()
-  const [items, setItems] = useState([])
+  const [items, setItems] = useState([]) // omstridte gjenstander som er avklart: bare disse fordeles med metodene
+  const [contested, setContested] = useState([]) // alle omstridte, også de som venter på svar
+  const [waiting, setWaiting] = useState([]) // [{ item, pending }]: omstridte der noen ikke har svart
   const [members, setMembers] = useState([])
   const [mode, setMode] = useState('lottery')
   const [resolutions, setResolutions] = useState({})
@@ -66,7 +68,12 @@ export default function ConflictPage({ session, onToast }) {
     const memberIds = new Set(ms.map(m => m.user_id))
     // Interesser fra tidligere medlemmer teller ikke med i fordelingen
     const all = (its || []).map(i => ({ ...i, interests: (i.interests || []).filter(x => memberIds.has(x.user_id)) }))
-    setItems(all.filter(isContested))
+    // Bare avklarte gjenstander fordeles: manglende svar regnes aldri som «nei takk» (samme regel i databasen)
+    const omstridt = all.filter(isContested)
+    setContested(omstridt)
+    setItems(omstridt.filter(i => isSettled(i, ms, extras.passes, extras.heirs)))
+    setWaiting(omstridt.filter(i => !isSettled(i, ms, extras.passes, extras.heirs))
+      .map(i => ({ item: i, pending: pendingMembersFor(i, ms, extras.passes, extras.heirs) })))
     setAssignedItems(all.filter(i => i.status === 'assigned'))
     setAllItems(all)
     setMembers(ms)
@@ -192,13 +199,40 @@ export default function ConflictPage({ session, onToast }) {
 
   // Alt tildeles i én transaksjon i databasen, med metoden logget. Gjenstander som en annen har tildelt
   // i mellomtiden, hoppes over. Etter loddtrekning må tildelingen være lik databasens trekning.
+  // Rett før tildelingen hentes ønskene på nytt: har de endret seg mens dere fordelte, tildeles ingenting.
+  // Databasen sjekker det samme (20261023_settled_assignment_checks.sql).
   const apply = async () => {
     setApplying(true)
     const list = Object.entries(resolutions).map(([item_id, heir_id]) => ({ item_id, heir_id }))
+    const [{ data: fresh }, extras] = await Promise.all([getItems(id), loadStatusExtras(id)])
+    const memberIds = new Set(extras.members.map(m => m.user_id))
+    const wishes = i => (i?.interests || []).map(x => x.user_id).filter(u => memberIds.has(u)).sort().join(',')
+    const changed = list.some(({ item_id }) => {
+      const before = items.find(i => i.id === item_id)
+      const now = (fresh || []).find(i => i.id === item_id)
+      if (!now || now.status === 'assigned') return false // allerede tildelt: hoppes over av databasen
+      const nowMembers = { ...now, interests: (now.interests || []).filter(x => memberIds.has(x.user_id)) }
+      return wishes(before) !== wishes(now) || !isSettled(nowMembers, extras.members, extras.passes, extras.heirs)
+    })
+    if (changed) {
+      setApplying(false)
+      onToast(L('Ønskene er endret mens dere fordelte – ingenting ble tildelt. Se over på nytt.', 'The wishes changed while you were distributing – nothing was assigned. Please review again.'), 'error')
+      setResolutions({}); setSnakePos(0); setDraftStarted(false)
+      load()
+      return
+    }
     const { data, error } = await assignItems(id, list, mode)
-    const count = error ? 0 : data?.assigned || 0
-    const failed = list.length - count
     setApplying(false)
+    if (error) {
+      onToast(/endret|stilling/.test(error.message || '')
+        ? L('Ønskene er endret mens dere fordelte – ingenting ble tildelt. Se over på nytt.', 'The wishes changed while you were distributing – nothing was assigned. Please review again.')
+        : L('Ingenting ble tildelt. Prøv igjen.', 'Nothing was assigned. Please try again.'), 'error')
+      setResolutions({}); setSnakePos(0); setDraftStarted(false)
+      load()
+      return
+    }
+    const count = data?.assigned || 0
+    const failed = list.length - count
     if (failed) onToast(L(`${count} tildelt. ${failed} kunne ikke tildeles – de kan allerede være tildelt.`, `${count} assigned. ${failed} could not be assigned – they may already be assigned.`), 'error')
     else onToast(L(`${count} ${count === 1 ? 'gjenstand' : 'gjenstander'} tildelt`, `${count} ${count === 1 ? 'item' : 'items'} assigned`))
     navigate(`/estate/${id}`)
@@ -213,7 +247,8 @@ export default function ConflictPage({ session, onToast }) {
 
   if (loading) return <div style={{ padding:'80px', textAlign:'center', color:'#75604B', fontFamily:'Karla, sans-serif' }}>{L('Laster…', 'Loading…')}</div>
 
-  if (undecided.length) {
+  // Arvingene ser ventesiden som før. Administrator kommer videre med de avklarte gjenstandene.
+  if (undecided.length && (myRole !== 'admin' || !items.length)) {
     const meMissing = undecided.some(u => u.member.user_id === session.user.id)
     return (
       <div style={{ maxWidth:'560px', margin:'0 auto', padding:'28px 16px 60px', fontFamily:'Karla, sans-serif' }}>
@@ -261,7 +296,7 @@ export default function ConflictPage({ session, onToast }) {
     )
   }
 
-  const talkFirst = <TalkFirstList items={items} allItems={allItems} nameOf={nameOf} myUserId={session.user.id} estateId={id} onChanged={load} onToast={onToast} withdrawn={withdrawn} setWithdrawn={setWithdrawn} />
+  const talkFirst = <TalkFirstList items={contested} allItems={allItems} nameOf={nameOf} myUserId={session.user.id} estateId={id} onChanged={load} onToast={onToast} withdrawn={withdrawn} setWithdrawn={setWithdrawn} />
 
   if (!items.length && Object.keys(withdrawn).length) return (
     <div style={{ maxWidth:'560px', margin:'0 auto', padding:'28px 16px 60px', fontFamily:'Karla, sans-serif' }}>
@@ -313,6 +348,18 @@ export default function ConflictPage({ session, onToast }) {
         </div>
       </div>
 
+      {waiting.length > 0 && (
+        <div role="status" style={{ background:'#F5E8D5', border:'1px solid #D9B98C', borderRadius:'12px', padding:'16px 20px', marginBottom:'20px', color:'#3A2F26', fontSize:'0.875rem', lineHeight:1.6 }}>
+          <strong style={{ fontWeight:'600' }}>{L(`${waiting.length} ${waiting.length === 1 ? 'gjenstand venter' : 'gjenstander venter'} på svar og er ikke tatt med her.`, `${waiting.length} ${waiting.length === 1 ? 'item is' : 'items are'} waiting for answers and not included here.`)}</strong>{' '}
+          {L('At noen ikke har svart, regnes ikke som nei takk.', 'Not answering is not counted as no thanks.')}
+          <ul style={{ margin:'8px 0 0', paddingLeft:'18px' }}>
+            {waiting.map(({ item, pending }) => (
+              <li key={item.id}>{item.title}: {L('venter på', 'waiting for')} {pending.map(m => m.user_id === session.user.id ? L('deg', 'you') : (m.profiles?.display_name || L('en arving', 'an heir'))).join(', ')}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       {!people.length && (
         <div role="status" style={{ background:'#FBF9F5', border:'1px solid #D9CFC0', borderRadius:'12px', padding:'16px 20px', marginBottom:'20px', color:'#3A2F26', fontSize:'0.875rem', lineHeight:1.6 }}>
           {L('Før gjenstandene kan fordeles, må dere legge inn hvem som kan få gjenstander under «Arvinger».', 'Before the items can be distributed, add who can receive items under «Heirs».')}{' '}
@@ -323,7 +370,7 @@ export default function ConflictPage({ session, onToast }) {
       {/* Mode selector */}
       <details open style={{ marginBottom:'24px' }}>
         <summary style={{ cursor:'pointer', fontSize:'0.875rem', color:'#5C4530', padding:'10px 0', minHeight:'44px', boxSizing:'border-box' }}>
-          {L(`Snakk sammen først: begrunnelsene for ${items.length} ${items.length === 1 ? 'gjenstand' : 'gjenstander'}`, `Talk first: the reasons for ${items.length} ${items.length === 1 ? 'item' : 'items'}`)}
+          {L(`Snakk sammen først: begrunnelsene for ${contested.length} ${contested.length === 1 ? 'gjenstand' : 'gjenstander'}`, `Talk first: the reasons for ${contested.length} ${contested.length === 1 ? 'item' : 'items'}`)}
         </summary>
         {talkFirst}
       </details>

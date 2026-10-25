@@ -15,6 +15,7 @@ import AgreedValue from '../components/AgreedValue'
 import { withCorrections } from '../lib/aiCorrections'
 import { assignItems, unassignItem } from '../lib/assignments'
 import { recipientsOf, recipientOf, isUnconfirmedAssignment } from '../lib/recipients'
+import { pendingMembersFor } from '../lib/estateProgress'
 import StoredImage from '../components/StoredImage'
 
 const tc = c => { if(!c)return'#FBF9F5'; const r=parseInt(c.slice(1,3),16),g=parseInt(c.slice(3,5),16),b=parseInt(c.slice(5,7),16); return(0.299*r+0.587*g+0.114*b)/255>0.55?'#3A2F26':'#FBF9F5' }
@@ -34,6 +35,7 @@ export default function ItemDetailPage({ session, profile, onToast, isDemo }) {
   const [commentText, setCommentText] = useState('')
   const [submittingComment, setSubmittingComment] = useState(false)
   const [showAssign, setShowAssign] = useState(false)
+  const [assignPick, setAssignPick] = useState(null) // valgt person når noen ikke har svart: tildelingen må bekreftes
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [showWithdrawConfirm, setShowWithdrawConfirm] = useState(false)
   const [passes, setPasses] = useState([])
@@ -57,7 +59,7 @@ export default function ItemDetailPage({ session, profile, onToast, isDemo }) {
       getEstateMembers(id),
       supabase.from('estate_members').select('role').eq('estate_id', id).eq('user_id', session.user.id).single(),
       getPasses([itemId]),
-      supabase.from('heirs').select('id, name, relationship, user_id, receives_items').eq('estate_id', id).order('created_at'),
+      supabase.from('heirs').select('id, name, email, relationship, user_id, receives_items').eq('estate_id', id).order('created_at'),
     ])
     setHeirs(hs || [])
     setItem(it)
@@ -98,6 +100,9 @@ export default function ItemDetailPage({ session, profile, onToast, isDemo }) {
   const recipient = recipientOf(item, heirs)
   const people = recipientsOf(heirs)
   const unconfirmed = isUnconfirmedAssignment(item)
+  // Medlemmer som ikke har svart på gjenstanden (rådgiverroller teller ikke). Manglende svar er ikke «nei takk».
+  const pending = isAssigned ? [] : pendingMembersFor(item, members, passes, heirs)
+  const pendingNames = pending.map(m => m.user_id === session.user.id ? L('du', 'you') : (m.profiles?.display_name || L('en arving', 'an heir'))).join(', ')
   const accountName = members.find(m => m.user_id === item.assigned_to)?.profiles?.display_name || L('et tidligere medlem', 'a former member')
 
   // Kjører en handling én gang om gangen og viser feilen hvis den ikke gikk gjennom.
@@ -179,7 +184,7 @@ export default function ItemDetailPage({ session, profile, onToast, isDemo }) {
       async () => { const r = await assignItems(id, [{ item_id: itemId, heir_id: heirId }], 'manual'); return r.error || r.data?.assigned ? r : { error: 'skipped' } },
       L('Gjenstand tildelt', 'Item assigned'), L('Kunne ikke tildele. Bare administratorer kan tildele gjenstander.', 'Could not assign. Only administrators can assign items.'),
     )
-    if (ok) setShowAssign(false)
+    if (ok) { setShowAssign(false); setAssignPick(null) }
   }
 
   // Eldre tildeling uten bekreftet person: familien bekrefter mottakeren (logges, endres aldri automatisk)
@@ -451,7 +456,7 @@ export default function ItemDetailPage({ session, profile, onToast, isDemo }) {
               {contested ? L('Flere ønsker denne', 'Several want this') : L('Interesserte', 'Interested')} ({item.interests?.length || 0})
             </h3>
             {isAdmin && !isAssigned && (
-              <button onClick={() => setShowAssign(!showAssign)} style={{ fontSize:'0.8125rem', color:'#5F6E52', background:'none', border:'1px solid #B8C8A8', padding:'5px 12px', borderRadius:'6px', cursor:'pointer', fontFamily:'Karla, sans-serif' }}>
+              <button onClick={() => { if (!showAssign) load(); setShowAssign(!showAssign); setAssignPick(null) }} style={{ fontSize:'0.8125rem', color:'#5F6E52', background:'none', border:'1px solid #B8C8A8', padding:'5px 12px', borderRadius:'6px', cursor:'pointer', fontFamily:'Karla, sans-serif' }}>
                 {L('Tildel', 'Assign')}
               </button>
             )}
@@ -459,6 +464,20 @@ export default function ItemDetailPage({ session, profile, onToast, isDemo }) {
           {showAssign && (
             <div style={{ background:'#DCE3D2', border:'1px solid #B8C8A8', borderRadius:'10px', padding:'16px', marginBottom:'16px' }}>
               <p style={{ fontSize:'0.8125rem', color:'#5C4530', marginBottom:'12px' }}>{L('Hvem skal ha den?', 'Who should have it?')}</p>
+              {pending.length > 0 && (
+                <div role="status" style={{ background:'#F5E8D5', border:'1px solid #D9B98C', borderRadius:'8px', padding:'10px 12px', marginBottom:'12px', fontSize:'0.8125rem', color:'#3A2F26', lineHeight:1.6 }}>
+                  <strong style={{ fontWeight:'600' }}>{L('Disse har ikke svart på denne gjenstanden:', 'These people have not answered on this item:')}</strong> {pendingNames}.{' '}
+                  {L('Tildeler du nå, registreres det at de ikke hadde svart. Det betyr ikke at de har sagt nei takk.', 'If you assign it now, it is recorded that they had not answered. It does not mean they said no thanks.')}
+                </div>
+              )}
+              {assignPick && (
+                <div style={{ display:'flex', gap:'8px', flexWrap:'wrap', alignItems:'center', marginBottom:'12px' }}>
+                  <button onClick={() => handleAssign(assignPick)} disabled={busy} style={{ minHeight:'44px', padding:'10px 14px', background:'#3A2F26', color:'#FBF9F5', border:'none', borderRadius:'8px', cursor:'pointer', fontSize:'0.875rem', fontFamily:'Karla, sans-serif' }}>
+                    {L(`Tildel til ${people.find(h => h.id === assignPick)?.name || ''} før alle har svart`, `Assign to ${people.find(h => h.id === assignPick)?.name || ''} before everyone has answered`)}
+                  </button>
+                  <button onClick={() => setAssignPick(null)} style={{ minHeight:'44px', padding:'10px 14px', background:'none', border:'1px solid #9A8B78', borderRadius:'8px', cursor:'pointer', color:'#5C4530', fontSize:'0.875rem', fontFamily:'Karla, sans-serif' }}>{L('Avbryt', 'Cancel')}</button>
+                </div>
+              )}
               {!people.length && (
                 <p style={{ fontSize:'0.8125rem', color:'#3A2F26', lineHeight:1.6 }}>
                   {L('Legg først inn personene som kan få gjenstander under «Arvinger».', 'First add the people who can receive items under «Heirs».')}{' '}
@@ -466,7 +485,7 @@ export default function ItemDetailPage({ session, profile, onToast, isDemo }) {
                 </p>
               )}
               {people.map(h => (
-                <button key={h.id} onClick={() => handleAssign(h.id)} disabled={busy} style={{ display:'flex', alignItems:'center', gap:'10px', width:'100%', minHeight:'44px', padding:'10px 14px', background:'#fff', border:'1px solid #B8C8A8', borderRadius:'8px', cursor:'pointer', textAlign:'left', fontFamily:'Karla, sans-serif', marginBottom:'6px' }}>
+                <button key={h.id} onClick={() => (pending.length ? setAssignPick(h.id) : handleAssign(h.id))} aria-pressed={assignPick === h.id} disabled={busy} style={{ display:'flex', alignItems:'center', gap:'10px', width:'100%', minHeight:'44px', padding:'10px 14px', background:'#fff', border:'1px solid #B8C8A8', borderRadius:'8px', cursor:'pointer', textAlign:'left', fontFamily:'Karla, sans-serif', marginBottom:'6px' }}>
                   <div aria-hidden="true" style={{ width:'28px', height:'28px', borderRadius:'50%', background:'#DCE3D2', border:'1px solid #D9CFC0', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'0.6875rem', color:'#3A2F26', fontWeight:'500' }}>
                     {(h.name||'?')[0].toUpperCase()}
                   </div>

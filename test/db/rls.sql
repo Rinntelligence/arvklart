@@ -13,6 +13,11 @@ begin
   raise notice 'OK   %', label;
 end $$;
 grant execute on function public.t_as(text), public.t_eq(anyelement, anyelement, text) to anon, authenticated;
+-- Fra 20261023 trekkes lodd bare når alle har svart på gjenstanden; testene lar de som mangler, si nei takk
+create or replace function public.t_settle(p_item uuid) returns void language sql security definer set search_path = public as $$
+  insert into item_passes (item_id, user_id) select p_item, u from unnest(public.item_pending_members(p_item)) u on conflict do nothing
+$$;
+grant execute on function public.t_settle(uuid) to authenticated;
 
 -- Oppsett: Eva lager et bo og legger til Frank som arving
 select t_as('eva@test.no'); set role authenticated;
@@ -277,6 +282,7 @@ exception when invalid_parameter_value then raise notice 'OK   kan bare tildele 
 end $$;
 select t_eq((unassign_item('11110000-0000-0000-0000-000000000001'))->>'ok', 'true', 'admin kan angre tildelingen via unassign_item');
 select t_eq((select count(*)::int from estate_events where item_id = '11110000-0000-0000-0000-000000000001' and kind = 'unassigned'), 1, 'angringen logges');
+select t_settle('11110000-0000-0000-0000-000000000001');
 select t_eq((draw_lot('11110000-0000-0000-0000-000000000001'))->>'winner', '00000000-0000-0000-0000-0000000000f1', 'loddtrekningen skjer i databasen blant dem som ønsker gjenstanden');
 do $$ begin
   perform assign_items('eeee0000-0000-0000-0000-000000000001', '[{"item_id":"11110000-0000-0000-0000-000000000001","user_id":"00000000-0000-0000-0000-0000000000e1"}]', 'lottery');
@@ -877,6 +883,7 @@ do $$ begin
 exception when insufficient_privilege then raise notice 'OK   en person med tildelte gjenstander kan ikke fjernes fra listen';
 end $$;
 -- Loddtrekning blant mottakerne (Cato ønsker, men står ikke på listen)
+select t_settle('f7f70000-0000-0000-0000-0000000000b3');
 select set_config('test.d7', draw_lot('f7f70000-0000-0000-0000-0000000000b3')::text, false);
 select t_eq((current_setting('test.d7')::jsonb->>'winner_heir') in ('f7f70000-0000-0000-0000-0000000000f1', 'f7f70000-0000-0000-0000-0000000000f2'), true, 'loddtrekningen gir en person på listen');
 select t_eq(jsonb_array_length(current_setting('test.d7')::jsonb->'candidate_heirs'), 2, 'den som ikke står på listen, er ikke med i trekningen');
@@ -1069,3 +1076,151 @@ select t_as('mona.demo@heirsplit.no'); set role authenticated;
 select t_eq(item_estate_id('face0001-0000-0000-0000-000000000001'), 'deed0001-0000-0000-0000-000000000001'::uuid, 'item_estate_id gir boets id til medlemmer');
 select t_eq((select count(*)::int from interests where item_id = 'face0001-0000-0000-0000-000000000001') > 0, true, 'medlem ser fortsatt ønskene (policy med item_estate_id)');
 reset role;
+
+-- ═══ 20261023: avklart gjenstand, «single», kontroller i metodene og pending_responses ═══
+-- Felles tilfeller med JS-testen (test/fixtures/settled_cases.json, sendes inn som :cases av run.sh)
+reset role; select t_as(null);
+select set_config('test.cases', :'cases', false);
+do $$
+declare
+  c jsonb; m jsonb; v_est uuid; v_item uuid; v_owner uuid; v_got uuid[]; v_want uuid[]; n int := 0; x text;
+begin
+  for c in select * from jsonb_array_elements(current_setting('test.cases')::jsonb -> 'cases') loop
+    v_est := gen_random_uuid(); v_item := gen_random_uuid();
+    -- Alle kontoene i tilfellet (også tidligere medlemmer) finnes i auth.users
+    for x in select distinct v from (select jsonb_array_elements(c->'members')->>'id' v union all
+      select jsonb_array_elements_text(c->'interests') union all select jsonb_array_elements_text(c->'passes')) s loop
+      insert into auth.users (id, email) values (md5(v_est::text || x)::uuid, md5(v_est::text || x) || '@sak.test');
+    end loop;
+    v_owner := md5(v_est::text || (c->'members'->0->>'id'))::uuid;
+    insert into estates (id, name, owner_id, invite_code) values (v_est, 'Avklart: ' || (c->>'name'), v_owner, substr(md5(v_est::text), 1, 10));
+    for m in select * from jsonb_array_elements(c->'members') loop
+      insert into profiles (user_id, display_name, email) values (md5(v_est::text || (m->>'id'))::uuid, m->>'id', m->>'email');
+      insert into estate_members (estate_id, user_id, role) values (v_est, md5(v_est::text || (m->>'id'))::uuid, coalesce(m->>'role', 'member'));
+    end loop;
+    for m in select * from jsonb_array_elements(c->'heirs') loop
+      insert into heirs (estate_id, name, email, relationship) values (v_est, 'Person', m->>'email', m->>'relationship');
+    end loop;
+    insert into items (id, estate_id, title, added_by) values (v_item, v_est, 'Ting', v_owner);
+    insert into interests (item_id, user_id) select v_item, md5(v_est::text || v)::uuid from jsonb_array_elements_text(c->'interests') v;
+    insert into item_passes (item_id, user_id) select v_item, md5(v_est::text || v)::uuid from jsonb_array_elements_text(c->'passes') v;
+    select coalesce(array_agg(u order by u), '{}') into v_got from unnest(public.item_pending_members(v_item)) u;
+    select coalesce(array_agg(md5(v_est::text || v)::uuid order by md5(v_est::text || v)::uuid), '{}') into v_want from jsonb_array_elements_text(c->'pending') v;
+    if v_got is distinct from v_want then raise exception 'FAIL avklart «%»: fikk %, ventet %', c->>'name', v_got, v_want; end if;
+    if public.item_is_settled(v_item) is distinct from (cardinality(v_want) = 0) then raise exception 'FAIL item_is_settled «%»', c->>'name'; end if;
+    n := n + 1;
+  end loop;
+  raise notice 'OK   item_pending_members gir samme svar som pendingMembersFor (% tilfeller)', n;
+end $$;
+
+-- Eget bo: Ada (admin, arving), Ben og Cia (arvinger), Rolf (rådgiver, medlem, ikke mottaker)
+insert into auth.users (id, email) values
+  ('a2300000-0000-0000-0000-0000000000a1', 'ada23@test.no'), ('a2300000-0000-0000-0000-0000000000b1', 'ben23@test.no'),
+  ('a2300000-0000-0000-0000-0000000000c1', 'cia23@test.no'), ('a2300000-0000-0000-0000-0000000000d1', 'rolf23@test.no');
+insert into profiles (user_id, display_name, email) values
+  ('a2300000-0000-0000-0000-0000000000a1', 'Ada', 'ada23@test.no'), ('a2300000-0000-0000-0000-0000000000b1', 'Ben', 'ben23@test.no'),
+  ('a2300000-0000-0000-0000-0000000000c1', 'Cia', 'cia23@test.no'), ('a2300000-0000-0000-0000-0000000000d1', 'Rolf', 'rolf23@test.no');
+insert into estates (id, name, owner_id, invite_code) values ('a2300000-0000-0000-0000-000000000001', 'Avklart-bo', 'a2300000-0000-0000-0000-0000000000a1', 'A23A23');
+insert into estate_members (estate_id, user_id, role) values
+  ('a2300000-0000-0000-0000-000000000001', 'a2300000-0000-0000-0000-0000000000a1', 'admin'),
+  ('a2300000-0000-0000-0000-000000000001', 'a2300000-0000-0000-0000-0000000000b1', 'member'),
+  ('a2300000-0000-0000-0000-000000000001', 'a2300000-0000-0000-0000-0000000000c1', 'member'),
+  ('a2300000-0000-0000-0000-000000000001', 'a2300000-0000-0000-0000-0000000000d1', 'member');
+insert into heirs (id, estate_id, name, email, relationship, user_id) values
+  ('a2300000-0000-0000-0000-0000000000f1', 'a2300000-0000-0000-0000-000000000001', 'Ada', 'ada23@test.no', 'Barn', 'a2300000-0000-0000-0000-0000000000a1'),
+  ('a2300000-0000-0000-0000-0000000000f2', 'a2300000-0000-0000-0000-000000000001', 'Ben', 'ben23@test.no', 'Barn', 'a2300000-0000-0000-0000-0000000000b1'),
+  ('a2300000-0000-0000-0000-0000000000f3', 'a2300000-0000-0000-0000-000000000001', 'Cia', 'cia23@test.no', 'Barn', 'a2300000-0000-0000-0000-0000000000c1');
+insert into heirs (estate_id, name, email, relationship) values ('a2300000-0000-0000-0000-000000000001', 'Rolf', 'rolf23@test.no', 'Rådgiver');
+-- S1: bare Ada vil ha, de andre har sagt nei (Rolf har ikke svart, men teller ikke) · S2: Ada vil ha, Ben har ikke svart
+-- S3: Ada og Ben vil ha, Cia nei · S4: Ada og Ben vil ha, Cia har ikke svart · S5: bare Ben vil ha · S6: Ada og Cia, eldre trekning
+insert into items (id, estate_id, title, added_by) select ('a2300000-0000-0000-0000-0000000000e' || n)::uuid, 'a2300000-0000-0000-0000-000000000001', 'S' || n, 'a2300000-0000-0000-0000-0000000000a1' from generate_series(1, 6) n;
+insert into interests (item_id, user_id) values
+  ('a2300000-0000-0000-0000-0000000000e1', 'a2300000-0000-0000-0000-0000000000a1'),
+  ('a2300000-0000-0000-0000-0000000000e2', 'a2300000-0000-0000-0000-0000000000a1'),
+  ('a2300000-0000-0000-0000-0000000000e3', 'a2300000-0000-0000-0000-0000000000a1'), ('a2300000-0000-0000-0000-0000000000e3', 'a2300000-0000-0000-0000-0000000000b1'),
+  ('a2300000-0000-0000-0000-0000000000e4', 'a2300000-0000-0000-0000-0000000000a1'), ('a2300000-0000-0000-0000-0000000000e4', 'a2300000-0000-0000-0000-0000000000b1'),
+  ('a2300000-0000-0000-0000-0000000000e5', 'a2300000-0000-0000-0000-0000000000b1'),
+  ('a2300000-0000-0000-0000-0000000000e6', 'a2300000-0000-0000-0000-0000000000a1'), ('a2300000-0000-0000-0000-0000000000e6', 'a2300000-0000-0000-0000-0000000000c1');
+insert into item_passes (item_id, user_id) values
+  ('a2300000-0000-0000-0000-0000000000e1', 'a2300000-0000-0000-0000-0000000000b1'), ('a2300000-0000-0000-0000-0000000000e1', 'a2300000-0000-0000-0000-0000000000c1'),
+  ('a2300000-0000-0000-0000-0000000000e2', 'a2300000-0000-0000-0000-0000000000c1'),
+  ('a2300000-0000-0000-0000-0000000000e3', 'a2300000-0000-0000-0000-0000000000c1'),
+  ('a2300000-0000-0000-0000-0000000000e5', 'a2300000-0000-0000-0000-0000000000a1'), ('a2300000-0000-0000-0000-0000000000e5', 'a2300000-0000-0000-0000-0000000000c1'),
+  ('a2300000-0000-0000-0000-0000000000e6', 'a2300000-0000-0000-0000-0000000000b1');
+-- S6 har en eldre trekning uten kandidatliste (før 20261021): Ada vant
+insert into estate_events (estate_id, item_id, actor, kind, data) values ('a2300000-0000-0000-0000-000000000001', 'a2300000-0000-0000-0000-0000000000e6', 'a2300000-0000-0000-0000-0000000000a1', 'lottery_draw', jsonb_build_object('winner', 'a2300000-0000-0000-0000-0000000000a1', 'draw_no', 1));
+
+select t_as('ben23@test.no'); set role authenticated;
+do $$ begin
+  perform assign_items('a2300000-0000-0000-0000-000000000001', '[{"item_id":"a2300000-0000-0000-0000-0000000000e5","heir_id":"a2300000-0000-0000-0000-0000000000f2"}]', 'single');
+  raise exception 'FAIL: medlem kunne tildele';
+exception when insufficient_privilege then raise notice 'OK   medlem kan ikke bruke samlet tildeling';
+end $$;
+select t_eq(has_function_privilege('public.item_pending_members(uuid)', 'EXECUTE'), false, 'klienten kan ikke kalle item_pending_members');
+reset role;
+
+select t_as('ada23@test.no'); set role authenticated;
+select t_eq(assign_items('a2300000-0000-0000-0000-000000000001', '[
+  {"item_id":"a2300000-0000-0000-0000-0000000000e1","heir_id":"a2300000-0000-0000-0000-0000000000f1"},
+  {"item_id":"a2300000-0000-0000-0000-0000000000e2","heir_id":"a2300000-0000-0000-0000-0000000000f1"},
+  {"item_id":"a2300000-0000-0000-0000-0000000000e3","heir_id":"a2300000-0000-0000-0000-0000000000f1"},
+  {"item_id":"a2300000-0000-0000-0000-0000000000e5","heir_id":"a2300000-0000-0000-0000-0000000000f1"}]', 'single'),
+  '{"assigned": 1, "skipped": ["a2300000-0000-0000-0000-0000000000e2", "a2300000-0000-0000-0000-0000000000e3", "a2300000-0000-0000-0000-0000000000e5"]}'::jsonb,
+  'single tildeler bare avklart gjenstand med én interessent til den personen; uavklart, to interessenter og feil person hoppes over');
+select t_eq((select status from items where id = 'a2300000-0000-0000-0000-0000000000e2'), 'active', 'uavklart gjenstand er ikke tildelt (manglende svar er ikke nei takk)');
+select t_eq(assign_items('a2300000-0000-0000-0000-000000000001', '[{"item_id":"a2300000-0000-0000-0000-0000000000e1","heir_id":"a2300000-0000-0000-0000-0000000000f1"}]', 'single'),
+  '{"assigned": 0, "skipped": ["a2300000-0000-0000-0000-0000000000e1"]}'::jsonb, 'single hopper over gjenstand som allerede er tildelt');
+select t_eq((select data->'pending_responses' from estate_events where item_id = 'a2300000-0000-0000-0000-0000000000e1' and kind = 'assigned'), '[]'::jsonb, 'single logger tom pending_responses (rådgiveren teller ikke)');
+select t_eq((select data->>'method' from estate_events where item_id = 'a2300000-0000-0000-0000-0000000000e1' and kind = 'assigned'), 'single', 'metoden single logges');
+do $$ begin
+  perform draw_lot('a2300000-0000-0000-0000-0000000000e4');
+  raise exception 'FAIL: loddtrekning på uavklart gjenstand';
+exception when sqlstate '22023' then raise notice 'OK   draw_lot avviser gjenstand der noen ikke har svart';
+end $$;
+do $$ begin
+  perform assign_items('a2300000-0000-0000-0000-000000000001', '[{"item_id":"a2300000-0000-0000-0000-0000000000e4","heir_id":"a2300000-0000-0000-0000-0000000000f1"}]', 'snake');
+  raise exception 'FAIL: runder på uavklart gjenstand';
+exception when sqlstate '22023' then raise notice 'OK   runder avvises for gjenstand der noen ikke har svart';
+end $$;
+do $$ begin
+  perform assign_items('a2300000-0000-0000-0000-000000000001', '[{"item_id":"a2300000-0000-0000-0000-0000000000e5","heir_id":"a2300000-0000-0000-0000-0000000000f1"}]', 'snake');
+  raise exception 'FAIL: runder til en som ikke ønsker gjenstanden';
+exception when sqlstate '22023' then raise notice 'OK   runder avvises når mottakeren ikke ønsker gjenstanden';
+end $$;
+do $$ begin
+  perform assign_items('a2300000-0000-0000-0000-000000000001', '[
+    {"item_id":"a2300000-0000-0000-0000-0000000000e5","heir_id":"a2300000-0000-0000-0000-0000000000f2"},
+    {"item_id":"a2300000-0000-0000-0000-0000000000e4","heir_id":"a2300000-0000-0000-0000-0000000000f1"}]', 'equal');
+  raise exception 'FAIL: jevn fordeling med en uavklart gjenstand';
+exception when sqlstate '22023' then raise notice 'OK   jevn fordeling avvises når én gjenstand ikke er avklart';
+end $$;
+select t_eq((select status from items where id = 'a2300000-0000-0000-0000-0000000000e5'), 'active', 'avvist kall tildeler ingenting (heller ikke de gyldige)');
+select t_eq((assign_items('a2300000-0000-0000-0000-000000000001', '[{"item_id":"a2300000-0000-0000-0000-0000000000e5","heir_id":"a2300000-0000-0000-0000-0000000000f2"}]', 'equal'))->>'assigned', '1', 'jevn fordeling tildeler avklart gjenstand til en som ønsker den');
+-- Loddtrekning, så endrer ønskene seg før tildelingen
+select draw_lot('a2300000-0000-0000-0000-0000000000e3');
+reset role;
+select t_as('ben23@test.no'); set role authenticated;
+delete from interests where item_id = 'a2300000-0000-0000-0000-0000000000e3' and user_id = auth.uid();
+insert into item_passes (item_id, user_id) values ('a2300000-0000-0000-0000-0000000000e3', auth.uid());
+reset role;
+select t_as('ada23@test.no'); set role authenticated;
+do $$
+declare w uuid := (select (data->>'winner_heir')::uuid from estate_events where item_id = 'a2300000-0000-0000-0000-0000000000e3' and kind = 'lottery_draw' order by id desc limit 1);
+begin
+  perform assign_items('a2300000-0000-0000-0000-000000000001', jsonb_build_array(jsonb_build_object('item_id', 'a2300000-0000-0000-0000-0000000000e3', 'heir_id', w)), 'lottery');
+  raise exception 'FAIL: tildeling etter trekning selv om ønskene er endret';
+exception when sqlstate '22023' then raise notice 'OK   loddtrekning må gjøres på nytt når ønskene er endret etter trekningen';
+end $$;
+select t_eq((assign_items('a2300000-0000-0000-0000-000000000001', '[{"item_id":"a2300000-0000-0000-0000-0000000000e6","heir_id":"a2300000-0000-0000-0000-0000000000f1"}]', 'lottery'))->>'assigned', '1',
+  'eldre trekning uten kandidatliste kan fortsatt tildeles (ingen regresjon)');
+-- Manuell tildeling før alle har svart: tillatt, og logget med hvem som ikke hadde svart
+select t_eq((assign_items('a2300000-0000-0000-0000-000000000001', '[{"item_id":"a2300000-0000-0000-0000-0000000000e2","heir_id":"a2300000-0000-0000-0000-0000000000f1"}]', 'manual'))->>'assigned', '1',
+  'administrator kan tildele manuelt før alle har svart');
+select t_eq((select data->'pending_responses' from estate_events where item_id = 'a2300000-0000-0000-0000-0000000000e2' and kind = 'assigned'), '["a2300000-0000-0000-0000-0000000000b1"]'::jsonb,
+  'manuell tildeling logger nøyaktig dem som ikke hadde svart');
+reset role;
+-- Kontosletting: konto-id-en fjernes også fra pending_responses
+select t_as(null);
+select anonymize_estate_events('a2300000-0000-0000-0000-0000000000b1');
+select t_eq((select data->'pending_responses' from estate_events where item_id = 'a2300000-0000-0000-0000-0000000000e2' and kind = 'assigned'), '["00000000-0000-0000-0000-000000000000"]'::jsonb,
+  'anonymize_estate_events fjerner konto-id-en fra pending_responses');

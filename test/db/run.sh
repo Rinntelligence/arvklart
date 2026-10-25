@@ -54,7 +54,8 @@ NOT_GRANTED=$("${PSQL[@]}" -tA -c "select string_agg(n, ', ') from unnest(string
 if [ -n "$NOT_GRANTED" ]; then echo "Appen kaller RPC-er som ikke står i client_functions: $NOT_GRANTED"; exit 1; fi
 
 echo "Tilgangsregler:"
-OUT=$("${PSQL[@]}" < test/db/rls.sql 2>&1 || true)
+# Felles tilfeller for «avklart gjenstand» (samme som test/estate/settled.test.js)
+OUT=$("${PSQL[@]}" -v cases="$(cat test/fixtures/settled_cases.json)" < test/db/rls.sql 2>&1 || true)
 echo "$OUT" | grep -oE "(OK|FAIL) .*|ERROR: .*" | sed 's/^/  /'
 if echo "$OUT" | grep -qE "FAIL|ERROR"; then exit 1; fi
 
