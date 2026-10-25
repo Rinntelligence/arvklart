@@ -1,7 +1,7 @@
 // Visning av bilder fra Storage med tidsbegrensede (signerte) URL-er, så bøtten kan være privat.
 // Databasen lagrer fortsatt den offentlige URL-en som identifikator (image_url, extra_images, branding_logo);
-// her gjøres den om til en signert URL når bildet skal vises. Andre adresser (Unsplash i demoen,
-// data:- og blob:-forhåndsvisninger) brukes som de er.
+// her gjøres den om til en signert URL når bildet skal vises. Andre adresser (eksterne URL-er,
+// data:- og blob:-forhåndsvisninger) brukes som de er; eksterne bilder blokkeres av innholdsreglene i vercel.json.
 //
 // Mange bilder på samme side hentes i ett kall (createSignedUrls), og svarene huskes til kort før de utløper.
 

@@ -60,3 +60,36 @@ test('andeler brukes bare når de er bekreftet, egendefinert og summerer til 100
 test('valueTotal teller ukjente for seg', () => {
   assert.deepEqual(valueTotal([it('a', 100), it('b', null), it('c', 0)]), { sum: 100, unknown: 1 })
 })
+
+// «Tildel alle som bare én ønsker» (singleInterestAssignments)
+import { singleInterestAssignments } from '../../src/lib/distribution.js'
+
+const sMembers = [
+  { user_id: 'ua', profiles: { email: 'a@test.no' } }, { user_id: 'ub', profiles: { email: 'b@test.no' } },
+  { user_id: 'ur', profiles: { email: 'r@test.no' } },
+]
+const sHeirs = [
+  { id: 'ha', name: 'Ada', email: 'a@test.no', relationship: 'Barn', user_id: 'ua', receives_items: true },
+  { id: 'hb', name: 'Ben', email: 'b@test.no', relationship: 'Barn', user_id: 'ub', receives_items: false },
+  { id: 'hr', name: 'Rolf', email: 'r@test.no', relationship: 'Rådgiver', user_id: null },
+]
+const want = (...u) => u.map(user_id => ({ user_id }))
+const pass = (item, ...u) => u.map(user_id => ({ item_id: item, user_id }))
+
+test('samlet tildeling: bare avklarte gjenstander med nøyaktig én interessent som er mottaker', () => {
+  const items = [
+    { id: 'en', status: 'active', interests: want('ua') },                 // klar (rådgiveren har ikke svart, teller ikke)
+    { id: 'to', status: 'active', interests: want('ua', 'ub') },           // to interessenter: ikke med
+    { id: 'ingen', status: 'active', interests: [] },                      // ingen: ikke med
+    { id: 'gammel', status: 'active', interests: want('ua', 'tidligere') },// ønske fra tidligere medlem teller ikke
+    { id: 'venter', status: 'active', interests: want('ua') },             // Ben har ikke svart
+    { id: 'ikke-mottaker', status: 'active', interests: want('ub') },      // Ben kan ikke få gjenstander
+    { id: 'ukoblet', status: 'active', interests: want('ur') },            // Rolf er ikke koblet til en person
+    { id: 'tildelt', status: 'assigned', interests: want('ua') },          // allerede tildelt
+  ]
+  const passes = [...pass('en', 'ub'), ...pass('gammel', 'ub'), ...pass('ikke-mottaker', 'ua'), ...pass('ukoblet', 'ua', 'ub')]
+  const r = singleInterestAssignments(items, sMembers, passes, sHeirs)
+  assert.deepEqual(r.ready.map(x => [x.item.id, x.heir.id]), [['en', 'ha'], ['gammel', 'ha']])
+  assert.deepEqual(r.waiting.map(x => [x.item.id, x.pending.map(m => m.user_id)]), [['venter', ['ub']]])
+  assert.deepEqual(r.unlinked.map(x => [x.item.id, x.reason]), [['ikke-mottaker', 'not_recipient'], ['ukoblet', 'no_person']])
+})

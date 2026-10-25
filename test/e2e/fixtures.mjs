@@ -25,8 +25,15 @@ export const FIXTURES = {
   heirs: [{ id: 'h1', estate_id: EST, name: 'Kari', email: 'kari@test.no', relationship: 'Barn', percentage: 0, created_at: now }],
 }
 
-export async function setup(browser, { loggedIn = true, viewport = { width: 390, height: 844 }, textSize = null, fixtures = {}, rpc = {} } = {}) {
+// email: logg inn med en annen e-post, f.eks. en demokonto (*.demo@heirsplit.no)
+export const sessionFor = email => {
+  const t = `${b64({ alg: 'HS256', typ: 'JWT' })}.${b64({ sub: UID, email, role: 'authenticated', exp, session_id: 's1' })}.sig`
+  return { ...session, access_token: t, user: { ...session.user, email } }
+}
+
+export async function setup(browser, { loggedIn = true, viewport = { width: 390, height: 844 }, textSize = null, fixtures = {}, rpc = {}, email = null } = {}) {
   const data = { ...FIXTURES, ...fixtures }
+  const s0 = email ? sessionFor(email) : session
   const ctx = await browser.newContext({ viewport })
   const page = await ctx.newPage()
   const calls = [] // { method, table } for alle kall mot databasen, så testene kan sjekke hva som ble gjort
@@ -54,7 +61,7 @@ export async function setup(browser, { loggedIn = true, viewport = { width: 390,
     localStorage.removeItem('hs_lang')
     if (ts) localStorage.setItem('hs_text_size', ts)
     if (on) localStorage.setItem('sb-test-auth-token', JSON.stringify(s)); else localStorage.removeItem('sb-test-auth-token')
-  }, [session, loggedIn, textSize])
+  }, [s0, loggedIn, textSize])
   return { ctx, page, calls }
 }
 

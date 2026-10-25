@@ -29,3 +29,10 @@ test('fordelingsverdi og arveandeler', () => {
   assert.equal(eventText({ kind: 'agreed_value_set', actor: 'b', data: { value: null } }, nameOf), 'Lars fjernet fordelingsverdien')
   assert.equal(eventText({ kind: 'shares_unconfirmed', actor: null, data: { reason: 'heirs_changed' } }, nameOf), 'Bekreftelsen av arveandelene ble nullstilt fordi arvelisten ble endret')
 })
+
+test('tildeling før alle hadde svart (20261023): antallet som ikke hadde svart, aldri «nei takk» eller «samtykke»', () => {
+  const t = eventText({ kind: 'assigned', actor: 'b', data: { name: 'Gunn', method: 'manual', pending_responses: ['a', 'x'] } }, nameOf)
+  assert.equal(t, 'Lars tildelte gjenstanden til Gunn (valgt av administrator) før alle hadde svart (2 hadde ikke svart)')
+  assert.doesNotMatch(t, /nei takk|samtykke|godtatt/)
+  assert.equal(eventText({ kind: 'assigned', actor: 'b', data: { name: 'Gunn', method: 'single', pending_responses: [] } }, nameOf), 'Lars tildelte gjenstanden til Gunn (den eneste som ønsket den)')
+})

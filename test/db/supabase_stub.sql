@@ -28,6 +28,8 @@ grant execute on all functions in schema auth to anon, authenticated, service_ro
 grant select, insert, update, delete on storage.objects, storage.buckets to authenticated, service_role;
 alter default privileges in schema public grant all on tables to anon, authenticated, service_role;
 alter default privileges in schema public grant all on sequences to anon, authenticated, service_role;
+-- Som i Supabase: nye funksjoner i public kan kalles av anon og authenticated (i tillegg til PUBLIC)
+alter default privileges in schema public grant all on functions to anon, authenticated, service_role;
 insert into auth.users (id, email) values
   ('00000000-0000-0000-0000-00000000000a', 'owner@test.no'),
   ('00000000-0000-0000-0000-00000000000b', 'kari.demo@heirsplit.no'),

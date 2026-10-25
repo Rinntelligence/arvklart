@@ -138,6 +138,7 @@ export default function EstatePage({ session, profile, onToast, isDemo }) {
   const breakdown = getStatusBreakdown(items)
   const myUndecided = undecided.find(u => u.member.user_id === session.user.id)?.items.length || 0
   const memberCount = statusExtras?.members.length
+  const openTaskCount = statusExtras ? statusExtras.tasks.filter(t => !t.completed).length : 0
 
   const statusTabs = [
     { key:'all', label:L('Alle', 'All'), count:items.length },
@@ -204,8 +205,9 @@ export default function EstatePage({ session, profile, onToast, isDemo }) {
 
       {estate.status === 'closed' && (
         <div style={{ background:'#E8DFD0', border:'1px solid #D9CFC0', borderRadius:'10px', padding:'12px 16px', marginBottom:'16px', fontSize:'0.8125rem', color:'#5C4530', lineHeight:1.5 }}>
-          {L('Boet er avsluttet. Det slettes automatisk, med alle bilder og dokumenter, 12 måneder etter at det ble avsluttet.', 'This estate is closed. It is deleted automatically, with all photos and documents, 12 months after it was closed.')}
-          {estate.closed_at && ` (${new Date(estate.closed_at).toLocaleDateString(locale(), { day:'numeric', month:'long', year:'numeric' })})`}
+          {L('Boet er avsluttet', 'This estate is closed')}
+          {estate.closed_at && ` (${new Date(estate.closed_at).toLocaleDateString(locale(), { day:'numeric', month:'long', year:'numeric' })})`}.{' '}
+          {L('Det oppbevares med bilder og dokumenter til det slettes. Det finnes ingen automatisk sletting; administratoren kan be Arvklart slette boet.', 'It is kept with its photos and documents until it is deleted. There is no automatic deletion; the administrator can ask Arvklart to delete the estate.')}
         </div>
       )}
 
@@ -300,7 +302,10 @@ export default function EstatePage({ session, profile, onToast, isDemo }) {
             ? { path:`/estate/${id}/conflicts`, label:L('Løsningsmetoder', 'Resolution methods'), desc:L(`${contested} ettertraktede`, `${contested} contested`), highlight: true }
             : { path:`/estate/${id}/conflicts`, label:L('Løsningsmetoder', 'Resolution methods'), desc:L('Ingen ettertraktede ennå', 'None contested yet') },
           { path:`/estate/${id}/status`, label:L('Hva gjenstår', 'What remains'), desc: remainingSteps === null ? L('Oversikt over boet', 'Estate overview') : remainingSteps === 0 ? L('Alt er klart', 'All done') : L(`${remainingSteps} steg gjenstår`, `${remainingSteps} ${remainingSteps === 1 ? 'step' : 'steps'} left`) },
-        ].filter(mod => myRole === 'admin' || !mod.adminOnly).map(mod => (
+          // Dokumentarkivet er ikke tilgjengelig i demoen (ruten er sperret for demokontoen)
+          { path:`/estate/${id}/documents`, label:L('Dokumenter', 'Documents'), desc:L('Testament, skjøter og verdivurderinger', 'Wills, deeds and valuations'), notInDemo: true },
+          { path:`/estate/${id}/tasks`, label:L('Sjekkliste', 'Checklist'), desc: openTaskCount ? L(`${openTaskCount} ${openTaskCount === 1 ? 'oppgave' : 'oppgaver'} gjenstår`, `${openTaskCount} ${openTaskCount === 1 ? 'task' : 'tasks'} left`) : L('Praktiske oppgaver etter dødsfallet', 'Practical tasks after the death') },
+        ].filter(mod => (myRole === 'admin' || !mod.adminOnly) && !(isDemo && mod.notInDemo)).map(mod => (
           <button key={mod.path} onClick={() => navigate(mod.path)} style={{
             padding:'12px 14px', background:'#fff', border:`1px solid ${mod.highlight ? '#8B9A7D' : '#D9CFC0'}`,
             borderRadius:'8px', cursor:'pointer', textAlign:'left', fontFamily:'Karla, sans-serif',

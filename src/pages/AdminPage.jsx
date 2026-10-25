@@ -58,7 +58,6 @@ export default function AdminPage({ session, profile, onToast }) {
   }
 
   const saveBranding = async () => {
-    if (!can('whitelabel')) { onToast(L('Hvitmerking krever Business-plan', 'White-label requires the Business plan'), 'error'); return }
     setSaving(true)
     try {
       let logoUrl = estate.branding_logo
@@ -82,7 +81,7 @@ export default function AdminPage({ session, profile, onToast }) {
     load()
   }
 
-  // Avsluttede bo slettes automatisk etter 12 måneder (se personvernerklæringen)
+  // Avsluttede bo oppbevares til de slettes på forespørsel (ingen automatisk sletting, se personvernerklæringen)
   const setClosed = async (closed) => {
     const { error } = await updateEstate(id, closed ? { status: 'closed', closed_at: new Date().toISOString() } : { status: 'active', closed_at: null })
     setConfirmClose(false)
@@ -174,7 +173,6 @@ export default function AdminPage({ session, profile, onToast }) {
       <Card style={{ padding:'28px', marginBottom:'20px' }}>
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:'6px' }}>
           <h2 style={{ fontFamily:'Fraunces, serif', fontSize:'1.125rem', fontWeight:'400', color:'#3A2F26' }}>{L('Merkevare', 'Branding')}</h2>
-          {!can('whitelabel') && <span style={{ fontSize:'0.6875rem', background:'#DCE3D2', color:'#5F6E52', padding:'3px 8px', borderRadius:'20px' }}>{L('Business-plan', 'Business plan')}</span>}
         </div>
         <p style={{ fontSize:'0.8125rem', color:'#75604B', marginBottom:'20px' }}>{L('Tilpass utseendet for dine klienter — din logo og farger i topplinjen.', 'Customise the look for your clients — your logo and colours in the top bar.')}</p>
 
@@ -228,15 +226,15 @@ export default function AdminPage({ session, profile, onToast }) {
         <h2 style={{ fontFamily:'Fraunces, serif', fontSize:'1.125rem', fontWeight:'400', color:'#3A2F26', marginBottom:'6px' }}>{estate.status === 'closed' ? L('Boet er avsluttet', 'The estate is closed') : L('Avslutt boet', 'Close the estate')}</h2>
         <p style={{ fontSize:'0.8125rem', color:'#75604B', marginBottom:'16px', lineHeight:'1.6' }}>
           {estate.status === 'closed'
-            ? `${L('Avsluttet', 'Closed')} ${estate.closed_at ? new Date(estate.closed_at).toLocaleDateString(locale(), { day:'numeric', month:'long', year:'numeric' }) : ''}. ${L('Boet med bilder og dokumenter slettes automatisk 12 måneder etter dette. Åpner du boet igjen, stopper slettingen.', 'The estate with its photos and documents is deleted automatically 12 months after this. Reopening the estate stops the deletion.')}`
-            : L('Når oppgjøret er ferdig, kan du avslutte boet. Det slettes da automatisk med alle bilder og dokumenter etter 12 måneder. Last ned det dere trenger før det.', 'When the settlement is finished, you can close the estate. It is then deleted automatically with all photos and documents after 12 months. Download what you need before then.')}
+            ? `${L('Avsluttet', 'Closed')} ${estate.closed_at ? new Date(estate.closed_at).toLocaleDateString(locale(), { day:'numeric', month:'long', year:'numeric' }) : ''}. ${L('Boet oppbevares med bilder og dokumenter til det slettes; det finnes ingen automatisk sletting. Du kan be Arvklart slette det (admin@arvklart.no). Vi kontrollerer at forespørselen kommer fra en administrator av boet før noe slettes. Slettingen gjelder hele boet for alle medlemmer og kan ikke angres.', 'The estate is kept with its photos and documents until it is deleted; there is no automatic deletion. You can ask Arvklart to delete it (admin@arvklart.no). We check that the request comes from an administrator of the estate before anything is deleted. The deletion applies to the whole estate for all members and cannot be undone.')}`
+            : L('Når oppgjøret er ferdig, kan du avslutte boet. Det oppbevares da med bilder og dokumenter til det slettes; det finnes ingen automatisk sletting. Last ned det dere trenger.', 'When the settlement is finished, you can close the estate. It is then kept with its photos and documents until it is deleted; there is no automatic deletion. Download what you need.')}
         </p>
         {estate.status === 'closed' ? (
           <button onClick={() => setClosed(false)} style={{ padding:'9px 18px', background:'none', border:'1px solid #D9CFC0', borderRadius:'8px', cursor:'pointer', color:'#5C4530', fontSize:'0.875rem', fontFamily:'Karla, sans-serif' }}>{L('Åpne boet igjen', 'Reopen the estate')}</button>
         ) : confirmClose ? (
           <>
           <p role="status" style={{ fontSize:'0.8125rem', color:'#3A2F26', background:'#FBF9F5', border:'1px solid #D9CFC0', borderRadius:'8px', padding:'10px 12px', marginBottom:'12px', lineHeight:1.6 }}>
-            {L('Før dere avslutter: se over fordelingen og last ned protokollen. Etter 12 måneder slettes alt.', 'Before you close: review the distribution and download the record. Everything is deleted after 12 months.')}{' '}
+            {L('Før dere avslutter: se over fordelingen og last ned protokollen.', 'Before you close: review the distribution and download the record.')}{' '}
             <button onClick={() => navigate(`/estate/${id}/fordeling`)} style={{ background:'none', border:'none', padding:0, color:'#5F6E52', textDecoration:'underline', cursor:'pointer', fontSize:'0.8125rem', fontFamily:'Karla, sans-serif' }}>{L('Se fordelingen', 'See the distribution')}</button>
           </p>
           <div style={{ display:'flex', gap:'10px', alignItems:'center', flexWrap:'wrap' }}>

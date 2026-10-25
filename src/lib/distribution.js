@@ -9,7 +9,8 @@
 // - Med bekreftede arveandeler (confirmedWeights) vektes fordelingen: den med lavest sum i forhold til
 //   sin andel får neste gjenstand. Ellers deles det likt.
 import { parseNOK } from './format.js'
-import { recipientsOf, recipientIdOf, interestedPeople } from './recipients.js'
+import { recipientsOf, recipientIdOf, interestedPeople, receivesItems } from './recipients.js'
+import { isSettled, pendingMembersFor } from './estateProgress.js'
 
 // Fordelingsverdien; null = ukjent
 export const itemValue = (item) => {
@@ -68,4 +69,26 @@ export function valueTotal(items) {
   let sum = 0, unknown = 0
   for (const i of items) { const v = itemValue(i); if (v === null) unknown++; else sum += v }
   return { sum, unknown }
+}
+
+// «Tildel alle som bare én ønsker»: åpne gjenstander med nøyaktig én interesse fra et nåværende medlem.
+// ready: avklart (alle som skal ta stilling, har svart) og interessenten er én person på listen med «Kan få
+// gjenstander» → { item, heir }. waiting: noen har ikke svart → { item, pending }; manglende svar er aldri
+// «nei takk». unlinked: interessenten er ikke en person som kan få gjenstander → { item, reason }.
+// Databasen kontrollerer det samme (assign_items med metoden 'single', 20261023_settled_assignment_checks.sql).
+export function singleInterestAssignments(items, members, passes, heirs = []) {
+  const memberIds = new Set(members.map(m => m.user_id))
+  const out = { ready: [], waiting: [], unlinked: [] }
+  for (const raw of items) {
+    if (raw.status === 'assigned') continue
+    const wanters = [...new Set((raw.interests || []).map(x => x.user_id).filter(u => memberIds.has(u)))]
+    if (wanters.length !== 1) continue
+    const item = { ...raw, interests: (raw.interests || []).filter(x => memberIds.has(x.user_id)) }
+    if (!isSettled(item, members, passes, heirs)) { out.waiting.push({ item, pending: pendingMembersFor(item, members, passes, heirs) }); continue }
+    const linked = heirs.filter(h => h.user_id && h.user_id === wanters[0])
+    if (linked.length !== 1) { out.unlinked.push({ item, reason: 'no_person' }); continue }
+    if (!receivesItems(linked[0])) { out.unlinked.push({ item, reason: 'not_recipient' }); continue }
+    out.ready.push({ item, heir: linked[0] })
+  }
+  return out
 }

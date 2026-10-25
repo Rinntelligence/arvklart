@@ -19,17 +19,25 @@ export const decidingMembers = (members, heirs = []) => {
 // Flere vil ha gjenstanden, og den er ikke tildelt ennå.
 export const isContested = item => item.status !== 'assigned' && (item.interests?.length || 0) > 1
 
+const hasDecided = (userId, item, passes) =>
+  !!item.interests?.some(x => x.user_id === userId) || passes.some(p => p.item_id === item.id && p.user_id === userId)
+
 // Returnerer [{ member, items }] for hvert medlem som ikke har tatt stilling til alt.
 export const getUndecided = (items, members, passes, heirs = []) => {
   const open = items.filter(i => i.status !== 'assigned')
   return decidingMembers(members, heirs).map(member => ({
     member,
-    items: open.filter(i =>
-      !i.interests?.some(x => x.user_id === member.user_id) &&
-      !passes.some(p => p.item_id === i.id && p.user_id === member.user_id)
-    ),
+    items: open.filter(i => !hasDecided(member.user_id, i, passes)),
   })).filter(u => u.items.length > 0)
 }
+
+// Medlemmene som ikke har svart på én gjenstand. Manglende svar er aldri «nei takk».
+// Samme regel som item_pending_members() i databasen (20261023_settled_assignment_checks.sql).
+export const pendingMembersFor = (item, members, passes, heirs = []) =>
+  decidingMembers(members, heirs).filter(m => !hasDecided(m.user_id, item, passes))
+
+// Avklart: alle som skal ta stilling, har sagt «vil ha» eller «nei takk»
+export const isSettled = (item, members, passes, heirs = []) => pendingMembersFor(item, members, passes, heirs).length === 0
 
 // Gjenstående steg i fornuftig rekkefølge. Bare steg som ikke er ferdige tas med.
 // proposal: { needsMyResponse } når et forslag til fordeling venter på svar fra meg (F6)
@@ -97,7 +105,9 @@ export const buildRemainingSteps = ({ estateId, userId, items, members, passes, 
   if (single.length) steps.push({
     key: 'single',
     title: L(`${item(single.length)} har én interessent og kan tildeles`, `${item(single.length)} ${single.length === 1 ? 'has' : 'have'} one interested heir and can be assigned`),
-    detail: L('Administrator tildeler fra gjenstandssiden', 'The administrator assigns from the item page'),
+    detail: L('Administrator kan tildele dem samlet fra «Fordelingen» når alle har svart, eller én og én fra gjenstandssiden', 'The administrator can assign them together from «The distribution» once everyone has answered, or one by one from the item page'),
+    // Bare administrator tildeler; arvingene får ingen lenke hit
+    ...(members.find(m => m.user_id === userId)?.role === 'admin' && { path: `/estate/${estateId}/fordeling`, pathLabel: L('Tildel', 'Assign') }),
   })
 
   const deciding = decidingMembers(members, heirs)

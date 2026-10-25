@@ -1,0 +1,23 @@
+{
+  "_om": "Felles tilfeller for «avklart gjenstand»: hvem har ikke svart på én gjenstand. Brukes av test/estate/settled.test.js (pendingMembersFor i src/lib/estateProgress.js) og test/db/rls.sql (item_pending_members i 20261023_settled_assignment_checks.sql). Begge skal gi «pending».",
+  "cases": [
+    { "name": "alle har svart", "members": [{ "id": "a", "email": "a@test.no" }, { "id": "b", "email": "b@test.no" }],
+      "heirs": [], "interests": ["a"], "passes": ["b"], "pending": [] },
+    { "name": "én mangler svar", "members": [{ "id": "a", "email": "a@test.no" }, { "id": "b", "email": "b@test.no" }],
+      "heirs": [], "interests": ["a"], "passes": [], "pending": ["b"] },
+    { "name": "administrator som mangler svar teller", "members": [{ "id": "adm", "email": "adm@test.no", "role": "admin" }, { "id": "b", "email": "b@test.no" }],
+      "heirs": [], "interests": [], "passes": ["b"], "pending": ["adm"] },
+    { "name": "rådgiver som mangler svar teller ikke", "members": [{ "id": "a", "email": "a@test.no" }, { "id": "r", "email": "r@test.no" }],
+      "heirs": [{ "email": "r@test.no", "relationship": "Rådgiver" }], "interests": ["a"], "passes": [], "pending": [] },
+    { "name": "advokat og bobestyrer teller ikke", "members": [{ "id": "a", "email": "a@test.no" }, { "id": "l", "email": "l@test.no" }, { "id": "s", "email": "s@test.no" }],
+      "heirs": [{ "email": "l@test.no", "relationship": "Advokat" }, { "email": "s@test.no", "relationship": "Bobestyrer" }], "interests": [], "passes": ["a"], "pending": [] },
+    { "name": "e-post med store bokstaver og mellomrom", "members": [{ "id": "a", "email": "a@test.no" }, { "id": "r", "email": "r@test.no" }],
+      "heirs": [{ "email": "  R@Test.NO ", "relationship": "Advokat" }], "interests": [], "passes": ["a"], "pending": [] },
+    { "name": "arving (ikke rådgiver) med samme e-post teller", "members": [{ "id": "a", "email": "a@test.no" }],
+      "heirs": [{ "email": "a@test.no", "relationship": "Barn" }], "interests": [], "passes": [], "pending": ["a"] },
+    { "name": "medlem uten profil-e-post teller", "members": [{ "id": "a", "email": null }, { "id": "b", "email": "b@test.no" }],
+      "heirs": [{ "email": "r@test.no", "relationship": "Rådgiver" }], "interests": ["b"], "passes": [], "pending": ["a"] },
+    { "name": "ønske fra tidligere medlem påvirker ikke", "members": [{ "id": "a", "email": "a@test.no" }],
+      "heirs": [], "interests": ["gammel"], "passes": [], "pending": ["a"] }
+  ]
+}

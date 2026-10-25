@@ -1,5 +1,5 @@
 // Kjører appens spørringer mot PostgREST + testdatabasen med samme klient som supabase-js bruker.
-import { test } from 'node:test'
+import { test, before } from 'node:test'
 import assert from 'node:assert/strict'
 import crypto from 'node:crypto'
 import { PostgrestClient } from '@supabase/postgrest-js'
@@ -20,6 +20,23 @@ const as = name => new PostgrestClient('http://localhost:54330', {
   headers: { Authorization: `Bearer ${jwt({ sub: USERS[name][0], email: USERS[name][1], role: 'authenticated' })}` },
 })
 const DEMO = 'deed0001-0000-0000-0000-000000000001'
+
+// Demokontoene er skrivebeskyttet, og demoboet har bare demomedlemmer (20261024). Det som krever en vanlig
+// administrator (endre gjenstander, stemme, fordelingsverdi), testes derfor i et eget bo som owner oppretter selv.
+const OWN = {}
+before(async () => {
+  const db = as('owner')
+  const estate = await db.from('estates').insert({ name: 'Eget testbo', owner_id: USERS.owner[0], invite_code: `OWN${crypto.randomBytes(3).toString('hex')}` }).select('id').single()
+  assert.equal(estate.error, null)
+  OWN.estate = estate.data.id
+  assert.equal((await db.from('estate_members').insert({ estate_id: OWN.estate, user_id: USERS.owner[0], role: 'admin' })).error, null)
+  const items = await db.from('items').insert([
+    { estate_id: OWN.estate, title: 'Bokhylle', estimated_value: '3000', added_by: USERS.owner[0] },
+    { estate_id: OWN.estate, title: 'Lenestol', estimated_value: '1500', added_by: USERS.owner[0] },
+  ]).select('id')
+  assert.equal(items.error, null)
+  ;[OWN.item1, OWN.item2] = items.data.map(i => i.id)
+})
 
 // Samme som fetchAll i src/lib/supabase.js
 async function fetchAll(buildQuery, pageSize = 1000) {
@@ -57,7 +74,7 @@ test('begrunnelse på eget ønske via PostgREST (setInterestReason), ikke på an
 })
 
 test('nei takk per bo (getEstatePasses)', async () => {
-  const { data, error } = await fetchAll(() => as('owner').from('item_passes').select('item_id, user_id, items!inner(estate_id)').eq('items.estate_id', DEMO).order('id'), 7)
+  const { data, error } = await fetchAll(() => as('mona').from('item_passes').select('item_id, user_id, items!inner(estate_id)').eq('items.estate_id', DEMO).order('id'), 7)
   assert.equal(error, null)
   assert.ok(data.length > 0)
 })
@@ -143,7 +160,7 @@ test('profil-upsert kan ikke sette founder (upsertProfile)', async () => {
 // F0 (20261016): kolonnerettigheter på items. Vanlige endringer virker som før; stemmer går via RPC.
 test('admin kan fortsatt rette tittel og verdi via PostgREST (kolonnerettigheter)', async () => {
   const db = as('owner')
-  const item = 'face0003-0000-0000-0000-000000000003'
+  const item = OWN.item1
   const before = await db.from('items').select('title, estimated_value').eq('id', item).single()
   const upd = await db.from('items').update({ title: 'Mahognibokhylle', estimated_value: '5000' }).eq('id', item).select('id')
   assert.equal(upd.error, null)
@@ -153,7 +170,7 @@ test('admin kan fortsatt rette tittel og verdi via PostgREST (kolonnerettigheter
 
 test('stemmetelleren kan ikke skrives direkte, men stemmen lagres via vote_item_value', async () => {
   const db = as('owner')
-  const item = 'face0004-0000-0000-0000-000000000004'
+  const item = OWN.item2
   const direct = await db.from('items').update({ value_agree_count: 50 }).eq('id', item).select('id')
   assert.equal(direct.error?.code, '42501')
   const vote = await db.rpc('vote_item_value', { p_item: item, p_vote: 'agree', p_value: null })
@@ -166,16 +183,16 @@ test('stemmetelleren kan ikke skrives direkte, men stemmen lagres via vote_item_
 // F3 (20261018): fordelingsverdi bare via set_agreed_values; AI-anslaget er urørt
 test('fordelingsverdi via set_agreed_values; direkte skriving avvises og AI-anslaget endres ikke', async () => {
   const db = as('owner')
-  const item = 'face0003-0000-0000-0000-000000000003'
+  const item = OWN.item1
   const before = await db.from('items').select('estimated_value, agreed_value').eq('id', item).single()
   const direct = await db.from('items').update({ agreed_value: 1 }).eq('id', item).select('id')
   assert.equal(direct.error?.code, '42501')
-  const set = await db.rpc('set_agreed_values', { p_estate: DEMO, p_values: [{ item_id: item, value: 4200, source: 'manual' }] })
+  const set = await db.rpc('set_agreed_values', { p_estate: OWN.estate, p_values: [{ item_id: item, value: 4200, source: 'manual' }] })
   assert.equal(set.error, null)
   const after = await db.from('items').select('estimated_value, agreed_value, agreed_value_source').eq('id', item).single()
   assert.equal(Number(after.data.agreed_value), 4200)
   assert.equal(after.data.estimated_value, before.data.estimated_value)
-  await db.rpc('set_agreed_values', { p_estate: DEMO, p_values: [{ item_id: item, value: before.data.agreed_value === null ? null : Number(before.data.agreed_value), source: 'ai' }] })
+  await db.rpc('set_agreed_values', { p_estate: OWN.estate, p_values: [{ item_id: item, value: before.data.agreed_value === null ? null : Number(before.data.agreed_value), source: 'ai' }] })
 })
 
 // F6 (20261020): forslag og svar via RPC; svar kan ikke skrives direkte

@@ -37,6 +37,8 @@ export default function HeirsPage({ session, profile, onToast, isDemo }) {
   const [confirmHeir, setConfirmHeir] = useState(null)
   const [invitee, setInvitee] = useState(null) // arvingen invitasjonskortet gjelder
   const [estateName, setEstateName] = useState('')
+  const [selfAdd, setSelfAdd] = useState(false) // skjemaet legger inn administratoren selv, og kobler kontoen etterpå
+  const [adding, setAdding] = useState(false)
   const nameRef = useRef(null)
   // Når skjemaet åpnes, havner fokus i navnefeltet (og feltet vises), uansett hvor på siden man trykket
   useEffect(() => { if (showAdd) { nameRef.current?.focus(); nameRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' }) } }, [showAdd])
@@ -91,18 +93,64 @@ export default function HeirsPage({ session, profile, onToast, isDemo }) {
   }
 
   const addHeir = async () => {
-    if (!newHeir.name.trim()) return
+    if (!newHeir.name.trim() || adding) return
     const email = normEmail(newHeir.email)
     if (email && !isEmail(email)) { onToast?.(L('Ugyldig e-postadresse', 'Invalid email address'), 'error'); return }
+    setAdding(true)
+    if (selfAdd) {
+      // Hent listen på nytt rett før: står e-posten der allerede (f.eks. etter et dobbeltklikk), lages ingen ny rad
+      const { data: now } = await supabase.from('heirs').select('id, email').eq('estate_id', id)
+      if ((now || []).some(h => normEmail(h.email) === email)) {
+        setAdding(false); setSelfAdd(false); setShowAdd(false)
+        onToast?.(L('Du står allerede på listen. Koble kontoen din til deg selv.', 'You are already on the list. Link your account to yourself.'), 'error')
+        load()
+        return
+      }
+    }
     const { error } = await supabase.from('heirs').insert({ ...newHeir, email: email || null, estate_id: id, percentage: parseFloat(newHeir.percentage) || 0 })
-    if (error) { onToast?.(L('Kunne ikke legge til arving: ', 'Could not add heir: ') + error.message, 'error'); return }
-    onToast?.(L(`${newHeir.name.trim()} er lagt til`, `${newHeir.name.trim()} has been added`))
-    // Neste steg vises der og da: send invitasjonen (ikke bare en melding som forsvinner)
-    if (email) setInvitee({ name: newHeir.name.trim(), email })
+    if (error) { setAdding(false); onToast?.(L('Kunne ikke legge til arving: ', 'Could not add heir: ') + error.message, 'error'); return }
+    if (selfAdd) {
+      // Koblingen gjøres av databasen (join_estate), med samme e-postkontroll som når en arving blir med.
+      // Feiler den, står personen på listen uten kobling, og «Dette er meg» kan prøves igjen.
+      const { error: linkError } = await supabase.rpc('join_estate', { p_code: inviteCode })
+      if (linkError) onToast?.(L('Du er lagt til på listen, men kontoen ble ikke koblet. Trykk «Dette er meg – koble kontoen» for å prøve igjen.', 'You have been added to the list, but your account was not linked. Tap «This is me – link my account» to try again.'), 'error')
+      else onToast?.(L('Du står nå på listen, og kontoen din er koblet', 'You are now on the list, and your account is linked'))
+    } else {
+      onToast?.(L(`${newHeir.name.trim()} er lagt til`, `${newHeir.name.trim()} has been added`))
+      // Neste steg vises der og da: send invitasjonen (ikke bare en melding som forsvinner)
+      if (email) setInvitee({ name: newHeir.name.trim(), email })
+    }
+    setAdding(false)
+    setSelfAdd(false)
     setNewHeir({ name: '', email: '', relationship: 'Barn', notes: '', percentage: '' })
     setShowAdd(false)
     load()
   }
+
+  // Er administratoren selv på listen? Leses fra databasen ved hver lasting.
+  const myEmail = normEmail(session.user.email)
+  const myHeir = heirs.find(h => h.user_id === session.user.id)
+  const sameEmail = myEmail ? heirs.filter(h => normEmail(h.email) === myEmail) : []
+  const selfState = myHeir ? 'linked'
+    : sameEmail.length > 1 ? 'ambiguous'
+    : sameEmail.length === 1 ? (sameEmail[0].user_id ? 'taken' : 'link')
+    : 'absent'
+  const linkSelf = async () => {
+    if (adding) return
+    setAdding(true)
+    const { error } = await supabase.rpc('join_estate', { p_code: inviteCode })
+    setAdding(false)
+    if (error) onToast?.(L('Kunne ikke koble kontoen. Prøv igjen.', 'Could not link the account. Please try again.'), 'error')
+    else onToast?.(L('Kontoen din er koblet til deg på listen', 'Your account is linked to you on the list'))
+    load()
+  }
+  const startSelfAdd = () => {
+    setSelfAdd(true)
+    setNewHeir({ name: profile?.display_name || '', email: myEmail, relationship: 'Barn', notes: '', percentage: '' })
+    setShowAdd(true)
+  }
+  // Samme standard som databasen setter for alle nye personer på listen (guard_heir_insert)
+  const advisorRole = ['Bobestyrer', 'Advokat', 'Rådgiver'].includes(newHeir.relationship)
 
   const saveEmail = async () => {
     const email = normEmail(emailEdit.value)
@@ -160,15 +208,32 @@ export default function HeirsPage({ session, profile, onToast, isDemo }) {
           <p style={{ color:'#75604B', fontSize:'0.875rem' }}>{L('Administrer arvinger og beregn hvordan boet fordeles', 'Manage heirs and calculate how the estate is distributed')}</p>
           <p style={{ color:'#75604B', fontSize:'0.8125rem', marginTop:'4px', lineHeight:1.5 }}>{L('Listen er familiens egen registrering. Arvklart avgjør ikke hvem som har arverett; er dere usikre, bør dere få juridisk råd.', 'The list is the family\'s own registration. Arvklart does not decide who is entitled to inherit; if you are unsure, get legal advice.')}</p>
         </div>
-        {canEdit && <button onClick={() => setShowAdd(!showAdd)} aria-expanded={showAdd} aria-controls={showAdd ? 'add-heir-form' : undefined} style={{ padding:'9px 18px', background:'#3A2F26', color:'#FBF9F5', border:'none', borderRadius:'8px', cursor:'pointer', fontSize:'0.875rem', fontFamily:'Karla, sans-serif' }}>
+        {canEdit && <button onClick={() => { setSelfAdd(false); setNewHeir({ name: '', email: '', relationship: 'Barn', notes: '', percentage: '' }); setShowAdd(!showAdd) }} aria-expanded={showAdd} aria-controls={showAdd ? 'add-heir-form' : undefined} style={{ padding:'9px 18px', background:'#3A2F26', color:'#FBF9F5', border:'none', borderRadius:'8px', cursor:'pointer', fontSize:'0.875rem', fontFamily:'Karla, sans-serif' }}>
           {L('+ Legg til arving', '+ Add heir')}
         </button>}
       </div>
 
+      {/* Administratoren selv på listen: brukerrollen gir ingen rett til gjenstander eller til å godkjenne */}
+      {canEdit && !loading && !showAdd && (
+        <div role="status" style={{ background:'#FBF9F5', border:'1px solid #D9CFC0', borderRadius:'12px', padding:'14px 18px', marginBottom:'20px', fontSize:'0.875rem', color:'#3A2F26', lineHeight:1.6 }}>
+          {selfState === 'linked' && L(`Du står på listen som ${myHeir.name}.`, `You are on the list as ${myHeir.name}.`)}
+          {selfState === 'link' && <>
+            {L(`E-posten din står på ${sameEmail[0].name}. Er det deg, kobler du kontoen så du kan få gjenstander og godkjenne fordelingen.`, `Your email is on ${sameEmail[0].name}. If that is you, link your account so you can receive items and approve the distribution.`)}{' '}
+            <button onClick={linkSelf} disabled={adding} style={{ marginTop:'6px', minHeight:'44px', padding:'8px 14px', background:'#3A2F26', color:'#FBF9F5', border:'none', borderRadius:'8px', cursor:'pointer', fontSize:'0.875rem', fontFamily:'Karla, sans-serif' }}>{L('Dette er meg – koble kontoen', 'This is me – link my account')}</button>
+          </>}
+          {selfState === 'ambiguous' && L('E-posten din står på flere personer på listen, så Arvklart kan ikke vite hvem av dem du er. Rett e-posten på den som ikke er deg.', 'Your email is on several people on the list, so Arvklart cannot tell which of them you are. Correct the email on the one who is not you.')}
+          {selfState === 'taken' && L(`E-posten din står på ${sameEmail[0].name}, som er koblet til en annen konto. Rett e-posten hvis det er feil.`, `Your email is on ${sameEmail[0].name}, who is linked to another account. Correct the email if this is wrong.`)}
+          {selfState === 'absent' && <>
+            {L('Du står ikke på listen. Skal du selv få gjenstander eller godkjenne fordelingen, må du stå der. Å være administrator gir ingen rett til gjenstander.', 'You are not on the list. If you are to receive items or approve the distribution, you must be on it. Being administrator gives no right to items.')}{' '}
+            <button onClick={startSelfAdd} style={{ marginTop:'6px', minHeight:'44px', padding:'8px 14px', background:'none', border:'1px solid #9A8B78', borderRadius:'8px', cursor:'pointer', color:'#3A2F26', fontSize:'0.875rem', fontFamily:'Karla, sans-serif' }}>{L('Legg meg til på listen', 'Add me to the list')}</button>
+          </>}
+        </div>
+      )}
+
       {/* Legg til arving: rett under knappen, så skjemaet ikke åpnes utenfor skjermen */}
       {showAdd && canEdit && (
         <div id="add-heir-form" style={{ background:'#fff', border:'1px solid #D9CFC0', borderRadius:'12px', padding:'24px', marginBottom:'20px' }}>
-          <h3 style={{ fontFamily:'Fraunces, serif', fontSize:'1rem', fontWeight:'400', color:'#3A2F26', marginBottom:'16px' }}>{L('Legg til arving', 'Add heir')}</h3>
+          <h3 style={{ fontFamily:'Fraunces, serif', fontSize:'1rem', fontWeight:'400', color:'#3A2F26', marginBottom:'16px' }}>{selfAdd ? L('Legg meg til på listen', 'Add me to the list') : L('Legg til arving', 'Add heir')}</h3>
           <div style={{ display:'flex', flexDirection:'column', gap:'12px' }}>
             <div style={{ display:'flex', gap:'10px', flexWrap:'wrap' }}>
               <div style={{ flex:1, minWidth:'160px' }}>
@@ -178,7 +243,7 @@ export default function HeirsPage({ session, profile, onToast, isDemo }) {
               </div>
               <div style={{ flex:1, minWidth:'160px' }}>
                 <label htmlFor="heirs-f3" style={{ display:'block', fontSize:'0.75rem', color:'#75604B', marginBottom:'5px' }}>{L('E-post (den arvingen logger inn med)', 'Email (the one the heir logs in with)')}</label>
-                <input id="heirs-f3" type="email" value={newHeir.email} onChange={e => setNewHeir(p => ({ ...p, email: e.target.value }))} placeholder={L('kari@epost.no', 'jane@email.com')} maxLength={254}
+                <input id="heirs-f3" type="email" value={newHeir.email} readOnly={selfAdd} onChange={e => setNewHeir(p => ({ ...p, email: e.target.value }))} placeholder={L('kari@epost.no', 'jane@email.com')} maxLength={254}
                   style={{ width:'100%', padding:'10px 12px', border:'1px solid #9A8B78', borderRadius:'8px', fontSize:'0.875rem', background:'#FBF9F5', color:'#3A2F26', fontFamily:'Karla, sans-serif', boxSizing:'border-box' }} />
               </div>
             </div>
@@ -203,9 +268,20 @@ export default function HeirsPage({ session, profile, onToast, isDemo }) {
               <input id="heirs-f6" value={newHeir.notes} onChange={e => setNewHeir(p => ({ ...p, notes: e.target.value }))} placeholder={L('Relevante notater…', 'Relevant notes…')} maxLength={500}
                 style={{ width:'100%', padding:'10px 12px', border:'1px solid #9A8B78', borderRadius:'8px', fontSize:'0.875rem', background:'#FBF9F5', color:'#3A2F26', fontFamily:'Karla, sans-serif', boxSizing:'border-box' }} />
             </div>
+            {selfAdd && (
+              <div role="status" style={{ background:'#DCE3D2', border:'1px solid #B8C8A8', borderRadius:'8px', padding:'10px 12px', fontSize:'0.8125rem', color:'#3A2F26', lineHeight:1.6 }}>
+                <strong style={{ fontWeight:'600' }}>{L('Dette betyr det:', 'What this means:')}</strong>
+                <ul style={{ margin:'4px 0 0', paddingLeft:'18px' }}>
+                  <li>{advisorRole ? L('Du kan ikke få gjenstander, og du skal ikke godkjenne fordelingen (som for alle med denne rollen).', 'You cannot receive items and will not approve the distribution (as for everyone with this role).') : L('Du kan få gjenstander, og du blir en av dem som må godkjenne fordelingen (som for alle andre på listen).', 'You can receive items, and you become one of those who must approve the distribution (as for everyone else on the list).')}</li>
+                  {splitMode === 'custom' && <li>{L('Andelen din blir 0 % til du endrer den. De andres andeler endres ikke.', 'Your share will be 0% until you change it. The others\' shares are not changed.')}</li>}
+                  {sharesConfirmed && <li>{L('Bekreftelsen av arveandelene nullstilles, fordi listen endres.', 'The confirmation of the shares is reset, because the list changes.')}</li>}
+                  <li>{L('Har dere lagt frem et forslag til fordeling, blir det utdatert og må legges frem på nytt.', 'If you have proposed a distribution, it becomes outdated and must be proposed again.')}</li>
+                </ul>
+              </div>
+            )}
             <div style={{ display:'flex', gap:'10px' }}>
-              <button onClick={() => setShowAdd(false)} style={{ flex:1, padding:'10px', background:'none', border:'1px solid #D9CFC0', borderRadius:'8px', cursor:'pointer', color:'#5C4530', fontSize:'0.875rem', fontFamily:'Karla, sans-serif' }}>{L('Avbryt', 'Cancel')}</button>
-              <button onClick={addHeir} disabled={!newHeir.name.trim()} style={{ flex:2, padding:'10px', background:newHeir.name.trim()?'#3A2F26':'#D9CFC0', color:'#FBF9F5', border:'none', borderRadius:'8px', cursor:newHeir.name.trim()?'pointer':'not-allowed', fontSize:'0.875rem', fontFamily:'Karla, sans-serif' }}>{L('Legg til arving', 'Add heir')}</button>
+              <button onClick={() => { setShowAdd(false); setSelfAdd(false) }} style={{ flex:1, padding:'10px', background:'none', border:'1px solid #D9CFC0', borderRadius:'8px', cursor:'pointer', color:'#5C4530', fontSize:'0.875rem', fontFamily:'Karla, sans-serif' }}>{L('Avbryt', 'Cancel')}</button>
+              <button onClick={addHeir} disabled={!newHeir.name.trim() || adding} style={{ flex:2, padding:'10px', background:newHeir.name.trim()?'#3A2F26':'#D9CFC0', color:'#FBF9F5', border:'none', borderRadius:'8px', cursor:newHeir.name.trim()?'pointer':'not-allowed', fontSize:'0.875rem', fontFamily:'Karla, sans-serif' }}>{selfAdd ? L('Legg meg til', 'Add me') : L('Legg til arving', 'Add heir')}</button>
             </div>
           </div>
         </div>

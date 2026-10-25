@@ -136,3 +136,15 @@ describe('getStatusBreakdown', () => {
   })
 
 })
+
+test('«én interessent»: bare administrator får lenken til samlet tildeling', async () => {
+  const { buildRemainingSteps } = await import('../../src/lib/estateProgress.js')
+  const items = [{ id: 'i', status: 'active', interests: [{ user_id: 'a' }] }]
+  const members = [{ user_id: 'a', role: 'admin', profiles: { email: 'a@x.no' } }, { user_id: 'b', role: 'member', profiles: { email: 'b@x.no' } }]
+  const heirs = [{ id: 'h', name: 'A', email: 'a@x.no', relationship: 'Barn', receives_items: true }]
+  const base = { estateId: 'e', items, members, passes: [{ item_id: 'i', user_id: 'b' }], heirs, tasks: [] }
+  const admin = buildRemainingSteps({ ...base, userId: 'a' }).find(s => s.key === 'single')
+  const heir = buildRemainingSteps({ ...base, userId: 'b' }).find(s => s.key === 'single')
+  assert.equal(admin.path, '/estate/e/fordeling')
+  assert.equal(heir.path, undefined)
+})

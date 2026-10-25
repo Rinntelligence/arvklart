@@ -21,6 +21,7 @@ export default function ResetPasswordPage({ session, onToast, onDone }) {
 
   const errMsg = (msg) => {
     if (msg.includes('different from the old')) return L('Det nye passordet må være forskjellig fra det gamle', 'The new password must be different from the old one')
+    if (msg.includes('known to be weak') || msg.includes('pwned')) return L('Passordet finnes i kjente datalekkasjer — velg et annet', 'This password appears in known data breaches — choose another one')
     if (msg.includes('Password should')) return L('Passordet må ha minst 6 tegn', 'The password must have at least 6 characters')
     return msg
   }
