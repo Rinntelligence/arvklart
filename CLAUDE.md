@@ -92,6 +92,7 @@ Tilgjengelighet (WCAG 2.2 AA): ikke bruk `outline:'none'`; fokus vises med `:foc
 ## Demokonto
 `mona.demo@heirsplit.no` er en demo-bruker — ikke slett eller endre dennes data i databasen.
 - «Test ut demo» kaller edge-funksjonen `demo-login`, som nullstiller demo-boet (`reset_demo_estate()`) og returnerer en økt. Passordet ligger bare i hemmeligheten `DEMO_PASSWORD`, aldri i frontend
+- Demoboet har bare syntetiske kontoer (Kari, Lars og Mona, som eier det). `reset_demo_estate()` fjerner ekte kontoer og alt de har lagt inn i demoboet ved hver demoinnlogging (fra `20261024`, ikke kjørt i prod ennå); legg aldri en ekte konto inn i demoboet
 - Alle `*.demo@heirsplit.no`-kontoer er skrivebeskyttet i databasen: de kan vise interesse, si nei takk og prøve fordelingen, ikke noe annet
 - Demoen kan prøve AI-analyse og verdiestimat på «Legg til gjenstand» (5 forsøk per besøk), men ikke lagre. Da vises «Dette er en demo. Du må opprette et arveoppgjør i Arvklart for å bruke denne funksjonen.»
 

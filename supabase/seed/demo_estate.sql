@@ -19,7 +19,6 @@ DECLARE
   kari_id uuid;
   lars_id uuid;
   mona_id uuid;
-  my_id   uuid;
   demo_emails text[] := ARRAY['kari.demo@heirsplit.no','lars.demo@heirsplit.no','mona.demo@heirsplit.no'];
 BEGIN
 
@@ -33,14 +32,8 @@ BEGIN
       E'Demo-brukere ikke funnet.\nOpprett kari/lars/mona via Dashboard → Authentication → Users og kjør scriptet på nytt.';
   END IF;
 
-  -- Finn app-eierens ID (første ikke-demo-bruker)
-  SELECT id INTO my_id FROM auth.users
-  WHERE email IS NOT NULL AND email <> ALL(demo_emails)
-  ORDER BY created_at ASC LIMIT 1;
-
-  IF my_id IS NULL THEN
-    RAISE EXCEPTION 'Fant ikke din brukerkonto. Logg inn i appen minst én gang først.';
-  END IF;
+  -- Bare syntetiske demokontoer er med i demoboet: Mona eier det, og ingen ekte konto er medlem
+  -- (navnene ville ellers blitt vist for alle som åpner demoen).
 
   -- ============================================================
   -- DEL 1: Profiler for demo-brukerne
@@ -63,11 +56,10 @@ BEGIN
     'deed0001-0000-0000-0000-000000000001',
     'Fam. Hansen sitt bo',
     'Boet etter Astrid og Per Hansen – Bærum, 2025. Hus, innbo og familieklenodier fordeles mellom tre arvinger.',
-    my_id, 'HANSEN2025', 'active', 158400, 'equal'
+    mona_id, 'HANSEN2025', 'active', 158400, 'equal'
   ) ON CONFLICT (id) DO NOTHING;
 
   INSERT INTO estate_members (estate_id, user_id, role) VALUES
-    ('deed0001-0000-0000-0000-000000000001', my_id,    'admin'),
     ('deed0001-0000-0000-0000-000000000001', kari_id,  'admin'),
     ('deed0001-0000-0000-0000-000000000001', lars_id,  'admin'),
     ('deed0001-0000-0000-0000-000000000001', mona_id,  'admin')
@@ -209,9 +201,9 @@ BEGIN
     'face0011-0000-0000-0000-000000000011'
   );
 
-  -- Gyngestol: du + Kari
+  -- Gyngestol: Lars + Kari
   INSERT INTO interests (item_id, user_id, reason) VALUES
-    ('face0001-0000-0000-0000-000000000001', my_id,
+    ('face0001-0000-0000-0000-000000000001', lars_id,
      'Jeg husker den fra barndommen — bestemor satt alltid der og strikket'),
     ('face0001-0000-0000-0000-000000000001', kari_id,
      'Mamma elsket den stolen. Jeg vil ta vare på den til barna mine');
@@ -223,9 +215,9 @@ BEGIN
     ('face0002-0000-0000-0000-000000000002', mona_id,
      'Vi mangler et skikkelig spisebord — dette er drømmen');
 
-  -- Oljemaleri: du + Lars + Mona
+  -- Oljemaleri: Kari + Lars + Mona
   INSERT INTO interests (item_id, user_id, reason) VALUES
-    ('face0004-0000-0000-0000-000000000004', my_id,
+    ('face0004-0000-0000-0000-000000000004', kari_id,
      'Det hørte alltid til i stua. Jeg kan ikke forestille meg det noe annet sted'),
     ('face0004-0000-0000-0000-000000000004', lars_id,
      'Pappa var veldig glad i dette maleriet. Jeg vil beholde minnet'),
@@ -239,9 +231,9 @@ BEGIN
     ('face0006-0000-0000-0000-000000000006', mona_id,
      'Jeg er den eneste som bruker ur, og det er et klassisk stykke');
 
-  -- B&O: du + Lars
+  -- B&O: Kari + Lars
   INSERT INTO interests (item_id, user_id, reason) VALUES
-    ('face0008-0000-0000-0000-000000000008', my_id,
+    ('face0008-0000-0000-0000-000000000008', kari_id,
      'Jeg bruker musikkanlegg daglig og dette er av fantastisk kvalitet'),
     ('face0008-0000-0000-0000-000000000008', lars_id,
      'Er stor B&O-fan. Har alltid likt dette anlegget');
@@ -277,7 +269,7 @@ BEGIN
 
   -- Sykmaskin og Kristallglass: ingen interesserte (vises som "ingen vil ha")
 
-  RAISE NOTICE 'Demo-boet er klart! Eier: %, Kari: %, Lars: %, Mona: %', my_id, kari_id, lars_id, mona_id;
+  RAISE NOTICE 'Demo-boet er klart! Kari: %, Lars: %, Mona (eier): %', kari_id, lars_id, mona_id;
 
 END $$;
 

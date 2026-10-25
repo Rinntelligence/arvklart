@@ -529,7 +529,25 @@ select t_eq((select preferred_lang from profiles where user_id = '00000000-0000-
 select t_eq((select column_default::text from information_schema.columns where table_name = 'profiles' and column_name = 'preferred_lang'), null::text, 'språk har ingen standardverdi');
 
 -- Nullstilling av demoen
+-- Ekte konto i demoboet (som før 20261024): eier, medlem, ønske, kommentar, verdiforslag og person på listen
+reset role; select t_as(null);
+update estates set owner_id = '00000000-0000-0000-0000-00000000000a' where id = 'deed0001-0000-0000-0000-000000000001';
+insert into estate_members (estate_id, user_id, role) values ('deed0001-0000-0000-0000-000000000001', '00000000-0000-0000-0000-00000000000a', 'admin') on conflict do nothing;
+insert into interests (item_id, user_id, reason) values ('face0010-0000-0000-0000-000000000010', '00000000-0000-0000-0000-00000000000a', 'Ekte begrunnelse') on conflict do nothing;
+insert into comments (item_id, user_id, content) values ('face0010-0000-0000-0000-000000000010', '00000000-0000-0000-0000-00000000000a', 'Ekte kommentar');
+update items set value_suggestions = '[{"user_id":"00000000-0000-0000-0000-00000000000a","name":"Olav Ekte","value":5}]'::jsonb, value_disagree_count = 1 where id = 'face0010-0000-0000-0000-000000000010';
+insert into heirs (estate_id, name, email, relationship) values ('deed0001-0000-0000-0000-000000000001', 'Olav Ekte', 'owner@test.no', 'Barn');
+update profiles set display_name = 'Markus Hansen' where email = 'kari.demo@heirsplit.no';
 select reset_demo_estate();
+select t_eq((select owner_id from estates where id = 'deed0001-0000-0000-0000-000000000001'), (select id from auth.users where email = 'mona.demo@heirsplit.no'), 'demoboet eies av Mona etter nullstilling');
+select t_eq((select count(*)::int from estate_members m join auth.users u on u.id = m.user_id where m.estate_id = 'deed0001-0000-0000-0000-000000000001' and u.email not like '%.demo@heirsplit.no'), 0, 'ingen ekte kontoer er medlemmer i demoboet');
+select t_eq((select count(*)::int from heirs where estate_id = 'deed0001-0000-0000-0000-000000000001' and coalesce(email, '') not like '%.demo@heirsplit.no'), 0, 'ingen ekte personer på demoens liste');
+select t_eq((select count(*)::int from comments c join items i on i.id = c.item_id join auth.users u on u.id = c.user_id where i.estate_id = 'deed0001-0000-0000-0000-000000000001' and u.email not like '%.demo@heirsplit.no'), 0, 'ingen kommentarer fra ekte kontoer i demoen');
+select t_eq((select count(*)::int from items where estate_id = 'deed0001-0000-0000-0000-000000000001' and (value_suggestions <> '[]'::jsonb or value_disagree_count <> 0)), 0, 'ingen verdiforslag med navn fra ekte kontoer i demoen');
+select t_eq((select string_agg(display_name, ',' order by email) from profiles where email like '%.demo@heirsplit.no'), 'Kari Hansen,Lars Hansen,Mona Hansen-Dahl', 'demokontoene har faste profilnavn');
+select t_eq((select count(*)::int from (select item_id from interests where item_id in ('face0001-0000-0000-0000-000000000001', 'face0004-0000-0000-0000-000000000004', 'face0008-0000-0000-0000-000000000008') group by item_id having count(*) >= 2) x), 3,
+  'de omstridte gjenstandene har fortsatt minst to interessenter (uten eieren)');
+select t_eq((select count(*)::int from estate_members where user_id = '00000000-0000-0000-0000-00000000000a'), (select count(*)::int from estate_members where user_id = '00000000-0000-0000-0000-00000000000a' and estate_id <> 'deed0001-0000-0000-0000-000000000001'), 'den ekte kontoen beholder sine andre bo');
 select t_eq((select count(*)::int from interests where item_id::text like 'face%'), 18, 'nullstilling gjenoppretter alle interesser');
 select t_eq((select count(*)::int from estate_events where estate_id = 'deed0001-0000-0000-0000-000000000001'), 0, 'nullstilling tømmer demoens logg');
 select t_eq((select count(*)::int from items where estate_id = 'deed0001-0000-0000-0000-000000000001' and disposition is not null), 0, 'nullstilling fjerner disponeringene');
