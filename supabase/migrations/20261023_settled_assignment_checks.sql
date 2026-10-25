@@ -186,8 +186,14 @@ begin
 end;
 $$;
 
--- Nye funksjoner er stengt for klientene (20261022_function_grants.sql); assign_items og draw_lot står fortsatt
--- i client_functions med samme signatur
+-- Hjelpefunksjonene gir medlemmer for vilkårlige gjenstander og skal aldri kunne kalles av klientene, heller
+-- ikke om denne migreringen kjøres før 20261022 (Supabase gir ellers nye funksjoner EXECUTE til alle).
+revoke all on function public.item_pending_members(uuid), public.item_is_settled(uuid), public.item_interested_members(uuid)
+  from public, anon, authenticated;
+grant execute on function public.item_pending_members(uuid), public.item_is_settled(uuid), public.item_interested_members(uuid)
+  to service_role;
+
+-- assign_items og draw_lot står fortsatt i client_functions med samme signatur (20261022_function_grants.sql)
 do $$ begin
   if to_regprocedure('public.apply_function_grants()') is not null then perform public.apply_function_grants(); end if;
 end $$;

@@ -106,8 +106,8 @@ export const buildRemainingSteps = ({ estateId, userId, items, members, passes, 
     key: 'single',
     title: L(`${item(single.length)} har én interessent og kan tildeles`, `${item(single.length)} ${single.length === 1 ? 'has' : 'have'} one interested heir and can be assigned`),
     detail: L('Administrator kan tildele dem samlet fra «Fordelingen» når alle har svart, eller én og én fra gjenstandssiden', 'The administrator can assign them together from «The distribution» once everyone has answered, or one by one from the item page'),
-    path: `/estate/${estateId}/fordeling`,
-    pathLabel: L('Tildel', 'Assign'),
+    // Bare administrator tildeler; arvingene får ingen lenke hit
+    ...(members.find(m => m.user_id === userId)?.role === 'admin' && { path: `/estate/${estateId}/fordeling`, pathLabel: L('Tildel', 'Assign') }),
   })
 
   const deciding = decidingMembers(members, heirs)
