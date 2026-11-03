@@ -1,0 +1,41 @@
+# Røyktest i ekte nettleser mot ekte utrullinger (scripts/smoke-browser.mjs): forsiden, innlogging (feil passord),
+# nytt passord, invitasjonslenke, veiviser, personvern og demoen med navigering i demo-boet. Ingen ekte kontoer;
+# demo-login nullstiller demo-boet, som ved hvert demobesøk.
+# - Forhåndsvisning: når Vercel melder at utrullingen er klar (krever VERCEL_AUTOMATION_BYPASS_SECRET).
+# - Produksjon: etter hver utrulling, mot https://www.arvklart.no.
+# Rapporterer bare (rød kjøring); tilbakerulling er manuell (Instant Rollback i Vercel).
+name: Røyktest mot Vercel
+
+on:
+  deployment_status:
+  workflow_dispatch:
+    inputs:
+      url:
+        description: 'Adresse som skal testes, f.eks. https://www.arvklart.no'
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    if: github.event_name == 'workflow_dispatch' || github.event.deployment_status.state == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npx playwright-core install --with-deps chromium
+      - name: Røyktest
+        env:
+          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+          URL: ${{ github.event.inputs.url || github.event.deployment_status.environment_url || github.event.deployment_status.target_url }}
+          PRODUCTION: ${{ github.event_name == 'deployment_status' && startsWith(github.event.deployment.environment, 'Production') }}
+        run: |
+          export CHROMIUM_PATH="$(node -e "import('playwright-core').then(p => console.log(p.chromium.executablePath()))")"
+          # Produksjon testes på hoveddomenet, ikke på utrullingens egen vercel.app-adresse
+          if [ "$PRODUCTION" = "true" ]; then URL=https://www.arvklart.no; fi
+          node scripts/smoke-browser.mjs "$URL"
