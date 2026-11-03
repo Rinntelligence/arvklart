@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { supabase, upsertProfile } from './lib/supabase'
 import { PlanProvider } from './hooks/usePlan'
@@ -6,27 +6,9 @@ import { isDemoSession } from './lib/demo'
 import LoginPage from './pages/LoginPage'
 import ResetPasswordPage from './pages/ResetPasswordPage'
 import LandingPage from './pages/LandingPage'
-import ProfileSetupPage from './pages/ProfileSetupPage'
-import EstatesPage from './pages/EstatesPage'
-import EstatePage from './pages/EstatePage'
-import ItemDetailPage from './pages/ItemDetailPage'
-import AddItemPage from './pages/AddItemPage'
-import AddItemsPage from './pages/AddItemsPage'
-import SwipePage from './pages/SwipePage'
-import EditItemPage from './pages/EditItemPage'
-import AdminPage from './pages/AdminPage'
-import FounderPage from './pages/FounderPage'
 import FounderGate from './components/FounderGate'
 import GuidePage from './pages/GuidePage'
-import TasksPage from './pages/TasksPage'
-import DocumentVaultPage from './pages/DocumentVaultPage'
-import HeirsPage from './pages/HeirsPage'
-import GoodwillPage from './pages/GoodwillPage'
 import { JoinPage, CategoriesPage, PrivacyPage, AccountPage } from './pages/OtherPages'
-import ConflictPage from './pages/ConflictPage'
-import UnwantedPage from './pages/UnwantedPage'
-import DistributionPage from './pages/DistributionPage'
-import StatusPage from './pages/StatusPage'
 import ContactPage from './pages/ContactPage'
 import { getPendingSave, clearPendingSave } from './lib/wizardEstate'
 import { clearAllReasonDrafts } from './lib/reasonDraft'
@@ -36,6 +18,13 @@ import Toasts from './components/Toast'
 import FeedbackWidget from './components/FeedbackWidget'
 import { L } from './lib/lang'
 import RouteMeta from './seo/RouteMeta'
+// Den innloggede appen lastes ved behov; offentlige sider over er i hovedfilen (forhåndsrendres og hydreres)
+import {
+  ProfileSetupPage, EstatesPage, EstatePage, ItemDetailPage, AddItemPage, AddItemsPage, SwipePage, EditItemPage, AdminPage,
+  FounderPage, TasksPage, DocumentVaultPage, HeirsPage, GoodwillPage, ConflictPage, UnwantedPage, DistributionPage, StatusPage,
+  preloadAppPages,
+} from './appPages'
+import PageErrorBoundary, { PageLoading } from './components/PageErrorBoundary'
 
 // Pages that must never be hijacked by post-login redirects (e.g. legal text opened in a new tab)
 const NO_REDIRECT_PATHS = ['/personvern']
@@ -152,6 +141,9 @@ export default function App({ prerendered = false }) {
     return () => { cancelled = true }
   }, [user?.id])
 
+  // Innlogget: hent resten av appen i bakgrunnen, så navigering ikke venter på nett
+  useEffect(() => { if (user?.id) preloadAppPages() }, [user?.id])
+
   if (session === undefined && !prerendered) return <Splash />
 
   // Vent til demo-boet er funnet, så bo-listen aldri blinker forbi
@@ -193,6 +185,8 @@ export default function App({ prerendered = false }) {
         )}
         <Toasts success={toast} errors={errors} onDismiss={dismissError} />
         {!isDemo && <FeedbackWidget session={session} onToast={showToast} />}
+        <PageErrorBoundary resetKey={pathname}>
+        <Suspense fallback={<PageLoading />}>
         <Routes>
           <Route path="/" element={isDemo ? demoHome : <EstatesPage {...p} />} />
           <Route path="/home" element={<LandingPage loggedIn onToast={showToast} />} />
@@ -229,6 +223,8 @@ export default function App({ prerendered = false }) {
           <Route path="/konto" element={notForDemo(<AccountPage session={session} onToast={showToast} />)} />
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>
+        </Suspense>
+        </PageErrorBoundary>
       </div>
     </PlanProvider>
   )
