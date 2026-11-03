@@ -1,6 +1,7 @@
 // Teknisk SEO i byggesteget (registrert i vite.config.js):
 //  - Setter inn standardtaggene fra src/seo/pages.js i index.html (skallet som serveres på alle app-stier).
-//  - Forhåndsrendrer offentlige sider med prerender: true til dist/<side>.html (vercel.json omskriver /<side> dit).
+//  - Forhåndsrendrer offentlige sider med prerender: true til dist/<side>.html (vercel.json omskriver /<side> dit);
+//    forsiden «/» skrives til dist/index.html, og appens skall (alle andre stier) flyttes til dist/shell.html.
 //    HTML-en er appens egen første visning (<App prerendered />) for en besøkende uten innlogging på norsk, så
 //    søkemotorer og brukere får samme innhold, og nettleseren kan hydrere den uten å bytte ut DOM-en (main.jsx).
 // Supabase byttes ut med en tom klient under renderingen: ingen nettverk, ingen miljøvariabler. Bruker noe
@@ -10,7 +11,7 @@ import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createServer } from 'vite'
 import react from '@vitejs/plugin-react'
-import { PUBLIC_PAGES, defaultHeadTags, headTags } from './pages.js'
+import { PUBLIC_PAGES, SHELL_FILE, defaultHeadTags, headTags, prerenderFile } from './pages.js'
 
 const SEO_PLACEHOLDER = '<!--seo-->'
 const SEO_BLOCK = /<!--seo:start-->[\s\S]*?<!--seo:end-->/
@@ -57,7 +58,9 @@ export default function seoPlugin() {
     async closeBundle() {
       if (config.command !== 'build' || config.build.ssr) return
       const outDir = resolve(config.root, config.build.outDir)
+      // Skallet fra Vite (index.html) tas vare på som shell.html før index.html blir den forhåndsrendrede forsiden
       const template = await readFile(resolve(outDir, 'index.html'), 'utf8')
+      await writeFile(resolve(outDir, SHELL_FILE), template)
       const server = await createServer({
         root: config.root,
         configFile: false,
@@ -74,7 +77,7 @@ export default function seoPlugin() {
           const markup = unescapeStyles(render(page.path))
           if (!/<h1[\s>]/.test(markup)) throw new Error(`SEO: ${page.path} ble rendret uten <h1>`)
           const html = injectRoot(injectHead(template, headTags(page)), markup)
-          await writeFile(resolve(outDir, `${page.path.slice(1)}.html`), html)
+          await writeFile(resolve(outDir, prerenderFile(page.path)), html)
         }
       } finally {
         await server.close()

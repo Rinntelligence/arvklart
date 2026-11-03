@@ -48,17 +48,17 @@ async function check(name, fn) {
 const assert = (c, m) => { if (!c) throw new Error(m) }
 const notBroken = async page => assert(await page.getByText('Siden kunne ikke lastes').count() === 0, '«Siden kunne ikke lastes» vises')
 
-await check('Forsiden: overskrift, demo-knapp og lenker', async page => {
-  await page.goto(`${BASE}/home`)
+await check('Forsiden «/»: overskrift, demo-knapp og lenker', async page => {
+  await page.goto(`${BASE}/`)
   await page.getByRole('heading', { level: 1 }).waitFor()
   await page.getByRole('button', { name: /Test ut demo/ }).waitFor()
   for (const href of ['/veiviser', '/kontakt', '/personvern', '/logg-inn']) assert(await page.locator(`a[href="${href}"]`).count() > 0, `lenken til ${href} mangler`)
 })
 
-await check('Uten innlogging: «/», ukjente adresser og app-sider ender på forsiden', async page => {
-  for (const path of ['/', '/finnes-ikke', '/estate/00000000-0000-0000-0000-000000000000']) {
+await check('Uten innlogging: /home, /app, ukjente adresser og app-sider ender på forsiden «/»', async page => {
+  for (const path of ['/home', '/app', '/finnes-ikke', '/estate/00000000-0000-0000-0000-000000000000']) {
     await page.goto(BASE + path)
-    await page.waitForURL(`${BASE}/home`, { timeout: 15000 })
+    await page.waitForURL(`${BASE}/`, { timeout: 15000 })
   }
 })
 
@@ -91,7 +91,7 @@ await check('Veiviseren og personvern vises', async page => {
 })
 
 await check('Demo: åpner demo-boet, og navigering i boet virker', async page => {
-  await page.goto(`${BASE}/home`)
+  await page.goto(`${BASE}/`)
   await page.getByRole('button', { name: /Test ut demo/ }).first().click()
   await page.waitForURL(/\/estate\/[0-9a-f-]{36}$/, { timeout: 30000 })
   await page.getByText(/Du ser på en/).waitFor()

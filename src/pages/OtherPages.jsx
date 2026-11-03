@@ -10,6 +10,7 @@ import { isDemoSession } from '../lib/demo'
 import { categoryLabel } from '../lib/categories'
 import TextSizeControl from '../components/TextSizeControl'
 import { PRIVACY_UPDATED } from '../lib/privacy'
+import { APP_HOME, HOME } from '../lib/routes'
 
 const updatedText = () => new Date(`${PRIVACY_UPDATED}T12:00:00`).toLocaleDateString(getLang() === 'en' ? 'en-GB' : 'nb-NO', { day: 'numeric', month: 'long', year: 'numeric' })
 
@@ -71,7 +72,7 @@ export function JoinPage({ session, onToast }) {
             ) : (
               <p style={{ color:'#75604B', marginTop:'8px', lineHeight:'1.5' }}>{texts[status] || errorMsg}</p>
             )}
-            <button onClick={() => navigate('/')} style={{ ...btn, marginTop:'20px', background:'none', color:'#5C4530', border:'1px solid #9A8B78' }}>{L('Til mine bo', 'To my estates')}</button>
+            <button onClick={() => navigate(APP_HOME)} style={{ ...btn, marginTop:'20px', background:'none', color:'#5C4530', border:'1px solid #9A8B78' }}>{L('Til mine bo', 'To my estates')}</button>
           </>
         )}
       </div>
@@ -291,7 +292,7 @@ export function AccountPage({ session, onToast }) {
         throw Object.assign(new Error('delete-account'), { code })
       }
       await supabase.auth.signOut()
-      navigate('/home')
+      navigate(HOME)
     } catch (e) {
       // Fast melding på brukerens språk (serveren sender aldri råtekst); slettingen kan prøves på nytt
       onToast(e.code === 'delete_failed'

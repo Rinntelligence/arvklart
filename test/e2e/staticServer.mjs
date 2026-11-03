@@ -1,7 +1,8 @@
 // Serverer det bygde nettstedet (dist/) med hodene og omskrivingene fra vercel.json, slik Vercel gjør, så
 // e2e-testene (csp.mjs, seo.mjs) kjører med de samme hodene og stiene som i produksjon. Supabase-adressen i
 // CSP-en byttes til den simulerte (test.supabase.co). Bruk: node test/e2e/staticServer.mjs <dist> <port>
-// Som Vercel: finnes filen, serveres den; ellers gjelder første omskriving som passer; ellers 404. Hodene velges
+// Som Vercel: først videresendinger (redirects; permanent gir 308), så filen hvis den finnes («/» gir index.html),
+// ellers første omskriving som passer, ellers 404. Hodene velges
 // etter den opprinnelige stien (alle regler som passer, i rekkefølge). Kildene i vercel.json tolkes som
 // regulære uttrykk (^…$), og bare den formen brukes der (test/seo/seo.test.js sjekker at det ikke er :param).
 // Dette er en etterligning: oppførselen må også sjekkes på en forhåndsvisning hos Vercel (scripts/check-seo.mjs).
@@ -29,7 +30,13 @@ const isFile = file => stat(file).then(s => s.isFile(), () => false)
 
 createServer(async (req, res) => {
   const path = normalize(decodeURIComponent(new URL(req.url, 'http://x').pathname)).replace(/^(\.\.[/\\])+/, '')
+  const redirect = (vercel.redirects || []).find(r => matches(r.source, path))
+  if (redirect) {
+    res.writeHead(redirect.permanent === false ? 307 : 308, { ...headersFor(path), Location: redirect.destination })
+    return res.end()
+  }
   let file = join(dir, path)
+  if (path.endsWith('/')) file = join(file, 'index.html')
   if (!(await isFile(file))) {
     const rewrite = vercel.rewrites.find(r => matches(r.source, path))
     file = rewrite ? join(dir, rewrite.destination) : null

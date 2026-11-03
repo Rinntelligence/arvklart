@@ -5,19 +5,19 @@
 // preview: Vercel legger selv X-Robots-Tag: noindex på forhåndsvisninger (ikke-produksjonsdomener). Der kan
 // fraværet av noindex på offentlige sider ikke bevises; sjekken rapporteres som SKIP og må gjøres mot produksjon.
 import { gzipSync } from 'node:zlib'
-import { PUBLIC_PAGES, SITE_URL, organizationJsonLd } from '../../src/seo/pages.js'
+import { PUBLIC_PAGES, SITE_URL, organizationJsonLd, websiteJsonLd } from '../../src/seo/pages.js'
 
 // JavaScript som lastes før en offentlig side er interaktiv (gzip). Før code splitting: 371 kB. Se test/e2e/chunks.mjs.
 export const JS_BUDGET_GZIP = 175 * 1024
 
 export const H1_NO = 'Arvefordeling gjort enklere og inkluderende'
-const PRIVATE = ['/', '/logg-inn', '/nytt-passord', '/join/ABC123', '/estate/22222222-0000-0000-0000-000000000001',
+const PRIVATE = ['/app', '/logg-inn', '/nytt-passord', '/join/ABC123', '/estate/22222222-0000-0000-0000-000000000001',
   '/estate/22222222-0000-0000-0000-000000000001/fordeling', '/konto', '/founder', '/setup', '/finnes-ikke',
-  '/home.html', '/kontakt.html', '/index.html']
+  '/home.html', '/kontakt.html', '/index.html', '/shell.html']
 
 // Stiene som alltid vises i rapporten (status og hoder), så reglene kan leses av ekte svar
 export const REPORT_PATHS = ['/', '/home', '/kontakt', '/personvern', '/veiviser', '/veiviser.html', '/robots.txt', '/sitemap.xml',
-  '/logg-inn', '/nytt-passord', '/join/ABC123', '/estate/x', '/konto', '/finnes-ikke', '/home.html']
+  '/app', '/logg-inn', '/nytt-passord', '/join/ABC123', '/estate/x', '/konto', '/finnes-ikke', '/home.html', '/shell.html']
 
 const assert = (cond, msg) => { if (!cond) throw new Error(msg) }
 const PERMANENT = [301, 308]
@@ -28,13 +28,13 @@ export function isVercelProtection(status, location) {
   return status >= 300 && status < 400 && /vercel\.com|_vercel_sso|\/sso-api/i.test(location || '')
 }
 
-// Kanonisk domene: apex og http skal sende permanent (301/308) til https://www.… med samme sti.
-export async function domainChecks({ fetchImpl = fetch, site = SITE_URL, path = '/home' } = {}) {
+// Kanonisk domene: apex og http skal sende permanent (301/308) til https://www.… med samme sti (forsiden og en underside).
+export async function domainChecks({ fetchImpl = fetch, site = SITE_URL, paths = ['/', '/kontakt'] } = {}) {
   const results = []
   const host = new URL(site).host
   const apex = host.replace(/^www\./, '')
-  const target = `${site}${path}`
-  for (const from of [`https://${apex}${path}`, `http://${host}${path}`]) {
+  for (const path of paths) for (const from of [`https://${apex}${path}`, `http://${host}${path}`]) {
+    const target = `${site}${path}`
     const name = `${from} sendes permanent til ${target}`
     try {
       const r = await fetchImpl(from, { redirect: 'manual' })
@@ -126,14 +126,21 @@ export async function runHttpChecks(base, { headers = {}, preview = false, fetch
     })
   }
 
-  await check('/home uten JavaScript: forsidens tekst, lenkene til de offentlige sidene og Organization', async () => {
-    const { body } = await get('/home')
+  await check('/home sendes permanent til forsiden «/»', async () => {
+    const r = await get('/home')
+    const location = r.headers.get('location') || ''
+    assert([301, 308].includes(r.status), `/home: status ${r.status} (forventet 301/308)`)
+    assert(new URL(location, `${base}/home`).pathname === '/', `/home sendes til ${location}`)
+  })
+
+  await check('Forsiden «/» uten JavaScript: tekst, lenkene til de offentlige sidene, WebSite og Organization', async () => {
+    const { body } = await get('/')
     for (const text of [H1_NO, 'Én rolig, tydelig vei gjennom en vanskelig prosess.', 'Rettferdig, ikke bare likt', 'Test ut demo nå'])
       assert(body.includes(text), `mangler «${text}»`)
     for (const href of ['/veiviser', '/kontakt', '/personvern', '/logg-inn']) assert(body.includes(`href="${href}"`), `lenken til ${href} mangler`)
     assert(!/&gt;|&#x27;/.test(body.match(/<div id="root"[\s\S]*?<\/style>/)?.[0] || ''), 'CSS-en i <style> er HTML-kodet')
     const ld = [...body.matchAll(/<script type="application\/ld\+json">(.*?)<\/script>/g)].map(m => JSON.parse(m[1]))
-    assert(ld.length === 1 && JSON.stringify(ld[0]) === JSON.stringify(organizationJsonLd()), `JSON-LD: ${JSON.stringify(ld)}`)
+    assert(JSON.stringify(ld) === JSON.stringify([websiteJsonLd(), organizationJsonLd()]), `JSON-LD: ${JSON.stringify(ld)}`)
   })
 
   await check('Offentlige sider uten forhåndsrendering: appens skall uten canonical, og ingen noindex', async () => {
@@ -148,7 +155,7 @@ export async function runHttpChecks(base, { headers = {}, preview = false, fetch
     return notes.join('; ') || null
   })
 
-  await check('Appen, innlogging, invitasjoner, ukjente adresser og «/» får X-Robots-Tag: noindex', async () => {
+  await check('Appen (/app, /estate/…), innlogging, invitasjoner og ukjente adresser får X-Robots-Tag: noindex', async () => {
     for (const path of PRIVATE) {
       const r = await get(path)
       assert(r.status === 200, `${path}: status ${r.status}`)
@@ -178,7 +185,7 @@ export async function runHttpChecks(base, { headers = {}, preview = false, fetch
   })
 
   await check('Sikkerhetshodene sendes på sidene, appen og robots.txt', async () => {
-    for (const path of ['/', '/home', '/kontakt', '/estate/x', '/veiviser.html', '/robots.txt', '/sitemap.xml']) {
+    for (const path of ['/', '/app', '/kontakt', '/estate/x', '/veiviser.html', '/robots.txt', '/sitemap.xml']) {
       const h = (await get(path)).headers
       assert(h.get('content-security-policy')?.startsWith("default-src 'self'; script-src 'self' https://cdnjs.cloudflare.com;"), `CSP mangler på ${path}`)
       assert(h.get('content-security-policy')?.includes("frame-ancestors 'self'"), `frame-ancestors mangler på ${path}`)

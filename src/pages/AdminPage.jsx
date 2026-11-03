@@ -6,6 +6,7 @@ import { uploadEstateImage } from '../lib/images'
 import { Avatar, Card } from '../components/UI'
 import { L, locale } from '../lib/lang'
 import StoredImage from '../components/StoredImage'
+import { APP_HOME } from '../lib/routes'
 
 const genCode = () => Math.random().toString(36).substring(2, 8).toUpperCase()
 
@@ -105,7 +106,7 @@ export default function AdminPage({ session, profile, onToast }) {
   if (!estate || myRole !== 'admin') return (
     <div style={{ padding:'80px 16px', textAlign:'center', color:'#75604B', fontFamily:'Karla, sans-serif' }}>
       <p style={{ marginBottom:'16px' }}>{L('Bare administratorer av boet har tilgang til denne siden.', 'Only administrators of the estate can access this page.')}</p>
-      <button onClick={() => navigate(estate ? `/estate/${id}` : '/')} style={{ padding:'10px 20px', background:'#3A2F26', color:'#FBF9F5', border:'none', borderRadius:'8px', cursor:'pointer', fontSize:'0.875rem', fontFamily:'Karla, sans-serif' }}>{L('Tilbake', 'Back')}</button>
+      <button onClick={() => navigate(estate ? `/estate/${id}` : APP_HOME)} style={{ padding:'10px 20px', background:'#3A2F26', color:'#FBF9F5', border:'none', borderRadius:'8px', cursor:'pointer', fontSize:'0.875rem', fontFamily:'Karla, sans-serif' }}>{L('Tilbake', 'Back')}</button>
     </div>
   )
 

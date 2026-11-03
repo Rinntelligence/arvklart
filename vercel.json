@@ -1,8 +1,10 @@
 {
+  "redirects": [
+    { "source": "/home", "destination": "/", "permanent": true }
+  ],
   "rewrites": [
-    { "source": "/home", "destination": "/home.html" },
     { "source": "/kontakt", "destination": "/kontakt.html" },
-    { "source": "/(.*)", "destination": "/index.html" }
+    { "source": "/(.*)", "destination": "/shell.html" }
   ],
   "headers": [
     {
@@ -16,7 +18,7 @@
       ]
     },
     {
-      "source": "/((?!(?:home|kontakt|personvern|veiviser|robots\\.txt|sitemap\\.xml|veiviser\\.html)$)(?!assets/)(?!.*\\.(?:js|css|svg|jpg|jpeg|png|webp|gif|ico|woff2?|map)$).*)",
+      "source": "/((?!(?:|kontakt|personvern|veiviser|robots\\.txt|sitemap\\.xml|veiviser\\.html)$)(?!assets/)(?!.*\\.(?:js|css|svg|jpg|jpeg|png|webp|gif|ico|woff2?|map)$).*)",
       "headers": [{ "key": "X-Robots-Tag", "value": "noindex" }, { "key": "X-Arvklart-Robots", "value": "noindex" }]
     },
     {

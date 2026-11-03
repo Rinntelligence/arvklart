@@ -1,6 +1,12 @@
 # Migrering: offentlig forside til `/`, appen til `/app`
 
-Status: **plan, ikke implementert.** Egen PR med egen risikovurdering. Ikke en del av den tekniske SEO-grunnmuren (PR #56).
+Status: **implementert i PR 2** (etter PR #56 og #57). Valg som ble gjort:
+- `emailRedirectTo` og Supabase-innstillingene er **uendret**: e-postlenker lander fortsatt på `/`, og `/` sender en innlogget videre til `/app` (ingen endring i `src/lib/supabase.js` eller i Supabase-dashbordet).
+- `/estate/…` er uendret; bare inngangen `/` er flyttet til `/app`.
+- En innlogget som åpner `/` direkte, går til `/app`; forsiden vises for innloggede bare fra appens «Tilbake til hjemmesiden». En innlogget som åpner en gammel `/home`-lenke, havner derfor også i appen (før: forsiden).
+- `/home` → `/` er permanent (308) i `vercel.json`.
+
+Planen under var grunnlaget.
 
 ## Hvorfor
 I dag er `/` den innloggede appen (bo-listen), og den offentlige forsiden ligger på `/home`. Konsekvenser:

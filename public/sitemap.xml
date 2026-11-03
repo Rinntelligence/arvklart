@@ -2,7 +2,7 @@
 <!-- Offentlige, indekserbare sider. Må stemme med src/seo/pages.js (sitemap: true); test/seo/seo.test.js sjekker det.
      Ingen lastmod: legg den bare inn med faktisk endringsdato for innholdet. -->
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <url><loc>https://www.arvklart.no/home</loc></url>
+  <url><loc>https://www.arvklart.no/</loc></url>
   <url><loc>https://www.arvklart.no/kontakt</loc></url>
   <url><loc>https://www.arvklart.no/personvern</loc></url>
   <url><loc>https://www.arvklart.no/veiviser</loc></url>

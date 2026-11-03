@@ -7,6 +7,7 @@ import {
   createWizardEstate, listAdminEstates, loadWizardContext, saveWizardToEstate,
 } from '../lib/wizardEstate'
 import { L, isEn } from '../lib/lang'
+import { HOME, LANDING_STATE } from '../lib/routes'
 
 // Hindrer at en ventende lagring kjøres to ganger hvis siden monteres på nytt underveis
 let processingPending = false
@@ -31,7 +32,9 @@ export default function GuidePage({ standalone = false, session = null, onToast 
   const userEmail = session?.user?.email || ''
   const isDemo = isDemoEmail(userEmail)
   // Opened from the landing page (no estate) — go back to the home page instead
-  const backPath = id ? `/estate/${id}` : '/home'
+  // Tilbake til boet, eller til forsiden (også for innloggede, som /home før)
+  const backPath = id ? `/estate/${id}` : HOME
+  const goBack = useCallback(() => navigate(backPath, id ? undefined : { state: LANDING_STATE }), [navigate, backPath, id])
 
   // onToast kan være en ny funksjon ved hver rendring; effektene under skal ikke kjøres på nytt av det
   const toastRef = useRef(onToast)
@@ -104,7 +107,7 @@ export default function GuidePage({ standalone = false, session = null, onToast 
     const onMessage = async (e) => {
       if (e.origin !== window.location.origin || e.source !== frameRef.current?.contentWindow) return
       const m = e.data || {}
-      if (m.type === 'veiviser-back') navigate(backPath)
+      if (m.type === 'veiviser-back') goBack()
       if (m.type === 'veiviser-ready') sendContext()
       if (m.type === 'veiviser-navigate' && typeof m.path === 'string' && /^\/estate\/[\w-]+(\/[\w-]+)?$/.test(m.path)) navigate(m.path)
       if (m.type === 'veiviser-save') {
@@ -141,7 +144,7 @@ export default function GuidePage({ standalone = false, session = null, onToast 
     }
     window.addEventListener('message', onMessage)
     return () => window.removeEventListener('message', onMessage)
-  }, [backPath, navigate, sendContext, doSave, toFrame, userId, id, isDemo])
+  }, [goBack, navigate, sendContext, doSave, toFrame, userId, id, isDemo])
 
   // Ny kontekst når innlogging eller bo endres mens veiviseren er åpen
   useEffect(() => { if (contextRef.current) sendContext() }, [sendContext])
@@ -181,7 +184,7 @@ export default function GuidePage({ standalone = false, session = null, onToast 
       {/* Mobilnettlesere regner adresselinjen med i vh; dvh er den synlige høyden (lik vh på PC) */}
       <style>{`@supports (height: 100dvh) { .guide-shell { height: calc(100dvh - 56px) !important; } .guide-shell.standalone { height: 100dvh !important; } }`}</style>
       <div style={{ padding: '12px 20px', background: '#FBF9F5', borderBottom: '1px solid #D9CFC0', display: 'flex', alignItems: 'center', gap: '12px' }}>
-        <button onClick={() => navigate(backPath)} style={{ background: 'none', border: 'none', color: '#75604B', cursor: 'pointer', fontSize: '0.875rem', fontFamily: 'Karla, sans-serif' }}>
+        <button onClick={goBack} style={{ background: 'none', border: 'none', color: '#75604B', cursor: 'pointer', fontSize: '0.875rem', fontFamily: 'Karla, sans-serif' }}>
           {id ? L('← Tilbake til boet', '← Back to the estate') : L('← Tilbake til hjemmesiden', '← Back to the home page')}
         </button>
         {busy && <span style={{ fontSize: '0.8125rem', color: '#5F6E52', fontFamily: 'Karla, sans-serif' }}>{L('Lagrer i boet …', 'Saving to the estate …')}</span>}
