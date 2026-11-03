@@ -6,7 +6,8 @@ import { readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { gzipSync } from 'node:zlib'
 import { BASE, EST, launch, checker, assert } from './fixtures.mjs'
-import { PUBLIC_PAGES, prerenderFile } from '../../src/seo/pages.js'
+import { prerenderFile } from '../../src/seo/pages.js'
+import { publicRegistry } from '../../src/seo/content.js'
 import { JS_BUDGET_GZIP } from '../seo/httpChecks.mjs'
 
 // Budsjett for JavaScript som lastes før en offentlig side er interaktiv (felles med scripts/check-seo.mjs).
@@ -23,7 +24,8 @@ const APP_CHUNK = /\/assets\/(EstatesPage|EstatePage|ItemDetailPage|AddItemsPage
 
 await check('Offentlige sider: bare hovedfilen, innenfor budsjettet og uten diagrambiblioteket', async () => {
   assert(DIST, 'DIST (byggemappen) er ikke satt')
-  for (const page of PUBLIC_PAGES.filter(p => p.prerender)) {
+  // Alle forhåndsrendrede sider i bygget, også guidene (testinnholdet, ARVKLART_CONTENT_DIR)
+  for (const page of publicRegistry(process.env.ARVKLART_CONTENT_DIR || 'test/fixtures/content').filter(p => p.prerender)) {
     const html = readFileSync(join(DIST, prerenderFile(page.path)), 'utf8')
     const files = assetsOf(html)
     const code = files.map(f => readFileSync(join(DIST, f)))

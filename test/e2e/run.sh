@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Starter Vite mot en falsk Supabase-adresse (alle kall simuleres i testen) og kjører akseptansetestene.
 # Krever Chromium (CHROMIUM_PATH, standard /opt/pw-browsers/chromium). Kjør: npm run test:e2e
-# csp.mjs, seo.mjs og chunks.mjs kjøres til slutt mot bygget (dist) med hodene og omskrivingene fra vercel.json
+# csp.mjs, seo.mjs, guides.mjs og chunks.mjs kjøres til slutt mot bygget (med testinnholdet i test/fixtures/content) (dist) med hodene og omskrivingene fra vercel.json
 # (test/e2e/staticServer.mjs); seo.mjs trenger de forhåndsrendrede sidene, som bare finnes i bygget.
 # Alle testfilene kjøres selv om én feiler, slik at resultatet er fullstendig; skriptet feiler til slutt.
 set -uo pipefail
@@ -19,12 +19,13 @@ done
 # Sikkerhetshodene (vercel.json) testes mot det bygde nettstedet; Vite-utviklingsserveren legger inn skript i HTML-en
 DIST=$(mktemp -d)
 CSP_PORT=$((PORT + 1))
-VITE_SUPABASE_URL=https://test.supabase.co VITE_SUPABASE_ANON_KEY=test npx vite build --outDir "$DIST" --emptyOutDir >/tmp/arvklart-e2e-build.log 2>&1 || { echo "Bygget feilet"; cat /tmp/arvklart-e2e-build.log; exit 1; }
+ARVKLART_CONTENT_DIR=test/fixtures/content VITE_SUPABASE_URL=https://test.supabase.co VITE_SUPABASE_ANON_KEY=test npx vite build --outDir "$DIST" --emptyOutDir >/tmp/arvklart-e2e-build.log 2>&1 || { echo "Bygget feilet"; cat /tmp/arvklart-e2e-build.log; exit 1; }
 node test/e2e/staticServer.mjs "$DIST" "$CSP_PORT" &
 STATIC=$!
 trap 'kill $VITE $STATIC 2>/dev/null || true; rm -rf "$DIST"' EXIT
 until curl -sf "localhost:$CSP_PORT" >/dev/null 2>&1; do sleep 1; done
 BASE_URL="http://localhost:$CSP_PORT" node test/e2e/csp.mjs || FAILED+=(test/e2e/csp.mjs)
 BASE_URL="http://localhost:$CSP_PORT" node test/e2e/seo.mjs || FAILED+=(test/e2e/seo.mjs)
+BASE_URL="http://localhost:$CSP_PORT" node test/e2e/guides.mjs || FAILED+=(test/e2e/guides.mjs)
 DIST="$DIST" BASE_URL="http://localhost:$CSP_PORT" node test/e2e/chunks.mjs || FAILED+=(test/e2e/chunks.mjs)
 if [ ${#FAILED[@]} -gt 0 ]; then echo "Feilet: ${FAILED[*]}"; exit 1; fi

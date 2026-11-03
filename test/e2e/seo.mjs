@@ -214,11 +214,31 @@ await check('Direkte lenke til en app-side med økt virker', async page => {
   assert(await page.title() === 'Arvklart — Arvefordeling gjort enklere', `tittel: ${await page.title()}`)
 })
 
-await check('Uten innlogging: «/» er forsiden; /app, app-sider og ukjente adresser ender der, med én canonical', async page => {
+await check('Ukjent adresse: HTTP 404 med 404-siden (uten appen), og «Til forsiden» virker', async page => {
+  for (const path of ['/finnes-ikke', '/guider/finnes-ikke', '/a/b']) {
+    const res = await page.goto(BASE + path)
+    assert(res.status() === 404, `${path}: ${res.status()}`)
+    await page.getByRole('heading', { name: 'Fant ikke siden' }).waitFor()
+    assert(new URL(page.url()).pathname === path, `${path} sendte videre til ${page.url()}`)
+  }
+  await page.getByRole('link', { name: 'Til forsiden' }).click()
+  await page.waitForURL(`${BASE}/`)
+  await page.getByRole('button', { name: 'Test ut demo nå' }).waitFor()
+}, { loggedIn: false })
+
+await check('Ukjent adresse med innlogging: 404-siden, og «Mine bo» går til appen', async page => {
+  const res = await page.goto(`${BASE}/finnes-ikke`)
+  assert(res.status() === 404, `status ${res.status()}`)
+  await page.getByRole('link', { name: 'Mine bo' }).click()
+  await page.waitForURL(`${BASE}/app`)
+  await page.getByText('Testbo').first().waitFor()
+})
+
+await check('Uten innlogging: «/» er forsiden; /app og app-sider ender der, med én canonical', async page => {
   await page.goto(`${BASE}/`)
   await page.locator('h1').waitFor()
   assert(new URL(page.url()).pathname === '/', `«/» sendte videre til ${page.url()}`)
-  for (const path of ['/app', `/estate/${EST}`, '/finnes-ikke']) {
+  for (const path of ['/app', `/estate/${EST}`]) {
     await page.goto(BASE + path)
     await page.waitForURL(`${BASE}/`)
     await page.locator('h1').waitFor()

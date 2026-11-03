@@ -10,6 +10,7 @@ import FounderGate from './components/FounderGate'
 import GuidePage from './pages/GuidePage'
 import { JoinPage, CategoriesPage, PrivacyPage, AccountPage } from './pages/OtherPages'
 import ContactPage from './pages/ContactPage'
+import ArticlePage from './pages/ArticlePage'
 import { getPendingSave, clearPendingSave } from './lib/wizardEstate'
 import { clearAllReasonDrafts } from './lib/reasonDraft'
 import { adoptProfileLang, initialProfileLang } from './lib/lang'
@@ -165,6 +166,8 @@ export default function App({ prerendered = false }) {
           <Route path="/personvern" element={<PrivacyPage />} />
           <Route path="/kontakt" element={<ContactPage />} />
           <Route path="/veiviser" element={<GuidePage standalone onToast={showToast} />} />
+          {/* Guidene (content/guider/*.md): forhåndsrendret; ukjente og utkast gir 404 fra Vercel */}
+          <Route path="/guider/:slug" element={<ArticlePage />} />
           <Route path="*" element={<Navigate to={HOME} />} />
         </Routes>
       </>
@@ -197,6 +200,7 @@ export default function App({ prerendered = false }) {
           <Route path={APP_HOME} element={isDemo ? demoHome : <EstatesPage {...p} />} />
           <Route path="/home" element={<Navigate to={HOME} replace state={LANDING_STATE} />} />
           <Route path="/kontakt" element={<ContactPage />} />
+          <Route path="/guider/:slug" element={<ArticlePage />} />
           <Route path="/setup" element={notForDemo(<ProfileSetupPage session={session} profile={profile} onSaved={(saved) => {
             const first = !profile?.display_name
             setProfile(saved)

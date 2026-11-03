@@ -1,14 +1,11 @@
-// Offentlige sider som kan indekseres av søkemotorer: én kilde for metadata, forhåndsrendering, sitemap,
-// noindex-regelen i vercel.json og RouteMeta. Testene (test/seo/seo.test.js) feiler hvis public/sitemap.xml
-// eller vercel.json ikke stemmer med denne listen.
+// Markedssidene (egne React-komponenter) som kan indekseres. Guidene ligger i content/guider/*.md
+// (src/seo/content.js). Sammen er de registeret over offentlige sider (publicRegistry i content.js ved bygging,
+// src/seo/registry.js i nettleseren), som metadata, forhåndsrendering, sitemap.xml og RouteMeta bygger på.
 //
-// Ny offentlig side:
-//   1. Legg den inn her (tekstene hentes fra siden selv; norsk er standard).
-//   2. Legg stien inn i unntakene i noindex-regelen i vercel.json (ellers får den X-Robots-Tag: noindex).
-//   3. Med prerender: true, legg inn omskriving «/sti» → «/sti.html» i vercel.json før «/(.*)» (ikke for «/», som
-//      Vercel serverer som index.html).
-//   4. Med sitemap: true, legg URL-en inn i public/sitemap.xml.
-// Alle andre stier (appen på /app og /estate/…, innlogging, invitasjoner og ukjente adresser) får noindex.
+// Ny markedsside: legg den inn her med prerender: true, og legg ruten inn i App.jsx. Ingen endring i vercel.json
+// eller sitemap: «/<side>» omskrives generelt til «/<side>.html», som byggesteget lager, og sitemap.xml lages ved
+// bygging. test/seo/seo.test.js sjekker at rutene i App.jsx, reglene i vercel.json og registeret stemmer.
+// Alle andre stier (appen på /app og /estate/…, innlogging, invitasjoner) får noindex; ukjente adresser gir 404.
 // Ren data uten nettleser-API-er: brukes både i nettleseren og i byggesteget (src/seo/vitePlugin.js).
 
 export const SITE_URL = 'https://www.arvklart.no'
@@ -63,9 +60,10 @@ export const PUBLIC_PAGES = [
 
 export const pageFor = (path) => PUBLIC_PAGES.find(p => p.path === path) || null
 export const canonicalUrl = (path) => SITE_URL + path
+export const canonicalOf = (page) => page.canonical || canonicalUrl(page.path)
 export const prerenderedPaths = () => PUBLIC_PAGES.filter(p => p.prerender).map(p => p.path)
-// Filen en forhåndsrendret side skrives til: «/» er index.html (Vercel serverer den på «/»), ellers <sti>.html.
-// Appens skall (for alle andre stier) ligger i SHELL_FILE, som vercel.json omskriver «/(.*)» til.
+// Filen en forhåndsrendret side skrives til: «/» er index.html (Vercel serverer den på «/»), ellers <sti>.html
+// (/guider/<slug> blir guider/<slug>.html). Appens skall (app-rutene i vercel.json) ligger i SHELL_FILE.
 export const prerenderFile = (path) => (path === '/' ? 'index.html' : `${path.slice(1)}.html`)
 export const SHELL_FILE = 'shell.html'
 
@@ -96,9 +94,36 @@ export function defaultHeadTags() {
   ].join('\n    ')
 }
 
+// Guide: Article (forfatter, datoer, utgiver) og BreadcrumbList (Forside › guiden). Bare opplysninger fra guiden.
+export const articleJsonLd = (g) => ({
+  '@context': 'https://schema.org',
+  '@type': 'Article',
+  headline: g.title,
+  description: g.description,
+  author: { '@type': g.author === SITE_NAME ? 'Organization' : 'Person', name: g.author },
+  publisher: { '@type': 'Organization', name: SITE_NAME, url: SITE_URL },
+  datePublished: g.published,
+  ...(g.updated ? { dateModified: g.updated } : {}),
+  mainEntityOfPage: canonicalOf(g),
+  image: SITE_URL + (g.og_image || OG_IMAGE),
+  inLanguage: 'nb-NO',
+})
+export const breadcrumbJsonLd = (g) => ({
+  '@context': 'https://schema.org',
+  '@type': 'BreadcrumbList',
+  itemListElement: [
+    { '@type': 'ListItem', position: 1, name: 'Forside', item: `${SITE_URL}/` },
+    { '@type': 'ListItem', position: 2, name: g.title, item: canonicalOf(g) },
+  ],
+})
+
+// JSON-LD og sidedata er datablokker, ikke skript: de kjøres ikke og stoppes ikke av CSP-en (script-src 'self').
+// «<» kodes så teksten aldri kan avslutte blokken.
+export const dataBlock = (type, data, id) => `<script type="${type}"${id ? ` id="${id}"` : ''}>${JSON.stringify(data).replace(/</g, '\\u003c')}</script>`
+
 // <head>-tagger for en forhåndsrendret offentlig side (norsk, som er versjonen søkemotorene ser).
 export function headTags(page) {
-  const url = canonicalUrl(page.path)
+  const url = canonicalOf(page)
   const tags = [
     `<title>${esc(page.title)}</title>`,
     `<meta name="description" content="${esc(page.description)}" />`,
@@ -106,25 +131,40 @@ export function headTags(page) {
     `<meta property="og:url" content="${esc(url)}" />`,
     ...sharedTags(page),
   ]
-  // JSON-LD er en datablokk, ikke et skript: den kjøres ikke og stoppes ikke av CSP-en (script-src 'self').
-  // «<» kodes så teksten aldri kan avslutte blokken.
-  const ld = (data) => `<script type="application/ld+json">${JSON.stringify(data).replace(/</g, '\\u003c')}</script>`
+  const ld = (data) => dataBlock('application/ld+json', data)
   if (page.website) tags.push(ld(websiteJsonLd()))
   if (page.organization) tags.push(ld(organizationJsonLd()))
+  if (page.kind === 'guide') {
+    tags.push(`<meta property="article:published_time" content="${esc(page.published)}" />`)
+    if (page.updated) tags.push(`<meta property="article:modified_time" content="${esc(page.updated)}" />`)
+    if (page.schema !== 'none') tags.push(ld(articleJsonLd(page)), ld(breadcrumbJsonLd(page)))
+  }
   return tags.join('\n    ')
 }
 
+// sitemap.xml fra registeret: bare publiserte, indekserbare sider med sitemap: true. lastmod bare når siden har en
+// faktisk endringsdato (guidene: updated eller published) – aldri byggetidspunktet.
+export function sitemapXml(pages) {
+  const urls = pages.filter(p => p.sitemap && (p.kind !== 'guide' || p.status === 'published')).map(p => {
+    const loc = canonicalOf(p)
+    if (!loc.startsWith(`${SITE_URL}/`)) throw new Error(`sitemap: ${loc} er ikke på ${SITE_URL}`)
+    return `  <url><loc>${esc(loc)}</loc>${p.lastmod ? `<lastmod>${esc(p.lastmod)}</lastmod>` : ''}</url>`
+  })
+  return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.join('\n')}\n</urlset>\n`
+}
+
 function sharedTags(meta) {
+  const image = SITE_URL + (meta.og_image || OG_IMAGE)
   return [
-    `<meta property="og:type" content="website" />`,
+    `<meta property="og:type" content="${meta.kind === 'guide' ? 'article' : 'website'}" />`,
     `<meta property="og:site_name" content="${SITE_NAME}" />`,
     `<meta property="og:locale" content="nb_NO" />`,
     `<meta property="og:title" content="${esc(meta.title)}" />`,
     `<meta property="og:description" content="${esc(meta.description)}" />`,
-    `<meta property="og:image" content="${esc(SITE_URL + OG_IMAGE)}" />`,
+    `<meta property="og:image" content="${esc(image)}" />`,
     `<meta name="twitter:card" content="summary_large_image" />`,
     `<meta name="twitter:title" content="${esc(meta.title)}" />`,
     `<meta name="twitter:description" content="${esc(meta.description)}" />`,
-    `<meta name="twitter:image" content="${esc(SITE_URL + OG_IMAGE)}" />`,
+    `<meta name="twitter:image" content="${esc(image)}" />`,
   ]
 }

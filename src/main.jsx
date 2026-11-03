@@ -6,6 +6,7 @@ import App from './App.jsx'
 import { getLang } from './lib/lang'
 import { applyTextSize } from './lib/textSize'
 import { hasAuthInUrl, hasStoredSession } from './seo/clientState'
+import { PageDataContext, readPageData } from './seo/pageData'
 
 // Tekststørrelsen settes før første visning, så siden ikke hopper
 applyTextSize()
@@ -21,7 +22,9 @@ if (getLang() === 'en') {
 // av public/seo-early.js til React har tatt over, og byttes ut i én operasjon.
 const container = document.getElementById('root')
 const prerendered = container.hasAttribute('data-prerendered')
-const app = (props) => <BrowserRouter><App {...props} /></BrowserRouter>
+// Innholdet fra byggesteget (guidene) leses før React tar over, også når siden rendres på nytt i nettleseren
+const pageData = readPageData()
+const app = (props) => <PageDataContext.Provider value={pageData}><BrowserRouter><App {...props} /></BrowserRouter></PageDataContext.Provider>
 
 if (prerendered && getLang() === 'no' && !hasStoredSession() && !hasAuthInUrl()) {
   ReactDOM.hydrateRoot(container, app({ prerendered: true }))
