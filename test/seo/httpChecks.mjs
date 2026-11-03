@@ -4,7 +4,11 @@
 //
 // preview: Vercel legger selv X-Robots-Tag: noindex på forhåndsvisninger (ikke-produksjonsdomener). Der kan
 // fraværet av noindex på offentlige sider ikke bevises; sjekken rapporteres som SKIP og må gjøres mot produksjon.
+import { gzipSync } from 'node:zlib'
 import { PUBLIC_PAGES, SITE_URL, organizationJsonLd } from '../../src/seo/pages.js'
+
+// JavaScript som lastes før en offentlig side er interaktiv (gzip). Før code splitting: 371 kB. Se test/e2e/chunks.mjs.
+export const JS_BUDGET_GZIP = 175 * 1024
 
 export const H1_NO = 'Arvefordeling gjort enklere og inkluderende'
 const PRIVATE = ['/', '/logg-inn', '/nytt-passord', '/join/ABC123', '/estate/22222222-0000-0000-0000-000000000001',
@@ -154,6 +158,23 @@ export async function runHttpChecks(base, { headers = {}, preview = false, fetch
     }
     const guide = await get('/veiviser.html')
     assert((robotsTag(guide) || '').includes('indexifembedded') && ruleTag(guide) === 'noindex, indexifembedded', `/veiviser.html: ${robotsTag(guide)} / ${ruleTag(guide)}`)
+  })
+
+  await check(`Offentlige sider: første JavaScript er innenfor budsjettet (${JS_BUDGET_GZIP / 1024} kB gzip)`, async () => {
+    const sizes = []
+    for (const page of PUBLIC_PAGES.filter(p => p.prerender)) {
+      const files = [...new Set([...(await get(page.path)).body.matchAll(/(?:src|href)="(\/assets\/[^"]+\.js)"/g)].map(m => m[1]))]
+      assert(files.length > 0, `${page.path}: fant ingen skript`)
+      let gz = 0
+      for (const f of files) {
+        const r = await get(f)
+        assert(r.status === 200 && /javascript/.test(r.headers.get('content-type') || ''), `${f}: ${r.status} ${r.headers.get('content-type')}`)
+        gz += gzipSync(Buffer.from(r.body)).length
+      }
+      assert(gz <= JS_BUDGET_GZIP, `${page.path}: ${Math.round(gz / 1024)} kB gzip er over budsjettet`)
+      sizes.push(`${page.path} ${Math.round(gz / 1024)} kB`)
+    }
+    results.push(`INFO JavaScript før interaktiv (gzip): ${sizes.join(', ')}`)
   })
 
   await check('Sikkerhetshodene sendes på sidene, appen og robots.txt', async () => {
