@@ -104,7 +104,11 @@ test('vercel.json: ingen offentlig side får noindex, og unntakene i regelen er 
 test('vercel.json: appen, innlogging, invitasjoner, ukjente adresser og «/» får noindex', () => {
   for (const path of PRIVATE) assert.ok(noindexed(path), `${path} mangler noindex`)
   const embed = vercel.headers.find(h => h.source === '/veiviser.html')
-  assert.deepEqual(embed?.headers, [{ key: 'X-Robots-Tag', value: 'noindex, indexifembedded' }])
+  assert.deepEqual(embed?.headers, [{ key: 'X-Robots-Tag', value: 'noindex, indexifembedded' }, { key: 'X-Arvklart-Robots', value: 'noindex, indexifembedded' }])
+  // X-Arvklart-Robots speiler regelen: Vercel setter selv noindex på forhåndsvisninger, men aldri dette hodet,
+  // så scripts/check-seo.mjs kan se hvilke stier våre regler faktisk treffer hos Vercel.
+  for (const h of vercel.headers.filter(h => h.headers.some(x => x.key === 'X-Robots-Tag')))
+    assert.equal(h.headers.find(x => x.key === 'X-Arvklart-Robots')?.value, h.headers.find(x => x.key === 'X-Robots-Tag').value, `${h.source}: X-Arvklart-Robots må være lik X-Robots-Tag`)
   for (const path of ['/robots.txt', '/sitemap.xml', '/assets/index-abc.js', '/hero-bg.jpg', '/ARVKLART Horizontal Negative.svg', '/seo-early.js', '/arveveiviser/ui.js'])
     assert.ok(!vercel.headers.some(h => matches(h.source, path) && h.headers.some(x => x.value === 'noindex')), `${path} skal ikke ha noindex`)
 })

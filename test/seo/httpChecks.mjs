@@ -52,7 +52,7 @@ export async function httpReport(base, { headers = {}, fetchImpl = fetch } = {})
     try {
       const r = await fetchImpl(base + path, { headers, redirect: 'manual' })
       const h = (k) => r.headers.get(k) ?? '–'
-      rows.push(`INFO ${path.padEnd(16)} ${String(r.status).padEnd(4)} x-robots-tag=${h('x-robots-tag')}  content-type=${h('content-type')}${r.headers.get('location') ? `  location=${r.headers.get('location').split('?')[0]}` : ''}`)
+      rows.push(`INFO ${path.padEnd(16)} ${String(r.status).padEnd(4)} x-robots-tag=${h('x-robots-tag')}  regel=${h('x-arvklart-robots')}  content-type=${h('content-type')}${r.headers.get('location') ? `  location=${r.headers.get('location').split('?')[0]}` : ''}`)
     } catch (e) { rows.push(`INFO ${path.padEnd(16)} feil: ${e.message}`) }
   }
   return rows
@@ -71,6 +71,10 @@ export async function runHttpChecks(base, { headers = {}, preview = false, fetch
     return seen.get(path)
   }
   const robotsTag = (r) => r.headers.get('x-robots-tag')
+  // Speilet av våre noindex-regler (vercel.json). Vercel setter det aldri selv, så det viser også på en
+  // forhåndsvisning (der Vercel legger noindex på alt) hvilke stier reglene våre treffer.
+  const ruleTag = (r) => r.headers.get('x-arvklart-robots')
+  const noRule = (path, r) => assert(!ruleTag(r), `${path} treffes av noindex-regelen (X-Arvklart-Robots: ${ruleTag(r)})`)
   const check = async (name, fn) => {
     try { const note = await fn(); results.push(note ? `SKIP ${name}: ${note}` : `OK   ${name}`) } catch (e) { results.push(`FAIL ${name}: ${e.message.split('\n')[0]}`) }
   }
@@ -84,6 +88,7 @@ export async function runHttpChecks(base, { headers = {}, preview = false, fetch
   }
   // Offentlige sider: ingen noindex fra oss. På en forhåndsvisning kommer noindex fra Vercel og kan ikke skilles fra vår.
   const notNoindexed = (path, r) => {
+    noRule(path, r)
     if (!robotsTag(r)) return null
     if (preview) return `X-Robots-Tag «${robotsTag(r)}» på ${path}: Vercel setter noindex på forhåndsvisninger, sjekk mot produksjon`
     throw new Error(`${path} har X-Robots-Tag: ${robotsTag(r)}`)
@@ -98,6 +103,8 @@ export async function runHttpChecks(base, { headers = {}, preview = false, fetch
     assert(sitemap.body.startsWith('<?xml') && sitemap.body.includes('<urlset'), 'sitemap.xml er ikke XML')
     const locs = [...sitemap.body.matchAll(/<loc>([^<]+)<\/loc>/g)].map(m => m[1])
     assert(JSON.stringify(locs) === JSON.stringify(PUBLIC_PAGES.filter(p => p.sitemap).map(p => SITE_URL + p.path)), `uventede URL-er: ${locs}`)
+    noRule('/robots.txt', robots)
+    noRule('/sitemap.xml', sitemap)
   })
 
   for (const page of PUBLIC_PAGES.filter(p => p.prerender)) {
@@ -142,10 +149,11 @@ export async function runHttpChecks(base, { headers = {}, preview = false, fetch
       const r = await get(path)
       assert(r.status === 200, `${path}: status ${r.status}`)
       assert(/(^|,\s*)noindex(\s*,|$)/.test(robotsTag(r) || ''), `${path}: X-Robots-Tag er ${robotsTag(r)}`)
+      assert(ruleTag(r) === 'noindex', `${path}: treffes ikke av noindex-regelen i vercel.json (X-Arvklart-Robots: ${ruleTag(r)})`)
       assert(!r.body.includes('rel="canonical"') || path.endsWith('.html'), `${path}: skallet har canonical`)
     }
     const guide = await get('/veiviser.html')
-    assert((robotsTag(guide) || '').includes('indexifembedded'), `/veiviser.html: ${robotsTag(guide)}`)
+    assert((robotsTag(guide) || '').includes('indexifembedded') && ruleTag(guide) === 'noindex, indexifembedded', `/veiviser.html: ${robotsTag(guide)} / ${ruleTag(guide)}`)
   })
 
   await check('Sikkerhetshodene sendes på sidene, appen og robots.txt', async () => {
