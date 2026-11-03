@@ -3,8 +3,9 @@
     { "source": "/home", "destination": "/", "permanent": true }
   ],
   "rewrites": [
-    { "source": "/kontakt", "destination": "/kontakt.html" },
-    { "source": "/(.*)", "destination": "/shell.html" }
+    { "source": "/(app|setup|estate|join|founder|konto|logg-inn|nytt-passord|personvern|veiviser)(/.*)?", "destination": "/shell.html" },
+    { "source": "/guider/([a-z0-9-]+)", "destination": "/guider/$1.html" },
+    { "source": "/((?!(?:index|shell|404)$)[a-z0-9-]+)", "destination": "/$1.html" }
   ],
   "headers": [
     {
@@ -18,7 +19,11 @@
       ]
     },
     {
-      "source": "/((?!(?:|kontakt|personvern|veiviser|robots\\.txt|sitemap\\.xml|veiviser\\.html)$)(?!assets/)(?!.*\\.(?:js|css|svg|jpg|jpeg|png|webp|gif|ico|woff2?|map)$).*)",
+      "source": "/(app|setup|estate|join|founder|konto|logg-inn|nytt-passord)(/.*)?",
+      "headers": [{ "key": "X-Robots-Tag", "value": "noindex" }, { "key": "X-Arvklart-Robots", "value": "noindex" }]
+    },
+    {
+      "source": "/((?!(?:|[a-z0-9-]+|guider/[a-z0-9-]+|robots\\.txt|sitemap\\.xml|veiviser\\.html)$)(?!assets/)(?!.*\\.(?:js|css|svg|jpg|jpeg|png|webp|gif|ico|woff2?|map)$).*)",
       "headers": [{ "key": "X-Robots-Tag", "value": "noindex" }, { "key": "X-Arvklart-Robots", "value": "noindex" }]
     },
     {

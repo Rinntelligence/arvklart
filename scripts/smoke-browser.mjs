@@ -55,10 +55,18 @@ await check('Forsiden «/»: overskrift, demo-knapp og lenker', async page => {
   for (const href of ['/veiviser', '/kontakt', '/personvern', '/logg-inn']) assert(await page.locator(`a[href="${href}"]`).count() > 0, `lenken til ${href} mangler`)
 })
 
-await check('Uten innlogging: /home, /app, ukjente adresser og app-sider ender på forsiden «/»', async page => {
-  for (const path of ['/home', '/app', '/finnes-ikke', '/estate/00000000-0000-0000-0000-000000000000']) {
+await check('Uten innlogging: /home, /app og app-sider ender på forsiden «/»', async page => {
+  for (const path of ['/home', '/app', '/estate/00000000-0000-0000-0000-000000000000']) {
     await page.goto(BASE + path)
     await page.waitForURL(`${BASE}/`, { timeout: 15000 })
+  }
+})
+
+await check('Ukjente adresser og guider som ikke er publisert: HTTP 404 med 404-siden', async page => {
+  for (const path of ['/finnes-ikke', '/guider/finnes-ikke', '/guider/mal-for-guide']) {
+    const res = await page.goto(BASE + path)
+    assert(res.status() === 404, `${path}: ${res.status()}`)
+    await page.getByRole('heading', { name: 'Fant ikke siden' }).waitFor()
   }
 })
 

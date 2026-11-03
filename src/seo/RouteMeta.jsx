@@ -1,10 +1,11 @@
 import { useEffect } from 'react'
 import { useLocation } from 'react-router-dom'
 import { isEn } from '../lib/lang'
-import { DEFAULT_META, canonicalUrl, pageFor } from './pages'
+import { DEFAULT_META, canonicalOf } from './pages'
+import { pageFor } from './registry'
 
 // Holder tittel, beskrivelse og canonical i <head> i takt med ruten når brukeren navigerer i appen.
-// Offentlige sider (src/seo/pages.js) får sin egen tittel og canonical; alle andre stier får standardtittelen
+// Offentlige sider (src/seo/registry.js: markedssidene og publiserte guider) får sin egen tittel og canonical; alle andre stier får standardtittelen
 // og ingen canonical (de har X-Robots-Tag: noindex fra vercel.json). Forhåndsrendrede sider har de samme
 // taggene i HTML-en fra serveren; her oppdateres de eksisterende taggene, så det aldri blir to.
 function setMeta(attr, key, content) {
@@ -32,8 +33,8 @@ export function applyRouteMeta(pathname) {
   setMeta('property', 'og:description', description)
   setMeta('name', 'twitter:title', title)
   setMeta('name', 'twitter:description', description)
-  setLink('canonical', page ? canonicalUrl(page.path) : null)
-  if (page) setMeta('property', 'og:url', canonicalUrl(page.path))
+  setLink('canonical', page ? canonicalOf(page) : null)
+  if (page) setMeta('property', 'og:url', canonicalOf(page))
   else document.head.querySelector('meta[property="og:url"]')?.remove()
 }
 

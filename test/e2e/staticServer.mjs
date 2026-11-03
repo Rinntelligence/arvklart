@@ -2,7 +2,7 @@
 // e2e-testene (csp.mjs, seo.mjs) kjører med de samme hodene og stiene som i produksjon. Supabase-adressen i
 // CSP-en byttes til den simulerte (test.supabase.co). Bruk: node test/e2e/staticServer.mjs <dist> <port>
 // Som Vercel: først videresendinger (redirects; permanent gir 308), så filen hvis den finnes («/» gir index.html),
-// ellers første omskriving som passer, ellers 404. Hodene velges
+// ellers første omskriving som passer (med $1 osv.), ellers 404 med 404.html. Hodene velges
 // etter den opprinnelige stien (alle regler som passer, i rekkefølge). Kildene i vercel.json tolkes som
 // regulære uttrykk (^…$), og bare den formen brukes der (test/seo/seo.test.js sjekker at det ikke er :param).
 // Dette er en etterligning: oppførselen må også sjekkes på en forhåndsvisning hos Vercel (scripts/check-seo.mjs).
@@ -39,11 +39,16 @@ createServer(async (req, res) => {
   if (path.endsWith('/')) file = join(file, 'index.html')
   if (!(await isFile(file))) {
     const rewrite = vercel.rewrites.find(r => matches(r.source, path))
-    file = rewrite ? join(dir, rewrite.destination) : null
+    // $1, $2 … er gruppene fra kilden (som hos Vercel)
+    const groups = rewrite ? path.match(new RegExp(`^${rewrite.source}$`)) : null
+    file = rewrite ? join(dir, rewrite.destination.replace(/\$(\d)/g, (_, n) => groups[n] ?? '')) : null
   }
+  // Ingen fil og ingen omskriving som gir en fil: 404 med 404.html (antatt lik Vercel; sjekkes på forhåndsvisningen)
   if (!file || !(await isFile(file))) {
-    res.writeHead(404, { ...headersFor(path), 'Content-Type': 'text/plain; charset=utf-8' })
-    return res.end('404')
+    const notFound = join(dir, '404.html')
+    const page = (await isFile(notFound)) ? await readFile(notFound) : '404'
+    res.writeHead(404, { ...headersFor(path), 'Content-Type': 'text/html; charset=utf-8' })
+    return res.end(page)
   }
   res.writeHead(200, { ...headersFor(path), 'Content-Type': TYPES[extname(file)] || 'application/octet-stream' })
   res.end(await readFile(file))
