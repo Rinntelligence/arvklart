@@ -23,9 +23,11 @@ const results = []
 const notes = [] // ting som ikke kunne sjekkes, rapporteres som SKIP
 const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || '/opt/pw-browsers/chromium', args: ['--no-sandbox'] })
 
-async function newPage() {
+// consent: valget om statistikk som settes før siden lastes (standard «Avslå», så spørsmålet ikke dekker knappene)
+async function newPage({ consent = 'denied' } = {}) {
   const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, locale: 'nb-NO' })
   const page = await ctx.newPage()
+  if (consent) await page.addInitScript(c => { if (!localStorage.getItem('hs_analytics_consent')) localStorage.setItem('hs_analytics_consent', JSON.stringify({ v: 1, choice: c, at: new Date().toISOString() })) }, consent)
   // Bypass-hodet bare mot vår egen adresse (ikke mot Supabase, der et ukjent hode ville stoppet CORS)
   if (secret) await page.route(url => url.origin === origin, route => route.continue({ headers: { ...route.request().headers(), 'x-vercel-protection-bypass': secret } }))
   const problems = []
@@ -35,8 +37,8 @@ async function newPage() {
   return { ctx, page, problems }
 }
 
-async function check(name, fn) {
-  const { ctx, page, problems } = await newPage()
+async function check(name, fn, opts) {
+  const { ctx, page, problems } = await newPage(opts)
   try {
     await fn(page)
     if (problems.length) throw new Error(problems.join(' | '))
@@ -114,6 +116,24 @@ await check('Demo: åpner demo-boet, og navigering i boet virker', async page =>
     await page.getByText(/Du ser på en/).waitFor({ timeout: 15000 })
   }
 })
+
+await check('Statistikk: ingenting til Google før valget; etter «Godta» lastes GTM uten CSP-brudd', async page => {
+  const google = []
+  page.on('request', r => { if (/googletagmanager\.com|google-analytics\.com|analytics\.google\.com/.test(r.url())) google.push(r.url()) })
+  // Selve målingene stoppes, så røyktesten ikke blir med i statistikken
+  await page.route(/google-analytics\.com|analytics\.google\.com/, route => route.abort())
+  await page.goto(`${BASE}/`)
+  const region = page.getByRole('region', { name: 'Informasjonskapsler' })
+  await region.waitFor({ timeout: 15000 })
+  await page.waitForTimeout(1500)
+  assert(google.length === 0, `hentet fra Google før valget: ${google.slice(0, 3)}`)
+  const gtm = page.waitForResponse(r => r.url().startsWith('https://www.googletagmanager.com/gtm.js?id=GTM-KQWKCWBC'), { timeout: 15000 })
+  await region.getByRole('button', { name: 'Godta' }).click()
+  const res = await gtm
+  assert(res.status() === 200, `gtm.js: ${res.status()}`)
+  await page.waitForTimeout(2500) // GTM laster GA4-taggen, hvis den er aktiv i containeren
+  if (!google.some(u => /googletagmanager\.com\/gtag\/js/.test(u))) notes.push('GTM-containeren lastet ingen GA4-tagg (er taggen publisert i GTM?)')
+}, { consent: null })
 
 await browser.close()
 console.log([`Røyktest mot ${BASE}${secret ? ' (med bypass-hemmelighet)' : ''}`, ...results].join('\n'))

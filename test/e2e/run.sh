@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Starter Vite mot en falsk Supabase-adresse (alle kall simuleres i testen) og kjører akseptansetestene.
 # Krever Chromium (CHROMIUM_PATH, standard /opt/pw-browsers/chromium). Kjør: npm run test:e2e
-# csp.mjs, seo.mjs og chunks.mjs kjøres til slutt mot bygget (dist) med hodene og omskrivingene fra vercel.json
+# csp.mjs, seo.mjs, chunks.mjs og analytics.mjs kjøres til slutt mot bygget (dist) med hodene og omskrivingene fra vercel.json
 # (test/e2e/staticServer.mjs); seo.mjs trenger de forhåndsrendrede sidene, som bare finnes i bygget.
 # Alle testfilene kjøres selv om én feiler, slik at resultatet er fullstendig; skriptet feiler til slutt.
 set -uo pipefail
@@ -27,4 +27,5 @@ until curl -sf "localhost:$CSP_PORT" >/dev/null 2>&1; do sleep 1; done
 BASE_URL="http://localhost:$CSP_PORT" node test/e2e/csp.mjs || FAILED+=(test/e2e/csp.mjs)
 BASE_URL="http://localhost:$CSP_PORT" node test/e2e/seo.mjs || FAILED+=(test/e2e/seo.mjs)
 DIST="$DIST" BASE_URL="http://localhost:$CSP_PORT" node test/e2e/chunks.mjs || FAILED+=(test/e2e/chunks.mjs)
+BASE_URL="http://localhost:$CSP_PORT" node test/e2e/analytics.mjs || FAILED+=(test/e2e/analytics.mjs)
 if [ ${#FAILED[@]} -gt 0 ]; then echo "Feilet: ${FAILED[*]}"; exit 1; fi

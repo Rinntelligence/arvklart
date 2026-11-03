@@ -31,7 +31,9 @@ export const sessionFor = email => {
   return { ...session, access_token: t, user: { ...session.user, email } }
 }
 
-export async function setup(browser, { loggedIn = true, viewport = { width: 390, height: 844 }, textSize = null, fixtures = {}, rpc = {}, email = null } = {}) {
+// consent: valget om statistikk (src/lib/analytics.js) som settes hvis det ikke finnes; standard «denied», så
+// spørsmålet ikke dekker knappene i testene. null: ikke valgt (test/e2e/analytics.mjs).
+export async function setup(browser, { loggedIn = true, viewport = { width: 390, height: 844 }, textSize = null, fixtures = {}, rpc = {}, email = null, consent = 'denied' } = {}) {
   const data = { ...FIXTURES, ...fixtures }
   const s0 = email ? sessionFor(email) : session
   const ctx = await browser.newContext({ viewport })
@@ -57,11 +59,13 @@ export async function setup(browser, { loggedIn = true, viewport = { width: 390,
     const body = single ? (rows[0] ?? null) : rows
     return route.fulfill({ status: single && !rows.length ? 406 : 200, contentType: 'application/json', body: JSON.stringify(body) })
   })
-  await page.addInitScript(([s, on, ts]) => {
+  await page.addInitScript(([s, on, ts, consent]) => {
     localStorage.removeItem('hs_lang')
     if (ts) localStorage.setItem('hs_text_size', ts)
-    if (on) localStorage.setItem('sb-test-auth-token', JSON.stringify(s)); else localStorage.removeItem('sb-test-auth-token')
-  }, [s0, loggedIn, textSize])
+    // loggedIn: null rører ikke økten (en innlogging i testen overlever da ny lasting av siden)
+    if (on) localStorage.setItem('sb-test-auth-token', JSON.stringify(s)); else if (on === false) localStorage.removeItem('sb-test-auth-token')
+    if (consent && !localStorage.getItem('hs_analytics_consent')) localStorage.setItem('hs_analytics_consent', JSON.stringify({ v: 1, choice: consent, at: '2026-01-01T00:00:00Z' }))
+  }, [s0, loggedIn, textSize, consent])
   return { ctx, page, calls }
 }
 

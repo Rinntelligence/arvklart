@@ -142,7 +142,7 @@ test('vercel.json: gamle /home sendes permanent til forsiden «/», og ingenting
 test('vercel.json: sikkerhetshodene er uendret og gjelder alle stier', () => {
   const security = vercel.headers.find(h => h.source === '/(.*)')
   assert.deepEqual(security.headers, [
-    { key: 'Content-Security-Policy', value: "default-src 'self'; script-src 'self' https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https://swmuztsejghweqmaogol.supabase.co; connect-src 'self' https://swmuztsejghweqmaogol.supabase.co wss://swmuztsejghweqmaogol.supabase.co; media-src 'self' blob:; frame-src 'self'; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'; upgrade-insecure-requests" },
+    { key: 'Content-Security-Policy', value: "default-src 'self'; script-src 'self' https://cdnjs.cloudflare.com https://*.googletagmanager.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https://swmuztsejghweqmaogol.supabase.co https://*.google-analytics.com https://*.googletagmanager.com; connect-src 'self' https://swmuztsejghweqmaogol.supabase.co wss://swmuztsejghweqmaogol.supabase.co https://*.google-analytics.com https://*.analytics.google.com https://*.googletagmanager.com; media-src 'self' blob:; frame-src 'self'; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'; upgrade-insecure-requests" },
     { key: 'X-Content-Type-Options', value: 'nosniff' },
     { key: 'X-Frame-Options', value: 'SAMEORIGIN' },
     { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
@@ -209,4 +209,46 @@ test('e-postlenker med økten i adressen: forsiden hydreres ikke som for en ny b
   assert.equal(at('?promo_code=x', ''), false, 'bare parameteren code, ikke ord som slutter på code')
   const early = read('public/seo-early.js')
   assert.ok(early.includes('(access_token|refresh_token|error_description|code)='), 'seo-early.js må bruke samme mønster som clientState.js')
+})
+
+// ── Statistikk (GA4 via GTM) bare med samtykke, bare på offentlige sider (src/lib/analytics.js) ─────────────
+test('statistikk: lastes bare med samtykke, på offentlige sider, uten innlogging og uten økt i adressen', async () => {
+  const { canLoadAnalytics } = await import('../../src/lib/analytics.js')
+  const ok = { consent: 'granted', pathname: '/', loggedIn: false, authInUrl: false }
+  assert.equal(canLoadAnalytics(ok), true)
+  for (const p of PUBLIC_PAGES) assert.equal(canLoadAnalytics({ ...ok, pathname: p.path }), true, p.path)
+  assert.equal(canLoadAnalytics({ ...ok, consent: null }), false, 'ikke valgt')
+  assert.equal(canLoadAnalytics({ ...ok, consent: 'denied' }), false, 'avslått')
+  assert.equal(canLoadAnalytics({ ...ok, loggedIn: true }), false, 'innlogget (også demoen)')
+  assert.equal(canLoadAnalytics({ ...ok, authInUrl: true }), false, 'e-postlenke med økten i adressen')
+  for (const pathname of ['/app', '/estate/x', '/estate/x/fordeling', '/logg-inn', '/nytt-passord', '/join/ABC', '/konto', '/founder', '/finnes-ikke'])
+    assert.equal(canLoadAnalytics({ ...ok, pathname }), false, pathname)
+})
+
+test('statistikk: samtykket lagres med versjon, og ukjent eller gammel versjon regnes som ikke valgt', async () => {
+  const store = new Map()
+  globalThis.localStorage = { getItem: k => store.get(k) ?? null, setItem: (k, v) => store.set(k, String(v)), removeItem: k => store.delete(k) }
+  const { getConsent, CONSENT_KEY, CONSENT_VERSION } = await import('../../src/lib/analytics.js')
+  assert.equal(getConsent(), null)
+  store.set(CONSENT_KEY, JSON.stringify({ v: CONSENT_VERSION, choice: 'granted' })); assert.equal(getConsent(), 'granted')
+  store.set(CONSENT_KEY, JSON.stringify({ v: CONSENT_VERSION, choice: 'denied' })); assert.equal(getConsent(), 'denied')
+  store.set(CONSENT_KEY, JSON.stringify({ v: CONSENT_VERSION - 1, choice: 'granted' })); assert.equal(getConsent(), null, 'gammel versjon')
+  store.set(CONSENT_KEY, JSON.stringify({ v: CONSENT_VERSION, choice: 'ja' })); assert.equal(getConsent(), null)
+  store.set(CONSENT_KEY, '{ikke json'); assert.equal(getConsent(), null)
+  delete globalThis.localStorage
+})
+
+test('CSP: bare Googles domener for GTM og GA4 er lagt til; ingen eval og ingen skript i HTML-en', () => {
+  const csp = Object.fromEntries(vercel.headers[0].headers.find(h => h.key === 'Content-Security-Policy').value.split(';').map(d => d.trim().split(/\s+/)).map(([k, ...v]) => [k, v]))
+  assert.deepEqual(csp['script-src'], ["'self'", 'https://cdnjs.cloudflare.com', 'https://*.googletagmanager.com'])
+  assert.deepEqual(csp['connect-src'].filter(s => /google/.test(s)), ['https://*.google-analytics.com', 'https://*.analytics.google.com', 'https://*.googletagmanager.com'])
+  assert.deepEqual(csp['img-src'].filter(s => /google/.test(s)), ['https://*.google-analytics.com', 'https://*.googletagmanager.com'])
+  assert.ok(!JSON.stringify(csp).includes('unsafe-eval'))
+  assert.ok(!csp['script-src'].includes("'unsafe-inline'"))
+  assert.deepEqual(csp['frame-src'], ["'self'"], 'ingen rammer fra Google')
+})
+
+test('statistikk: GTM-ID-en står bare i src/lib/analytics.js, ikke i HTML-en', () => {
+  assert.doesNotMatch(read('index.html'), /googletagmanager|GTM-/)
+  assert.match(read('src/lib/analytics.js'), /GTM_ID = 'GTM-KQWKCWBC'/)
 })
