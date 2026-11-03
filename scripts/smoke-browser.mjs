@@ -162,11 +162,18 @@ await check('Statistikk: ingenting til Google før valget; etter «Godta» sende
   const version = container.match(/"version":"(\d+)"/)?.[1] || '?'
   const hosts = [...new Set((container.match(/arvklart[a-z0-9.-]*/gi) || []))]
   notes.push(`INFO GTM-KQWKCWBC versjon ${version}: GA4-ID-er i containeren: ${ids.join(', ') || 'ingen'}${hosts.length ? `; vertsnavn i reglene: ${hosts.join(', ')}` : ''}`)
-  // Kallene logges fra siden åpnes (watchGoogle), så et kall som skjedde før denne linjen, telles også
-  for (let i = 0; i < 30 && !g.requests.some(u => /googletagmanager\.com\/gtag\/js\?id=G-/.test(u)); i++) await page.waitForTimeout(500)
-  if (!g.requests.some(u => /googletagmanager\.com\/gtag\/js\?id=G-/.test(u)))
-    throw new Error(`GTM-containeren (versjon ${version}) lastet ingen GA4-tagg (gtag/js?id=G-…); GA4-ID-er i containeren: ${ids.join(', ') || 'ingen'}${hosts.length ? `; vertsnavn i reglene: ${hosts.join(', ')}` : ''}`)
-  for (let i = 0; i < 30 && !g.hits.some(h => h.en === 'page_view'); i++) await page.waitForTimeout(500)
+  // Venter på selve målingen (page_view til GA4). Kallene logges fra siden åpnes (watchGoogle).
+  for (let i = 0; i < 40 && !g.hits.some(h => h.en === 'page_view'); i++) await page.waitForTimeout(500)
+  if (!g.hits.some(h => h.en === 'page_view')) {
+    const state = await page.evaluate(() => ({
+      layer: (window.dataLayer || []).map(e => (e && typeof e.length === 'number' && !Array.isArray(e)) ? Array.from(e)[0] + ':' + (Array.from(e)[1] ?? '') : (e?.event || Object.keys(e || {}).join('+'))),
+      gtm: Object.keys(window.google_tag_manager || {}),
+    })).catch(() => ({ layer: [], gtm: [] }))
+    const calls = [...new Set(g.requests.map(u => { const x = new URL(u); return x.host + x.pathname })) ]
+    throw new Error(`ingen page_view sendt etter «Godta». GTM versjon ${version}, GA4-ID i containeren: ${ids.join(', ') || 'ingen'}. `
+      + `Kall til Google: ${calls.join(', ') || 'ingen'}. dataLayer: ${state.layer.join(', ')}. Registrert i GTM: ${state.gtm.join(', ') || 'ingenting'}. Målinger: ${g.hits.map(h => h.en).join(',') || 'ingen'}`)
+  }
+  if (!g.requests.some(u => /googletagmanager\.com\/gtag\/js\?id=G-/.test(u))) notes.push('INFO GA4 ble lastet uten eget gtag/js-kall (innebygd i containeren)')
   const pv = g.hits.find(h => h.en === 'page_view')
   assert(pv, `ingen page_view sendt etter «Godta» (målinger: ${g.hits.map(h => h.en).join(',') || 'ingen'})`)
   assert(/^G-[A-Z0-9]+$/.test(pv.tid || ''), `målings-ID: ${pv.tid}`)
