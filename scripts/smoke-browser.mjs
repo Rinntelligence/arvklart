@@ -214,8 +214,9 @@ await check('Statistikk: etter tilbaketrekking på /personvern sendes ingenting,
 await check('Statistikk: demoen fra forsiden med samtykke laster siden på nytt uten GTM; ingen måling fra demo-boet', async page => {
   const g = await watchGoogle(page)
   await page.goto(`${BASE}/`)
+  const gtm = page.waitForResponse(r => r.url().startsWith('https://www.googletagmanager.com/gtm.js'), { timeout: 15000 })
   await region(page).getByRole('button', { name: 'Godta' }).click({ timeout: 15000 })
-  await page.waitForResponse(r => r.url().startsWith('https://www.googletagmanager.com/gtm.js'), { timeout: 15000 })
+  await gtm
   await page.getByRole('button', { name: /Test ut demo/ }).first().click()
   await page.waitForURL(/\/estate\/[0-9a-f-]{36}$/, { timeout: 30000 })
   await page.getByText(/Du ser på en/).waitFor()
@@ -271,8 +272,10 @@ await check('Guidene: «Åpne demoen» med samtykke åpner demo-boet uten GTM; i
   const [path] = await guidePaths(page)
   if (!path) { notes.push('ingen guider i sitemap.xml'); return }
   const g = await watchGoogle(page)
+  // Samtykket er gitt før lasting, så gtm.js hentes mens siden lastes: lytt før goto, ellers kan svaret komme først
+  const gtm = page.waitForResponse(r => r.url().startsWith('https://www.googletagmanager.com/gtm.js'), { timeout: 15000 })
   await page.goto(BASE + path)
-  await page.waitForResponse(r => r.url().startsWith('https://www.googletagmanager.com/gtm.js'), { timeout: 15000 })
+  await gtm
   await page.getByRole('button', { name: 'Åpne demoen' }).click()
   await page.waitForURL(/\/estate\/[0-9a-f-]{36}$/, { timeout: 30000 })
   await page.getByText(/Du ser på en/).waitFor()
