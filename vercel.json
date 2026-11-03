@@ -1,5 +1,9 @@
 {
-  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }],
+  "rewrites": [
+    { "source": "/home", "destination": "/home.html" },
+    { "source": "/kontakt", "destination": "/kontakt.html" },
+    { "source": "/(.*)", "destination": "/index.html" }
+  ],
   "headers": [
     {
       "source": "/(.*)",
@@ -10,6 +14,14 @@
         { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
         { "key": "Permissions-Policy", "value": "camera=(self), microphone=(), geolocation=(), payment=(), usb=()" }
       ]
+    },
+    {
+      "source": "/((?!(?:home|kontakt|personvern|veiviser|robots\\.txt|sitemap\\.xml|veiviser\\.html)$)(?!assets/)(?!.*\\.(?:js|css|svg|jpg|jpeg|png|webp|gif|ico|woff2?|map)$).*)",
+      "headers": [{ "key": "X-Robots-Tag", "value": "noindex" }, { "key": "X-Arvklart-Robots", "value": "noindex" }]
+    },
+    {
+      "source": "/veiviser.html",
+      "headers": [{ "key": "X-Robots-Tag", "value": "noindex, indexifembedded" }, { "key": "X-Arvklart-Robots", "value": "noindex, indexifembedded" }]
     }
   ]
 }

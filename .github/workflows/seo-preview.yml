@@ -1,0 +1,47 @@
+# Teknisk SEO mot ekte utrullinger hos Vercel (scripts/check-seo.mjs): omskrivinger, robots.txt, sitemap.xml,
+# forhåndsrendret HTML, canonical, noindex og sikkerhetshoder. Den lokale etterligningen i e2e-testene er ikke
+# bevis for hvordan Vercel tolker vercel.json.
+# - Forhåndsvisning (PR): kjøres når Vercel melder at utrullingen er klar. Vercel setter selv noindex på
+#   forhåndsvisninger, så fraværet av noindex på offentlige sider rapporteres som SKIP der.
+# - Produksjon: kjøres etter hver utrulling til produksjon, med --production (full sjekk av noindex).
+# Beskyttede forhåndsvisninger krever hemmeligheten VERCEL_AUTOMATION_BYPASS_SECRET (Vercel → Project Settings →
+# Deployment Protection → Protection Bypass for Automation). Bare lesing (GET); ingen andre hemmeligheter.
+name: SEO mot Vercel
+
+on:
+  deployment_status:
+  workflow_dispatch:
+    inputs:
+      url:
+        description: 'Adresse som skal sjekkes, f.eks. https://www.arvklart.no'
+        required: true
+      production:
+        description: 'Produksjon (full sjekk av noindex)'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  seo:
+    if: github.event_name == 'workflow_dispatch' || github.event.deployment_status.state == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Sjekk utrullingen
+        env:
+          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+          URL: ${{ github.event.inputs.url || github.event.deployment_status.environment_url || github.event.deployment_status.target_url }}
+          PRODUCTION: ${{ github.event.inputs.production == 'true' || (github.event_name == 'deployment_status' && startsWith(github.event.deployment.environment, 'Production')) }}
+        run: |
+          # Produksjon sjekkes på hoveddomenet (canonical-domenet), ikke på utrullingens egen vercel.app-adresse
+          if [ "$PRODUCTION" = "true" ]; then
+            [ "$GITHUB_EVENT_NAME" = "deployment_status" ] && URL=https://www.arvklart.no
+            node scripts/check-seo.mjs "$URL" --production
+          else
+            node scripts/check-seo.mjs "$URL"
+          fi
