@@ -44,7 +44,10 @@ async function check(name, fn, opts) {
     if (problems.length) throw new Error(problems.join(' | '))
     results.push(`OK   ${name}`)
     for (const n of notes.splice(0)) results.push(n.startsWith('INFO ') ? n : `SKIP ${name}: ${n}`)
-  } catch (e) { results.push(`FAIL ${name}: ${e.message.split('\n')[0]} (adresse: ${page.url()})`) }
+  } catch (e) {
+    results.push(`FAIL ${name}: ${e.message.split('\n')[0]} (adresse: ${page.url()})`)
+    for (const n of notes.splice(0)) if (n.startsWith('INFO ')) results.push(n)
+  }
   await ctx.close()
 }
 const assert = (c, m) => { if (!c) throw new Error(m) }
@@ -151,9 +154,16 @@ await check('Statistikk: ingenting til Google før valget; etter «Godta» sende
   assert(g.requests.length === 0, `hentet fra Google før valget: ${g.requests.slice(0, 3)}`)
   const gtm = page.waitForResponse(r => r.url().startsWith('https://www.googletagmanager.com/gtm.js?id=GTM-KQWKCWBC'), { timeout: 15000 })
   await region(page).getByRole('button', { name: 'Godta' }).click()
-  assert((await gtm).status() === 200, 'gtm.js')
+  const gtmRes = await gtm
+  assert(gtmRes.status() === 200, 'gtm.js')
+  // Hva den publiserte containeren inneholder (målings-ID-er og versjon er ikke hemmelige), for feilsøking
+  const container = await gtmRes.text()
+  const ids = [...new Set(container.match(/G-[A-Z0-9]{6,}/g) || [])]
+  const version = container.match(/"version":"(\d+)"/)?.[1] || '?'
+  const hosts = [...new Set((container.match(/arvklart[a-z0-9.-]*/gi) || []))]
+  notes.push(`INFO GTM-KQWKCWBC versjon ${version}: GA4-ID-er i containeren: ${ids.join(', ') || 'ingen'}${hosts.length ? `; vertsnavn i reglene: ${hosts.join(', ')}` : ''}`)
   await page.waitForResponse(r => /googletagmanager\.com\/gtag\/js\?id=G-/.test(r.url()), { timeout: 15000 })
-    .catch(() => { throw new Error('GTM-containeren lastet ingen GA4-tagg (gtag/js?id=G-…)') })
+    .catch(() => { throw new Error(`GTM-containeren (versjon ${version}) lastet ingen GA4-tagg (gtag/js?id=G-…); GA4-ID-er i containeren: ${ids.join(', ') || 'ingen'}${hosts.length ? `; vertsnavn i reglene: ${hosts.join(', ')}` : ''}`) })
   for (let i = 0; i < 30 && !g.hits.some(h => h.en === 'page_view'); i++) await page.waitForTimeout(500)
   const pv = g.hits.find(h => h.en === 'page_view')
   assert(pv, `ingen page_view sendt etter «Godta» (målinger: ${g.hits.map(h => h.en).join(',') || 'ingen'})`)
