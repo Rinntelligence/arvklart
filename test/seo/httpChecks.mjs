@@ -228,6 +228,7 @@ export async function runHttpChecks(base, { headers = {}, preview = false, fetch
     for (const path of ['/', '/app', '/kontakt', '/estate/x', '/veiviser.html', '/robots.txt', '/sitemap.xml', '/finnes-ikke']) {
       const h = (await get(path)).headers
       assert(h.get('content-security-policy')?.startsWith("default-src 'self'; script-src 'self' https://cdnjs.cloudflare.com"), `CSP mangler på ${path}`)
+      assert(!/unsafe-eval/.test(h.get('content-security-policy')) && !/script-src[^;]*'unsafe-inline'/.test(h.get('content-security-policy')), `CSP tillater eval eller skript i HTML-en på ${path}`)
       assert(h.get('content-security-policy')?.includes("frame-ancestors 'self'"), `frame-ancestors mangler på ${path}`)
       assert(h.get('x-frame-options') === 'SAMEORIGIN' && h.get('x-content-type-options') === 'nosniff', `hodene mangler på ${path}`)
       assert(h.get('permissions-policy')?.includes('camera=(self)'), `Permissions-Policy mangler på ${path}`)

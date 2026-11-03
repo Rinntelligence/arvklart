@@ -350,6 +350,7 @@ export default function LandingPage({ loggedIn = false }) {
             <li><a href="/personvern">{L('Personvernerklæring', 'Privacy policy')}</a></li>
             <li><a href="/personvern#vilkar">{L('Vilkår for bruk', 'Terms of use')}</a></li>
             <li><a href="/kontakt">{L('Kontakt', 'Contact')}</a></li>
+            <li><a href="/personvern#informasjonskapsler">{L('Informasjonskapsler', 'Cookies')}</a></li>
             <li><a href="#" onClick={toggleLang} lang={isEn() ? 'no' : 'en'}>{langLabel()}</a></li>
           </ul>
         </footer>

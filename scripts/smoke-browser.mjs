@@ -23,9 +23,11 @@ const results = []
 const notes = [] // ting som ikke kunne sjekkes, rapporteres som SKIP
 const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || '/opt/pw-browsers/chromium', args: ['--no-sandbox'] })
 
-async function newPage() {
+// consent: valget om statistikk som settes før siden lastes (standard «Avslå», så spørsmålet ikke dekker knappene)
+async function newPage({ consent = 'denied' } = {}) {
   const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, locale: 'nb-NO' })
   const page = await ctx.newPage()
+  if (consent) await page.addInitScript(c => { if (!localStorage.getItem('hs_analytics_consent')) localStorage.setItem('hs_analytics_consent', JSON.stringify({ v: 1, choice: c, at: new Date().toISOString() })) }, consent)
   // Bypass-hodet bare mot vår egen adresse (ikke mot Supabase, der et ukjent hode ville stoppet CORS)
   if (secret) await page.route(url => url.origin === origin, route => route.continue({ headers: { ...route.request().headers(), 'x-vercel-protection-bypass': secret } }))
   const problems = []
@@ -35,14 +37,17 @@ async function newPage() {
   return { ctx, page, problems }
 }
 
-async function check(name, fn) {
-  const { ctx, page, problems } = await newPage()
+async function check(name, fn, opts) {
+  const { ctx, page, problems } = await newPage(opts)
   try {
     await fn(page)
     if (problems.length) throw new Error(problems.join(' | '))
     results.push(`OK   ${name}`)
-    for (const n of notes.splice(0)) results.push(`SKIP ${name}: ${n}`)
-  } catch (e) { results.push(`FAIL ${name}: ${e.message.split('\n')[0]} (adresse: ${page.url()})`) }
+    for (const n of notes.splice(0)) results.push(n.startsWith('INFO ') ? n : `SKIP ${name}: ${n}`)
+  } catch (e) {
+    results.push(`FAIL ${name}: ${e.message.split('\n')[0]} (adresse: ${page.url()})`)
+    for (const n of notes.splice(0)) if (n.startsWith('INFO ')) results.push(n)
+  }
   await ctx.close()
 }
 const assert = (c, m) => { if (!c) throw new Error(m) }
@@ -122,6 +127,102 @@ await check('Demo: åpner demo-boet, og navigering i boet virker', async page =>
     await page.getByText(/Du ser på en/).waitFor({ timeout: 15000 })
   }
 })
+
+// ── Statistikk mot den ekte GTM-containeren (GTM-KQWKCWBC) og GA4-taggen ──────────────────────────────────────
+// gtm.js og GA4-taggen hentes fra Google. GA4s målinger (…/g/collect) fanges i nettleseren og besvares lokalt, så
+// testen ser nøyaktig hva som ville blitt sendt, uten at røyktesten havner i statistikken.
+async function watchGoogle(page) {
+  const requests = [] // alt mot Google, også det som stoppes
+  const hits = []     // GA4-målinger: parametrene fra adressen og hver linje i innholdet
+  page.on('request', r => { if (/googletagmanager\.com|google-analytics\.com|analytics\.google\.com|doubleclick\.net/.test(r.url())) requests.push(r.url()) })
+  await page.route(/google-analytics\.com|analytics\.google\.com/, route => {
+    const req = route.request()
+    const base = Object.fromEntries(new URL(req.url()).searchParams)
+    const lines = (req.postData() || '').split('\n').filter(Boolean)
+    for (const line of lines.length ? lines : ['']) hits.push({ ...base, ...Object.fromEntries(new URLSearchParams(line)) })
+    return route.fulfill({ status: 204, body: '' })
+  })
+  return { requests, hits }
+}
+const region = page => page.getByRole('region', { name: 'Informasjonskapsler' })
+
+await check('Statistikk: ingenting til Google før valget; etter «Godta» sendes page_view til GA4 med samtykke bare for statistikk', async page => {
+  const g = await watchGoogle(page)
+  await page.goto(`${BASE}/`)
+  await region(page).waitFor({ timeout: 15000 })
+  await page.waitForTimeout(2000)
+  assert(g.requests.length === 0, `hentet fra Google før valget: ${g.requests.slice(0, 3)}`)
+  const gtm = page.waitForResponse(r => r.url().startsWith('https://www.googletagmanager.com/gtm.js?id=GTM-KQWKCWBC'), { timeout: 15000 })
+  await region(page).getByRole('button', { name: 'Godta' }).click()
+  const gtmRes = await gtm
+  assert(gtmRes.status() === 200, 'gtm.js')
+  // Hva den publiserte containeren inneholder (målings-ID-er og versjon er ikke hemmelige), for feilsøking
+  const container = await gtmRes.text()
+  const ids = [...new Set(container.match(/G-[A-Z0-9]{6,}/g) || [])]
+  const version = container.match(/"version":"(\d+)"/)?.[1] || '?'
+  const hosts = [...new Set((container.match(/arvklart[a-z0-9.-]*/gi) || []))]
+  notes.push(`INFO GTM-KQWKCWBC versjon ${version}: GA4-ID-er i containeren: ${ids.join(', ') || 'ingen'}${hosts.length ? `; vertsnavn i reglene: ${hosts.join(', ')}` : ''}`)
+  // Venter på selve målingen (page_view til GA4). Kallene logges fra siden åpnes (watchGoogle).
+  for (let i = 0; i < 40 && !g.hits.some(h => h.en === 'page_view'); i++) await page.waitForTimeout(500)
+  if (!g.hits.some(h => h.en === 'page_view')) {
+    const state = await page.evaluate(() => ({
+      layer: (window.dataLayer || []).map(e => (e && typeof e.length === 'number' && !Array.isArray(e)) ? Array.from(e)[0] + ':' + (Array.from(e)[1] ?? '') : (e?.event || Object.keys(e || {}).join('+'))),
+      gtm: Object.keys(window.google_tag_manager || {}),
+    })).catch(() => ({ layer: [], gtm: [] }))
+    const calls = [...new Set(g.requests.map(u => { const x = new URL(u); return x.host + x.pathname })) ]
+    throw new Error(`ingen page_view sendt etter «Godta». GTM versjon ${version}, GA4-ID i containeren: ${ids.join(', ') || 'ingen'}. `
+      + `Kall til Google: ${calls.join(', ') || 'ingen'}. dataLayer: ${state.layer.join(', ')}. Registrert i GTM: ${state.gtm.join(', ') || 'ingenting'}. Målinger: ${g.hits.map(h => h.en).join(',') || 'ingen'}`)
+  }
+  if (!g.requests.some(u => /googletagmanager\.com\/gtag\/js\?id=G-/.test(u))) notes.push('INFO GA4 ble lastet uten eget gtag/js-kall (innebygd i containeren)')
+  const pv = g.hits.find(h => h.en === 'page_view')
+  assert(pv, `ingen page_view sendt etter «Godta» (målinger: ${g.hits.map(h => h.en).join(',') || 'ingen'})`)
+  assert(/^G-[A-Z0-9]+$/.test(pv.tid || ''), `målings-ID: ${pv.tid}`)
+  // gcs = G1<annonser><statistikk>: G101 er statistikk tillatt, annonser avslått
+  if (pv.gcs) assert(pv.gcs === 'G101', `samtykkemodus: gcs=${pv.gcs} (forventet G101)`)
+  const dl = new URL(pv.dl)
+  assert(dl.origin === new URL(BASE).origin && dl.pathname === '/', `sideadresse i målingen: ${pv.dl}`)
+  assert(!g.requests.some(u => /doubleclick\.net|googleadservices|\/ads\//.test(u)), `annonsekall: ${g.requests.filter(u => /doubleclick|ads/.test(u))}`)
+  notes.push(`INFO GA4 ${pv.tid}: ${g.hits.length} måling(er) (${[...new Set(g.hits.map(h => h.en))].join(', ')}), gcs=${pv.gcs || '–'}`)
+}, { consent: null })
+
+await check('Statistikk: etter «Avslå» sendes ingenting til Google, heller ikke etter ny lasting og på andre offentlige sider', async page => {
+  const g = await watchGoogle(page)
+  await page.goto(`${BASE}/`)
+  await region(page).getByRole('button', { name: 'Avslå' }).click({ timeout: 15000 })
+  for (const path of ['/', '/kontakt', '/veiviser']) { await page.goto(BASE + path); await page.waitForTimeout(1500) }
+  assert(await region(page).count() === 0, 'spørsmålet vises igjen etter «Avslå»')
+  assert(g.requests.length === 0, `sendt til Google etter avslag: ${g.requests.slice(0, 3)}`)
+}, { consent: null })
+
+await check('Statistikk: etter tilbaketrekking på /personvern sendes ingenting, og informasjonskapslene er borte', async page => {
+  const g = await watchGoogle(page)
+  await page.goto(`${BASE}/`)
+  await region(page).getByRole('button', { name: 'Godta' }).click({ timeout: 15000 })
+  for (let i = 0; i < 30 && !g.hits.length; i++) await page.waitForTimeout(500)
+  await page.goto(`${BASE}/personvern#informasjonskapsler`)
+  await page.getByRole('button', { name: 'Trekk tilbake samtykket' }).click({ timeout: 15000 })
+  await page.getByText('Du har avslått statistikk i denne nettleseren.').waitFor({ timeout: 15000 })
+  const before = g.requests.length
+  for (const path of ['/', '/kontakt']) { await page.goto(BASE + path); await page.waitForTimeout(1500) }
+  assert(g.requests.length === before, `sendt til Google etter tilbaketrekking: ${g.requests.slice(before, before + 3)}`)
+  const cookies = (await page.context().cookies()).filter(c => /^_ga/.test(c.name)).map(c => c.name)
+  assert(cookies.length === 0, `informasjonskapsler igjen: ${cookies}`)
+}, { consent: null })
+
+await check('Statistikk: demoen fra forsiden med samtykke laster siden på nytt uten GTM; ingen måling fra demo-boet', async page => {
+  const g = await watchGoogle(page)
+  await page.goto(`${BASE}/`)
+  await region(page).getByRole('button', { name: 'Godta' }).click({ timeout: 15000 })
+  await page.waitForResponse(r => r.url().startsWith('https://www.googletagmanager.com/gtm.js'), { timeout: 15000 })
+  await page.getByRole('button', { name: /Test ut demo/ }).first().click()
+  await page.waitForURL(/\/estate\/[0-9a-f-]{36}$/, { timeout: 30000 })
+  await page.getByText(/Du ser på en/).waitFor()
+  const estate = new URL(page.url()).pathname
+  await page.waitForTimeout(3000)
+  assert(await page.evaluate(() => !window.__arvklartGtm), 'GTM er lastet i demo-boet')
+  const leaked = g.hits.filter(h => /\/estate\/|\/app/.test(h.dl || '') || (h.dl || '').includes(estate))
+  assert(leaked.length === 0, `måling med app-adresse: ${leaked.map(h => h.dl)}`)
+}, { consent: null })
 
 await browser.close()
 console.log([`Røyktest mot ${BASE}${secret ? ' (med bypass-hemmelighet)' : ''}`, ...results].join('\n'))

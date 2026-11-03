@@ -20,6 +20,7 @@ import FeedbackWidget from './components/FeedbackWidget'
 import { L } from './lib/lang'
 import RouteMeta from './seo/RouteMeta'
 import { APP_HOME, HOME, LANDING_STATE } from './lib/routes'
+import AnalyticsConsent from './components/AnalyticsConsent'
 // Den innloggede appen lastes ved behov; offentlige sider over er i hovedfilen (forhåndsrendres og hydreres)
 import {
   ProfileSetupPage, EstatesPage, EstatePage, ItemDetailPage, AddItemPage, AddItemsPage, SwipePage, EditItemPage, AdminPage,
@@ -155,6 +156,7 @@ export default function App({ prerendered = false }) {
     return (
       <>
         <RouteMeta />
+        <AnalyticsConsent loggedIn={false} />
         <Toasts success={toast} errors={errors} onDismiss={dismissError} />
         <Routes>
           <Route path={HOME} element={<LandingPage onToast={showToast} />} />
@@ -183,6 +185,8 @@ export default function App({ prerendered = false }) {
     <PlanProvider session={session}>
       <div style={{ minHeight: '100vh', background: '#FBF9F5' }}>
         <RouteMeta />
+        {/* Innlogget: aldri statistikk; lastet fra en offentlig side, lastes siden på nytt uten */}
+        <AnalyticsConsent loggedIn />
         <TopBar profile={profile} session={session} onToast={showToast} />
         {isDemo && (
           <div style={{ background: '#DCE3D2', borderBottom: '1px solid #B8C8A8', padding: '8px 20px', textAlign: 'center', fontSize: '0.8125rem', color: '#3A5A30', fontFamily: 'Karla, sans-serif' }}>
