@@ -7,6 +7,8 @@ Ved bygging (`npm run build`, `src/seo/vitePlugin.js`) blir hver **publiserte** 
 - en forhåndsrendret side med teksten i HTML-en (`dist/guider/<slug>.html`), med H1, forfatter, datoer, kilder,
   relaterte sider, brødsmulesti og strukturerte data (`Article` og `BreadcrumbList`)
 - en oppføring i `sitemap.xml` (med `lastmod` = `updated`, ellers `published`)
+- et kort med tittel og beskrivelse i seksjonen «Guider» på forsiden (og menypunktet «Guider»), så ingen guide står
+  uten lenker fra nettstedet
 - kjent for appen i nettleseren (tittel og canonical ved navigering)
 
 Ingen endring i `vercel.json`, sitemap eller andre lister. Utkast (`status: draft`) bygges aldri og gir 404.

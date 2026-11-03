@@ -3,6 +3,10 @@ import { useNavigate } from 'react-router-dom'
 import { startDemoSession } from '../lib/demo'
 import { L, isEn, setLang } from '../lib/lang'
 import { APP_HOME } from '../lib/routes'
+import { REGISTRY } from '../seo/registry'
+
+// De publiserte guidene (content/guider, via registeret), så hver ny guide får lenke fra forsiden uten endring her
+const GUIDES = REGISTRY.filter(p => p.kind === 'guide')
 
 // Språkbytte for besøkende som ikke er innlogget (innloggede bytter i TopBar)
 const toggleLang = (e) => {
@@ -131,6 +135,17 @@ export default function LandingPage({ loggedIn = false }) {
         .lp .feature h3 { font-family: 'Fraunces', serif; font-weight: 400; font-size: 1.3125rem; margin-bottom: 14px; }
         .lp .feature p { font-size: 0.9062rem; line-height: 1.65; color: var(--walnut); }
 
+        .lp .guides { background: var(--lin); padding: 96px 56px; }
+        .lp .guides-inner { max-width: 1080px; margin: 0 auto; }
+        .lp .guides h2 { font-family: 'Fraunces', serif; font-weight: 400; font-size: 2rem; line-height: 1.3; margin-bottom: 12px; }
+        .lp .guides .lead { font-size: 1rem; line-height: 1.65; color: var(--walnut); max-width: 640px; margin-bottom: 36px; }
+        .lp .guide-list { list-style: none; display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px; }
+        .lp .guide-list a { display: block; height: 100%; background: var(--snow); border: 1px solid var(--sandgray); border-radius: 12px; padding: 24px; transition: border-color 0.18s ease; }
+        .lp .guide-list a:hover { border-color: var(--sage-d); }
+        .lp .guide-list h3 { font-family: 'Fraunces', serif; font-weight: 400; font-size: 1.25rem; line-height: 1.35; margin-bottom: 10px; }
+        .lp .guide-list p { font-size: 0.9375rem; line-height: 1.6; color: var(--walnut); margin-bottom: 14px; }
+        .lp .guide-list .more { font-size: 0.9062rem; font-weight: 500; color: var(--sage-d); text-decoration: underline; }
+
         .lp .demo-section {
           background: var(--espresso); color: var(--snow);
           padding: 130px 56px; text-align: center;
@@ -192,6 +207,8 @@ export default function LandingPage({ loggedIn = false }) {
           .lp .feature-grid { grid-template-columns: 1fr; gap: 44px; }
           .lp .feature + .feature { border-left: none; padding-left: 0; border-top: 1px solid var(--sandgray); padding-top: 44px; }
           .lp .demo-section { padding: 90px 24px; }
+          .lp .guides { padding: 76px 24px; }
+          .lp .guides h2 { font-size: 1.625rem; }
           .lp .demo-mockup { margin: 40px 0 0; }
           footer.lp-footer { flex-direction: column; gap: 26px; text-align: center; }
           footer.lp-footer .foot-links { flex-wrap: wrap; justify-content: center; gap: 12px 24px; }
@@ -240,6 +257,7 @@ export default function LandingPage({ loggedIn = false }) {
               <li><a href="#for-hvem">{L('For hvem', 'Who it is for')}</a></li>
               <li><a href="#demo" onClick={(e) => { e.preventDefault(); document.getElementById('demo').scrollIntoView({ behavior: 'smooth' }) }}>{L('Prøv demo', 'Try the demo')}</a></li>
               <li><a href="/veiviser">{L('Veiviser', 'Guide')}</a></li>
+              {GUIDES.length > 0 && <li><a href="#guider">{L('Guider', 'Articles')}</a></li>}
               <li><a href="#" onClick={toggleLang} lang={isEn() ? 'no' : 'en'}>{langLabel()}</a></li>
               <li className="nav-login-item"><a className="nav-login" href="/logg-inn">{L('Logg inn', 'Log in')}</a></li>
             </ul>
@@ -342,6 +360,28 @@ export default function LandingPage({ loggedIn = false }) {
             </div>
           </div>
         </section>
+
+        {/* GUIDER — de publiserte guidene fra registeret (norsk innhold; overskriften følger språket) */}
+        {GUIDES.length > 0 && (
+          <section className="guides" id="guider" aria-labelledby="guider-tittel">
+            <div className="guides-inner">
+              <div className="eyebrow">{L('Guider', 'Articles')}</div>
+              <h2 id="guider-tittel">{L('Praktiske råd for arveoppgjøret', 'Practical advice for settling an estate')}</h2>
+              <p className="lead">{L('Råd dere kan bruke med eller uten Arvklart, med lenker til lovteksten der det gjelder.', 'Advice you can use with or without Arvklart, with links to the law where relevant (in Norwegian).')}</p>
+              <ul className="guide-list">
+                {GUIDES.map(g => (
+                  <li key={g.path}>
+                    <a href={g.path}>
+                      <h3>{g.title}</h3>
+                      <p>{g.description}</p>
+                      <span className="more">{L('Les guiden', 'Read the article')}</span>
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </section>
+        )}
 
         {/* FOOTER */}
         <footer className="lp-footer">

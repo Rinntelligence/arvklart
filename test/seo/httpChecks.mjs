@@ -168,6 +168,11 @@ export async function runHttpChecks(base, { headers = {}, preview = false, fetch
     for (const text of [H1_NO, 'Én rolig, tydelig vei gjennom en vanskelig prosess.', 'Rettferdig, ikke bare likt', 'Test ut demo nå'])
       assert(body.includes(text), `mangler «${text}»`)
     for (const href of ['/veiviser', '/kontakt', '/personvern', '/logg-inn']) assert(body.includes(`href="${href}"`), `lenken til ${href} mangler`)
+    // Hver guide i sitemap har en lenke fra forsiden (ingen foreldreløse guider)
+    for (const { loc } of sitemapEntries) {
+      const path = new URL(loc).pathname
+      if (path.startsWith('/guider/')) assert(body.includes(`href="${path}"`), `forsiden lenker ikke til ${path}`)
+    }
     assert(!/&gt;|&#x27;/.test(body.match(/<div id="root"[\s\S]*?<\/style>/)?.[0] || ''), 'CSS-en i <style> er HTML-kodet')
     const ld = [...body.matchAll(/<script type="application\/ld\+json">(.*?)<\/script>/g)].map(m => JSON.parse(m[1]))
     assert(JSON.stringify(ld) === JSON.stringify([websiteJsonLd(), organizationJsonLd()]), `JSON-LD: ${JSON.stringify(ld)}`)

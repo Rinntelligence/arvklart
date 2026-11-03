@@ -90,6 +90,18 @@ await check('Demoen kan ikke åpnes: melding, ingen tom side', async page => {
   assert(page.url() === BASE + PATH, `byttet side: ${page.url()}`)
 }, { loggedIn: false })
 
+await check('Forsiden lenker til de publiserte guidene (uten JavaScript), ikke til utkast', async () => {
+  const ctx = await browser.newContext({ javaScriptEnabled: false })
+  const page = await ctx.newPage()
+  await page.goto(`${BASE}/`)
+  const card = page.locator(`#guider a[href="${PATH}"]`)
+  assert(await card.count() === 1, 'forsiden lenker ikke til guiden')
+  assert((await card.locator('h3').textContent()) === TITLE, 'kortet viser ikke guidens tittel')
+  assert(await page.locator('a[href="/guider/testutkast"]').count() === 0, 'forsiden lenker til et utkast')
+  assert(await page.locator('nav a[href="#guider"]').count() === 1, 'menypunktet «Guider» mangler')
+  await ctx.close()
+}, { loggedIn: false })
+
 await check('Ny lasting av guiden virker (oppdatering i nettleseren)', async page => {
   await page.goto(BASE + PATH)
   await page.reload()
