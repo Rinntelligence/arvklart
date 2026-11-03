@@ -1,7 +1,6 @@
 // Statistikk med Google Analytics 4 via Google Tag Manager – bare med samtykke, og bare på offentlige sider for
 // besøkende som ikke er innlogget (src/components/AnalyticsConsent.jsx). Aldri i appen, i boene eller i demoen.
 // Skriptet lastes fra denne filen (ikke direkte i HTML-en), så innholdsreglene (CSP i vercel.json) kan holdes stramme.
-import { pageFor } from '../seo/pages.js'
 import { hasAuthInUrl } from '../seo/clientState.js'
 
 export const GTM_ID = 'GTM-KQWKCWBC'
@@ -17,9 +16,12 @@ export function getConsent() {
   } catch { return null }
 }
 
-// Bare offentlige sider (src/seo/pages.js), ikke innlogget, og ikke med økten fra en e-postlenke i adressen
-export function canLoadAnalytics({ consent, pathname, loggedIn, authInUrl }) {
-  return consent === 'granted' && Boolean(pageFor(pathname)) && !loggedIn && !authInUrl
+// Bare offentlige sider, ikke innlogget, og ikke med økten fra en e-postlenke i adressen.
+// page er oppslaget i registeret over offentlige sider (pageFor i src/seo/registry.js: markedssidene og de
+// publiserte guidene; aldri utkast, app-sider eller ukjente adresser). Oppslaget gjøres av komponenten, så denne
+// regelen er ren og kan testes uten byggesteget.
+export function canLoadAnalytics({ consent, page, loggedIn, authInUrl }) {
+  return consent === 'granted' && Boolean(page?.path) && ['page', 'guide', undefined].includes(page.kind) && !loggedIn && !authInUrl
 }
 
 export const isGtmLoaded = () => typeof window !== 'undefined' && Boolean(window.__arvklartGtm)

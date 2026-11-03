@@ -2,10 +2,11 @@ import { useEffect, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import { L } from '../lib/lang'
 import { CONSENT_EVENT, canLoadAnalytics, getConsent, hasAuthInUrl, isGtmLoaded, loadGtm, setConsent } from '../lib/analytics'
-import { pageFor } from '../seo/pages'
+// Registeret over offentlige sider: markedssidene og alle publiserte guider (aldri utkast eller app-sider)
+import { pageFor } from '../seo/registry'
 
 // Samtykke til statistikk (Google Analytics 4 via Google Tag Manager), se src/lib/analytics.js.
-//  - Spørsmålet vises bare på offentlige sider for besøkende som ikke er innlogget, og først etter at siden er
+//  - Spørsmålet vises bare på offentlige sider (src/seo/registry.js, også publiserte guider) for besøkende som ikke er innlogget, og først etter at siden er
 //    vist (ikke i den forhåndsrendrede HTML-en, så søkemotorer og hydreringen ser samme innhold som før).
 //  - «Godta» og «Avslå» er like enkle. Valget kan endres på /personvern#informasjonskapsler.
 //  - Er GTM lastet og siden går over i appen (innlogging, demo) eller til en side som ikke er offentlig, lastes
@@ -23,7 +24,7 @@ export default function AnalyticsConsent({ loggedIn }) {
 
   useEffect(() => {
     if (consent === undefined) return
-    const allowed = canLoadAnalytics({ consent, pathname, loggedIn, authInUrl: hasAuthInUrl() })
+    const allowed = canLoadAnalytics({ consent, page: pageFor(pathname), loggedIn, authInUrl: hasAuthInUrl() })
     if (allowed) loadGtm()
     else if (isGtmLoaded()) window.location.reload()
   }, [consent, pathname, loggedIn])

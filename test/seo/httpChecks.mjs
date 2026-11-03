@@ -12,12 +12,14 @@ export const JS_BUDGET_GZIP = 175 * 1024
 
 export const H1_NO = 'Arvefordeling gjort enklere og inkluderende'
 const PRIVATE = ['/app', '/logg-inn', '/nytt-passord', '/join/ABC123', '/estate/22222222-0000-0000-0000-000000000001',
-  '/estate/22222222-0000-0000-0000-000000000001/fordeling', '/konto', '/founder', '/setup', '/finnes-ikke',
-  '/home.html', '/kontakt.html', '/index.html', '/shell.html']
+  '/estate/22222222-0000-0000-0000-000000000001/fordeling', '/konto', '/founder', '/setup',
+  '/kontakt.html', '/index.html', '/shell.html']
+// Ukjente adresser, utkast (mal-for-guide er et utkast i content/guider) og interne filnavn: ekte 404
+export const NOT_FOUND = ['/finnes-ikke', '/guider/finnes-ikke', '/guider/mal-for-guide', '/guider', '/a/b', '/index', '/shell', '/home.html']
 
 // Stiene som alltid vises i rapporten (status og hoder), så reglene kan leses av ekte svar
 export const REPORT_PATHS = ['/', '/home', '/kontakt', '/personvern', '/veiviser', '/veiviser.html', '/robots.txt', '/sitemap.xml',
-  '/app', '/logg-inn', '/nytt-passord', '/join/ABC123', '/estate/x', '/konto', '/finnes-ikke', '/home.html', '/shell.html']
+  '/app', '/logg-inn', '/nytt-passord', '/join/ABC123', '/estate/x', '/konto', '/finnes-ikke', '/guider/finnes-ikke', '/a/b', '/home.html', '/shell.html']
 
 const assert = (cond, msg) => { if (!cond) throw new Error(msg) }
 const PERMANENT = [301, 308]
@@ -64,6 +66,7 @@ export async function httpReport(base, { headers = {}, fetchImpl = fetch } = {})
 
 export async function runHttpChecks(base, { headers = {}, preview = false, fetchImpl = fetch } = {}) {
   const results = []
+  const sitemapEntries = [] // fra den utrullede sitemap.xml
   const seen = new Map()
   const get = async (path) => {
     if (!seen.has(path)) {
@@ -105,24 +108,51 @@ export async function runHttpChecks(base, { headers = {}, preview = false, fetch
     const sitemap = await get('/sitemap.xml')
     assert(sitemap.status === 200 && /xml/.test(sitemap.headers.get('content-type') || ''), `sitemap.xml: ${sitemap.status} ${sitemap.headers.get('content-type')}`)
     assert(sitemap.body.startsWith('<?xml') && sitemap.body.includes('<urlset'), 'sitemap.xml er ikke XML')
-    const locs = [...sitemap.body.matchAll(/<loc>([^<]+)<\/loc>/g)].map(m => m[1])
-    assert(JSON.stringify(locs) === JSON.stringify(PUBLIC_PAGES.filter(p => p.sitemap).map(p => SITE_URL + p.path)), `uventede URL-er: ${locs}`)
+    const entries = [...sitemap.body.matchAll(/<url><loc>([^<]+)<\/loc>(?:<lastmod>([^<]+)<\/lastmod>)?<\/url>/g)].map(m => ({ loc: m[1], lastmod: m[2] || null }))
+    assert(entries.length === (sitemap.body.match(/<url>/g) || []).length, 'sitemap.xml har <url> på ukjent form')
+    const locs = entries.map(e => e.loc)
+    for (const p of PUBLIC_PAGES.filter(p => p.sitemap)) assert(locs.includes(SITE_URL + p.path), `${p.path} mangler i sitemap`)
+    for (const loc of locs) {
+      assert(loc.startsWith(`${SITE_URL}/`), `${loc} er ikke på ${SITE_URL}`)
+      const path = new URL(loc).pathname
+      assert(PUBLIC_PAGES.some(p => p.path === path) || /^\/guider\/[a-z0-9-]+$/.test(path), `uventet adresse i sitemap: ${loc}`)
+    }
+    assert(new Set(locs).size === locs.length, 'en adresse står flere ganger i sitemap')
+    for (const e of entries) if (e.lastmod) assert(/^\d{4}-\d{2}-\d{2}$/.test(e.lastmod), `lastmod ${e.lastmod}`)
+    sitemapEntries.push(...entries)
     noRule('/robots.txt', robots)
     noRule('/sitemap.xml', sitemap)
   })
 
-  for (const page of PUBLIC_PAGES.filter(p => p.prerender)) {
-    await check(`${page.path} uten JavaScript: forhåndsrendret, én canonical, metadata og ingen noindex`, async () => {
-      const r = await get(page.path)
+  // Hver adresse i den utrullede sitemap.xml (også nye guider, uten endring her): forhåndsrendret, riktig canonical
+  for (const { loc, lastmod } of sitemapEntries) {
+    const path = new URL(loc).pathname
+    const known = PUBLIC_PAGES.find(p => p.path === path)
+    if (known && !known.prerender) continue // rendres i nettleseren; sjekkes under
+    await check(`${path} uten JavaScript: forhåndsrendret, én canonical, metadata og ingen noindex`, async () => {
+      const r = await get(path)
       assert(r.status === 200, `status ${r.status}`)
       assert(!/name="robots"|noindex/.test(r.body), 'noindex i HTML-en')
       const canon = [...r.body.matchAll(/<link rel="canonical" href="([^"]+)"/g)].map(m => m[1])
-      assert(canon.length === 1 && canon[0] === SITE_URL + page.path, `canonical: ${canon}`)
-      assert(r.body.includes(`<title>${page.title}</title>`) && (r.body.match(/<title>/g) || []).length === 1, 'tittelen mangler eller står flere ganger')
+      assert(canon.length === 1 && canon[0] === loc, `canonical: ${canon} (sitemap: ${loc})`)
+      assert((r.body.match(/<title>/g) || []).length === 1 && (!known || r.body.includes(`<title>${known.title}</title>`)), 'tittelen mangler eller står flere ganger')
       for (const t of ['og:title', 'og:description', 'og:image', 'og:url', 'twitter:card']) assert(r.body.includes(t), `${t} mangler`)
       assert(/<div id="root" data-prerendered><.+<h1[\s>]/s.test(r.body), 'innholdet er ikke forhåndsrendret')
+      assert((r.body.match(/<h1[\s>]/g) || []).length === 1, 'skal ha nøyaktig én <h1>')
       assert(/<script type="module" crossorigin src="\/assets\/index-[^"]+\.js">/.test(r.body), 'appens skript mangler')
-      return notNoindexed(page.path, r)
+      if (path.startsWith('/guider/')) {
+        const ld = [...r.body.matchAll(/<script type="application\/ld\+json">(.*?)<\/script>/g)].map(m => JSON.parse(m[1]))
+        const article = ld.find(x => x['@type'] === 'Article')
+        const crumbs = ld.find(x => x['@type'] === 'BreadcrumbList')
+        assert(r.body.includes('<meta property="og:type" content="article" />'), 'og:type er ikke article')
+        if (article) {
+          assert(article.mainEntityOfPage === loc && article.headline && article.datePublished, 'Article mangler felt')
+          assert(crumbs?.itemListElement?.at(-1)?.item === loc, 'BreadcrumbList peker ikke på guiden')
+          if (lastmod) assert(lastmod === (article.dateModified || article.datePublished), `lastmod ${lastmod} er ikke guidens dato`)
+        }
+        assert(/<script type="application\/json" id="page-data">/.test(r.body), 'guidens innhold mangler for nettleseren')
+      }
+      return notNoindexed(path, r)
     })
   }
 
@@ -155,7 +185,16 @@ export async function runHttpChecks(base, { headers = {}, preview = false, fetch
     return notes.join('; ') || null
   })
 
-  await check('Appen (/app, /estate/…), innlogging, invitasjoner og ukjente adresser får X-Robots-Tag: noindex', async () => {
+  await check('Ukjente adresser, utkast og interne filnavn gir HTTP 404 med 404-siden', async () => {
+    for (const path of NOT_FOUND) {
+      const r = await get(path)
+      assert(r.status === 404, `${path}: status ${r.status} (forventet 404)`)
+      assert(r.body.includes('Fant ikke siden'), `${path}: 404-siden vises ikke`)
+      assert(r.headers.get('content-security-policy')?.includes("frame-ancestors 'self'"), `${path}: sikkerhetshodene mangler`)
+    }
+  })
+
+  await check('Appen (/app, /estate/…), innlogging og invitasjoner får X-Robots-Tag: noindex', async () => {
     for (const path of PRIVATE) {
       const r = await get(path)
       assert(r.status === 200, `${path}: status ${r.status}`)
@@ -169,7 +208,8 @@ export async function runHttpChecks(base, { headers = {}, preview = false, fetch
 
   await check(`Offentlige sider: første JavaScript er innenfor budsjettet (${JS_BUDGET_GZIP / 1024} kB gzip)`, async () => {
     const sizes = []
-    for (const page of PUBLIC_PAGES.filter(p => p.prerender)) {
+    const prerendered = [...new Set(['/', ...sitemapEntries.map(e => new URL(e.loc).pathname)])].filter(p => !PUBLIC_PAGES.some(x => x.path === p && !x.prerender))
+    for (const page of prerendered.map(path => ({ path }))) {
       const files = [...new Set([...(await get(page.path)).body.matchAll(/(?:src|href)="(\/assets\/[^"]+\.js)"/g)].map(m => m[1]))]
       assert(files.length > 0, `${page.path}: fant ingen skript`)
       let gz = 0
@@ -185,7 +225,7 @@ export async function runHttpChecks(base, { headers = {}, preview = false, fetch
   })
 
   await check('Sikkerhetshodene sendes på sidene, appen og robots.txt', async () => {
-    for (const path of ['/', '/app', '/kontakt', '/estate/x', '/veiviser.html', '/robots.txt', '/sitemap.xml']) {
+    for (const path of ['/', '/app', '/kontakt', '/estate/x', '/veiviser.html', '/robots.txt', '/sitemap.xml', '/finnes-ikke']) {
       const h = (await get(path)).headers
       assert(h.get('content-security-policy')?.startsWith("default-src 'self'; script-src 'self' https://cdnjs.cloudflare.com"), `CSP mangler på ${path}`)
       assert(!/unsafe-eval/.test(h.get('content-security-policy')) && !/script-src[^;]*'unsafe-inline'/.test(h.get('content-security-policy')), `CSP tillater eval eller skript i HTML-en på ${path}`)

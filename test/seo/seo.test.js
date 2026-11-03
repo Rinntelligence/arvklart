@@ -1,22 +1,22 @@
-// Teknisk SEO: src/seo/pages.js er eneste liste over offentlige sider. Sitemap, robots.txt og vercel.json
-// (omskrivinger, noindex, sikkerhetshoder) må stemme med den. Se også test/e2e/seo.mjs (det bygde nettstedet).
+// Teknisk SEO: registeret over offentlige sider (pages.js og guidene i content/, src/seo/content.js) styrer
+// metadata, forhåndsrendering og sitemap; vercel.json har bare generelle regler, og testene her simulerer rutingen.
+// Se også test/seo/content.test.js (guidene) og test/e2e/seo.mjs (det bygde nettstedet).
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { PUBLIC_PAGES, SITE_URL, SHELL_FILE, headTags, defaultHeadTags, organizationJsonLd, websiteJsonLd, prerenderFile } from '../../src/seo/pages.js'
 import { injectHead, injectRoot, unescapeStyles } from '../../src/seo/vitePlugin.js'
+import { publicRegistry } from '../../src/seo/content.js'
 import { runHttpChecks, httpReport, domainChecks, isVercelProtection, REPORT_PATHS } from './httpChecks.mjs'
 
 const read = (p) => readFileSync(new URL(`../../${p}`, import.meta.url), 'utf8')
 const vercel = JSON.parse(read('vercel.json'))
 const matches = (source, path) => new RegExp(`^${source}$`).test(path)
-const NOINDEX = vercel.headers.find(h => h.headers.some(x => x.key === 'X-Robots-Tag' && x.value === 'noindex'))
-const noindexed = (path) => vercel.headers.some(h => matches(h.source, path) && h.headers.some(x => x.key === 'X-Robots-Tag' && /noindex/.test(x.value)))
 
-// Stier som aldri skal kunne indekseres (eksempler fra App.jsx); ukjente adresser og «/» (appen) hører med
+// Stier som aldri skal kunne indekseres (eksempler fra App.jsx og filnavn); ukjente adresser gir dessuten 404
 const PRIVATE = ['/app', '/app/', '/logg-inn', '/nytt-passord', '/join/ABC123', '/setup', '/konto', '/founder', '/shell.html',
   '/estate/22222222-0000-0000-0000-000000000001', '/estate/x/item/y', '/estate/x/fordeling', '/estate/x/guide',
-  '/finnes-ikke', '/home/', '/home.html', '/kontakt.html', '/homepage', '/veiviserx', '/index.html']
+  '/home/', '/home.html', '/kontakt.html', '/index.html', '/a/b', '/guider/x/y', '/guider/testguide-fordeling.html']
 
 test('pages.js: unike stier og titler, beskrivelse på begge språk, og canonical på hoveddomenet', () => {
   assert.equal(SITE_URL, 'https://www.arvklart.no')
@@ -81,54 +81,82 @@ test('robots.txt: alt tillatt (noindex styres av hodene), og sitemap oppgitt', (
   assert.deepEqual(lines, ['User-agent: *', 'Allow: /', `Sitemap: ${SITE_URL}/sitemap.xml`])
 })
 
-test('sitemap.xml: gyldig form, nøyaktig de offentlige sidene, ingen private stier og ingen lastmod', () => {
-  const raw = read('public/sitemap.xml')
-  const xml = raw.replace(/<!--[\s\S]*?-->/g, '')
-  assert.ok(raw.startsWith('<?xml version="1.0" encoding="UTF-8"?>'))
-  assert.match(xml, /<urlset xmlns="http:\/\/www\.sitemaps\.org\/schemas\/sitemap\/0\.9">[\s\S]*<\/urlset>\s*$/)
-  assert.equal((xml.match(/<url>/g) || []).length, (xml.match(/<\/url>/g) || []).length)
-  assert.doesNotMatch(xml, /lastmod|&(?!amp;)/)
-  const locs = [...xml.matchAll(/<loc>([^<]+)<\/loc>/g)].map(m => m[1])
-  assert.deepEqual(locs, PUBLIC_PAGES.filter(p => p.sitemap).map(p => SITE_URL + p.path))
-  for (const loc of locs) assert.ok(!noindexed(new URL(loc).pathname), `${loc} står i sitemap men har noindex`)
-  assert.doesNotMatch(xml, /\/estate|\/join|\/logg-inn|\/konto|\/founder|\/setup|\/nytt-passord/)
+// ── Ruting slik Vercel gjør det: videresending, så fil, så første omskriving (med $1), ellers 404 ──────────────
+// FILES er filene bygget lager (registeret med testinnhold) pluss public/. Utkast og ukjente sider har ingen fil.
+const FIXTURES = 'test/fixtures/content'
+const registryFx = publicRegistry(FIXTURES)
+const PUBLIC_FILES = ['robots.txt', 'seo-early.js', 'veiviser.html', '404.html', 'hero-bg.jpg', 'favicon.svg']
+const FILES = new Set([SHELL_FILE, 'sitemap.xml', ...PUBLIC_FILES, ...registryFx.filter(p => p.prerender).map(p => prerenderFile(p.path))])
+function route(path, files = FILES) {
+  const redirect = vercel.redirects.find(r => matches(r.source, path))
+  if (redirect) return { status: redirect.permanent ? 308 : 307, location: redirect.destination }
+  const direct = path === '/' ? 'index.html' : path.slice(1)
+  if (files.has(direct)) return { status: 200, file: direct }
+  const rw = vercel.rewrites.find(r => matches(r.source, path))
+  if (!rw) return { status: 404 }
+  const groups = path.match(new RegExp(`^${rw.source}$`))
+  const file = rw.destination.replace(/\$(\d)/g, (_, n) => groups[n] ?? '').slice(1)
+  return files.has(file) ? { status: 200, file } : { status: 404, missing: file }
+}
+const robotsRule = (path) => vercel.headers.filter(h => matches(h.source, path)).flatMap(h => h.headers).filter(x => x.key === 'X-Robots-Tag').map(x => x.value)
+
+// Rutene i App.jsx (med eksempelverdier for :param), så en ny rute ikke kan glemmes i vercel.json
+const ROUTE_CONSTS = { HOME: '/', APP_HOME: '/app', RESET_PATH: '/nytt-passord' }
+const appRoutes = [...new Set([...read('src/App.jsx').matchAll(/<Route path=(?:"([^"]+)"|\{(\w+)\})/g)]
+  .map(m => m[1] ?? ROUTE_CONSTS[m[2]]).filter(p => p && p !== '*'))]
+const sample = (p) => p.replace(/:slug/g, 'testguide-fordeling').replace(/:\w+/g, 'x')
+
+test('App.jsx: alle ruter er kjent (konstantene løses opp), og guide-ruten finnes i begge trærne', () => {
+  for (const c of Object.keys(ROUTE_CONSTS)) assert.ok(read('src/App.jsx').includes(`path={${c}}`) || c === 'RESET_PATH', `${c} brukes ikke`)
+  assert.match(read('src/App.jsx'), /const RESET_PATH = '\/nytt-passord'/)
+  assert.ok(appRoutes.length > 25, `fant bare ${appRoutes.length} ruter`)
+  assert.equal(read('src/App.jsx').match(/<Route path="\/guider\/:slug"/g)?.length, 2, 'guidene må finnes både uten og med innlogging')
 })
 
-test('vercel.json: ingen offentlig side får noindex, og unntakene i regelen er nøyaktig pages.js', () => {
-  assert.ok(NOINDEX, 'noindex-regelen mangler')
-  for (const p of PUBLIC_PAGES) assert.ok(!noindexed(p.path), `${p.path} har noindex`)
-  const alternatives = NOINDEX.source.match(/^\/\(\(\?!\(\?:([^)]*)\)\$\)/)?.[1]?.split('|').map(s => s.replace(/\\\./g, '.'))
-  assert.ok(alternatives, 'fant ikke listen over unntak i noindex-regelen')
-  const infra = ['robots.txt', 'sitemap.xml', 'veiviser.html']
-  assert.deepEqual(new Set(alternatives), new Set([...PUBLIC_PAGES.map(p => p.path.slice(1)), ...infra]),
-    'unntakene i noindex-regelen må være de offentlige sidene i pages.js (pluss robots.txt, sitemap.xml og veiviser.html)')
+test('ruting: hver offentlig rute serveres og kan indekseres; hver privat rute får skallet og noindex', () => {
+  const publicPaths = new Set(registryFx.map(p => p.path))
+  for (const r of appRoutes) {
+    const path = sample(r)
+    const res = route(path)
+    if (path === '/home') { assert.equal(res.status, 308, '/home'); continue }
+    if (publicPaths.has(path)) {
+      assert.equal(res.status, 200, `${path} (offentlig) gir ${res.status}`)
+      assert.deepEqual(robotsRule(path), [], `${path} (offentlig) har noindex`)
+    } else {
+      assert.equal(res.file, SHELL_FILE, `${r} (privat) serveres ikke av appens skall: ${JSON.stringify(res)}`)
+      assert.ok(robotsRule(path).includes('noindex'), `${r} (privat) mangler noindex`)
+    }
+  }
 })
 
-test('vercel.json: appen, innlogging, invitasjoner, ukjente adresser og «/» får noindex', () => {
-  for (const path of PRIVATE) assert.ok(noindexed(path), `${path} mangler noindex`)
-  const embed = vercel.headers.find(h => h.source === '/veiviser.html')
-  assert.deepEqual(embed?.headers, [{ key: 'X-Robots-Tag', value: 'noindex, indexifembedded' }, { key: 'X-Arvklart-Robots', value: 'noindex, indexifembedded' }])
-  // X-Arvklart-Robots speiler regelen: Vercel setter selv noindex på forhåndsvisninger, men aldri dette hodet,
-  // så scripts/check-seo.mjs kan se hvilke stier våre regler faktisk treffer hos Vercel.
+test('ruting: ukjente adresser, utkast og interne filnavn gir 404', () => {
+  for (const path of ['/finnes-ikke', '/guider/finnes-ikke', '/guider/testutkast', '/guider', '/guider/a/b', '/index', '/shell', '/404',
+    '/a/b', '/home.html', '/kontakt/x', '/Kontakt', '/veiviserx', '/homepage', '/assets/finnes-ikke.js'])
+    assert.equal(route(path).status, 404, `${path}: ${JSON.stringify(route(path))}`)
+})
+
+test('ruting: forhåndsrendrede sider og guider uten egne regler; «/» og /home som før', () => {
+  for (const p of registryFx.filter(p => p.prerender)) assert.deepEqual(route(p.path), { status: 200, file: prerenderFile(p.path) }, p.path)
+  assert.deepEqual(route('/'), { status: 200, file: 'index.html' })
+  assert.deepEqual(route('/home'), { status: 308, location: '/' })
+  for (const p of ['/personvern', '/veiviser']) assert.equal(route(p).file, SHELL_FILE, `${p} rendres i nettleseren`)
+  assert.ok(!vercel.rewrites.some(r => r.source === '/(.*)'), 'ingen omskriving av alt: ukjente adresser skal gi 404')
+  assert.ok(!vercel.rewrites.some(r => registryFx.some(p => p.path !== '/' && r.source === p.path)), 'ingen omskriving per side')
+  assert.ok(!('cleanUrls' in vercel), 'cleanUrls ville sendt /veiviser.html videre til /veiviser')
+  for (const s of [...vercel.rewrites, ...vercel.headers, ...vercel.redirects].map(r => r.source)) {
+    assert.doesNotMatch(s, /(^|\/):[a-z]/i, `${s}: :param tolkes ikke likt av testserveren`); new RegExp(s)
+  }
+})
+
+test('noindex: private stier og alt utenfor de offentlige mønstrene; aldri offentlige sider eller filer de trenger', () => {
+  for (const path of PRIVATE) assert.ok(robotsRule(path).some(v => /noindex/.test(v)), `${path} mangler noindex`)
+  for (const p of registryFx) assert.deepEqual(robotsRule(p.path), [], `${p.path} har noindex`)
+  for (const path of ['/robots.txt', '/sitemap.xml', '/assets/index-abc.js', '/hero-bg.jpg', '/ARVKLART Horizontal Negative.svg', '/seo-early.js', '/arveveiviser/ui.js'])
+    assert.deepEqual(robotsRule(path), [], `${path} skal ikke ha noindex`)
+  assert.deepEqual(robotsRule('/veiviser.html'), ['noindex, indexifembedded'])
+  // X-Arvklart-Robots speiler reglene (Vercel setter selv noindex på forhåndsvisninger, men aldri dette hodet)
   for (const h of vercel.headers.filter(h => h.headers.some(x => x.key === 'X-Robots-Tag')))
     assert.equal(h.headers.find(x => x.key === 'X-Arvklart-Robots')?.value, h.headers.find(x => x.key === 'X-Robots-Tag').value, `${h.source}: X-Arvklart-Robots må være lik X-Robots-Tag`)
-  for (const path of ['/robots.txt', '/sitemap.xml', '/assets/index-abc.js', '/hero-bg.jpg', '/ARVKLART Horizontal Negative.svg', '/seo-early.js', '/arveveiviser/ui.js'])
-    assert.ok(!vercel.headers.some(h => matches(h.source, path) && h.headers.some(x => x.value === 'noindex')), `${path} skal ikke ha noindex`)
-})
-
-test('vercel.json: forhåndsrendrede sider omskrives før «/(.*)», og kildene er regulære uttrykk uten :param', () => {
-  const sources = [...vercel.rewrites, ...vercel.headers].map(r => r.source)
-  for (const s of sources) { assert.doesNotMatch(s, /(^|\/):[a-z]/i, `${s}: :param tolkes ikke likt av testserveren`); new RegExp(s) }
-  const catchAll = vercel.rewrites.findIndex(r => r.source === '/(.*)')
-  assert.equal(vercel.rewrites[catchAll].destination, `/${SHELL_FILE}`, 'appens skall ligger i shell.html; index.html er forsiden')
-  assert.equal(catchAll, vercel.rewrites.length - 1, '«/(.*)» må stå sist')
-  assert.equal(prerenderFile('/'), 'index.html')
-  for (const p of PUBLIC_PAGES.filter(p => p.prerender && p.path !== '/')) {
-    const i = vercel.rewrites.findIndex(r => r.source === p.path && r.destination === `/${prerenderFile(p.path)}`)
-    assert.ok(i >= 0 && i < catchAll, `${p.path} → /${prerenderFile(p.path)} mangler før «/(.*)»`)
-  }
-  assert.ok(!vercel.rewrites.some(r => r.source === '/'), '«/» serveres som index.html av Vercel og skal ikke omskrives')
-  assert.ok(!('cleanUrls' in vercel), 'cleanUrls ville sendt /veiviser.html videre til /veiviser')
 })
 
 test('vercel.json: gamle /home sendes permanent til forsiden «/», og ingenting annet videresendes', () => {
@@ -212,17 +240,30 @@ test('e-postlenker med økten i adressen: forsiden hydreres ikke som for en ny b
 })
 
 // ── Statistikk (GA4 via GTM) bare med samtykke, bare på offentlige sider (src/lib/analytics.js) ─────────────
-test('statistikk: lastes bare med samtykke, på offentlige sider, uten innlogging og uten økt i adressen', async () => {
+test('statistikk: lastes bare med samtykke, på offentlige sider (også publiserte guider), uten innlogging og uten økt i adressen', async () => {
   const { canLoadAnalytics } = await import('../../src/lib/analytics.js')
-  const ok = { consent: 'granted', pathname: '/', loggedIn: false, authInUrl: false }
+  const { clientMeta } = await import('../../src/seo/content.js')
+  // Samme register som nettleseren får (src/seo/registry.js): markedssidene og bare publiserte guider, som metadata
+  const browserRegistry = [...PUBLIC_PAGES, ...registryFx.filter(p => p.kind === 'guide').map(clientMeta)]
+  const pageFor = (path) => browserRegistry.find(p => p.path === path) || null
+  const ok = { consent: 'granted', page: pageFor('/'), loggedIn: false, authInUrl: false }
   assert.equal(canLoadAnalytics(ok), true)
-  for (const p of PUBLIC_PAGES) assert.equal(canLoadAnalytics({ ...ok, pathname: p.path }), true, p.path)
+  for (const p of browserRegistry) assert.equal(canLoadAnalytics({ ...ok, page: pageFor(p.path) }), true, p.path)
+  assert.ok(browserRegistry.some(p => p.path === '/guider/testguide-fordeling'), 'den publiserte testguiden er med')
   assert.equal(canLoadAnalytics({ ...ok, consent: null }), false, 'ikke valgt')
   assert.equal(canLoadAnalytics({ ...ok, consent: 'denied' }), false, 'avslått')
   assert.equal(canLoadAnalytics({ ...ok, loggedIn: true }), false, 'innlogget (også demoen)')
   assert.equal(canLoadAnalytics({ ...ok, authInUrl: true }), false, 'e-postlenke med økten i adressen')
-  for (const pathname of ['/app', '/estate/x', '/estate/x/fordeling', '/logg-inn', '/nytt-passord', '/join/ABC', '/konto', '/founder', '/finnes-ikke'])
-    assert.equal(canLoadAnalytics({ ...ok, pathname }), false, pathname)
+  for (const pathname of ['/app', '/estate/x', '/estate/x/fordeling', '/logg-inn', '/nytt-passord', '/join/ABC', '/konto', '/founder', '/finnes-ikke', '/guider/testutkast', '/guider/finnes-ikke', '/guider'])
+    assert.equal(canLoadAnalytics({ ...ok, page: pageFor(pathname) }), false, pathname)
+  assert.equal(canLoadAnalytics({ ...ok, page: { path: '/x', kind: 'app' } }), false, 'bare sider og guider')
+})
+
+test('statistikk: komponenten slår opp i registeret (src/seo/registry.js), ikke bare i markedssidene', () => {
+  const src = read('src/components/AnalyticsConsent.jsx')
+  assert.match(src, /import \{ pageFor \} from '\.\.\/seo\/registry'/)
+  assert.doesNotMatch(src, /from '\.\.\/seo\/pages'/)
+  assert.doesNotMatch(read('src/lib/analytics.js'), /from '[^']*seo\/(pages|registry)/, 'regelen får siden fra komponenten (ingen import av registeret)')
 })
 
 test('statistikk: samtykket lagres med versjon, og ukjent eller gammel versjon regnes som ikke valgt', async () => {

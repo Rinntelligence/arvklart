@@ -111,18 +111,12 @@ await check('«Avslå»: ingenting fra Google, heller ikke etter ny lasting', as
 
 await check('Med samtykke: sider som ikke er offentlige, laster aldri GTM', async page => {
   const w = await watch(page)
-  for (const path of ['/logg-inn', '/nytt-passord', '/join/ABC123', '/finnes-ikke']) {
+  for (const path of ['/logg-inn', '/nytt-passord', '/join/ABC123']) {
     await page.goto(BASE + path)
     await page.waitForTimeout(600)
   }
-  // /finnes-ikke ender på forsiden (offentlig): der er GTM tillatt
-  const beforeHome = w.gtm().length
-  assert(await page.evaluate(() => location.pathname) === '/', 'ukjent adresse endte ikke på forsiden')
-  assert(beforeHome <= 1, `GTM lastet ${beforeHome} ganger`)
-  const w2 = await watch(await page.context().newPage())
-  const p2 = page.context().pages()[1]
-  for (const path of ['/logg-inn', '/nytt-passord', '/join/ABC123']) { await p2.goto(BASE + path); await p2.waitForTimeout(600) }
-  assert(w2.gtm().length === 0, `GTM på sider som ikke er offentlige: ${w2.gtm().length}`)
+  assert(w.gtm().length === 0, `GTM på sider som ikke er offentlige: ${w.gtm().length}`)
+  assert(await page.evaluate(() => !window.__arvklartGtm), 'GTM satt opp')
 }, { loggedIn: false, consent: 'granted' })
 
 await check('Med samtykke, innlogget: /app, et bo og forsiden fra appen laster aldri GTM', async page => {
@@ -183,6 +177,40 @@ await check('Trekk tilbake på /personvern: informasjonskapslene slettes, og GTM
   await page.getByRole('button', { name: 'Godta statistikk' }).click()
   await page.waitForFunction(() => window.__gtmStub === true)
 }, { loggedIn: false, consent: 'granted' })
+
+// ── Guidene (content/guider, her testinnholdet): omfattes av samtykket via registeret (src/seo/registry.js) ──────
+const GUIDE = '/guider/testguide-fordeling'
+
+await check('Publisert guide, ny besøkende: spørsmålet vises, og ingenting hentes fra Google før valget', async page => {
+  const w = await watch(page)
+  await page.goto(BASE + GUIDE)
+  await banner(page).waitFor()
+  await page.waitForTimeout(800)
+  assert(w.google.length === 0, `hentet fra Google før valget: ${w.google}`)
+  await accept(page)
+  await page.waitForFunction(() => window.__gtmStub === true)
+  assert(w.gtm().length === 1, 'GTM ble ikke lastet etter «Godta» på guiden')
+  noErrors(w)
+}, { loggedIn: false, consent: null })
+
+await check('Med samtykke: utkast og ukjente guider (404) laster aldri GTM', async page => {
+  const w = await watch(page)
+  for (const path of ['/guider/testutkast', '/guider/finnes-ikke', '/finnes-ikke']) {
+    const res = await page.goto(BASE + path)
+    assert(res.status() === 404, `${path}: ${res.status()}`)
+    await page.waitForTimeout(500)
+  }
+  assert(w.gtm().length === 0, `GTM på 404: ${w.gtm()}`)
+  assert(await page.evaluate(() => !window.__arvklartGtm && !window.dataLayer), 'GTM satt opp på 404-siden')
+}, { loggedIn: false, consent: 'granted' })
+
+await check('Med samtykke, innlogget: guiden laster aldri GTM', async page => {
+  const w = await watch(page)
+  await page.goto(BASE + GUIDE)
+  await page.getByRole('heading', { level: 1, name: 'Testguide for fordeling av innbo' }).waitFor()
+  await page.waitForTimeout(800)
+  assert(w.gtm().length === 0, 'GTM for innlogget på guiden')
+}, { consent: 'granted' })
 
 await check('Engelsk: spørsmålet på engelsk', async page => {
   await page.addInitScript(() => localStorage.setItem('hs_lang', 'en'))

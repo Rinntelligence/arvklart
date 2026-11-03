@@ -3,7 +3,9 @@
 import { renderToString } from 'react-dom/server'
 import { StaticRouter } from 'react-router-dom/server'
 import App from '../App.jsx'
+import { PageDataContext } from './pageData.js'
 
-export function render(path) {
-  return renderToString(<StaticRouter location={path}><App prerendered /></StaticRouter>)
+// data: innholdet siden trenger (guidene), det samme som legges i HTML-en for nettleseren (src/seo/pageData.js)
+export function render(path, data = null) {
+  return renderToString(<PageDataContext.Provider value={data}><StaticRouter location={path}><App prerendered /></StaticRouter></PageDataContext.Provider>)
 }
