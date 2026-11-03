@@ -5,6 +5,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { PUBLIC_PAGES, SITE_URL, headTags, defaultHeadTags, organizationJsonLd } from '../../src/seo/pages.js'
 import { injectHead, injectRoot, unescapeStyles } from '../../src/seo/vitePlugin.js'
+import { runHttpChecks, httpReport, domainChecks, isVercelProtection, REPORT_PATHS } from './httpChecks.mjs'
 
 const read = (p) => readFileSync(new URL(`../../${p}`, import.meta.url), 'utf8')
 const vercel = JSON.parse(read('vercel.json'))
@@ -139,4 +140,41 @@ test('index.html: plassholder for SEO-taggene, ingen fast tittel eller canonical
   assert.doesNotMatch(html, /<title>|rel="canonical"|name="robots"|noindex/)
   assert.match(html, /<html lang="no">/)
   assert.match(html, /<script src="\/seo-early\.js"><\/script>/)
+})
+
+// ── scripts/check-seo.mjs: sjekkene mot ekte utrullinger (fetch simuleres, ingen nettverk) ──────────────────
+const fakeFetch = (routes) => async (url) => {
+  const r = routes(url)
+  return { status: r.status, headers: new Headers(r.headers || {}), text: async () => r.body || '' }
+}
+
+test('check-seo: en beskyttet forhåndsvisning gir én tydelig feil, aldri godkjent', async () => {
+  assert.equal(isVercelProtection(401, null), true)
+  assert.equal(isVercelProtection(302, 'https://vercel.com/sso-api?url=x'), true)
+  assert.equal(isVercelProtection(307, 'https://x.vercel.app/_vercel_sso?nonce=1'), true)
+  assert.equal(isVercelProtection(308, 'https://www.arvklart.no/home'), false)
+  assert.equal(isVercelProtection(200, null), false)
+  const sso = fakeFetch(() => ({ status: 302, headers: { location: 'https://vercel.com/sso-api?url=https%3A%2F%2Fx' } }))
+  const results = await runHttpChecks('https://x.vercel.app', { fetchImpl: sso })
+  assert.equal(results.length, 1)
+  assert.match(results[0], /^FAIL .*Deployment Protection.*VERCEL_AUTOMATION_BYPASS_SECRET/)
+  const rejected = await runHttpChecks('https://x.vercel.app', { fetchImpl: sso, headers: { 'x-vercel-protection-bypass': 'feil' } })
+  assert.match(rejected[0], /^FAIL .*ble avvist/)
+})
+
+test('check-seo: kanonisk domene krever permanent videresending til https://www med samme sti', async () => {
+  const run = (status, location) => domainChecks({ fetchImpl: fakeFetch(() => ({ status, headers: location ? { location } : {} })) })
+  assert.deepEqual((await run(308, 'https://www.arvklart.no/home')).map(r => r.slice(0, 4)), ['OK  ', 'OK  '])
+  assert.deepEqual((await run(301, '/home')).map(r => r.slice(0, 4)), ['FAIL', 'FAIL'], 'relativ location blir på samme vert og protokoll')
+  const temporary = await run(307, 'https://www.arvklart.no/home')
+  assert.ok(temporary.every(r => r.startsWith('FAIL') && /midlertidig/.test(r)))
+  assert.ok((await run(200)).every(r => /ingen videresending/.test(r)))
+  assert.ok((await run(308, 'https://www.arvklart.no/')).every(r => r.startsWith('FAIL')), 'stien må beholdes')
+})
+
+test('check-seo: rapporten viser status og hoder per sti, også private og ukjente', async () => {
+  const rows = await httpReport('https://x', { fetchImpl: fakeFetch(url => ({ status: 200, headers: { 'x-robots-tag': url.endsWith('/home') ? undefined : 'noindex', 'content-type': 'text/html' } })) })
+  assert.equal(rows.length, REPORT_PATHS.length)
+  for (const p of ['/', '/home', '/personvern', '/veiviser', '/veiviser.html', '/finnes-ikke', '/robots.txt']) assert.ok(REPORT_PATHS.includes(p))
+  assert.ok(rows.every(r => r.startsWith('INFO ')))
 })

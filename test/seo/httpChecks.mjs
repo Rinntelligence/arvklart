@@ -11,17 +11,76 @@ const PRIVATE = ['/', '/logg-inn', '/nytt-passord', '/join/ABC123', '/estate/222
   '/estate/22222222-0000-0000-0000-000000000001/fordeling', '/konto', '/founder', '/setup', '/finnes-ikke',
   '/home.html', '/kontakt.html', '/index.html']
 
-const assert = (cond, msg) => { if (!cond) throw new Error(msg) }
+// Stiene som alltid vises i rapporten (status og hoder), så reglene kan leses av ekte svar
+export const REPORT_PATHS = ['/', '/home', '/kontakt', '/personvern', '/veiviser', '/veiviser.html', '/robots.txt', '/sitemap.xml',
+  '/logg-inn', '/nytt-passord', '/join/ABC123', '/estate/x', '/konto', '/finnes-ikke', '/home.html']
 
-export async function runHttpChecks(base, { headers = {}, preview = false } = {}) {
+const assert = (cond, msg) => { if (!cond) throw new Error(msg) }
+const PERMANENT = [301, 308]
+
+// Vercel Deployment Protection (innlogging hos Vercel) svarer 401, eller sender videre til vercel.com / _vercel_sso.
+export function isVercelProtection(status, location) {
+  if (status === 401) return true
+  return status >= 300 && status < 400 && /vercel\.com|_vercel_sso|\/sso-api/i.test(location || '')
+}
+
+// Kanonisk domene: apex og http skal sende permanent (301/308) til https://www.… med samme sti.
+export async function domainChecks({ fetchImpl = fetch, site = SITE_URL, path = '/home' } = {}) {
   const results = []
+  const host = new URL(site).host
+  const apex = host.replace(/^www\./, '')
+  const target = `${site}${path}`
+  for (const from of [`https://${apex}${path}`, `http://${host}${path}`]) {
+    const name = `${from} sendes permanent til ${target}`
+    try {
+      const r = await fetchImpl(from, { redirect: 'manual' })
+      const location = r.headers.get('location') || ''
+      const resolved = location ? new URL(location, from).href : ''
+      assert(r.status >= 300 && r.status < 400, `status ${r.status}, ingen videresending`)
+      assert(resolved === target, `${r.status} til ${resolved || '(ingen location)'}`)
+      assert(PERMANENT.includes(r.status), `${r.status} er midlertidig; bør være 301 eller 308 (Vercel → Domains)`)
+      results.push(`OK   ${name} (${r.status})`)
+    } catch (e) { results.push(`FAIL ${name}: ${e.message.split('\n')[0]}`) }
+  }
+  return results
+}
+
+// Rapport: faktisk status og hoder per sti (det som ble svart, uten tolkning)
+export async function httpReport(base, { headers = {}, fetchImpl = fetch } = {}) {
+  const rows = []
+  for (const path of REPORT_PATHS) {
+    try {
+      const r = await fetchImpl(base + path, { headers, redirect: 'manual' })
+      const h = (k) => r.headers.get(k) ?? '–'
+      rows.push(`INFO ${path.padEnd(16)} ${String(r.status).padEnd(4)} x-robots-tag=${h('x-robots-tag')}  content-type=${h('content-type')}${r.headers.get('location') ? `  location=${r.headers.get('location').split('?')[0]}` : ''}`)
+    } catch (e) { rows.push(`INFO ${path.padEnd(16)} feil: ${e.message}`) }
+  }
+  return rows
+}
+
+export async function runHttpChecks(base, { headers = {}, preview = false, fetchImpl = fetch } = {}) {
+  const results = []
+  const seen = new Map()
   const get = async (path) => {
-    const r = await fetch(base + path, { headers, redirect: 'manual' })
-    return { status: r.status, headers: r.headers, body: await r.text() }
+    if (!seen.has(path)) {
+      seen.set(path, (async () => {
+        const r = await fetchImpl(base + path, { headers, redirect: 'manual' })
+        return { status: r.status, headers: r.headers, body: await r.text() }
+      })())
+    }
+    return seen.get(path)
   }
   const robotsTag = (r) => r.headers.get('x-robots-tag')
   const check = async (name, fn) => {
     try { const note = await fn(); results.push(note ? `SKIP ${name}: ${note}` : `OK   ${name}`) } catch (e) { results.push(`FAIL ${name}: ${e.message.split('\n')[0]}`) }
+  }
+  // Beskyttet utrulling: alt ville gitt misvisende feil. Én tydelig feil i stedet, aldri godkjent.
+  const probe = await get('/robots.txt')
+  if (isVercelProtection(probe.status, probe.headers.get('location'))) {
+    results.push(`FAIL Utrullingen er beskyttet (Vercel Deployment Protection, ${probe.status}${probe.headers.get('location') ? ` til ${probe.headers.get('location').split('?')[0]}` : ''}): `
+      + (headers['x-vercel-protection-bypass'] ? 'hemmeligheten VERCEL_AUTOMATION_BYPASS_SECRET ble avvist' : 'sett VERCEL_AUTOMATION_BYPASS_SECRET (Vercel → Settings → Deployment Protection → Protection Bypass for Automation)')
+      + '. Ingenting er sjekket.')
+    return results
   }
   // Offentlige sider: ingen noindex fra oss. På en forhåndsvisning kommer noindex fra Vercel og kan ikke skilles fra vår.
   const notNoindexed = (path, r) => {
