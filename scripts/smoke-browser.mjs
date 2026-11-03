@@ -162,8 +162,10 @@ await check('Statistikk: ingenting til Google før valget; etter «Godta» sende
   const version = container.match(/"version":"(\d+)"/)?.[1] || '?'
   const hosts = [...new Set((container.match(/arvklart[a-z0-9.-]*/gi) || []))]
   notes.push(`INFO GTM-KQWKCWBC versjon ${version}: GA4-ID-er i containeren: ${ids.join(', ') || 'ingen'}${hosts.length ? `; vertsnavn i reglene: ${hosts.join(', ')}` : ''}`)
-  await page.waitForResponse(r => /googletagmanager\.com\/gtag\/js\?id=G-/.test(r.url()), { timeout: 15000 })
-    .catch(() => { throw new Error(`GTM-containeren (versjon ${version}) lastet ingen GA4-tagg (gtag/js?id=G-…); GA4-ID-er i containeren: ${ids.join(', ') || 'ingen'}${hosts.length ? `; vertsnavn i reglene: ${hosts.join(', ')}` : ''}`) })
+  // Kallene logges fra siden åpnes (watchGoogle), så et kall som skjedde før denne linjen, telles også
+  for (let i = 0; i < 30 && !g.requests.some(u => /googletagmanager\.com\/gtag\/js\?id=G-/.test(u)); i++) await page.waitForTimeout(500)
+  if (!g.requests.some(u => /googletagmanager\.com\/gtag\/js\?id=G-/.test(u)))
+    throw new Error(`GTM-containeren (versjon ${version}) lastet ingen GA4-tagg (gtag/js?id=G-…); GA4-ID-er i containeren: ${ids.join(', ') || 'ingen'}${hosts.length ? `; vertsnavn i reglene: ${hosts.join(', ')}` : ''}`)
   for (let i = 0; i < 30 && !g.hits.some(h => h.en === 'page_view'); i++) await page.waitForTimeout(500)
   const pv = g.hits.find(h => h.en === 'page_view')
   assert(pv, `ingen page_view sendt etter «Godta» (målinger: ${g.hits.map(h => h.en).join(',') || 'ingen'})`)
