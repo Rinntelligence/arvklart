@@ -20,7 +20,8 @@ for (const line of await runHttpChecks(BASE)) results.push(line)
 // #root fjernes (hydreringen skal ikke bytte ut DOM-en), layoutskift, konsollfeil og brudd på innholdsreglene.
 async function observe(page, { lang } = {}) {
   const errors = []
-  page.on('console', m => { if (['error', 'warning'].includes(m.type()) && !/Failed to load resource/.test(m.text())) errors.push(m.text().slice(0, 200)) })
+  // Unntatt: nettverksfeil fra den simulerte Supabase (ingen sanntid på wss://test.supabase.co) og stengte skrifttyper
+  page.on('console', m => { if (['error', 'warning'].includes(m.type()) && !/Failed to load resource|WebSocket connection to 'wss:\/\/test\.supabase\.co/.test(m.text())) errors.push(m.text().slice(0, 200)) })
   page.on('pageerror', e => errors.push(e.message.slice(0, 200)))
   // Skrifttypene stenges, så bytte av skrift ikke gir layoutskift i målingen
   await page.route(/fonts\.(googleapis|gstatic)\.com/, route => route.abort())
@@ -48,7 +49,7 @@ const canonicals = page => page.evaluate(() => [...document.querySelectorAll('li
 await check('Uten JavaScript: forsiden viser overskrift, tekst og lenker', async () => {
   const ctx = await browser.newContext({ javaScriptEnabled: false })
   const page = await ctx.newPage()
-  await page.goto(`${BASE}/home`)
+  await page.goto(`${BASE}/`)
   assert((await page.locator('h1').textContent()) === H1_NO, 'overskriften vises ikke')
   assert(await page.getByText('Én rolig, tydelig vei gjennom en vanskelig prosess.').isVisible(), 'teksten vises ikke')
   assert(await page.getByRole('link', { name: 'Kontakt' }).count() === 1, 'lenken til Kontakt mangler')
@@ -59,7 +60,7 @@ await check('Uten JavaScript: forsiden viser overskrift, tekst og lenker', async
 
 await check('Norsk, ikke innlogget: hydrering uten at noe byttes ut, uten layoutskift og uten feil', async page => {
   const state = await observe(page)
-  await page.goto(`${BASE}/home`)
+  await page.goto(`${BASE}/`)
   await page.getByRole('button', { name: 'Test ut demo nå' }).waitFor()
   await settle(page)
   const s = await state()
@@ -68,7 +69,7 @@ await check('Norsk, ikke innlogget: hydrering uten at noe byttes ut, uten layout
   assert(s.removed === 0, `${s.removed} noder ble fjernet fra #root`)
   assert(s.shift < 0.01, `layoutskift ${s.shift}`)
   noErrors(s)
-  assert(JSON.stringify(await canonicals(page)) === JSON.stringify([`${SITE_URL}/home`]), `canonical: ${await canonicals(page)}`)
+  assert(JSON.stringify(await canonicals(page)) === JSON.stringify([`${SITE_URL}/`]), `canonical: ${await canonicals(page)}`)
   // Siden er interaktiv: menyen på mobil åpnes
   await page.getByRole('button', { name: 'Meny' }).click()
   assert(await page.getByRole('button', { name: 'Meny' }).getAttribute('aria-expanded') === 'true', 'menyen reagerer ikke')
@@ -86,7 +87,7 @@ await check('Norsk, ikke innlogget: kontaktsiden hydreres uten feil', async page
 
 await check('Engelsk, ikke innlogget: den norske teksten er skjult til appen viser engelsk, uten feil', async page => {
   const state = await observe(page, { lang: 'en' })
-  await page.goto(`${BASE}/home`)
+  await page.goto(`${BASE}/`)
   await page.getByRole('heading', { level: 1, name: H1_EN }).waitFor()
   await settle(page)
   const s = await state()
@@ -95,32 +96,103 @@ await check('Engelsk, ikke innlogget: den norske teksten er skjult til appen vis
   assert(await page.getByText(H1_NO).count() === 0, 'norsk tekst står igjen')
   noErrors(s)
   assert(await page.title() === 'Arvklart — Inheritance distribution made simpler', `tittel: ${await page.title()}`)
-  assert(JSON.stringify(await canonicals(page)) === JSON.stringify([`${SITE_URL}/home`]), 'én canonical')
+  assert(JSON.stringify(await canonicals(page)) === JSON.stringify([`${SITE_URL}/`]), 'én canonical')
 }, { loggedIn: false })
 
 for (const lang of ['no', 'en']) {
-  await check(`Innlogget (${lang}): forhåndsrendret tekst skjult, appen som før (meny øverst, «${lang === 'no' ? 'Gå til mine bo' : 'Go to my estates'}»)`, async page => {
+  await check(`Innlogget (${lang}) åpner «/» (bokmerke): forhåndsrendret tekst skjult, rett til appen på /app`, async page => {
     const state = await observe(page, { lang })
-    await page.goto(`${BASE}/home`)
-    await page.getByRole('button', { name: lang === 'no' ? 'Gå til mine bo' : 'Go to my estates' }).first().waitFor()
+    await page.goto(`${BASE}/`)
+    await page.waitForURL(`${BASE}/app`)
+    await page.getByText('Testbo').first().waitFor()
     await settle(page)
     const s = await state()
     assert(s.prerendered && s.visibility === 'hidden', `synlighet før appen: ${s.visibility}`)
-    assert(await page.locator('.lp header').count() === 0, 'menyen for besøkende vises for en innlogget')
-    assert(await page.locator('.lp.logged-in').count() === 1, 'innlogget forside vises ikke')
+    assert(await page.locator('.lp').count() === 0, 'forsiden vises for en innlogget som åpnet «/» direkte')
     noErrors(s)
-    await page.getByRole('button', { name: lang === 'no' ? 'Gå til mine bo' : 'Go to my estates' }).first().click()
-    await page.waitForURL(`${BASE}/`)
-    await page.getByText('Testbo').first().waitFor()
+    assert((await canonicals(page)).length === 0, 'appen har canonical')
   })
 }
 
-await check('Demo: «Test ut demo nå» fra den forhåndsrendrede forsiden åpner demo-boet', async page => {
+await check('Innlogget: «Tilbake til hjemmesiden» viser forsiden, og «Gå til mine bo» går til /app', async page => {
+  const state = await observe(page)
+  await page.goto(`${BASE}/estate/${EST}`)
+  await page.getByText('Testbo').first().waitFor()
+  await page.locator('.tb-logo').click()
+  await page.getByRole('menuitem', { name: /Tilbake til hjemmesiden/ }).click()
+  await page.waitForURL(`${BASE}/`)
+  await page.locator('.lp.logged-in').waitFor()
+  await page.getByRole('button', { name: 'Gå til mine bo' }).first().click()
+  await page.waitForURL(`${BASE}/app`)
+  await page.getByText('Testbo').first().waitFor()
+  await page.locator('.tb-logo').click()
+  await page.getByRole('menuitem', { name: 'Mine bo' }).click()
+  await page.waitForURL(`${BASE}/app`)
+  noErrors(await state())
+})
+
+await check('Gammel adresse /home: permanent til «/» (ikke innlogget: forsiden; innlogget: appen)', async page => {
+  const r = await fetch(`${BASE}/home`, { redirect: 'manual' })
+  assert(r.status === 308 && r.headers.get('location') === '/', `/home: ${r.status} ${r.headers.get('location')}`)
+  await page.goto(`${BASE}/home`)
+  await page.waitForURL(`${BASE}/app`)
+  await page.getByText('Testbo').first().waitFor()
+})
+
+await check('Gammel adresse /home uten innlogging: forsiden på «/»', async page => {
+  await page.goto(`${BASE}/home`)
+  await page.waitForURL(`${BASE}/`)
+  await page.getByRole('button', { name: 'Test ut demo nå' }).waitFor()
+}, { loggedIn: false })
+
+await check('E-postbekreftelse (#access_token på «/»): forsiden hydreres ikke, brukeren havner i appen', async page => {
+  const { session } = await import('./fixtures.mjs')
+  await page.route('https://test.supabase.co/auth/v1/user', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(session.user) }))
+  const state = await observe(page)
+  await page.goto(`${BASE}/#access_token=${session.access_token}&refresh_token=r&expires_in=3600&token_type=bearer&type=signup`)
+  await page.waitForURL(`${BASE}/app`)
+  await page.getByText('Testbo').first().waitFor()
+  const s = await state()
+  assert(s.prerendered && s.visibility === 'hidden', `forsiden ble vist før appen: ${s.visibility}`)
+  assert(!page.url().includes('access_token'), 'økten står igjen i adressen')
+  assert(await page.evaluate(() => Object.keys(localStorage).some(k => /^sb-.+-auth-token$/.test(k))), 'økten ble ikke lagret')
+  noErrors(s)
+}, { loggedIn: false })
+
+await check('Lenke for nytt passord (#type=recovery på /nytt-passord): skjemaet vises som før', async page => {
+  const { session } = await import('./fixtures.mjs')
+  await page.route('https://test.supabase.co/auth/v1/user', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(session.user) }))
+  await page.goto(`${BASE}/nytt-passord#access_token=${session.access_token}&refresh_token=r&expires_in=3600&token_type=bearer&type=recovery`)
+  await page.getByRole('heading', { name: 'Velg nytt passord' }).waitFor()
+  assert(new URL(page.url()).pathname === '/nytt-passord', `sendt videre til ${page.url()}`)
+}, { loggedIn: false })
+
+await check('Invitasjon uten innlogging: til innlogging, og koden huskes til etter innlogging', async page => {
+  await page.goto(`${BASE}/join/ABC123`)
+  await page.waitForURL(`${BASE}/logg-inn`)
+  await page.getByText(/Du er invitert til et bo/).waitFor()
+  assert(await page.evaluate(() => localStorage.getItem('pendingJoinCode')) === 'ABC123', 'invitasjonskoden ble ikke husket')
+}, { loggedIn: false })
+
+await check('Innlogging fra forsiden: etter innlogging til appen på /app', async page => {
+  const { session } = await import('./fixtures.mjs')
+  await page.route('https://test.supabase.co/auth/v1/token**', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(session) }))
+  await page.goto(`${BASE}/`)
+  await page.locator('a.nav-login').first().click()
+  await page.waitForURL(`${BASE}/logg-inn`)
+  await page.locator('input[type=email]').fill('test@test.no')
+  await page.locator('input[type=password]').fill('hemmelig')
+  await page.locator('input[type=password]').press('Enter')
+  await page.waitForURL(`${BASE}/app`)
+  await page.getByText('Testbo').first().waitFor()
+}, { loggedIn: false })
+
+await check('Demo: «Test ut demo nå» fra forsiden «/» åpner demo-boet', async page => {
   const demo = sessionFor('mona.demo@heirsplit.no')
   await page.route('https://test.supabase.co/functions/v1/demo-login', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ access_token: demo.access_token, refresh_token: 'r' }) }))
   await page.route('https://test.supabase.co/auth/v1/user', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(demo.user) }))
   const state = await observe(page)
-  await page.goto(`${BASE}/home`)
+  await page.goto(`${BASE}/`)
   await page.getByRole('button', { name: 'Test ut demo nå' }).click()
   await page.waitForURL(`${BASE}/estate/${EST}`)
   await page.getByText(/Du ser på en/).waitFor()
@@ -128,7 +200,7 @@ await check('Demo: «Test ut demo nå» fra den forhåndsrendrede forsiden åpne
 }, { loggedIn: false })
 
 await check('Innlogging virker som før fra den forhåndsrendrede forsiden', async page => {
-  await page.goto(`${BASE}/home`)
+  await page.goto(`${BASE}/`)
   await page.locator('a.nav-login').first().click()
   await page.waitForURL(`${BASE}/logg-inn`)
   await page.locator('input[type=email]').waitFor()
@@ -142,12 +214,15 @@ await check('Direkte lenke til en app-side med økt virker', async page => {
   assert(await page.title() === 'Arvklart — Arvefordeling gjort enklere', `tittel: ${await page.title()}`)
 })
 
-await check('«/» uten innlogging ender på forsiden med én canonical; ukjente adresser likeså', async page => {
-  for (const path of ['/', '/finnes-ikke']) {
+await check('Uten innlogging: «/» er forsiden; /app, app-sider og ukjente adresser ender der, med én canonical', async page => {
+  await page.goto(`${BASE}/`)
+  await page.locator('h1').waitFor()
+  assert(new URL(page.url()).pathname === '/', `«/» sendte videre til ${page.url()}`)
+  for (const path of ['/app', `/estate/${EST}`, '/finnes-ikke']) {
     await page.goto(BASE + path)
-    await page.waitForURL(`${BASE}/home`)
+    await page.waitForURL(`${BASE}/`)
     await page.locator('h1').waitFor()
-    assert(JSON.stringify(await canonicals(page)) === JSON.stringify([`${SITE_URL}/home`]), `${path}: ${await canonicals(page)}`)
+    assert(JSON.stringify(await canonicals(page)) === JSON.stringify([`${SITE_URL}/`]), `${path}: ${await canonicals(page)}`)
   }
 }, { loggedIn: false })
 

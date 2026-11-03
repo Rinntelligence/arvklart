@@ -50,12 +50,12 @@ await check('Hodene sendes på appen og på veiviseren', async () => {
 
 await check('Innholdsreglene blokkerer skript fra andre steder (kontroll av testen)', async page => {
   const get = await violations(page)
-  await page.goto(`${BASE}/home`)
+  await page.goto(`${BASE}/`)
   await page.evaluate(() => new Promise(r => { const s = document.createElement('script'); s.src = 'https://evil.example/x.js'; s.onerror = r; document.head.appendChild(s) }))
   assert((await get()).some(v => v.includes('evil.example')), 'skriptet ble ikke blokkert')
 }, { loggedIn: false })
 
-for (const [name, path] of [['Forsiden', '/home'], ['Innlogging', '/logg-inn'], ['Personvern', '/personvern']]) {
+for (const [name, path] of [['Forsiden', '/'], ['Innlogging', '/logg-inn'], ['Personvern', '/personvern']]) {
   await check(`${name} uten innlogging: ingenting blokkeres`, async page => {
     const get = await violations(page)
     await page.goto(BASE + path)

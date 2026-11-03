@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Navigate } from 'react-router-dom'
+import { APP_HOME } from '../lib/routes'
 import { amIFounder, getAssuranceLevel, getVerifiedTotpFactor, enrollTotp, verifyTotp } from '../lib/founder'
 
 // Tofaktor-steg foran founder-dashboardet. Dette er kun UX: dataene beskyttes av
@@ -51,7 +52,7 @@ export default function FounderGate({ children }) {
   }
 
   if (step === 'checking') return <div style={{ padding:'80px', textAlign:'center', color:'#75604B', fontFamily:'Karla, sans-serif' }}>Sjekker tilgang…</div>
-  if (step === 'denied') return <Navigate to="/" replace />
+  if (step === 'denied') return <Navigate to={APP_HOME} replace />
   if (step === 'ok') return children
 
   return (

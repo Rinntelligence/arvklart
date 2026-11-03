@@ -6,7 +6,7 @@ import { readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { gzipSync } from 'node:zlib'
 import { BASE, EST, launch, checker, assert } from './fixtures.mjs'
-import { PUBLIC_PAGES } from '../../src/seo/pages.js'
+import { PUBLIC_PAGES, prerenderFile } from '../../src/seo/pages.js'
 import { JS_BUDGET_GZIP } from '../seo/httpChecks.mjs'
 
 // Budsjett for JavaScript som lastes før en offentlig side er interaktiv (felles med scripts/check-seo.mjs).
@@ -24,7 +24,7 @@ const APP_CHUNK = /\/assets\/(EstatesPage|EstatePage|ItemDetailPage|AddItemsPage
 await check('Offentlige sider: bare hovedfilen, innenfor budsjettet og uten diagrambiblioteket', async () => {
   assert(DIST, 'DIST (byggemappen) er ikke satt')
   for (const page of PUBLIC_PAGES.filter(p => p.prerender)) {
-    const html = readFileSync(join(DIST, `${page.path.slice(1)}.html`), 'utf8')
+    const html = readFileSync(join(DIST, prerenderFile(page.path)), 'utf8')
     const files = assetsOf(html)
     const code = files.map(f => readFileSync(join(DIST, f)))
     const gz = code.reduce((n, b) => n + gzipSync(b).length, 0)
@@ -40,7 +40,7 @@ await check('Offentlige sider: bare hovedfilen, innenfor budsjettet og uten diag
 await check('Ikke innlogget: forsiden henter ingen app-sider', async page => {
   const requested = []
   page.on('request', r => requested.push(new URL(r.url()).pathname))
-  await page.goto(`${BASE}/home`)
+  await page.goto(`${BASE}/`)
   await page.getByRole('button', { name: 'Test ut demo nå' }).waitFor()
   await page.waitForTimeout(2500)
   assert(!requested.some(p => APP_CHUNK.test(p)), `app-sider ble hentet: ${requested.filter(p => APP_CHUNK.test(p))}`)

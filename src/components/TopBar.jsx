@@ -5,13 +5,14 @@ import { getLang, L } from '../lib/lang'
 import { changeLanguage } from '../lib/languagePref'
 import { isDemoSession } from '../lib/demo'
 import TextSizeControl from './TextSizeControl'
+import { APP_HOME, HOME, LANDING_STATE } from '../lib/routes'
 
 const tc = c => { if(!c)return'#FBF9F5'; const r=parseInt(c.slice(1,3),16),g=parseInt(c.slice(3,5),16),b=parseInt(c.slice(5,7),16); return(0.299*r+0.587*g+0.114*b)/255>0.55?'#3A2F26':'#FBF9F5' }
 
 export default function TopBar({ profile, session, estate }) {
   const navigate = useNavigate()
   const { pathname } = useLocation()
-  const onLanding = pathname === '/home'
+  const onLanding = pathname === HOME
   const [menuOpen, setMenuOpen] = useState(false)
   const [logoMenuOpen, setLogoMenuOpen] = useState(false)
   const [lang, setLangState] = useState(getLang())
@@ -50,13 +51,13 @@ export default function TopBar({ profile, session, estate }) {
     setMenuOpen(false)
     // Demo sessions end when leaving so the landing page shows as for a new visitor
     if (isDemo) await signOut()
-    navigate('/home')
+    navigate(HOME, { state: LANDING_STATE })
   }
 
   const logout = async () => {
     setMenuOpen(false)
     await signOut()
-    navigate('/home')
+    navigate(HOME)
   }
 
   return (
@@ -98,7 +99,7 @@ export default function TopBar({ profile, session, estate }) {
             border: '1px solid #D9CFC0', borderRadius: '12px', minWidth: '220px',
             boxShadow: '0 8px 32px rgba(0,0,0,0.14)', overflow: 'hidden',
           }}>
-            <button role="menuitem" className="tb-item" onClick={() => { navigate('/'); setLogoMenuOpen(false) }}>{L('Mine bo', 'My estates')}</button>
+            <button role="menuitem" className="tb-item" onClick={() => { navigate(APP_HOME); setLogoMenuOpen(false) }}>{L('Mine bo', 'My estates')}</button>
             <button role="menuitem" className="tb-item" onClick={goHome}>
               {isDemo ? L('Avslutt demo og gå til hjemmesiden', 'End demo and go to the home page') : L('← Tilbake til hjemmesiden', '← Back to the home page')}
             </button>

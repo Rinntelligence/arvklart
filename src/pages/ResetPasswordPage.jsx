@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { L } from '../lib/lang'
 import { isDemoSession } from '../lib/demo'
+import { APP_HOME } from '../lib/routes'
 
 const inputStyle = { width:'100%', padding:'12px 14px', border:'1px solid #9A8B78', borderRadius:'8px', fontSize:'0.9375rem', background:'#FBF9F5', color:'#3A2F26', fontFamily:'Karla, sans-serif', boxSizing:'border-box' }
 const linkStyle = { background:'none', border:'none', color:'#5F6E52', cursor:'pointer', fontSize:'0.8125rem', fontFamily:'Karla, sans-serif', textDecoration:'underline' }
@@ -34,7 +35,7 @@ export default function ResetPasswordPage({ session, onToast, onDone }) {
     if (error) { onToast(errMsg(error.message), 'error'); return }
     onToast(L('Passordet er oppdatert', 'Your password has been updated'))
     if (onDone) onDone()
-    else navigate('/')
+    else navigate(APP_HOME)
   }
 
   return (

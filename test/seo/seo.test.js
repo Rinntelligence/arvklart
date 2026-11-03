@@ -3,7 +3,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
-import { PUBLIC_PAGES, SITE_URL, headTags, defaultHeadTags, organizationJsonLd } from '../../src/seo/pages.js'
+import { PUBLIC_PAGES, SITE_URL, SHELL_FILE, headTags, defaultHeadTags, organizationJsonLd, websiteJsonLd, prerenderFile } from '../../src/seo/pages.js'
 import { injectHead, injectRoot, unescapeStyles } from '../../src/seo/vitePlugin.js'
 import { runHttpChecks, httpReport, domainChecks, isVercelProtection, REPORT_PATHS } from './httpChecks.mjs'
 
@@ -14,7 +14,7 @@ const NOINDEX = vercel.headers.find(h => h.headers.some(x => x.key === 'X-Robots
 const noindexed = (path) => vercel.headers.some(h => matches(h.source, path) && h.headers.some(x => x.key === 'X-Robots-Tag' && /noindex/.test(x.value)))
 
 // Stier som aldri skal kunne indekseres (eksempler fra App.jsx); ukjente adresser og «/» (appen) hører med
-const PRIVATE = ['/', '/logg-inn', '/nytt-passord', '/join/ABC123', '/setup', '/konto', '/founder',
+const PRIVATE = ['/app', '/app/', '/logg-inn', '/nytt-passord', '/join/ABC123', '/setup', '/konto', '/founder', '/shell.html',
   '/estate/22222222-0000-0000-0000-000000000001', '/estate/x/item/y', '/estate/x/fordeling', '/estate/x/guide',
   '/finnes-ikke', '/home/', '/home.html', '/kontakt.html', '/homepage', '/veiviserx', '/index.html']
 
@@ -23,7 +23,7 @@ test('pages.js: unike stier og titler, beskrivelse på begge språk, og canonica
   assert.equal(new Set(PUBLIC_PAGES.map(p => p.path)).size, PUBLIC_PAGES.length)
   assert.equal(new Set(PUBLIC_PAGES.map(p => p.title)).size, PUBLIC_PAGES.length, 'titlene må være unike')
   for (const p of PUBLIC_PAGES) {
-    assert.match(p.path, /^\/[a-z0-9-]+$/, `${p.path}: enkel sti uten skråstrek til slutt`)
+    assert.match(p.path, /^\/([a-z0-9-]+)?$/, `${p.path}: «/» eller enkel sti uten skråstrek til slutt`)
     for (const key of ['title', 'title_en', 'description', 'description_en']) assert.ok(p[key]?.trim(), `${p.path}: ${key} mangler`)
     assert.ok(p.description.length <= 200, `${p.path}: beskrivelsen er for lang`)
   }
@@ -32,7 +32,8 @@ test('pages.js: unike stier og titler, beskrivelse på begge språk, og canonica
 test('pages.js: hver offentlig side finnes som rute for besøkende uten innlogging (App.jsx)', () => {
   const app = read('src/App.jsx')
   const loggedOut = app.slice(app.indexOf('if (!session)'), app.indexOf('const p = { session'))
-  for (const p of PUBLIC_PAGES) assert.ok(loggedOut.includes(`path="${p.path}"`), `${p.path} mangler i App.jsx`)
+  for (const p of PUBLIC_PAGES) assert.ok(loggedOut.includes(p.path === '/' ? 'path={HOME}' : `path="${p.path}"`), `${p.path} mangler i App.jsx`)
+  assert.match(read('src/lib/routes.js'), /export const HOME = '\/'/)
 })
 
 test('head-taggene: én canonical og og:url på siden, ingen i skallet, ingen noindex', () => {
@@ -48,13 +49,15 @@ test('head-taggene: én canonical og og:url på siden, ingen i skallet, ingen no
   assert.doesNotMatch(shell, /canonical|og:url|ld\+json/, 'skallet serveres på alle stier og skal ikke peke på én side')
 })
 
-test('strukturerte data: bare Organization med opplysninger fra nettstedet, ikke WebSite', () => {
+test('strukturerte data: WebSite og Organization bare på forsiden «/», med opplysninger fra nettstedet', () => {
   assert.deepEqual(organizationJsonLd(), { '@context': 'https://schema.org', '@type': 'Organization', name: 'Arvklart', url: SITE_URL, email: 'admin@arvklart.no' })
-  const home = headTags(PUBLIC_PAGES.find(p => p.path === '/home'))
-  assert.equal(home.match(/application\/ld\+json/g).length, 1)
-  const ld = home.match(/<script type="application\/ld\+json">(.*?)<\/script>/)[1]
-  assert.deepEqual(JSON.parse(ld), organizationJsonLd())
-  assert.doesNotMatch(ld, /WebSite|aggregateRating|review|offers|logo/i)
+  assert.deepEqual(websiteJsonLd(), { '@context': 'https://schema.org', '@type': 'WebSite', name: 'Arvklart', url: `${SITE_URL}/` })
+  const home = headTags(PUBLIC_PAGES.find(p => p.path === '/'))
+  const ld = [...home.matchAll(/<script type="application\/ld\+json">(.*?)<\/script>/g)].map(m => JSON.parse(m[1]))
+  assert.deepEqual(ld, [websiteJsonLd(), organizationJsonLd()])
+  assert.doesNotMatch(JSON.stringify(ld), /aggregateRating|review|offers|logo/i)
+  for (const p of PUBLIC_PAGES.filter(p => p.path !== '/')) assert.doesNotMatch(headTags(p), /ld\+json/, `${p.path}: strukturerte data bare på forsiden`)
+  assert.equal(headTags(PUBLIC_PAGES.find(p => p.path === '/')).match(/rel="canonical" href="([^"]+)"/)[1], `${SITE_URL}/`)
 })
 
 test('forhåndsrenderingen setter inn taggene og innholdet, og feiler høyt hvis malen er endret', () => {
@@ -117,13 +120,23 @@ test('vercel.json: forhåndsrendrede sider omskrives før «/(.*)», og kildene 
   const sources = [...vercel.rewrites, ...vercel.headers].map(r => r.source)
   for (const s of sources) { assert.doesNotMatch(s, /(^|\/):[a-z]/i, `${s}: :param tolkes ikke likt av testserveren`); new RegExp(s) }
   const catchAll = vercel.rewrites.findIndex(r => r.source === '/(.*)')
-  assert.equal(vercel.rewrites[catchAll].destination, '/index.html')
+  assert.equal(vercel.rewrites[catchAll].destination, `/${SHELL_FILE}`, 'appens skall ligger i shell.html; index.html er forsiden')
   assert.equal(catchAll, vercel.rewrites.length - 1, '«/(.*)» må stå sist')
-  for (const p of PUBLIC_PAGES.filter(p => p.prerender)) {
-    const i = vercel.rewrites.findIndex(r => r.source === p.path && r.destination === `${p.path}.html`)
-    assert.ok(i >= 0 && i < catchAll, `${p.path} → ${p.path}.html mangler før «/(.*)»`)
+  assert.equal(prerenderFile('/'), 'index.html')
+  for (const p of PUBLIC_PAGES.filter(p => p.prerender && p.path !== '/')) {
+    const i = vercel.rewrites.findIndex(r => r.source === p.path && r.destination === `/${prerenderFile(p.path)}`)
+    assert.ok(i >= 0 && i < catchAll, `${p.path} → /${prerenderFile(p.path)} mangler før «/(.*)»`)
   }
+  assert.ok(!vercel.rewrites.some(r => r.source === '/'), '«/» serveres som index.html av Vercel og skal ikke omskrives')
   assert.ok(!('cleanUrls' in vercel), 'cleanUrls ville sendt /veiviser.html videre til /veiviser')
+})
+
+test('vercel.json: gamle /home sendes permanent til forsiden «/», og ingenting annet videresendes', () => {
+  assert.deepEqual(vercel.redirects, [{ source: '/home', destination: '/', permanent: true }])
+  assert.ok(!vercel.rewrites.some(r => r.source === '/home'), '/home skal ikke lenger omskrives')
+  assert.ok(PUBLIC_PAGES.some(p => p.path === '/') && !PUBLIC_PAGES.some(p => p.path === '/home'))
+  for (const p of ['/estate/x', '/estate/x/item/y', '/join/ABC', '/nytt-passord', '/logg-inn'])
+    assert.ok(!vercel.redirects.some(r => matches(r.source, p)), `${p} skal ikke videresendes (lenker i e-post og bokmerker)`)
 })
 
 test('vercel.json: sikkerhetshodene er uendret og gjelder alle stier', () => {
@@ -168,12 +181,14 @@ test('check-seo: en beskyttet forhåndsvisning gir én tydelig feil, aldri godkj
 
 test('check-seo: kanonisk domene krever permanent videresending til https://www med samme sti', async () => {
   const run = (status, location) => domainChecks({ fetchImpl: fakeFetch(() => ({ status, headers: location ? { location } : {} })) })
-  assert.deepEqual((await run(308, 'https://www.arvklart.no/home')).map(r => r.slice(0, 4)), ['OK  ', 'OK  '])
-  assert.deepEqual((await run(301, '/home')).map(r => r.slice(0, 4)), ['FAIL', 'FAIL'], 'relativ location blir på samme vert og protokoll')
-  const temporary = await run(307, 'https://www.arvklart.no/home')
-  assert.ok(temporary.every(r => r.startsWith('FAIL') && /midlertidig/.test(r)))
+  const byPath = (status) => fakeFetch(url => ({ status, headers: { location: `https://www.arvklart.no${new URL(url).pathname}` } }))
+  const ok = await domainChecks({ fetchImpl: byPath(308) })
+  assert.equal(ok.length, 4, 'apex og http for både «/» og /kontakt')
+  assert.ok(ok.every(r => r.startsWith('OK  ')), ok.join('\n'))
+  assert.ok((await domainChecks({ fetchImpl: byPath(307) })).every(r => r.startsWith('FAIL') && /midlertidig/.test(r)))
+  assert.ok((await run(301, '/kontakt')).every(r => r.startsWith('FAIL')), 'relativ location blir på samme vert og protokoll')
   assert.ok((await run(200)).every(r => /ingen videresending/.test(r)))
-  assert.ok((await run(308, 'https://www.arvklart.no/')).every(r => r.startsWith('FAIL')), 'stien må beholdes')
+  assert.ok((await run(308, 'https://www.arvklart.no/')).some(r => r.startsWith('FAIL')), 'stien må beholdes')
 })
 
 test('check-seo: rapporten viser status og hoder per sti, også private og ukjente', async () => {
@@ -181,4 +196,17 @@ test('check-seo: rapporten viser status og hoder per sti, også private og ukjen
   assert.equal(rows.length, REPORT_PATHS.length)
   for (const p of ['/', '/home', '/personvern', '/veiviser', '/veiviser.html', '/finnes-ikke', '/robots.txt']) assert.ok(REPORT_PATHS.includes(p))
   assert.ok(rows.every(r => r.startsWith('INFO ')))
+})
+
+test('e-postlenker med økten i adressen: forsiden hydreres ikke som for en ny besøkende', async () => {
+  const { hasAuthInUrl } = await import('../../src/seo/clientState.js')
+  const at = (search, hash) => hasAuthInUrl({ search, hash })
+  assert.equal(at('', '#access_token=a&refresh_token=b&type=signup'), true, 'bekreftelse (implicit)')
+  assert.equal(at('?code=abc', ''), true, 'bekreftelse (PKCE)')
+  assert.equal(at('', '#error=access_denied&error_description=expired'), true, 'utløpt lenke')
+  assert.equal(at('', ''), false)
+  assert.equal(at('?utm_source=x', '#slik-fungerer'), false, 'vanlige lenker og ankre')
+  assert.equal(at('?promo_code=x', ''), false, 'bare parameteren code, ikke ord som slutter på code')
+  const early = read('public/seo-early.js')
+  assert.ok(early.includes('(access_token|refresh_token|error_description|code)='), 'seo-early.js må bruke samme mønster som clientState.js')
 })

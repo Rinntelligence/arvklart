@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { startDemoSession } from '../lib/demo'
 import { L, isEn, setLang } from '../lib/lang'
+import { APP_HOME } from '../lib/routes'
 
 // Språkbytte for besøkende som ikke er innlogget (innloggede bytter i TopBar)
 const toggleLang = (e) => {
@@ -19,7 +20,7 @@ export default function LandingPage({ loggedIn = false }) {
 
   // Innloggede (også demoen) går rett til appen; ellers startes en demo-økt i samme fane.
   const handleDemo = async () => {
-    if (loggedIn) { navigate('/'); return }
+    if (loggedIn) { navigate(APP_HOME); return }
     setDemoLoading(true)
     setDemoError('')
     const { error } = await startDemoSession()
@@ -29,7 +30,7 @@ export default function LandingPage({ loggedIn = false }) {
       setDemoError(L('Demoen er ikke tilgjengelig akkurat nå. Prøv igjen om litt.', 'The demo is not available right now. Please try again shortly.'))
       return
     }
-    navigate('/')
+    navigate(APP_HOME)
   }
   const demoLabel = (idle) => demoLoading ? L('Åpner demo…', 'Opening the demo…') : loggedIn ? L('Gå til mine bo', 'Go to my estates') : idle
 

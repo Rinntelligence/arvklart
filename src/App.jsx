@@ -18,6 +18,7 @@ import Toasts from './components/Toast'
 import FeedbackWidget from './components/FeedbackWidget'
 import { L } from './lib/lang'
 import RouteMeta from './seo/RouteMeta'
+import { APP_HOME, HOME, LANDING_STATE } from './lib/routes'
 // Den innloggede appen lastes ved behov; offentlige sider over er i hovedfilen (forhåndsrendres og hydreres)
 import {
   ProfileSetupPage, EstatesPage, EstatePage, ItemDetailPage, AddItemPage, AddItemsPage, SwipePage, EditItemPage, AdminPage,
@@ -131,7 +132,7 @@ export default function App({ prerendered = false }) {
         if (cancelled) return
         setDemoEstateId(membership?.estate_id || null)
         // Rett fra «Test ut demo» på forsiden og inn i demo-boet
-        if (membership?.estate_id && window.location.pathname === '/home') navigate(`/estate/${membership.estate_id}`)
+        if (membership?.estate_id && [HOME, APP_HOME].includes(window.location.pathname)) navigate(`/estate/${membership.estate_id}`)
         return
       }
       // La brukeren velge nytt passord, eller lese personvernerklæringen, før noe annet
@@ -155,14 +156,16 @@ export default function App({ prerendered = false }) {
         <RouteMeta />
         <Toasts success={toast} errors={errors} onDismiss={dismissError} />
         <Routes>
-          <Route path="/home" element={<LandingPage onToast={showToast} />} />
+          <Route path={HOME} element={<LandingPage onToast={showToast} />} />
+          {/* Gammel adresse: vercel.json sender /home permanent til «/»; dette gjelder navigering i appen */}
+          <Route path="/home" element={<Navigate to={HOME} replace />} />
           <Route path="/logg-inn" element={<LoginPage onToast={showToast} />} />
           <Route path={RESET_PATH} element={<ResetPasswordPage session={null} onToast={showToast} />} />
           <Route path="/join/:code" element={<JoinPage onToast={showToast} />} />
           <Route path="/personvern" element={<PrivacyPage />} />
           <Route path="/kontakt" element={<ContactPage />} />
           <Route path="/veiviser" element={<GuidePage standalone onToast={showToast} />} />
-          <Route path="*" element={<Navigate to="/home" />} />
+          <Route path="*" element={<Navigate to={HOME} />} />
         </Routes>
       </>
     )
@@ -170,7 +173,7 @@ export default function App({ prerendered = false }) {
 
   const p = { session, profile, onToast: showToast, isDemo }
   // Demokontoen skal bare se og prøve fordelingen, ikke endre boet eller kontoen
-  const notForDemo = (element) => (isDemo ? <Navigate to="/" replace /> : element)
+  const notForDemo = (element) => (isDemo ? <Navigate to={APP_HOME} replace /> : element)
   const demoHome = demoEstateId ? <Navigate to={`/estate/${demoEstateId}`} replace /> : <EstatesPage {...p} />
 
   return (
@@ -188,14 +191,17 @@ export default function App({ prerendered = false }) {
         <PageErrorBoundary resetKey={pathname}>
         <Suspense fallback={<PageLoading />}>
         <Routes>
-          <Route path="/" element={isDemo ? demoHome : <EstatesPage {...p} />} />
-          <Route path="/home" element={<LandingPage loggedIn onToast={showToast} />} />
+          {/* «/» er forsiden: åpnet direkte (bokmerke, e-postlenke) sendes en innlogget til appen; fra appens
+              «Tilbake til hjemmesiden» (LANDING_STATE) vises forsiden, som /home gjorde før */}
+          <Route path={HOME} element={<LoggedInRoot onToast={showToast} />} />
+          <Route path={APP_HOME} element={isDemo ? demoHome : <EstatesPage {...p} />} />
+          <Route path="/home" element={<Navigate to={HOME} replace state={LANDING_STATE} />} />
           <Route path="/kontakt" element={<ContactPage />} />
           <Route path="/setup" element={notForDemo(<ProfileSetupPage session={session} profile={profile} onSaved={(saved) => {
             const first = !profile?.display_name
             setProfile(saved)
-            if (first) routeAfterLogin(saved, '/')
-            else navigate('/')
+            if (first) routeAfterLogin(saved, APP_HOME)
+            else navigate(APP_HOME)
           }} onToast={showToast} />)} />
           <Route path="/estate/:id" element={<EstatePage {...p} />} />
           <Route path="/estate/:id/item/:itemId" element={<ItemDetailPage {...p} />} />
@@ -219,15 +225,21 @@ export default function App({ prerendered = false }) {
           <Route path="/estate/:id/guide" element={<GuidePage session={session} onToast={showToast} />} />
           <Route path="/veiviser" element={<GuidePage session={session} onToast={showToast} />} />
           <Route path="/personvern" element={<PrivacyPage />} />
-          <Route path={RESET_PATH} element={<ResetPasswordPage session={session} onToast={showToast} onDone={() => routeAfterLogin(profile, '/')} />} />
+          <Route path={RESET_PATH} element={<ResetPasswordPage session={session} onToast={showToast} onDone={() => routeAfterLogin(profile, APP_HOME)} />} />
           <Route path="/konto" element={notForDemo(<AccountPage session={session} onToast={showToast} />)} />
-          <Route path="*" element={<Navigate to="/" />} />
+          <Route path="*" element={<Navigate to={APP_HOME} />} />
         </Routes>
         </Suspense>
         </PageErrorBoundary>
       </div>
     </PlanProvider>
   )
+}
+
+// «/» for innloggede: forsiden når appen ba om den (LANDING_STATE), ellers videre til appen
+function LoggedInRoot({ onToast }) {
+  const { state } = useLocation()
+  return state?.landing ? <LandingPage loggedIn onToast={onToast} /> : <Navigate to={APP_HOME} replace />
 }
 
 function Splash() {

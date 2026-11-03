@@ -12,6 +12,7 @@ import { categoryLabel } from '../lib/categories'
 import { Modal } from '../components/UI'
 import ReasonEditor from '../components/ReasonEditor'
 import StoredImage from '../components/StoredImage'
+import { APP_HOME } from '../lib/routes'
 
 const PALETTE = ['#5F6E52','#8B9A7D','#A97C3F','#7A8B6E','#9C8267','#6E8B87']
 
@@ -182,7 +183,7 @@ export default function EstatePage({ session, profile, onToast, isDemo }) {
     <div style={{ maxWidth:'960px', margin:'0 auto', padding:'24px 16px 64px', fontFamily:'Karla, sans-serif' }}>
       <style>{`@media (max-width: 600px) { .item-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 10px !important; } }`}</style>
       {/* Header */}
-      <button onClick={() => navigate('/')} style={{ background:'none', border:'none', color:'#75604B', cursor:'pointer', fontSize:'0.8125rem', padding:'0 0 8px', fontFamily:'Karla, sans-serif' }}>{L('← Alle bo', '← All estates')}</button>
+      <button onClick={() => navigate(APP_HOME)} style={{ background:'none', border:'none', color:'#75604B', cursor:'pointer', fontSize:'0.8125rem', padding:'0 0 8px', fontFamily:'Karla, sans-serif' }}>{L('← Alle bo', '← All estates')}</button>
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-end', marginBottom:'20px', flexWrap:'wrap', gap:'12px' }}>
         <div>
           <h1 style={{ fontFamily:'Fraunces, serif', fontSize:'1.625rem', fontWeight:'400', color:'#3A2F26', marginBottom:'2px' }}>{estate.name}</h1>

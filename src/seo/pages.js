@@ -5,9 +5,10 @@
 // Ny offentlig side:
 //   1. Legg den inn her (tekstene hentes fra siden selv; norsk er standard).
 //   2. Legg stien inn i unntakene i noindex-regelen i vercel.json (ellers får den X-Robots-Tag: noindex).
-//   3. Med prerender: true, legg inn omskriving «/sti» → «/sti.html» i vercel.json før «/(.*)».
+//   3. Med prerender: true, legg inn omskriving «/sti» → «/sti.html» i vercel.json før «/(.*)» (ikke for «/», som
+//      Vercel serverer som index.html).
 //   4. Med sitemap: true, legg URL-en inn i public/sitemap.xml.
-// Alle andre stier (appen, innlogging, invitasjoner, ukjente adresser og «/») får noindex.
+// Alle andre stier (appen på /app og /estate/…, innlogging, invitasjoner og ukjente adresser) får noindex.
 // Ren data uten nettleser-API-er: brukes både i nettleseren og i byggesteget (src/seo/vitePlugin.js).
 
 export const SITE_URL = 'https://www.arvklart.no'
@@ -24,11 +25,12 @@ export const DEFAULT_META = {
 
 export const PUBLIC_PAGES = [
   {
-    path: '/home',
+    path: '/',
     ...DEFAULT_META,
     prerender: true,
     sitemap: true,
     organization: true,
+    website: true,
   },
   {
     path: '/kontakt',
@@ -62,11 +64,21 @@ export const PUBLIC_PAGES = [
 export const pageFor = (path) => PUBLIC_PAGES.find(p => p.path === path) || null
 export const canonicalUrl = (path) => SITE_URL + path
 export const prerenderedPaths = () => PUBLIC_PAGES.filter(p => p.prerender).map(p => p.path)
+// Filen en forhåndsrendret side skrives til: «/» er index.html (Vercel serverer den på «/»), ellers <sti>.html.
+// Appens skall (for alle andre stier) ligger i SHELL_FILE, som vercel.json omskriver «/(.*)» til.
+export const prerenderFile = (path) => (path === '/' ? 'index.html' : `${path.slice(1)}.html`)
+export const SHELL_FILE = 'shell.html'
 
 const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 
 // Organization: bare opplysninger som står på nettstedet (navn, adresse, e-post på /kontakt).
-// WebSite (nettstedsnavn) legges ikke inn før den offentlige forsiden ligger på «/»: Google leser den bare der.
+// WebSite (nettstedsnavn i søkeresultatene): bare på forsiden på domenets rot, som Google krever.
+export const websiteJsonLd = () => ({
+  '@context': 'https://schema.org',
+  '@type': 'WebSite',
+  name: SITE_NAME,
+  url: `${SITE_URL}/`,
+})
 export const organizationJsonLd = () => ({
   '@context': 'https://schema.org',
   '@type': 'Organization',
@@ -94,11 +106,11 @@ export function headTags(page) {
     `<meta property="og:url" content="${esc(url)}" />`,
     ...sharedTags(page),
   ]
-  if (page.organization) {
-    // JSON-LD er en datablokk, ikke et skript: den kjøres ikke og stoppes ikke av CSP-en (script-src 'self').
-    // «<» kodes så teksten aldri kan avslutte blokken.
-    tags.push(`<script type="application/ld+json">${JSON.stringify(organizationJsonLd()).replace(/</g, '\\u003c')}</script>`)
-  }
+  // JSON-LD er en datablokk, ikke et skript: den kjøres ikke og stoppes ikke av CSP-en (script-src 'self').
+  // «<» kodes så teksten aldri kan avslutte blokken.
+  const ld = (data) => `<script type="application/ld+json">${JSON.stringify(data).replace(/</g, '\\u003c')}</script>`
+  if (page.website) tags.push(ld(websiteJsonLd()))
+  if (page.organization) tags.push(ld(organizationJsonLd()))
   return tags.join('\n    ')
 }
 

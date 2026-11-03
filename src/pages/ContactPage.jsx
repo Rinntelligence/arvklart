@@ -52,8 +52,8 @@ export default function ContactPage() {
 
       <div className="cp">
         <header>
-          <a href="/home"><img src="/ARVKLART Horizontal Negative.svg" alt="Arvklart" /></a>
-          <a className="back" href="/home">{L('Til forsiden', 'To the home page')}</a>
+          <a href="/"><img src="/ARVKLART Horizontal Negative.svg" alt="Arvklart" /></a>
+          <a className="back" href="/">{L('Til forsiden', 'To the home page')}</a>
         </header>
 
         <main>
