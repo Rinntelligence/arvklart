@@ -1,6 +1,8 @@
-import { useEffect } from 'react'
-import { useLocation } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { L } from '../lib/lang'
+import { startDemoSession } from '../lib/demo'
+import { APP_HOME } from '../lib/routes'
 import { usePageData } from '../seo/pageData'
 import { pageFor } from '../seo/registry'
 
@@ -12,7 +14,31 @@ const MONTHS = ['januar', 'februar', 'mars', 'april', 'mai', 'juni', 'juli', 'au
 export const formatDate = (iso) => { const [y, m, d] = iso.split('-').map(Number); return `${d}. ${MONTHS[m - 1]} ${y}` }
 const RELOAD_KEY = 'hs_article_reload'
 
-export default function ArticlePage() {
+// Fast boks nederst i alle guider: hva Arvklart er og ikke er, og demoen (samme innlogging som «Test ut demo» på
+// forsiden). Bare for besøkende som ikke er innlogget; innloggede er allerede i appen. Supabase brukes bare ved klikk.
+function DemoBox() {
+  const navigate = useNavigate()
+  const [state, setState] = useState('idle')
+  const open = async () => {
+    setState('loading')
+    const { error } = await startDemoSession()
+    if (error) { setState('error'); return }
+    navigate(APP_HOME)
+  }
+  return (
+    <aside className="cta" aria-labelledby="prov-arvklart">
+      <h2 id="prov-arvklart">{L('Se hvordan det fungerer i Arvklart', 'See how it works in Arvklart')}</h2>
+      <p>{L('Arvklart hjelper familien med oversikt over innboet, hvem som ønsker hva, og dokumentasjon av fordelingen. Det er ikke juridisk rådgivning eller takst, og det er dere som avgjør.', 'Arvklart helps the family keep track of the belongings, who wants what, and documents the distribution. It is not legal advice or a valuation, and you make the decisions.')}</p>
+      <p>
+        <button type="button" onClick={open} disabled={state === 'loading'}>{state === 'loading' ? L('Åpner demoen …', 'Opening the demo …') : L('Åpne demoen', 'Open the demo')}</button>
+        <span className="hint">{L('Ingen konto nødvendig', 'No account needed')}</span>
+      </p>
+      {state === 'error' && <p role="alert" className="err">{L('Demoen er ikke tilgjengelig akkurat nå. Prøv igjen om litt.', 'The demo is not available right now. Please try again shortly.')}</p>}
+    </aside>
+  )
+}
+
+export default function ArticlePage({ loggedIn = false }) {
   const data = usePageData()
   const { pathname } = useLocation()
   const ready = data?.kind === 'guide' && data.path === pathname
@@ -31,7 +57,7 @@ export default function ArticlePage() {
   return (
     <>
       <style>{`
-        .ga { --snow:#FBF9F5; --sand:#E8DFD0; --sandgray:#D9CFC0; --espresso:#3A2F26; --bark:#2A211A; --walnut:#5C4530; --latte-d:#75604B; --sage-d:#5F6E52;
+        .ga { --snow:#FBF9F5; --sand:#E8DFD0; --sandgray:#D9CFC0; --espresso:#3A2F26; --bark:#2A211A; --walnut:#5C4530; --latte-d:#75604B; --sage-d:#5F6E52; --mist:#DCE3D2;
           font-family: 'Karla', sans-serif; color: var(--espresso); background: var(--snow); min-height: 100vh; display: flex; flex-direction: column; }
         .ga a { color: var(--sage-d); }
         .ga header { background: var(--bark); padding: 20px 56px; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
@@ -50,7 +76,21 @@ export default function ArticlePage() {
         .ga .body p, .ga .body ul, .ga .body ol, .ga .body blockquote { margin-bottom: 18px; }
         .ga .body ul, .ga .body ol { padding-left: 24px; }
         .ga .body li { margin-bottom: 6px; }
-        .ga .body blockquote { border-left: 3px solid var(--sandgray); padding: 4px 0 4px 16px; color: var(--latte-d); }
+        .ga .body h2, .ga .body h3 { scroll-margin-top: 16px; }
+        .ga .body blockquote { background: var(--mist); border-left: 4px solid var(--sage-d); border-radius: 0 8px 8px 0; padding: 14px 18px; }
+        .ga .body blockquote p { margin: 0; }
+        .ga .toc { background: #fff; border: 1px solid var(--sandgray); border-radius: 10px; margin-bottom: 32px; }
+        .ga .toc summary { cursor: pointer; padding: 14px 20px; min-height: 44px; font-weight: 500; color: var(--espresso); }
+        .ga .toc ol { padding: 0 22px 16px 42px; font-size: 0.9375rem; line-height: 1.6; color: var(--walnut); }
+        .ga .toc li { margin-bottom: 4px; }
+        .ga .cta { margin-top: 44px; background: var(--sand); border-radius: 12px; padding: 24px; border-top: none; }
+        .ga .cta h2 { font-family: 'Fraunces', serif; font-weight: 400; font-size: 1.25rem; margin-bottom: 10px; }
+        .ga .cta p { font-size: 1rem; line-height: 1.65; color: var(--walnut); margin-bottom: 14px; }
+        .ga .cta p:last-child { margin-bottom: 0; }
+        .ga .cta button { font: inherit; font-weight: 500; background: var(--espresso); color: var(--snow); border: none; border-radius: 999px; padding: 11px 22px; cursor: pointer; margin-right: 12px; }
+        .ga .cta button:disabled { opacity: 0.7; cursor: wait; }
+        .ga .cta .hint { font-size: 0.875rem; color: var(--latte-d); display: inline-block; white-space: nowrap; }
+        .ga .cta .err { color: #8A4B2A; }
         .ga aside { margin-top: 44px; padding-top: 24px; border-top: 1px solid var(--sandgray); }
         .ga aside h2 { font-family: 'Fraunces', serif; font-weight: 400; font-size: 1.1875rem; margin-bottom: 10px; }
         .ga aside ul { padding-left: 20px; font-size: 0.9375rem; line-height: 1.7; color: var(--walnut); }
@@ -77,8 +117,19 @@ export default function ArticlePage() {
               {data.updated && <> · {L('Oppdatert', 'Updated')} <time dateTime={data.updated}>{formatDate(data.updated)}</time></>}
             </p>
             <p className="lead">{data.description}</p>
+            {/* Innholdsfortegnelsen er lukket til leseren åpner den (også på PC): da flytter ingenting seg etter
+                lasting, og en lang liste skyver ikke teksten ned på mobil. Lenkene står i HTML-en uansett. */}
+            {data.toc?.length >= 3 && (
+              <nav className="toc" aria-label={L('Innhold på siden', 'On this page')}>
+                <details>
+                  <summary>{L(`Innhold på siden (${data.toc.length} deler)`, `On this page (${data.toc.length} sections)`)}</summary>
+                  <ol>{data.toc.map(h => <li key={h.id}><a href={`#${h.id}`}>{h.text}</a></li>)}</ol>
+                </details>
+              </nav>
+            )}
             <div className="body" dangerouslySetInnerHTML={{ __html: data.html }} />
           </article>
+          {!loggedIn && <DemoBox />}
           {data.sources?.length > 0 && (
             <aside aria-labelledby="kilder">
               <h2 id="kilder">{L('Kilder', 'Sources')}</h2>

@@ -6,6 +6,8 @@
 //  - Demoen: «Test ut demo nå» åpner demo-boet, og navigering i boet (gjenstand, sveip, arvinger, løsninger,
 //    fordeling, status) virker, også sidene som lastes ved behov. demo-login nullstiller demo-boet, som ved
 //    hvert demobesøk.
+//  - Guidene (alle /guider/<slug> i sitemap.xml): vises, innholdsfortegnelsen virker, statistikk bare etter samtykke
+//    og med guidens adresse, og «Åpne demoen» virker uten at demo-boet måles.
 //  - Ingen JavaScript-feil, React-feil eller brudd på innholdsreglene (CSP).
 //
 //   node scripts/smoke-browser.mjs https://www.arvklart.no
@@ -223,6 +225,62 @@ await check('Statistikk: demoen fra forsiden med samtykke laster siden på nytt 
   const leaked = g.hits.filter(h => /\/estate\/|\/app/.test(h.dl || '') || (h.dl || '').includes(estate))
   assert(leaked.length === 0, `måling med app-adresse: ${leaked.map(h => h.dl)}`)
 }, { consent: null })
+
+// ── Guidene: hver /guider/<slug> i den utrullede sitemap.xml, så nye guider dekkes uten endring her ──────────────
+async function guidePaths(page) {
+  const res = await page.request.get(`${BASE}/sitemap.xml`, { headers: secret ? { 'x-vercel-protection-bypass': secret } : {} })
+  assert(res.ok(), `sitemap.xml: ${res.status()}`)
+  return [...(await res.text()).matchAll(/<loc>https:\/\/www\.arvklart\.no(\/guider\/[a-z0-9-]+)<\/loc>/g)].map(m => m[1])
+}
+
+await check('Guidene i sitemap: vises, innholdsfortegnelsen virker, ingenting til Google før valget, page_view med riktig adresse etter «Godta»', async page => {
+  const paths = await guidePaths(page)
+  if (!paths.length) { notes.push('ingen guider i sitemap.xml'); return }
+  const g = await watchGoogle(page)
+  for (const path of paths) {
+    await page.context().clearCookies()
+    await page.evaluate(() => localStorage.removeItem('hs_analytics_consent')).catch(() => {})
+    const res = await page.goto(BASE + path)
+    assert(res.status() === 200, `${path}: ${res.status()}`)
+    await page.getByRole('heading', { level: 1 }).waitFor()
+    await notBroken(page)
+    await region(page).waitFor({ timeout: 15000 })
+    await page.waitForTimeout(1500)
+    assert(g.requests.length === 0, `${path}: hentet fra Google før valget: ${g.requests.slice(0, 3)}`)
+    const toc = page.getByRole('navigation', { name: 'Innhold på siden' })
+    if (await toc.count()) {
+      await toc.locator('summary').click()
+      const link = toc.locator('a').last()
+      const hash = await link.getAttribute('href')
+      await link.click()
+      await page.waitForURL(`${BASE}${path}${hash}`)
+    } else notes.push(`INFO ${path}: ingen innholdsfortegnelse (færre enn tre H2)`)
+    assert(await page.getByRole('button', { name: 'Åpne demoen' }).count() === 1, `${path}: demo-knappen mangler`)
+    await region(page).getByRole('button', { name: 'Godta' }).click()
+    for (let i = 0; i < 40 && !g.hits.some(h => h.en === 'page_view'); i++) await page.waitForTimeout(500)
+    const pv = g.hits.filter(h => h.en === 'page_view')
+    assert(pv.length > 0, `${path}: ingen page_view etter «Godta»`)
+    assert(pv.every(h => new URL(h.dl).pathname === path && /^G-/.test(h.tid) && h.gcs === 'G101'), `${path}: page_view ${pv.map(h => `${h.dl} ${h.tid} ${h.gcs}`)}`)
+    notes.push(`INFO ${path}: ${pv.length} page_view til ${pv[0].tid}, gcs=${pv[0].gcs}`)
+    g.requests.length = 0
+    g.hits.length = 0
+  }
+}, { consent: null })
+
+await check('Guidene: «Åpne demoen» med samtykke åpner demo-boet uten GTM; ingen måling fra demo-boet', async page => {
+  const [path] = await guidePaths(page)
+  if (!path) { notes.push('ingen guider i sitemap.xml'); return }
+  const g = await watchGoogle(page)
+  await page.goto(BASE + path)
+  await page.waitForResponse(r => r.url().startsWith('https://www.googletagmanager.com/gtm.js'), { timeout: 15000 })
+  await page.getByRole('button', { name: 'Åpne demoen' }).click()
+  await page.waitForURL(/\/estate\/[0-9a-f-]{36}$/, { timeout: 30000 })
+  await page.getByText(/Du ser på en/).waitFor()
+  await page.waitForTimeout(3000)
+  assert(await page.evaluate(() => !window.__arvklartGtm), 'GTM er lastet i demo-boet')
+  const leaked = g.hits.filter(h => /\/estate\/|\/app/.test(h.dl || ''))
+  assert(leaked.length === 0, `måling med app-adresse: ${leaked.map(h => h.dl)}`)
+}, { consent: 'granted' })
 
 await browser.close()
 console.log([`Røyktest mot ${BASE}${secret ? ' (med bypass-hemmelighet)' : ''}`, ...results].join('\n'))

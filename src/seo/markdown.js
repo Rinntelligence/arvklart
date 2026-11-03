@@ -26,6 +26,8 @@ function inline(text, links) {
   }
   return out + emphasis(esc(text.slice(i)))
 }
+// Overskriften som ren tekst (innholdsfortegnelsen): lenketekst i stedet for lenken, uten * og **
+const plainText = (s) => s.replace(/\[([^\]]+)\]\([^)\s]+\)/g, '$1').replace(/\*\*([^*]+)\*\*/g, '$1').replace(/\*([^*]+)\*/g, '$1')
 const emphasis = (s) => s.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>').replace(/\*([^*]+)\*/g, '<em>$1</em>')
 
 // Returnerer { html, links, headings }
@@ -51,8 +53,9 @@ export function renderMarkdown(source) {
       flush()
       const level = m[1].length
       const text = m[2].trim()
-      const id = headingId(text)
-      headings.push({ level, text, id })
+      const id = headingId(plainText(text))
+      if (headings.some(h => h.id === id)) throw new Error(`To overskrifter gir samme adresse (#${id}): «${text}»`)
+      headings.push({ level, text: plainText(text), id })
       out.push(`<h${level} id="${id}">${inline(text, links)}</h${level}>`)
       continue
     }

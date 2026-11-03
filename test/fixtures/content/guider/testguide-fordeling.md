@@ -27,3 +27,11 @@ Dette er **testinnhold** for å kontrollere at guider blir forhåndsrendret med 
 2. Andre steg
 
 > Et sitat med <ikke-html> som skal kodes.
+
+## Andre del med *kursiv*
+
+Tekst i andre del.
+
+## Tredje del
+
+Tekst i tredje del.

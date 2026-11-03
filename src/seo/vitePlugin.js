@@ -66,8 +66,9 @@ export function injectRoot(html, markup, data = null) {
   return html.replace(ROOT_EMPTY, () => `<div id="root" data-prerendered>${markup}</div>${block}`)
 }
 
-// Det nettleseren trenger av en guide for å vise den likt (ikke kildeteksten eller lenkelistene)
-export const guideData = (g) => ({ kind: 'guide', path: g.path, title: g.title, description: g.description, author: g.author, published: g.published, updated: g.updated, html: g.html, sources: g.sources, related: g.related })
+// Det nettleseren trenger av en guide for å vise den likt (ikke kildeteksten eller lenkelistene). toc: H2-ene
+// (tekst og adresse), innholdsfortegnelsen øverst i guiden
+export const guideData = (g) => ({ kind: 'guide', path: g.path, title: g.title, description: g.description, author: g.author, published: g.published, updated: g.updated, html: g.html, toc: g.headings.filter(h => h.level === 2).map(({ text, id }) => ({ text, id })), sources: g.sources, related: g.related })
 
 export default function seoPlugin({ contentDir = CONTENT_DIR } = {}) {
   let config

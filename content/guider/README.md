@@ -32,6 +32,21 @@ Avsnitt, `##` og `###` overskrifter (H1 er tittelen), punktlister (`-`), nummere
 `**fet**`, `*kursiv*` og lenker `[tekst](/intern-sti)` eller `[tekst](https://…)`. Rå HTML vises som tekst.
 Interne lenker må gå til en publisert side; ellers stopper bygget.
 
+## Malen (`src/pages/ArticlePage.jsx`)
+Alle guider får automatisk:
+- **innholdsfortegnelse** («Innhold på siden») fra `##`-overskriftene når guiden har minst tre. Den er lukket til
+  leseren åpner den. To like `##`/`###`-overskrifter stopper bygget (de ville fått samme `#adresse`);
+- **faktaboks**: et sitat (`>`) vises som en uthevet boks. Bruk den til korte, viktige forbehold, f.eks.
+  `> **Ting som ikke tilhører boet:** …`;
+- **demo-boksen** nederst med det faste forbeholdet (ikke juridisk rådgivning eller takst) og «Åpne demoen»
+  (bare for besøkende som ikke er innlogget).
+
+## Faglig gjennomgang
+Juridiske og andre faglige påstander i en guide listes ordrett i `docs/guider/<slug>-gjennomgang.md`, med
+grunnlag (paragraf) og hva som må sjekkes, som linjer `Tekst: «…»`. `test/seo/content.test.js` feiler hvis et
+sitat ikke lenger står ordrett i guiden. Publiserte guider må også ha tittel på høyst 60 tegn, beskrivelse på
+70–160 tegn, kilder og minst tre `##`-overskrifter (samme test).
+
 ## Forhåndsvisning
 Sett `status: published` på en egen gren og åpne Vercel-forhåndsvisningen (`/guider/<slug>`). Først når grenen
 flettes til `main`, er guiden publisert. Feil i metadata eller lenker stopper bygget med en tydelig melding.

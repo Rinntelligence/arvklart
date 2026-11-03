@@ -204,7 +204,7 @@ export default function App({ prerendered = false }) {
           <Route path={APP_HOME} element={isDemo ? demoHome : <EstatesPage {...p} />} />
           <Route path="/home" element={<Navigate to={HOME} replace state={LANDING_STATE} />} />
           <Route path="/kontakt" element={<ContactPage />} />
-          <Route path="/guider/:slug" element={<ArticlePage />} />
+          <Route path="/guider/:slug" element={<ArticlePage loggedIn />} />
           <Route path="/setup" element={notForDemo(<ProfileSetupPage session={session} profile={profile} onSaved={(saved) => {
             const first = !profile?.display_name
             setProfile(saved)

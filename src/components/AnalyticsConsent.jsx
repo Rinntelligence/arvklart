@@ -39,8 +39,8 @@ export default function AnalyticsConsent({ loggedIn }) {
       <h2 style={{ fontFamily: "'Fraunces', serif", fontWeight: 400, fontSize: '1.125rem', marginBottom: '8px' }}>{L('Tillater du statistikk?', 'Do you allow statistics?')}</h2>
       <p style={{ fontSize: '0.875rem', lineHeight: 1.55, color: '#5C4530', marginBottom: '14px' }}>
         {L(
-          'Med samtykket ditt bruker vi Google Analytics til å se hvordan forsiden og veiviseren brukes. Det lagrer informasjonskapsler og sender opplysninger om besøket til Google. Appen og boene måles aldri.',
-          'With your consent, we use Google Analytics to see how the home page and the guide are used. This stores cookies and sends information about the visit to Google. The app and the estates are never measured.',
+          'Med samtykket ditt bruker vi Google Analytics til å se hvordan de offentlige sidene brukes, som forsiden, guidene og veiviseren. Det lagrer informasjonskapsler og sender opplysninger om besøket til Google. Appen og boene måles aldri.',
+          'With your consent, we use Google Analytics to see how the public pages are used, such as the home page, the articles and the guide. This stores cookies and sends information about the visit to Google. The app and the estates are never measured.',
         )}{' '}
         <a href="/personvern#informasjonskapsler" style={{ color: '#5F6E52' }}>{L('Les mer', 'Read more')}</a>
       </p>

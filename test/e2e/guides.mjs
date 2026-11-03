@@ -36,7 +36,8 @@ await check('Uten JavaScript: H1, tekst, forfatter og datoer, kilder, «Les ogs�
   const res = await page.goto(BASE + PATH)
   assert(res.status() === 200, `status ${res.status()}`)
   assert(await page.locator('h1').count() === 1 && (await page.locator('h1').textContent()) === TITLE, 'H1')
-  for (const text of ['testinnhold', 'Hva testguiden viser', 'Første steg', 'Et sitat med <ikke-html> som skal kodes.', 'Publisert 1. oktober 2026', 'Oppdatert 15. oktober 2026', 'Lov om arv og dødsboskifte (arveloven)'])
+  assert(await page.getByRole('heading', { level: 2, name: 'Hva testguiden viser' }).isVisible(), 'mangler H2')
+  for (const text of ['testinnhold', 'Første steg', 'Et sitat med <ikke-html> som skal kodes.', 'Publisert 1. oktober 2026', 'Oppdatert 15. oktober 2026', 'Lov om arv og dødsboskifte (arveloven)'])
     assert(await page.getByText(text, { exact: false }).first().isVisible(), `mangler «${text}»`)
   assert(await page.locator('nav[aria-label="Brødsmulesti"] a[href="/"]').count() === 1, 'brødsmulestien mangler')
   assert(await page.locator('nav[aria-label="Brødsmulesti"] [aria-current="page"]').textContent() === TITLE, 'siste ledd i brødsmulestien')
@@ -56,6 +57,39 @@ await check('Norsk, ikke innlogget: hydrering uten at noe byttes ut, én canonic
   assert(await page.title() === TITLE, `tittel: ${await page.title()}`)
 }, { loggedIn: false })
 
+await check('Innholdsfortegnelse og demo-boksen står i HTML-en; lenkene i innholdsfortegnelsen virker', async () => {
+  const ctx = await browser.newContext({ javaScriptEnabled: false })
+  const page = await ctx.newPage()
+  await page.goto(BASE + PATH)
+  const toc = page.locator('nav[aria-label="Innhold på siden"] a')
+  assert(JSON.stringify(await toc.allTextContents()) === JSON.stringify(['Hva testguiden viser', 'Andre del med kursiv', 'Tredje del']), `innholdsfortegnelse: ${await toc.allTextContents()}`)
+  assert(JSON.stringify(await toc.evaluateAll(a => a.map(x => x.getAttribute('href')))) === JSON.stringify(['#hva-testguiden-viser', '#andre-del-med-kursiv', '#tredje-del']), 'adressene i innholdsfortegnelsen')
+  assert(await page.getByRole('button', { name: 'Åpne demoen' }).count() === 1, 'demo-knappen mangler i HTML-en')
+  assert(await page.getByText('Det er ikke juridisk rådgivning eller takst', { exact: false }).isVisible(), 'forbeholdet mangler')
+  await ctx.close()
+}, { loggedIn: false })
+
+await check('Innholdsfortegnelsen: et klikk går til overskriften uten å laste siden på nytt', async page => {
+  await page.goto(BASE + PATH)
+  await page.getByRole('heading', { level: 1, name: TITLE }).waitFor()
+  await page.evaluate(() => { window.__same = true })
+  const toc = page.locator('nav[aria-label="Innhold på siden"]')
+  assert(!(await toc.locator('a').first().isVisible()), 'innholdsfortegnelsen skal være lukket til den åpnes')
+  await toc.getByText('Innhold på siden (3 deler)').click()
+  await toc.locator('a[href="#tredje-del"]').click()
+  await page.waitForURL(`${BASE}${PATH}#tredje-del`)
+  assert(await page.evaluate(() => window.__same === true), 'siden ble lastet på nytt')
+  assert(await page.locator('#tredje-del').isVisible() && await page.evaluate(() => Math.abs(document.getElementById('tredje-del').getBoundingClientRect().top) < 80), 'overskriften er ikke i bildet')
+}, { loggedIn: false })
+
+await check('Demoen kan ikke åpnes: melding, ingen tom side', async page => {
+  await page.route('https://test.supabase.co/functions/v1/demo-login', route => route.fulfill({ status: 500, contentType: 'application/json', body: '{}' }))
+  await page.goto(BASE + PATH)
+  await page.getByRole('button', { name: 'Åpne demoen' }).click()
+  await page.getByRole('alert').filter({ hasText: 'Demoen er ikke tilgjengelig' }).waitFor()
+  assert(page.url() === BASE + PATH, `byttet side: ${page.url()}`)
+}, { loggedIn: false })
+
 await check('Ny lasting av guiden virker (oppdatering i nettleseren)', async page => {
   await page.goto(BASE + PATH)
   await page.reload()
@@ -70,7 +104,8 @@ await check('Innlogget: guiden vises i appen (toppmeny), uten feil', async page 
   const s = await state()
   assert(s.visibility === 'hidden', 'den forhåndsrendrede teksten skal være skjult til appen tar over')
   assert(s.errors.length === 0, `feil: ${s.errors.join(' | ')}`)
-  assert(await page.getByText('Hva testguiden viser').isVisible(), 'teksten vises ikke')
+  assert(await page.getByRole('heading', { level: 2, name: 'Hva testguiden viser' }).isVisible(), 'teksten vises ikke')
+  assert(await page.getByRole('button', { name: 'Åpne demoen' }).count() === 0, 'demo-boksen vises for innloggede')
   assert(JSON.stringify(await canonicals(page)) === JSON.stringify([`${SITE_URL}${PATH}`]), 'canonical')
 })
 

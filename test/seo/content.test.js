@@ -2,7 +2,7 @@
 // publiseres aldri, teksten er trygg HTML, og sitemap lages fra registeret med lastmod bare fra faktiske datoer.
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
+import { readFileSync, existsSync } from 'node:fs'
 import { parseGuide, loadGuides, publicRegistry, clientMeta, parseFrontmatter } from '../../src/seo/content.js'
 import { renderMarkdown } from '../../src/seo/markdown.js'
 import { PUBLIC_PAGES, SITE_URL, headTags, sitemapXml, articleJsonLd, breadcrumbJsonLd } from '../../src/seo/pages.js'
@@ -58,6 +58,9 @@ test('Markdown: tekst og «rå» HTML kodes, bare interne og https-lenker, overs
   for (const href of ['javascript:alert(1)', 'http://x.no', '//evil.example', 'data:text/html,x'])
     assert.throws(() => renderMarkdown(`[x](${href})`), /intern|https/, href)
   assert.ok(renderMarkdown('[x](https://lovdata.no/a?b=1&c=2)').html.includes('href="https://lovdata.no/a?b=1&amp;c=2"'))
+  // Innholdsfortegnelsen: overskriftene som ren tekst, og to like overskrifter stopper bygget (samme #adresse)
+  assert.deepEqual(renderMarkdown('## Les [loven](https://lovdata.no/) *nå*').headings, [{ level: 2, text: 'Les loven nå', id: 'les-loven-na' }])
+  assert.throws(() => renderMarkdown('## Steg\n\n## Steg'), /samme adresse/)
 })
 
 test('utkast publiseres aldri: ikke i registeret, ikke i sitemap og ikke i nettleserens metadata', () => {
@@ -84,10 +87,38 @@ test('sitemap: alle publiserte sider på hoveddomenet, lastmod bare med faktisk 
   assert.ok(!xml.includes(`<lastmod>${today}</lastmod>`) || urls.some(([, d]) => d === today), 'lastmod er aldri byggedatoen')
 })
 
-test('produksjonsinnholdet (content/) publiserer ingen guide ennå; malen er et utkast', () => {
-  assert.deepEqual(loadGuides('content'), [])
-  assert.deepEqual(loadGuides('content', { includeDrafts: true }).map(g => [g.slug, g.status]), [['mal-for-guide', 'draft']])
-  assert.deepEqual(publicRegistry('content').map(p => p.path), PUBLIC_PAGES.map(p => p.path))
+test('produksjonsinnholdet (content/): de publiserte guidene er i registeret; malen er et utkast', () => {
+  const published = loadGuides('content').map(g => g.slug)
+  assert.ok(published.includes('fordeling-av-innbo'), 'fordeling-av-innbo er publisert')
+  assert.deepEqual(loadGuides('content', { includeDrafts: true }).filter(g => g.status === 'draft').map(g => g.slug), ['mal-for-guide'])
+  assert.deepEqual(publicRegistry('content').map(p => p.path), [...PUBLIC_PAGES.map(p => p.path), ...published.map(s => `/guider/${s}`)])
+})
+
+// Kvalitetskrav til guidene som faktisk publiseres (ikke testinnholdet): det som vises i søkeresultatet, kilder og
+// innholdsfortegnelse. Bygget stopper allerede ved feil i metadata og lenker; dette fanger det som er lov, men svakt.
+test('publiserte guider: tittel og beskrivelse passer i søkeresultatet, kilder, innholdsfortegnelse', () => {
+  for (const g of loadGuides('content')) {
+    assert.ok(g.title.length <= 60, `${g.slug}: tittelen er ${g.title.length} tegn (høyst 60)`)
+    assert.ok(g.description.length >= 70 && g.description.length <= 160, `${g.slug}: beskrivelsen er ${g.description.length} tegn (70–160)`)
+    assert.ok(g.sources.length > 0, `${g.slug}: mangler kilder`)
+    const toc = guideData(g).toc
+    assert.ok(toc.length >= 3, `${g.slug}: for få H2 til innholdsfortegnelse`)
+    assert.equal(new Set(toc.map(h => h.id)).size, toc.length)
+    assert.ok(toc.every(h => !/[*[\]]/.test(h.text)), 'innholdsfortegnelsen er ren tekst')
+  }
+})
+
+// Gjennomgangslisten for de juridiske formuleringene (docs/guider/<slug>-gjennomgang.md) siterer guiden ordrett
+// («Tekst: «…»»). Endres teksten i guiden, må listen oppdateres, så ingen formulering faller ut av gjennomgangen.
+test('juridisk gjennomgangsliste: hvert sitat står ordrett i guiden', () => {
+  for (const g of loadGuides('content')) {
+    const file = `docs/guider/${g.slug}-gjennomgang.md`
+    if (!existsSync(file)) continue
+    const source = readFileSync(`content/guider/${g.slug}.md`, 'utf8')
+    const quotes = [...readFileSync(file, 'utf8').matchAll(/^Tekst: «(.+)»$/gm)].map(m => m[1])
+    assert.ok(quotes.length > 0, `${file}: ingen sitater`)
+    for (const q of quotes) assert.ok(source.includes(q), `${file}: «${q.slice(0, 80)}…» står ikke (lenger) i guiden`)
+  }
 })
 
 test('interne lenker i en guide må gå til publiserte sider, ellers stopper bygget', () => {
@@ -110,7 +141,7 @@ test('guidens head: canonical, og:type article, datoer, Article og BreadcrumbLis
   assert.doesNotMatch(headTags({ ...g, schema: 'none' }), /ld\+json/)
   assert.ok(!('html' in clientMeta(g)), 'teksten skal ikke i JavaScript-filene')
   const data = guideData(g)
-  assert.deepEqual(Object.keys(data).sort(), ['author', 'description', 'html', 'kind', 'path', 'published', 'related', 'sources', 'title', 'updated'])
+  assert.deepEqual(Object.keys(data).sort(), ['author', 'description', 'html', 'kind', 'path', 'published', 'related', 'sources', 'title', 'toc', 'updated'])
 })
 
 test('README for guidene beskriver alle feltene loaderen godtar', () => {

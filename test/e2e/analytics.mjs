@@ -150,6 +150,22 @@ await check('Med samtykke: demoen fra forsiden laster siden på nytt uten GTM, s
   noErrors(w)
 }, { loggedIn: null, consent: 'granted' })
 
+await check('Med samtykke: demoen fra en guide («Åpne demoen») laster siden på nytt uten GTM', async page => {
+  const demo = sessionFor('mona.demo@heirsplit.no')
+  await page.route('https://test.supabase.co/functions/v1/demo-login', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ access_token: demo.access_token, refresh_token: 'r' }) }))
+  await page.route('https://test.supabase.co/auth/v1/user', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(demo.user) }))
+  const w = await watch(page)
+  await page.goto(`${BASE}/guider/testguide-fordeling`)
+  await page.waitForFunction(() => window.__gtmStub === true)
+  await page.getByRole('button', { name: 'Åpne demoen' }).click()
+  await page.waitForURL(`${BASE}/estate/${EST}`, { timeout: 15000 })
+  await page.getByText(/Du ser på en/).waitFor()
+  await page.waitForTimeout(800)
+  assert(await page.evaluate(() => !window.__arvklartGtm && !window.__gtmStub), 'GTM er fortsatt lastet i demo-boet')
+  assert(w.gtm().length === 1, `gtm.js hentet ${w.gtm().length} ganger (bare på guiden)`)
+  noErrors(w)
+}, { loggedIn: null, consent: 'granted' })
+
 await check('Med samtykke: e-postlenke med økten i adressen laster ikke GTM', async page => {
   await page.route('https://test.supabase.co/auth/v1/user', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(session.user) }))
   const w = await watch(page)
