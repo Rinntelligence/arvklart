@@ -35,6 +35,7 @@ import TopBar from './components/TopBar'
 import Toasts from './components/Toast'
 import FeedbackWidget from './components/FeedbackWidget'
 import { L } from './lib/lang'
+import RouteMeta from './seo/RouteMeta'
 
 // Pages that must never be hijacked by post-login redirects (e.g. legal text opened in a new tab)
 const NO_REDIRECT_PATHS = ['/personvern']
@@ -46,7 +47,9 @@ const pendingJoin = {
   clear: () => { try { localStorage.removeItem('pendingJoinCode') } catch { /* privat modus */ } },
 }
 
-export default function App() {
+// prerendered: siden ble forhåndsrendret ved bygging (src/seo/vitePlugin.js) og hydreres (main.jsx). Da vises
+// siden for besøkende uten innlogging mens økten sjekkes, slik den ble rendret på serveren, i stedet for Splash.
+export default function App({ prerendered = false }) {
   const [session, setSession] = useState(undefined)
   const [profile, setProfile] = useState(null)
   const [demoEstateId, setDemoEstateId] = useState(undefined)
@@ -149,7 +152,7 @@ export default function App() {
     return () => { cancelled = true }
   }, [user?.id])
 
-  if (session === undefined) return <Splash />
+  if (session === undefined && !prerendered) return <Splash />
 
   // Vent til demo-boet er funnet, så bo-listen aldri blinker forbi
   if (isDemo && demoEstateId === undefined) return <Splash />
@@ -157,6 +160,7 @@ export default function App() {
   if (!session) {
     return (
       <>
+        <RouteMeta />
         <Toasts success={toast} errors={errors} onDismiss={dismissError} />
         <Routes>
           <Route path="/home" element={<LandingPage onToast={showToast} />} />
@@ -180,6 +184,7 @@ export default function App() {
   return (
     <PlanProvider session={session}>
       <div style={{ minHeight: '100vh', background: '#FBF9F5' }}>
+        <RouteMeta />
         <TopBar profile={profile} session={session} onToast={showToast} />
         {isDemo && (
           <div style={{ background: '#DCE3D2', borderBottom: '1px solid #B8C8A8', padding: '8px 20px', textAlign: 'center', fontSize: '0.8125rem', color: '#3A5A30', fontFamily: 'Karla, sans-serif' }}>

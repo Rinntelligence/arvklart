@@ -1,0 +1,6 @@
+# Arvklart. Private sider og ukjente adresser stenges med X-Robots-Tag: noindex (vercel.json), ikke her:
+# en Disallow ville hindret søkemotorene i å se noindex. Robots.txt er ikke tilgangskontroll.
+User-agent: *
+Allow: /
+
+Sitemap: https://www.arvklart.no/sitemap.xml

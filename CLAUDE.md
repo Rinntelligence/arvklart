@@ -22,6 +22,14 @@ ArvKlart er en norsk SaaS-tjeneste for arveoppgjør. React 18 + Vite SPA, Supaba
 - **E-post**: malene for Supabase Auth (bekreftelse, nytt passord, magisk lenke, ny e-post) ligger i `supabase/templates/` og er på norsk eller engelsk etter `user_metadata.lang`, som `signUp` setter. De legges inn i dashbordet manuelt, se `supabase/README.md`
 - **Deployment**: Vercel, automatisk fra `main`. Sikkerhetshodene (CSP, `X-Frame-Options`, `Permissions-Policy` m.m.) står i `vercel.json`. Skript og tilkoblinger tillates bare fra egen side, Supabase-prosjektet (også `wss://` for sanntid) og cdnjs (jsPDF i veiviseren). Ingen skript direkte i HTML-en, heller ikke i `public/veiviser.html` (de ligger i `public/arveveiviser/`). Ny ekstern kilde må inn i CSP-en, og `test/e2e/csp.mjs` sjekker at ingenting blokkeres
 
+## Teknisk SEO
+- `src/seo/pages.js` er eneste liste over offentlige, indekserbare sider (`/home`, `/kontakt`, `/personvern`, `/veiviser`) med tittel, beskrivelse, `prerender` og `sitemap`. Canonical-domenet er `https://www.arvklart.no`. Alt annet, også `/` (appen), innlogging, `/join/…` og ukjente adresser, får `X-Robots-Tag: noindex` fra `vercel.json`. Aldri global noindex, og aldri `Disallow` i `robots.txt` for å skjule sider (det er ikke tilgangskontroll, og Google ser da ikke noindex)
+- Forhåndsrendering (`src/seo/vitePlugin.js`, ved `vite build`): sider med `prerender: true` rendres som appens første visning (`<App prerendered />`, uten innlogging, på norsk) til `dist/<side>.html`, og `vercel.json` omskriver `/<side>` dit. `main.jsx` hydrerer bare for norsk uten lagret økt; engelsk og innloggede rendres i nettleseren som før (den norske teksten skjules av `public/seo-early.js` til da). Supabase byttes ut med en tom klient under renderingen, så Supabase brukes bare i effekter og hendelser, aldri under rendering. Søkemotorer og brukere får samme innhold
+- `src/seo/RouteMeta.jsx` setter tittel, beskrivelse og canonical ved navigering: bare offentlige sider har canonical. Strukturerte data: bare `Organization` på `/home` (opplysninger fra nettstedet). `WebSite` legges ikke inn før den offentlige forsiden ligger på `/`. JSON-LD (`type="application/ld+json"`) er en datablokk, ikke et skript, og er unntatt regelen om skript i HTML-en
+- **Ny offentlig side**: legg den inn i `pages.js`, i unntakene i noindex-regelen i `vercel.json`, i `public/sitemap.xml` (uten oppdiktet `lastmod`), og med `prerender: true` også omskrivingen `/<side>` → `/<side>.html` før `/(.*)`. `test/seo/seo.test.js` feiler hvis disse ikke stemmer, og `test/e2e/seo.mjs` sjekker det bygde nettstedet (HTML uten JavaScript, hoder, hydrering på norsk/engelsk, innlogget/ikke, demo)
+- Etterligningen av Vercel i testene (`test/e2e/staticServer.mjs`) er ikke bevis: `scripts/check-seo.mjs <url>` (`.github/workflows/seo-preview.yml`) sjekker forhåndsvisningen og produksjonen. Vercel setter selv noindex på forhåndsvisninger, så fraværet av noindex på offentlige sider bevises bare mot produksjon (`--production`)
+- Planlagt: ekte 404 for ukjente adresser, og den offentlige forsiden på `/` med appen på `/app` (krever egen risikovurdering)
+
 ## Fargepalett — bruk alltid disse
 ```
 #3A2F26  espresso (primær bakgrunn, topbar)
@@ -103,7 +111,8 @@ npm run build      # bygg for produksjon
 npm run preview    # forhåndsvis bygget lokalt
 npm test           # enhetstester (veiviser, fremdrift, formatering)
 npm run test:db    # tilgangsregler og spørringer mot lokal Postgres + PostgREST (krever Docker)
-npm run test:e2e   # akseptansetester i Chromium (CHROMIUM_PATH) med simulert Supabase: «Legg til flere», tilgjengelighet, kundereisen, hvem kan kaste/endre verdi/slette, begrunnelse etter «Vil ha»
+npm run test:e2e   # akseptansetester i Chromium (CHROMIUM_PATH) med simulert Supabase: «Legg til flere», tilgjengelighet, kundereisen, hvem kan kaste/endre verdi/slette, begrunnelse etter «Vil ha», CSP og SEO mot bygget
+node scripts/check-seo.mjs <url> [--production]  # SEO-hoder, omskrivinger og forhåndsrendering mot en ekte utrulling
 ```
 Avhengighetene er låst i `package-lock.json` (bruk `npm ci`). GitHub Actions (`.github/workflows/test.yml`) kjører alle testene, også `test:db`, på hver PR.
 
