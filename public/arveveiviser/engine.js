@@ -167,15 +167,15 @@ function collectBlockers(a, f) {
   const deeper = (id, answer, sources, who, who_en) => answer === 'yes'
     ? { id, hard: true, questionId: id, sources,
         title: 'Arven går videre i flere ledd enn veiviseren kan beregne', title_en: 'The inheritance passes down more generations than the guide can calculate',
-        text: `Når både ${who} og deres barn er døde, går arven videre til neste ledd. Veiviseren regner bare ett ledd ned og kan derfor ikke gi et pålitelig svar på hvem som arver og hvor mye. Kontakt tingretten for veiledning.`,
-        text_en: `When both ${who_en} and their children have died, the inheritance passes on to the next generation. The guide only calculates one generation down and therefore cannot give a reliable answer about who inherits and how much. Contact the district court for guidance.` }
+        text: `Når både ${who} er døde, går arven videre til neste ledd. Veiviseren regner bare ett ledd ned og kan derfor ikke gi et pålitelig svar på hvem som arver og hvor mye. Kontakt tingretten for veiledning.`,
+        text_en: `When both ${who_en} have died, the inheritance passes on to the next generation. The guide only calculates one generation down and therefore cannot give a reliable answer about who inherits and how much. Contact the district court for guidance.` }
     : { id, hard: true, questionId: id, sources,
         title: 'Svar på spørsmålet om flere ledd før vi beregner arven', title_en: 'Answer the question about further generations before we calculate the inheritance',
         text: 'Er et barnebarn, en nevø eller en niese også død og har egne barn, arver de i stedet. Vi beregner ikke arven før dette er avklart, fordi resultatet ellers kan bli feil.',
         text_en: 'If a grandchild, nephew or niece has also died and has children of their own, those children inherit instead. We do not calculate the inheritance until this is clarified, because the result could otherwise be wrong.' }
-  if (f.deeperDescendantsUnresolved) b.push(deeper('deeperDescendants', a.deeperDescendants, ['arveloven_livsarvinger'], 'et barn', 'a child'))
-  if (f.deeperFirstSpouseUnresolved) b.push(deeper('deeperFirstSpouseDescendants', a.deeperFirstSpouseDescendants, ['arveloven_uskifte_arvinger', 'arveloven_livsarvinger'], 'et barn', 'a child'))
-  if (f.deeperSiblingUnresolved) b.push(deeper('deeperSiblingDescendants', a.deeperSiblingDescendants, ['arveloven_andre_arvegang'], 'et søsken', 'a sibling'))
+  if (f.deeperDescendantsUnresolved) b.push(deeper('deeperDescendants', a.deeperDescendants, ['arveloven_livsarvinger'], 'et barn og barnets barn', 'a child and that child\'s child'))
+  if (f.deeperFirstSpouseUnresolved) b.push(deeper('deeperFirstSpouseDescendants', a.deeperFirstSpouseDescendants, ['arveloven_uskifte_arvinger', 'arveloven_livsarvinger'], 'et barn og barnets barn', 'a child and that child\'s child'))
+  if (f.deeperSiblingUnresolved) b.push(deeper('deeperSiblingDescendants', a.deeperSiblingDescendants, ['arveloven_andre_arvegang'], 'et søsken og søskenets barn', 'a sibling and that sibling\'s child'))
   if (f.advancementsUnresolved) {
     const q = f.advancementsUnresolved
     const judgement = a.advancements === 'gift' && a.advancementSubstantial === 'yes'

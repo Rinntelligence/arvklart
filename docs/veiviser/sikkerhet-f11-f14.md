@@ -42,7 +42,7 @@ Bygger på gjennomgangen i PR #63 (`docs/veiviser/gjennomgang-2026-11.md`, F11 o
 - **Gavetidspunktet avgjør** hvilke regler som gjelder: arveloven § 180 sjette ledd, slik [HR-2025-1182-A](https://www.domstol.no/globalassets/upload/hret/avgjorelser/2025/juni/hr-2025-1182--a.pdf) tolker den (lest i fulltekst; avsnitt 20–23, 33 og 41).
 - **Gaver fra 1. januar 2021, § 75:** gaven avkortes «hvis dette var satt som en betingelse for ytelsen». Det er et samtidighetskrav: betingelsen må være satt senest da gaven ble gitt (HR avsnitt 23). Loven sier at betingelsen *bør* være skriftlig. Muntlig kan altså være nok.
 - **Gaver før 2021, arveloven 1972 § 38 første punktum** (sitert i HR avsnitt 21): en «monaleg gåve» (betydelig gave), «utan at dei andre livsarvingane har fått tilsvarande verdiar», avkortes hvis arvelateren «har fastsett det» (når som helst, også etter 2020) eller det blir «godtgjort at avkorting vil vere i samsvar med føresetnadene til arvelataren».
-- **Avkorting påvirker bare fordelingen mellom livsarvingene** (§ 75 fjerde ledd bokstav d). Med én barnelinje kan forskudd ikke endre resultatet. Derfor vises de nye spørsmålene og blokkeringene bare når det finnes mer enn én linje (`facts.advancementsMatter`). Med én linje er alt som før.
+- **Avkorting påvirker bare fordelingen mellom livsarvingene** (§ 75 andre ledd bokstav d, siste alternativ i andre ledd; det gjelder «hvis ikke noe annet er satt som betingelse»). Med én barnelinje kan forskudd da ikke endre resultatet. For gaver før 2021 forutsetter § 38 at det finnes andre livsarvinger («utan at dei andre livsarvingane har fått tilsvarande»). Derfor vises de nye spørsmålene og blokkeringene bare når det finnes mer enn én linje (`facts.advancementsMatter`). Med én linje er alt som før.
 
 **Nye spørsmål:**
 - `advancementTiming`: «Når ble gavene gitt?» med valgene Før 1. januar 2021 / 1. januar 2021 eller senere / Både før og etter / Vet ikke.
@@ -80,6 +80,8 @@ Bygger på gjennomgangen i PR #63 (`docs/veiviser/gjennomgang-2026-11.md`, F11 o
 
 Knappen «Gå til spørsmålet» går til det første uavklarte spørsmålet.
 
+**Paragrafhenvisning:** § 75 er kontrollert mot oppsettet i [lovvedtak 55 (2018–2019)](https://www.stortinget.no/globalassets/pdf/lovvedtak/2018-2019/vedtak-201819-055.pdf). Første ledd har to punktum (betingelsen; «bør være skriftlig»), slik HR-2025-1182-A avsnitt 22 siterer det. Andre ledd har bokstav a–d. En tidligere versjon sa feilaktig «fjerde ledd».
+
 **Tekster:** hjelpeteksten «Hva er forskudd på arv?» og varselet `advancementGifts` («Gavene er ikke trukket fra arven») er skrevet om etter tabellen. Kildelisten har fått `arveloven_1972_avkorting` og `hr_2025_1182`, de samme oppføringene som i PR #63.
 
 ## Tester
@@ -94,7 +96,47 @@ Knappen «Gå til spørsmålet» går til det første uavklarte spørsmålet.
 - **`test/e2e/veiviser.mjs`:** lagrede svar uten de nye feltene (én sjekk for F11, én for F14) gir blokkering uten beløp, «Gå til spørsmålet» åpner riktig spørsmål, og svaret lagres.
 
 ## Begrensninger og videre arbeid
-- **Bred blokkering:** blokkeringen skjuler også det som ikke påvirkes, som ektefellens eller samboerens del ved forskudd (§ 75 d). Godkjent foreløpig. En mer presis visning, der bare fordelingen mellom barna skjules, er et senere valg.
+- **Bred blokkering:** blokkeringen skjuler også det som ikke påvirkes, som ektefellens eller samboerens del ved forskudd (§ 75 andre ledd bokstav d). Godkjent foreløpig. En mer presis visning, der bare fordelingen mellom barna skjules, er et senere valg.
 - **Ingen beregning i flere ledd:** veiviseren beregner fortsatt ikke arv i flere ledd. Den stopper bare. Det er trinn 2 i planen (gjennomgangsdokumentet, avsnitt 7).
 - **Skjønn i § 38** (betydelig gave og avdødes forutsetning) overlates til familien eller advokat.
 - **Konflikter med PR #63:** tekstene om forskudd i `questions.js`, `rules.js` og `sources.js` er også endret i PR #63, og konfliktene løses i den PR-en som merges sist.
+
+## Siste kodegjennomgang og manuell kontroll (4. november 2026)
+
+### Kodegjennomgang
+| Kontroll | Resultat |
+|---|---|
+| Får gamle lagrede svar standardsvaret «Nei»? | **Nei.** Verken `public/` eller `src/` setter de nye nøklene. `facts.js` tolker manglende svar som uavklart (`!== 'no'`, og for F14 `!== 'yes'` eller `!== 'no'` der det kreves avklaring). «Nei» som standard finnes bare i testhjelperen `test/arveveiviser/helpers.js` `base()`, som ikke brukes av veiviseren |
+| Kan F11 fortsatt sende arv til feil arvegruppe? | Ikke når spørsmålet er ubesvart eller «Ja»/«Vet ikke»: den harde blokkeringen stopper `calculateSkifte`, så ingen arvegruppe får noe. Se restrisiko 2 og 3 for tilfeller der brukeren har svart «Nei» |
+| Kan F14 gi fradrag uten at vilkårene er avklart? | **Nei.** Fradrag (`f.advancements`) settes bare i fire tilfeller: før 2021 + betydelig; fra 2021 + sagt da gaven ble gitt; begge + begge vilkår; eller én barnelinje (der fradraget ikke har virkning). `advancementAmounts` brukes bare i `calculate.js` bak `f.advancements` |
+| Utilsiktede endringer i vanlige beregninger? | **Nei.** Alle eksisterende scenarioer gir samme resultat. Bevisste endringer: «Vet ikke» om forskudd blokkerer ved flere linjer; varselet om gaver vises ikke lenger ved én linje; feltet for et barn som er dødt spør om barnebarn som lever; blokkeringsteksten sier «et barn og barnets barn» / «et søsken og søskenets barn» |
+
+### Restrisiko (ikke løst i denne PR-en)
+1. **Bo lagret før PR #64.** `toEstatePayload` skriver arvinger med prosentandeler inn i boet. Et blokkert resultat lagret på nytt beholder arvingene som ligger der (`heirsKept` i `src/lib/wizardEstate.js`). Bo som ble lagret med et feil resultat før denne PR-en, blir altså ikke rettet. **Foreslås som egen, liten PR:** marker arvinger fra veiviseren som uavklart, eller vis et varsel i boet, når veiviseren er blokkert.
+2. **Spørsmålet om flere ledd stilles samlet.** Svarer brukeren «Nei» og senere merker et annet barn som dødt, spørres det ikke på nytt.
+3. **Eldre lagrede antall barnebarn** ble lagt inn under ledeteksten «Hvor mange barn etterlot barnet seg?» og kan inneholde barnebarn som er døde. F11-spørsmålet fanger døde barnebarn med egne barn, men ikke døde barnebarn uten barn som er talt med.
+
+### Manuell kontroll
+Forhåndsvisningen på Vercel er beskyttet og kunne ikke åpnes fra arbeidsmiljøet: Vercel-tilkoblingen finner ikke deployeringen, og proxyen avviser verten. Kontrollen er derfor gjort mot et produksjonsbygg av samme commit med `test/e2e/staticServer.mjs` (Vercel-reglene), på mobil (390 × 844) og PC (1366 × 900). Ingen konsollfeil, ingen sidelengs rulling.
+
+| Scenario | Mobil | PC |
+|---|---|---|
+| Vanlig: to barn som lever, ingen forskudd | Resultat med beløp | Samme |
+| F11, eldre lagret svar (barn dødt, ingen barnebarn som lever) | Blokkert, ingen beløp; «Gå til spørsmålet» → «Ja» gir varsel og fortsatt blokkering | Samme |
+| F11, nytt spørsmål | Vises med forklaring og Ja / Nei / Vet ikke | Samme |
+| F14, eldre lagret «Ja» uten tidspunkt | Blokkert; «Før 2021» → spørsmål om betydelig gave → «Ja» → resultat med fradrag | Samme |
+| F14, før 2021 + betydelig | Resultat med fradrag | Samme |
+| F14, gaver uten beskjed fra 2021 | Resultat uten fradrag, med forklaring | Samme |
+| F14, nytt spørsmål om tidspunkt | Vises med fire valg | Samme |
+
+## Gjenstår før merge
+- [ ] **Målrettet juridisk kontroll** av beslutningstabellen i F14. Ikke en ny bred gjennomgang, bare disse spørsmålene:
+  1. Gir «Ja» + gave før 2021 + betydelig uten tilsvarende til de andre rett resultat etter arveloven 1972 § 38 og HR-2025-1182-A? Er «betydelig» et dekkende ord for «monaleg»?
+  2. Er det riktig at gaver uten beskjed fra 2021 aldri gir fradrag (§ 75 første ledd)?
+  3. Bør «sagt senere» ved gaver fra 2021 gi «ingen fradrag» i stedet for blokkering?
+  4. Er det riktig at forskudd ikke påvirker resultatet ved én barnelinje (§ 75 andre ledd bokstav d)? Her er vilkåret «hvis ikke noe annet er satt som betingelse» ikke spurt om.
+- [ ] **Juridisk bekreftelse av F11:** at §§ 4 og 5 ikke har grense nedover, og at § 6 stopper ved søskenbarn, slik at 3. klasse ikke trenger kontrollen.
+- [ ] **Produkteier godtar:** at usikre tilfeller blokkerer hele beregningen; restrisiko 1 (egen PR); og at flere lagrede bo vil få nye spørsmål.
+- [ ] **En person ser forhåndsvisningen** på mobil og PC (beskyttet; ikke tilgjengelig fra arbeidsmiljøet).
+- [ ] **CI er grønn på siste commit.**
+- [ ] **Rekkefølge med PR #63:** merge #64 først. #63 må da løse konfliktene i `questions.js`, `rules.js` og `sources.js`.

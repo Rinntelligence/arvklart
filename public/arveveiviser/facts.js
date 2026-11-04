@@ -74,7 +74,7 @@ export function deriveFacts(a = {}) {
   //   gitt fra 1.1.2021: § 75, avkorting må være satt som betingelse da gaven ble gitt (muntlig er nok)
   //   gitt før 2021: arveloven 1972 § 38, en betydelig gave uten at de andre fikk tilsvarende, og avdøde har
   //   bestemt det (også senere) eller det er godtgjort at det var avdødes forutsetning.
-  // Avkorting påvirker bare fordelingen mellom livsarvingene (§ 75 fjerde ledd d), så med én linje er alt som før.
+  // Avkorting påvirker bare fordelingen mellom livsarvingene (§ 75 andre ledd bokstav d, når ikke noe annet er satt som betingelse), så med én linje er alt som før.
   // Fradrag beregnes bare når vilkårene er avklart; ellers blokkeres beregningen (advancementsUnresolved).
   const advMatters = f.hasDescendants && lines.length > 1
   const adv = f.hasDescendants ? a.advancements : undefined
