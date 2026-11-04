@@ -5,7 +5,7 @@
   "· veiviser",
   "Om arveprosessen",
   "Arveveiviser: fra dødsfall til fordelt bo, steg for steg",
-  "Finn ut hvem som arver og hvor mye, basert på din situasjon. Under finner du også en oversikt over hele prosessen, ord og ressurser.",
+  "Se arveoppgjøret fase for fase, med begreper og offentlige ressurser. Spørsmålene under gir en veiledende oversikt over hvem som arver.",
   "Skrevet av Arvklart · Sist oppdatert",
   "4. november 2026",
   "·",
@@ -152,11 +152,11 @@
   "Slik gjør du det:",
   "Ta kontakt med Skatteetaten i forbindelse med boets avslutning og be om forhåndsligning.",
   "Skatteetaten",
-  "Sende arvemelding til Skatteetaten.",
+  "Opplyse om arven i egen skattemelding.",
   "Hva er det:",
-  "En melding som gir Skatteetaten oversikt over hva hver arving har mottatt — viktig for korrekt skattlegging senere, for eksempel ved salg av arvet eiendom.",
+  "Det skal ikke sendes arvemelding til Skatteetaten for arv etter dødsfall i 2014 eller senere, fordi arveavgiften er fjernet. Har du arvet verdier på over 100 000 kroner, må du likevel opplyse om det i skattemeldingen din.",
   "Slik gjør du det:",
-  "Fyll ut og send arvemelding elektronisk via Skatteetatens tjenester, senest tre måneder etter at fordelingen er klar.",
+  "Legg inn verdien av arven under «Gave og arv» når du leverer skattemeldingen. Har du arvet bolig, hytte, bil eller lignende, må du sjekke at opplysningene i skattemeldingen er riktige, og selv legge til det som mangler.",
   "Skatteetaten",
   "Ordliste",
   "Klikk på et begrep for forklaringen.",
@@ -271,7 +271,7 @@
   },
   {
    "text": "Skatteetaten",
-   "href": "https://www.skatteetaten.no"
+   "href": "https://www.skatteetaten.no/person/folkeregister/dodsfall/egen-skatt/"
   },
   {
    "text": "Jussformidlingen i BergenGratis juridisk bistand knyttet til arv og skifte.",

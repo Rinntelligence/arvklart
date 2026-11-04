@@ -49,13 +49,14 @@ export const PUBLIC_PAGES = [
   },
   {
     // Hele veiviseren står i HTML-en (src/seo/veiviserHost.js). Tittel og beskrivelse er satt sammen av tekst som
-    // står på siden: H1 («Arveveiviser: fra dødsfall til fordelt bo …»), startkortet («Hvem arver – og hvor mye?»)
-    // og innledningen. Primært søkeord: arveveiviser; sekundært: hvem arver (og hvor mye).
+    // står på siden: H1 («Arveveiviser: fra dødsfall til fordelt bo …») og innledningen. Primært søkeord: arveveiviser.
+    // Metadata vektlegger prosessoversikten, begrepene og de offentlige ressursene; arveberegningen markedsføres ikke
+    // her før den er kvalitetssikret.
     path: '/veiviser',
-    title: 'Arveveiviser: Hvem arver – og hvor mye? — Arvklart',
-    title_en: 'Inheritance guide: Who inherits – and how much? — Arvklart',
-    description: 'Arveveiviser: finn ut hvem som arver og omtrent hvor mye, og se hele prosessen fra dødsfall til fordelt bo, med ordliste og offentlige ressurser.',
-    description_en: 'Inheritance guide: find out who inherits and roughly how much, and see the whole process from death to a distributed estate, with a glossary and public resources.',
+    title: 'Arveveiviser: fra dødsfall til fordelt bo — Arvklart',
+    title_en: 'Inheritance guide: from death to a distributed estate — Arvklart',
+    description: 'Arveveiviser: se hva som skjer i hver fase av arveoppgjøret, fra dødsfall til fordelt bo, hva sentrale begreper betyr og hvor du finner offentlige ressurser.',
+    description_en: 'Inheritance guide: see what happens in each phase of settling an estate, from death to a distributed estate, what key terms mean and where to find public resources.',
     prerender: true,
     sitemap: true,
   },
