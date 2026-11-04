@@ -1,11 +1,15 @@
 {
- "kilde": "main 1fa54de, /veiviser.html?back=home etter at skriptene har kjørt",
+ "kilde": "Fasit etter SEO-forbedringene fra PR #63 uten juridiske endringer (claude/veiviser-seo-trygg): /arveveiviser/ramme.html?back=home etter at skriptene har kjørt. Forskjellene fra fasiten før (main 28f8601) er H1, avsenderlinjen, oversikten over fasene og produkttekstene i fase 3 og 4 og i avslutningsboksen.",
  "texts": [
   "Arvklart",
   "· veiviser",
   "Om arveprosessen",
-  "Fra dødsfall til fordelt bo — steg for steg",
+  "Arveveiviser: fra dødsfall til fordelt bo, steg for steg",
   "Finn ut hvem som arver og hvor mye, basert på din situasjon. Under finner du også en oversikt over hele prosessen, ord og ressurser.",
+  "Skrevet av Arvklart · Sist oppdatert",
+  "4. november 2026",
+  "·",
+  "Kontakt oss",
   "Arveveiviser",
   "Hvem arver – og hvor mye?",
   "Svar på noen enkle spørsmål om familien og økonomien. Du får en oversikt over hvem som arver, omtrent hvor mye hver får, og hva dere bør gjøre nå.",
@@ -15,6 +19,11 @@
   "Start",
   "Prosessen i fem faser",
   "Klikk på en fase for å se hva som skjer automatisk, og hva som krever handling fra deg.",
+  "Rett etter dødsfallet",
+  "Kartlegging av boet",
+  "Verdivurdering og avklaring",
+  "Fordeling",
+  "Avslutning",
   "1",
   "Rett etter dødsfallet",
   "Registrering og de første avklaringene",
@@ -89,7 +98,7 @@
   "Verdivurdering og avklaring",
   "Hva er eiendelene faktisk verdt",
   "Her hjelper Arvklart deg",
-  "Arvklart lar dere registrere verdivurderinger og forskudd på arv på ett sted, slik at fordelingen senere bygger på et ryddig og omforent grunnlag.",
+  "Arvklart lar dere registrere eiendelene med bilde og verdi på ett sted, slik at fordelingen senere bygger på et felles grunnlag.",
   "Krever handling fra deg",
   "Verdsette eiendeler, eventuelt med hjelp fra en takstmann.",
   "Hva er det:",
@@ -110,13 +119,13 @@
   "Fordeling",
   "Eiendelene fordeles mellom arvingene",
   "Her hjelper Arvklart deg",
-  "Arvklart gjør selve fordelingen ryddig, sporbar og rettferdig for alle arvinger — også når dere er uenige.",
+  "Arvklart viser hvem som ønsker hva, og gir dere loddtrekning, runder eller jevn fordeling etter verdi når flere vil ha det samme. Det er dere som avgjør.",
   "Krever handling fra deg",
   "Fordele eiendelene mellom arvingene.",
   "Hva er det:",
   "Selve prosessen der eiendelene formelt tildeles hver arving, basert på verdivurdering og ønsker.",
   "Slik gjør du det:",
-  "Bruk Arvklart til å registrere eiendeler, ønsker og verdier, og la plattformen foreslå en rettferdig fordeling dere kan justere sammen.",
+  "Bruk Arvklart til å registrere eiendeler, ønsker og verdier. Når flere vil ha det samme, kan dere bruke loddtrekning, runder eller jevn fordeling etter verdi som utgangspunkt, og justere sammen.",
   "Ved uenighet: loddtrekning, mekling, eller i siste instans offentlig skifte.",
   "Hva er det:",
   "Tre trinn for å løse uenighet — fra det enkleste, loddtrekning om enkeltgjenstander, til det mest omfattende, offentlig skifte via tingretten.",
@@ -203,11 +212,35 @@
   "Norsk Pensjon",
   "Samlet oversikt over pensjon og forsikringer.",
   "Klar for å fordele eiendelene?",
-  "Når boet er kartlagt og verdsatt, gjør Arvklart selve fordelingen ryddig, sporbar og rettferdig for alle arvinger.",
+  "Når boet er kartlagt og verdsatt, gir Arvklart dere oversikt over hvem som ønsker hva, og et skriftlig grunnlag for fordelingen som alle arvingene kan se.",
   "Tilbake til hjemmesiden",
   "Arvklart er en støttemodul for informasjon — ikke juridisk rådgivning. Ved tvil, kontakt kvalifisert juridisk hjelp."
  ],
  "links": [
+  {
+   "text": "Kontakt oss",
+   "href": "/kontakt"
+  },
+  {
+   "text": "Rett etter dødsfallet",
+   "href": "#fase-1"
+  },
+  {
+   "text": "Kartlegging av boet",
+   "href": "#fase-2"
+  },
+  {
+   "text": "Verdivurdering og avklaring",
+   "href": "#fase-3"
+  },
+  {
+   "text": "Fordeling",
+   "href": "#fase-4"
+  },
+  {
+   "text": "Avslutning",
+   "href": "#fase-5"
+  },
   {
    "text": "Domstol.no",
    "href": "https://www.domstol.no"

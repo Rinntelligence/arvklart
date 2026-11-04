@@ -104,7 +104,7 @@ export function pageSections(en = false) {
         ]}
       ]
     },
-    { title: 'Verdivurdering og avklaring', title_en: 'Valuation and clarification', sub: 'Hva er eiendelene faktisk verdt', sub_en: 'What the belongings are actually worth', icon: ICONS.tag, focus: true, helpNote: 'Arvklart lar dere registrere verdivurderinger og forskudd på arv på ett sted, slik at fordelingen senere bygger på et ryddig og omforent grunnlag.', helpNote_en: 'Arvklart lets you record valuations and advances on inheritance in one place, so that the distribution later rests on an orderly, agreed basis.',
+    { title: 'Verdivurdering og avklaring', title_en: 'Valuation and clarification', sub: 'Hva er eiendelene faktisk verdt', sub_en: 'What the belongings are actually worth', icon: ICONS.tag, focus: true, helpNote: 'Arvklart lar dere registrere eiendelene med bilde og verdi på ett sted, slik at fordelingen senere bygger på et felles grunnlag.', helpNote_en: 'Arvklart lets you record the belongings with photos and values in one place, so that the distribution later rests on a shared basis.',
       groups: [
         { label: 'Krever handling fra deg', label_en: 'Requires action from you', type: 'manual', items: [
           { text: 'Verdsette eiendeler, eventuelt med hjelp fra en takstmann.', text_en: 'Value the belongings, possibly with help from a professional valuer.', what: 'En vurdering av hva eiendelene faktisk er verdt i dag — ikke hva de kostet, og ikke den følelsesmessige verdien.', what_en: 'An assessment of what the belongings are actually worth today — not what they cost, and not their sentimental value.', how: 'For bolig, kunst og andre dyrere gjenstander, bestill en uavhengig takstmann. For vanlig innbo holder ofte en felles, skjønnsmessig vurdering mellom arvingene.', how_en: 'For homes, art and other more valuable items, book an independent valuer. For ordinary contents, a shared, discretionary assessment between the heirs is often enough.' },
@@ -113,10 +113,10 @@ export function pageSections(en = false) {
         ]}
       ]
     },
-    { title: 'Fordeling', title_en: 'Distribution', sub: 'Eiendelene fordeles mellom arvingene', sub_en: 'The belongings are divided between the heirs', icon: ICONS.split, focus: true, helpNote: 'Arvklart gjør selve fordelingen ryddig, sporbar og rettferdig for alle arvinger — også når dere er uenige.', helpNote_en: 'Arvklart makes the distribution itself orderly, traceable and fair for all heirs — also when you disagree.',
+    { title: 'Fordeling', title_en: 'Distribution', sub: 'Eiendelene fordeles mellom arvingene', sub_en: 'The belongings are divided between the heirs', icon: ICONS.split, focus: true, helpNote: 'Arvklart viser hvem som ønsker hva, og gir dere loddtrekning, runder eller jevn fordeling etter verdi når flere vil ha det samme. Det er dere som avgjør.', helpNote_en: 'Arvklart shows who wants what, and gives you drawing lots, rounds or an even split by value when several people want the same thing. You make the decisions.',
       groups: [
         { label: 'Krever handling fra deg', label_en: 'Requires action from you', type: 'manual', items: [
-          { text: 'Fordele eiendelene mellom arvingene.', text_en: 'Divide the belongings between the heirs.', what: 'Selve prosessen der eiendelene formelt tildeles hver arving, basert på verdivurdering og ønsker.', what_en: 'The process in which the belongings are formally allocated to each heir, based on valuation and wishes.', how: 'Bruk Arvklart til å registrere eiendeler, ønsker og verdier, og la plattformen foreslå en rettferdig fordeling dere kan justere sammen.', how_en: 'Use Arvklart to record belongings, wishes and values, and let the platform suggest a fair distribution you can adjust together.' },
+          { text: 'Fordele eiendelene mellom arvingene.', text_en: 'Divide the belongings between the heirs.', what: 'Selve prosessen der eiendelene formelt tildeles hver arving, basert på verdivurdering og ønsker.', what_en: 'The process in which the belongings are formally allocated to each heir, based on valuation and wishes.', how: 'Bruk Arvklart til å registrere eiendeler, ønsker og verdier. Når flere vil ha det samme, kan dere bruke loddtrekning, runder eller jevn fordeling etter verdi som utgangspunkt, og justere sammen.', how_en: 'Use Arvklart to record belongings, wishes and values. When several people want the same thing, you can use drawing lots, rounds or an even split by value as a starting point, and adjust together.' },
           { text: 'Ved uenighet: loddtrekning, mekling, eller i siste instans offentlig skifte.', text_en: 'In case of disagreement: drawing lots, mediation, or as a last resort public administration.', what: 'Tre trinn for å løse uenighet — fra det enkleste, loddtrekning om enkeltgjenstander, til det mest omfattende, offentlig skifte via tingretten.', what_en: 'Three steps to resolve disagreement — from the simplest, drawing lots for individual items, to the most extensive, public administration through the district court.', how: 'Prøv loddtrekning eller intern mekling først. Fører ikke det frem, kan tingretten oppnevne en bobestyrer til å gjennomføre et offentlig skifte.', how_en: 'Try drawing lots or internal mediation first. If that does not work, the district court can appoint an administrator to carry out a public administration.', link: { label: 'Domstol.no', url: 'https://www.domstol.no' } }
         ]}
       ]
@@ -183,7 +183,7 @@ export function pageSections(en = false) {
       const gsSlotHtml = (i === 0) ? '<div class="gs-check" id="gsCheck">' + gsRenderIntro() + '</div>' : '';
       const griefNoteHtml = p.griefNote ? '<div class="grief-note">' + ICONS.feather + '<div><h4>' + T('Ta vare på dere selv', 'Take care of yourselves') + '</h4><p>' + p.griefNote + '</p></div></div>' : '';
       const cls = 'phase' + (p.focus ? ' is-focus' : '');
-      return '<div class="' + cls + '">' + '<h3 class="phase-h"><button type="button" class="phase-head" aria-expanded="false"><div class="phase-num">' + (i + 1) + '</div><div class="phase-title-wrap"><div class="phase-title">' + p.title + '</div><div class="phase-sub">' + p.sub + '</div></div>' + (p.focus ? '<span class="phase-badge">' + T('Her hjelper Arvklart deg', 'Arvklart helps you here') + '</span>' : '') + '<span class="chevron">' + ICONS.chevron + '</span></button></h3><div class="phase-body"><div class="phase-body-inner">' + helpNoteHtml + groupsHtml + gsSlotHtml + griefNoteHtml + '</div></div>' + '</div>';
+      return '<div class="' + cls + '" id="fase-' + (i + 1) + '">' + '<h3 class="phase-h"><button type="button" class="phase-head" aria-expanded="false"><div class="phase-num">' + (i + 1) + '</div><div class="phase-title-wrap"><div class="phase-title">' + p.title + '</div><div class="phase-sub">' + p.sub + '</div></div>' + (p.focus ? '<span class="phase-badge">' + T('Her hjelper Arvklart deg', 'Arvklart helps you here') + '</span>' : '') + '<span class="chevron">' + ICONS.chevron + '</span></button></h3><div class="phase-body"><div class="phase-body-inner">' + helpNoteHtml + groupsHtml + gsSlotHtml + griefNoteHtml + '</div></div>' + '</div>';
     }).join('');
   }
   function glossaryHtml(){
@@ -196,5 +196,21 @@ export function pageSections(en = false) {
     }).join('');
   }
 
-  return { T, GS_QUESTIONS, GS_OPTION_EN, gsRenderIntro, gsVerdict, gsRenderResult, timelineHtml, glossaryHtml, resourcesHtml };
+  // Oversikt over fasene: bare titlene, med lenke til fasen (id fase-N) over trekkspillene
+  function phaseOverviewHtml(){
+    return '<ol class="phase-overview">' + localize(PHASES).map((p, i) => '<li><a href="#fase-' + (i + 1) + '">' + p.title + '</a></li>').join('') + '</ol>';
+  }
+
+  // Avsender og dato for siste innholdsendring (endres når teksten på siden endres, ikke ved retting av skrivefeil).
+  // Ingen påstand om faglig gjennomgang før en navngitt person har gjort den.
+  const UPDATED = '2026-11-04';
+  const MONTHS = ['januar', 'februar', 'mars', 'april', 'mai', 'juni', 'juli', 'august', 'september', 'oktober', 'november', 'desember'];
+  const MONTHS_EN = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+  function bylineHtml(){
+    const [y, m, d] = UPDATED.split('-').map(Number);
+    const date = T(d + '. ' + MONTHS[m - 1] + ' ' + y, d + ' ' + MONTHS_EN[m - 1] + ' ' + y);
+    return T('Skrevet av Arvklart', 'Written by Arvklart') + ' · ' + T('Sist oppdatert', 'Last updated') + ' <time datetime="' + UPDATED + '">' + date + '</time> · <a href="/kontakt" target="_top">' + T('Kontakt oss', 'Contact us') + '</a>';
+  }
+
+  return { T, GS_QUESTIONS, GS_OPTION_EN, gsRenderIntro, gsVerdict, gsRenderResult, timelineHtml, glossaryHtml, resourcesHtml, phaseOverviewHtml, bylineHtml, UPDATED };
 }

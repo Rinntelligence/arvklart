@@ -107,7 +107,7 @@ await check('Engelsk veiviser (?lang=en): språkskriptet kjører før siden vise
   await page.goto(`${BASE}/arveveiviser/ramme.html?lang=en`)
   await page.locator('#timelineWrap > *').first().waitFor()
   assert(await page.evaluate(() => document.documentElement.lang) === 'en', 'språket ble ikke satt')
-  assert((await page.locator('h1').first().textContent()).startsWith('From death'), 'den engelske teksten vises ikke')
+  assert((await page.locator('h1').first().textContent()).startsWith('Inheritance guide'), 'den engelske teksten vises ikke')
   await none(get)
 }, { loggedIn: false })
 

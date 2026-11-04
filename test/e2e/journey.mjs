@@ -166,7 +166,7 @@ await check('Veiviser: norsk som standard, engelsk grensesnitt med ?lang=en og m
   await page.getByText('the Norwegian version is the authoritative one', { exact: false }).first().waitFor()
   await page.getByRole('heading', { name: 'Glossary' }).waitFor()
   assert(await page.evaluate(() => document.documentElement.lang) === 'en', 'html lang er ikke en')
-  await page.getByText('Right after the death').waitFor()
+  await page.locator('.phase-title', { hasText: 'Right after the death' }).waitFor()
   await page.getByText('Check your chances of a funeral grant').waitFor()
   await page.getByRole('button', { name: 'Start', exact: true }).click()
   await page.getByRole('heading', { name: 'Who are you in this inheritance settlement?' }).waitFor()

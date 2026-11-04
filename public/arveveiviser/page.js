@@ -7,7 +7,7 @@ import { pageSections } from './sections.js';
 // Engelsk (?lang=en, sendes av appen bare når den engelske veiviseren er slått på): innholdet har *_en-felter som
 // brukes i stedet for de norske. Norsk er standard og den gjeldende versjonen.
 const EN = new URLSearchParams(window.location.search).get('lang') === 'en';
-const { T, GS_QUESTIONS, GS_OPTION_EN, gsRenderIntro, gsVerdict, gsRenderResult, timelineHtml, glossaryHtml, resourcesHtml } = pageSections(EN);
+const { T, GS_QUESTIONS, GS_OPTION_EN, gsRenderIntro, gsVerdict, gsRenderResult, timelineHtml, glossaryHtml, resourcesHtml, phaseOverviewHtml, bylineHtml } = pageSections(EN);
 // Appen rundt veiviseren: GuidePage i rammen over (iframe), eller i samme vindu på /veiviser (data-veiviser-host)
 const HOST = window.parent !== window ? window.parent : (document.querySelector('[data-veiviser-host]') ? window : null);
 
@@ -38,6 +38,11 @@ function setupGravferdCheck(container){
   wireStart();
 }
 
+// Fyller en beholder hvis den er tom (i rammen); på /veiviser står HTML-en der allerede fra byggesteget
+const fillOnce = (id, html) => { const el = document.getElementById(id); if (el && !el.children.length) el.innerHTML = html(); return el; };
+fillOnce('bylineWrap', bylineHtml);
+const overview = fillOnce('phaseOverviewWrap', phaseOverviewHtml);
+
 const timelineWrap = document.getElementById('timelineWrap');
 if (!timelineWrap.children.length) timelineWrap.innerHTML = timelineHtml();
 timelineWrap.querySelectorAll('.phase').forEach(el => {
@@ -57,6 +62,14 @@ timelineWrap.querySelectorAll('.phase').forEach(el => {
   });
 });
 setupGravferdCheck(document.getElementById('gsCheck'));
+// En lenke i oversikten åpner fasen den peker til (nettleseren ruller dit selv)
+overview?.addEventListener('click', (e) => {
+  const link = e.target.closest('a[href^="#fase-"]');
+  const phase = link && document.getElementById(link.getAttribute('href').slice(1));
+  if (!phase || phase.classList.contains('open')) return;
+  phase.classList.add('open');
+  phase.querySelector('.phase-head').setAttribute('aria-expanded', 'true');
+});
 
 const glossaryWrap = document.getElementById('glossaryWrap');
 if (!glossaryWrap.children.length) glossaryWrap.innerHTML = glossaryHtml();
