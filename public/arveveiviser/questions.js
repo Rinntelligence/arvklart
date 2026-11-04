@@ -429,7 +429,7 @@ export const QUESTIONS = [
     showIf: { q: 'testamentContent', includes: 'limitsPartner' },
     title: 'Fikk {partner} vite om testamentet mens avdøde levde?', title_en: 'Did {partner} learn about the will while the deceased was alive?',
     titleSurvivor: 'Fikk du vite om testamentet mens avdøde levde?', titleSurvivor_en: 'Did you learn about the will while the deceased was alive?',
-    why: 'Et testament kan bare gi ektefelle eller samboer mindre enn loven sier, dersom de fikk vite om testamentet før dødsfallet. En minstearv er uansett beskyttet.', why_en: 'A will can only give a spouse or cohabitant less than the law says if they learned about the will before the death. A minimum inheritance is protected in any case.',
+    why: 'Et testament kan bare gi ektefelle eller samboer mindre enn loven sier, dersom de fikk vite om testamentet før dødsfallet. Ektefellens minstearv er uansett beskyttet.', why_en: 'A will can only give a spouse or cohabitant less than the law says if they learned about the will before the death. A spouse\'s minimum inheritance is protected in any case.',
     options: YES_NO_UNKNOWN,
     learnMore: { sources: ['arveloven_testament_ektefelle', 'arveloven_testament_samboer'] },
   },

@@ -4,7 +4,7 @@ Gjelder draft-PR-en på grenen `claude/veiviser-innhold` (bygger på PR #62, der
 
 **Avgrensning.** Beregningene og spørsmålslogikken er ikke endret.
 - Endringene gjelder innholdet på selve siden: `sections.js`, `ramme.html` og `pages.js`.
-- I veiviseren er definisjonen av minstearv (`glossary.js`) og to resultattekster i `rules.js` rettet (T18, T23), fordi de var upresise eller motsa beregningen. Hvilket varsel som vises, og beløpene, er uendret.
+- I veiviseren er definisjonen av minstearv (`glossary.js`), to resultattekster i `rules.js` (T18, T23) og én hjelpetekst i `questions.js` (T38) rettet, fordi de var upresise eller motsa beregningen. Hvilket varsel som vises, og beløpene, er uendret.
 - Forslag som ville endret beregningen, står i avsnitt 7.
 
 **Kildekontroll.** Lovdata, Domstolene, NAV og Skatteetaten kunne ikke åpnes direkte fra arbeidsmiljøet (Lovdata er sperret i nettverkspolicyen). Påstandene er derfor kontrollert mot utdrag av primærkildene fra søk, og mot kildelisten veiviseren allerede bruker (`public/arveveiviser/sources.js`). Alt som er merket **Krever juridisk godkjenning før merge**, må leses av en jurist mot gjeldende tekst før PR-en flettes.
@@ -30,7 +30,7 @@ Forklaring på statusene i tabellen:
 | Minstearv 4 G / 6 G for ektefelle | Korrekt (testet) | scenarios «Minstearv», 5 | |
 | Gift uten barn: foreldre, søsken, nevøer og nieser | Korrekt (testet) | scenarios 5, 11–12 | 1/2 til ektefellen, minst 6 G; alt hvis ingen i 2. arvegang |
 | Ingen ektefelle: barn, foreldre, besteforeldre, søskenbarn | Korrekt (testet) | `heirs.js`; scenarios 9–12 | Barnebarn og søskenbarn trer inn for døde |
-| Barn av en nevø eller niese som er død | **Ikke støttet** | `heirs.js` secondOrder (bare ett ledd under søsken) | Andre klasse har ingen grense nedover (§ 5). Se U7 og F11 |
+| Barnebarn eller nevø/niese som er død og har egne barn | **Kan villede** | `heirs.js` firstOrder og secondOrder (bare ett ledd), `ui.js` (antall) | Feil fordeling innen stammen; i verste fall faller hele linjen bort. Se F11 |
 | Ingen arvinger | Korrekt (testet) | scenarios «ingen arvinger» | Går til frivillig arbeid for barn og unge (§ 76) |
 | Samboer med felles barn (4 G) | Korrekt (testet) | scenarios 6, 8 | Også «venter barn» |
 | Samboer uten felles barn | Korrekt (testet) | scenarios 7 | Arver ikke uten testament |
@@ -144,9 +144,9 @@ Andre runde gjennomgikk teksten med juridisk korrekthet foran SEO, særlig:
 - 60-dagersfristen;
 - ordlisten.
 
-Beregningene og spørsmålslogikken er ikke endret. To tekster i `rules.js` er rettet: grandparentsInherit og testamentLimitsPartnerKnew. Begge er bare tekst. Hvilket varsel som vises, og beløpet, er som før.
+Beregningene og spørsmålslogikken er ikke endret. To tekster i `rules.js` er rettet: grandparentsInherit og testamentLimitsPartnerKnew. I tillegg er én hjelpetekst i `questions.js` rettet (T38). Alle tre er bare tekst. Hvilket varsel eller spørsmål som vises, og beløpet, er som før.
 
-Fasiten er laget på nytt (240 tekster, 25 lenker, 37 forklaringer; etter runde 1: 232 / 23 / 36). Endringene under er de eneste forskjellene fra runde 1.
+Fasiten er laget på nytt (240 tekster, 25 lenker, 37 forklaringer; etter runde 1: 232 / 23 / 36). Endringene under er de eneste forskjellene fra runde 1. T37 og T38 kom til etter kontrollen mot Skatteetatens norske veiledning; T37 er den eneste endringen i fasiten etter det.
 
 **Kilder.** Lovdata kan ikke nås fra arbeidsmiljøet (domenet er sperret i nettverkspolicyen). Lovteksten er derfor ikke lest i sin helhet. Påstandene er kontrollert mot:
 - Domstolene, Skatteetaten og regjeringen.no;
@@ -177,7 +177,9 @@ Hver rad oppgir kildene. Alle rader merket **Krever juridisk godkjenning før me
 | T33 | Fase 1, gravferdsstønad (K8) | Gravferdsstønad er en behovsprøvd støtte til gravferdsutgifter … | Gravferdsstønad er støtte til gravferdsutgifter. Den er behovsprøvd, unntatt når avdøde var under 18 år … | Teksten motsa sjanse-sjekken, som allerede sier at stønaden ikke er behovsprøvd under 18 år | [NAV: Gravferdsstønad](https://www.nav.no/gravferdsstonad) (kontrollert i runde 1) | Nei (samme som sjanse-sjekken) |
 | T34 | Fase 4, uenighet | … kan tingretten oppnevne en bobestyrer til å gjennomføre et offentlig skifte. | … kan en arving kreve offentlig skifte, og tingretten oppnevner da en bostyrer som gjennomfører skiftet. | Offentlig skifte krever at en arving ber om det. «Bostyrer» er lovens ord og det samme som i ordlisten | [Domstolene: Forskjellige former for skifte](https://www.domstol.no/no/dodsfall-arv-og-skifte/forskjellige-former-for-skifte/) | **Krever juridisk godkjenning før merge** |
 | T35 | Fase 5, forhåndsfastsetting (K6) | Forhåndsfastsetting avklarer boets skattemessige stilling før det avsluttes formelt, slik at arvingene slipper skatteoverraskelser i etterkant. / Ta kontakt med Skatteetaten … og be om forhåndsfastsetting. | Med forhåndsfastsetting blir skatten for dødsboet fastsatt før boet avsluttes, slik at dere ikke må vente på det vanlige skatteoppgjøret. Det kan ikke kreves når gjenlevende sitter i uskifte, eller når én arving har tatt over boet alene. / Lever «Skattemelding for forhåndsfastsetting» for dødsboet når dere vet datoen boet avsluttes, og før det avsluttes. | Sier hva det faktisk er og når det ikke kan brukes. «Skatteoverraskelser» var et løfte som ikke kunne underbygges | [Skatteetaten: Skattemelding for forhåndsfastsetting](https://www.skatteetaten.no/en/person/taxes/tax-return/tax-return-person/tax-return-for-advance-tax-assessment/); [Skatteetaten: Skattemelding og skatteoppgjør for avdøde](https://www.skatteetaten.no/en/person/national-registry/dodsfall/fa-oversikt-over-avdodes-okonomi/) | **Krever juridisk godkjenning før merge** |
-| T36 | Fase 5, nytt punkt (erstatter arvemeldingen, T10) | Sende arvemelding til Skatteetaten … senest tre måneder etter at fordelingen er klar. (fjernet i runde 1) | **Sørge for skattemeldingen for avdøde, og oppgi arven i egen skattemelding.** Det skal ikke sendes arvemelding for dødsfall fra 2014. Skattemeldingen for avdøde for dødsåret må likevel leveres, og har du arvet 100 000 kroner eller mer, skal du opplyse om det i din egen skattemelding under «Gave og arv». / Ta vare på opplysninger om hva avdøde betalte for bolig, hytte, aksjer og fond. Det kan ha betydning for skatten hvis dere selger noe dere har arvet. | Arvemeldingen er avviklet, men pliktene som gjelder i dag, manglet etter at punktet ble fjernet: skattemeldingen for dødsåret og opplysningsplikten for arv. Det gamle punktet sa med rette at arven kan ha betydning når arvet eiendom selges; det er beholdt uten detaljer om inngangsverdi, som har unntak | [Skatteetaten: Arveavgiften er opphevet](https://www.skatteetaten.no/en/person/taxes/get-the-taxes-right/gift-and-inheritance/inheritance-tax-is-abolished/); [Skatteetaten: Slik påvirkes din skatt som etterlatt](https://www.skatteetaten.no/en/person/national-registry/dodsfall/egen-skatt/); [Skatteetaten: Skattemelding og skatteoppgjør for avdøde](https://www.skatteetaten.no/en/person/national-registry/dodsfall/fa-oversikt-over-avdodes-okonomi/); [Skatte-ABC A-17: Arv og gave – inngangsverdi og kontinuitet](https://www.skatteetaten.no/en/rettskilder/type/handboker/skatte-abc/gjeldende/a-17-arv-og-gave--inngangsverdi-og-kontinuitet/A-17.041/A-17.043/) | **Krever juridisk godkjenning før merge.** Kontroller beløpsgrensen 100 000 kr (Skatteetaten skriver «penger»/«verdier»), og om fristen og ansvaret for skattemeldingen for avdøde bør sies mer presist |
+| T36 | Fase 5, nytt punkt (erstatter arvemeldingen, T10) | Sende arvemelding til Skatteetaten … senest tre måneder etter at fordelingen er klar. (fjernet i runde 1) | **Sørge for skattemeldingen for avdøde, og oppgi arven i egen skattemelding.** Det skal ikke sendes arvemelding for dødsfall fra 2014. Skattemeldingen for avdøde for dødsåret må likevel leveres, og har du arvet 100 000 kroner eller mer, skal du opplyse om det i din egen skattemelding under «Gave og arv». / Ta vare på opplysninger om hva avdøde betalte for bolig, hytte, aksjer og fond. Det kan ha betydning for skatten hvis dere selger noe dere har arvet. | Arvemeldingen er avviklet, men pliktene som gjelder i dag, manglet etter at punktet ble fjernet: skattemeldingen for dødsåret og opplysningsplikten for arv. Det gamle punktet sa med rette at arven kan ha betydning når arvet eiendom selges; det er beholdt uten detaljer om inngangsverdi, som har unntak | [Skatteetaten: Arveavgiften er opphevet](https://www.skatteetaten.no/en/person/taxes/get-the-taxes-right/gift-and-inheritance/inheritance-tax-is-abolished/); [Skatteetaten: Slik påvirkes din skatt som etterlatt](https://www.skatteetaten.no/en/person/national-registry/dodsfall/egen-skatt/); [Skatteetaten: Skattemelding og skatteoppgjør for avdøde](https://www.skatteetaten.no/en/person/national-registry/dodsfall/fa-oversikt-over-avdodes-okonomi/); [Skatte-ABC A-17: Arv og gave – inngangsverdi og kontinuitet](https://www.skatteetaten.no/en/rettskilder/type/handboker/skatte-abc/gjeldende/a-17-arv-og-gave--inngangsverdi-og-kontinuitet/A-17.041/A-17.043/) | **Krever juridisk godkjenning før merge.** Beløpsformuleringen er rettet i T37 |
+| T37 | Fase 5, arv over 100 000 kr (rettelse av T36) | … har du arvet 100 000 kroner eller mer, skal du opplyse om det i din egen skattemelding under «Gave og arv». | … har du arvet verdier på over 100 000 kroner, må du opplyse om det i din egen skattemelding under «Gave og arv». | Skatteetatens norske veiledning sier «Har du arvet verdier på over 100 000 kroner, må du opplyse om det i skattemeldingen din. Du legger inn verdien av arven under «Gave og arv».» Grensen er «over», ikke «eller mer», og gjelder verdier, ikke bare penger. (Skjemaet RF-1616 og siden om gaver bruker «100 000 kroner eller mer» for pengegaver; siden for etterlatte er fulgt her.) | [Skatteetaten: Slik påvirkes din skatt som etterlatt](https://www.skatteetaten.no/en/eksempler/etterlatte/dodsfall2/egen-skatt/); [Skatteetaten: Arveavgiften er opphevet](https://www.skatteetaten.no/en/person/taxes/get-the-taxes-right/gift-and-inheritance/inheritance-tax-is-abolished/) | **Krever juridisk godkjenning før merge** |
+| T38 | Hjelpetekst til spørsmålet testamentPartnerKnew (`questions.js`, bare tekst) | … dersom de fikk vite om testamentet før dødsfallet. En minstearv er uansett beskyttet. | … Ektefellens minstearv er uansett beskyttet. | Samme feil som F1/T23: samboeren har ingen minstearv som er beskyttet mot testament. Spørsmålet, valgene og når det vises, er uendret | Som T21 | **Krever juridisk godkjenning før merge** |
 
 **Ikke endret i runde 2, men kontrollert:**
 - **Klasse 1** («barnebarn i stedet for et barn som er dødt») er riktig, men nevner ikke oldebarn. Det er beholdt for å holde teksten kort.
@@ -194,7 +196,7 @@ Hver rad oppgir kildene. Alle rader merket **Krever juridisk godkjenning før me
 | U4 | Fase 5: arvemelding innen tre måneder | Ingen plikt for dødsfall fra 2014; veiviseren gjelder fra 2021 | Rettet (T10, T36) |
 | U5 | Fase 2: «Ta gjerne kontakt med tingretten innen 60 dager» | Fristen gjelder overtakelse av gjelden ved privat skifte (§ 117) og melding om uskifte (§§ 19 og 28) | Rettet (T26) |
 | U6 | «Hvem arver» og `rules.js`: søskenbarn «i stedet for en besteforelder» | `heirs.js` thirdOrder: søskenbarn bare i stedet for en tante eller onkel som er død | Rettet (T17, T18) |
-| U7 | «Hvem arver»: 2. klasse «og videre nedover» | `heirs.js` secondOrder regner bare med barna til et søsken som er dødt, ikke barnebarna (barn av en nevø eller niese som er død) | **Ikke rettet** (beregningen). Teksten er riktig etter loven; se forslag F11 |
+| U7 | «Hvem arver»: 1. og 2. klasse «og videre nedover» | `heirs.js` firstOrder og secondOrder regner bare ett ledd under et barn eller søsken som er dødt | **Ikke rettet** (beregningen). Teksten er riktig etter loven; se F11 i avsnitt 7 |
 
 ## 6. Formuleringer som var flagget (K1–K8)
 
@@ -211,30 +213,124 @@ Alle er nå behandlet i runde 2.
 | K7 | Proklama, seks uker (ordlisten) | Presisert (T28) |
 | K8 | Gravferdsstønad (fase 1 og sjanse-sjekken) | Rettet i fase 1 (T33); beløpet må oppdateres hvert år |
 
-## 7. Forslag til endring i beregningslogikken (ikke gjort)
+## 7. Plan for endringer i beregningslogikken (F11–F13, ikke gjort)
 
-Disse endrer hva veiviseren regner ut, og legges frem som forslag, slik oppdraget krever.
+Disse endrer hva veiviseren regner ut eller hvilke spørsmål den stiller. De tas i egne PR-er etter at PR #63 er godkjent, og hver av dem krever juridisk godkjenning av tekst og resultat.
 
-- **F11 – oldebarn av foreldrene (U7).** Rettes i `heirs.js` secondOrder, `questions.js` siblings og nye scenariotester. Risiko: lav for vanlige familier, men feil arvinger når en nevø eller niese er død og har barn.
-  - **Problem:** `twoParentSplit` fordeler et dødt søskens del likt på barna, men tar ikke høyde for at et av disse barna kan være dødt med egne barn. Andre klasse har ingen grense nedover (arveloven § 5).
-  - **Forslag:** spør om barn av en nevø eller niese som er død, eller stopp med en melding om at veiviseren ikke dekker det.
-- **F12 – bo av liten verdi.** `engine.js` SMALL_ESTATE_LIMIT = 170 000 kr.
-  - **Kilder spriker:** én side hos Domstolene oppgir 170 000 kr, mens Drammen tingrett og skjemaet tar utgangspunkt i 1 G etter gravferdsutgiftene. Loven (§ 95) sier bare «liten verdi», og retten avgjør.
-  - **Forslag:** knytt grensen til G med kilde, eller vis bare at retten avgjør. Dette erstatter F5.
-- **F13 – samboerens 4 G og testament.** `calculate.js` gir 0 kr når testamentet begrenser samboerens arv og samboeren visste om det.
-  - **Forslag:** juristen bekrefter at 4 G etter § 12 kan begrenses helt ved testament. Ellers må beregningen endres.
-  - **Unntaket** når det var umulig å varsle samboeren eller ektefellen, er ikke støttet (spørsmålet er bare ja/nei).
+### F11 – etterkommere i flere ledd (høyest prioritet)
 
-## 8. Til godkjenning før merge
+**Hva er galt** (`heirs.js`, `ui.js`):
+- **1. klasse:** for et barn som er dødt, spør veiviseren bare om antall barnebarn («Hvor mange barn etterlot barnet seg?», `children.N.grandchildren`). Et barnebarn som er dødt og har egne barn (oldebarn), kan ikke registreres.
+  - Teller brukeren med det døde barnebarnet, får en død person arv.
+  - Teller brukeren det ikke med, får oldebarna ingenting.
+  - Har barnet bare etterlatt seg døde barnebarn med egne barn, filtreres hele linjen bort (`childLines`). Da kan veiviseren konkludere med at det ikke finnes livsarvinger, og gi arven til foreldre eller søsken.
+- **2. klasse:** for et søsken som er dødt, spør veiviseren bare om antall barn som lever («Hvor mange barn har søskenet som lever?», `siblings.N.children`).
+  - Barn av en nevø eller niese som er død, kommer ikke med.
+  - Har søskenet bare barnebarn igjen, faller hele grenen bort, og delen går til de andre søsknene (`twoParentSplit`).
+  - Arveloven §§ 4 og 5 setter ingen grense nedover i 1. og 2. klasse.
+- **3. klasse er riktig:** søskenbarns barn arver ikke (§ 6), og veiviseren spør bare om søskenbarn som lever.
 
-**Juridisk.** Kryss av hvert punkt som jurist har lest mot gjeldende lovtekst på Lovdata, og godkjent eller rettet:
-- [ ] T3, T6, T9, T10, T11 og T12 (runde 1).
-- [ ] T16–T21 og T23–T31, T34–T36 (runde 2), alle merket **Krever juridisk godkjenning før merge**.
-- [ ] T32 (bankpraksis): kontrollert mot bankene eller Finans Norge.
-- [ ] F13: bekreft at samboerens 4 G kan begrenses helt ved testament, slik `calculate.js` regner.
+**Juridisk risiko: høy, men sjelden.** Feil arvinger og feil beløp vises uten varsel. I verste fall flyttes arven til en annen arvegangsklasse, og pliktdelsarven blir feil. Brukeren har ingen grunn til å mistenke feilen.
 
-**Produkt og drift:**
-- [ ] Produktformuleringene T5, T7, T8 og T13 stemmer med det Arvklart gjør.
-- [ ] Datoen i avsenderlinjen (`UPDATED` i `sections.js`) settes til dagen PR-en flettes.
-- [ ] Ingen påstand om faglig gjennomgang står på siden. Den legges til først når en navngitt person har gjort den.
-- [ ] Forslagene F11–F13 tas som egne PR-er.
+**Anbefalt løsning i to trinn:**
+1. **Trinn 1: stopp i stedet for feil svar** (liten PR, lav risiko).
+   - Nytt spørsmål når et barn eller søsken er dødt: «Er noen av barna til {navn} også døde, og etterlot de seg barn?» (Ja / Nei / Vet ikke).
+   - «Ja» eller «Vet ikke» gir en blokkering i `engine.js` collectBlockers: «Veiviseren regner ikke ut arv i flere ledd. Kontakt tingretten eller en advokat.»
+   - Tekstene i ledetekstene presiseres: «… som lever» i 1. klasse, og «Tell bare barn som lever» i 2. klasse.
+   - Lagrede svar uten spørsmålet tolkes som «Nei», slik at eksisterende bo ikke endres. Det må sies i resultatet: «Forutsetter at ingen barnebarn, nevøer eller nieser er døde og har etterlatt barn.»
+2. **Trinn 2: full beregning** (større PR, middels risiko; bare hvis trinn 1 viser at det trengs).
+   - Etterkommere registreres som et tre i stedet for et antall.
+   - `heirs.js` deler rekursivt per stamme.
+   - `ui.js` får nestede felt, og lagrede svar (tall) må gjøres om til trær.
+
+**Tester:**
+- `scenarios.test.js`, trinn 1:
+  - 1. klasse, dødt barn med ett dødt barnebarn som har to barn → blokkering;
+  - 2. klasse, dødt søsken med en nevø som er død og har ett barn → blokkering;
+  - dødt barn uten barnebarn som lever, men med oldebarn → blokkering, ikke 2. klasse;
+  - «Nei» gir samme resultat som i dag (regresjon for alle eksisterende scenarioer).
+- `scenarios.test.js`, trinn 2: forventede brøker per stamme, for eksempel ½ · ½ · ½ for hvert av to oldebarn.
+- `scenarios.test.js`, regresjon: søskenbarns barn arver aldri.
+- `flow.test.js`: spørsmålet vises bare når et barn eller søsken er dødt, og «Vet ikke» stopper.
+- `texts.test.js`: norsk og engelsk tekst finnes.
+- `changes.test.js`: lagrede svar uten det nye feltet gir uendret resultat.
+- e2e `journey.mjs`: én vei gjennom veiviseren som ender i blokkeringen.
+
+### F12 – grensen for bo av liten verdi
+
+**Hva er galt:** `engine.js` SMALL_ESTATE_LIMIT er 170 000 kr, og `rules.js` smallEstate sier at «tingretten bruker i praksis en grense rundt 170 000 kroner». Kildene spriker:
+- én side hos Domstolene oppgir 170 000 kr;
+- Drammen tingrett og Domstolenes skjema tar utgangspunkt i 1 G etter gravferdsutgiftene;
+- arveloven § 95 sier bare «liten verdi».
+
+**Juridisk risiko: lav til middels.** Det er bare et råd («vurder»), og retten avgjør. Men tallet kan gi falske forventninger, og domstolene kan praktisere ulikt.
+
+**Anbefalt løsning:**
+- Fjern kronebeløpet fra brukerteksten («Tingretten avgjør om boet er av liten verdi»).
+- La grensen bare styre om rådet vises, uttrykt i G med kilde i kodekommentaren.
+- Juristen velger 1 G eller 170 000 kr.
+
+**Tester:**
+- `scenarios.test.js`: bo rett over og rett under grensen;
+- `texts.test.js`: ingen kronebeløp i teksten;
+- `report.test.js`: rapporten viser rådet bare under grensen.
+
+### F13 – samboerens 4 G og testament
+
+**Hva det gjelder:** `calculate.js` partnerInheritance gir `protected: 0` for samboer. Når et testament begrenser samboerens arv og samboeren visste om det, blir arven 0 kr. For ektefelle gir det minstearv (4 G / 6 G).
+
+**Juridisk risiko: middels.** Bygger på at 4 G etter § 12 kan begrenses helt ved testament. Hvis bare en del kan begrenses, er beløpet feil.
+
+To mangler i tillegg:
+- Unntaket fra kravet om at samboeren visste om testamentet (når det var umulig eller urimelig vanskelig å varsle) er ikke støttet. Spørsmålet testamentPartnerKnew er bare Ja / Nei / Vet ikke.
+- «Vet ikke» gir i dag varselet «kan trolig ikke redusere». Det er riktig som utgangspunkt, men bør si at det må avklares.
+
+**Anbefalt løsning:**
+1. Juristen bekrefter regelen i § 12.
+2. Stemmer den, endres ikke beregningen. Bare teksten og testene utvides.
+3. Stemmer den ikke, endres `protected` for samboer i `calculate.js`, med tester.
+4. Unntaket for varsling legges inn som et eget valg som går til blokkering eller «sammensatt», ikke som en beregning.
+
+**Tester:**
+- `scenarios.test.js`:
+  - samboer, testament begrenser, visste → 0 kr (eller det juristen sier);
+  - ektefelle med barn, visste → 4 G; ektefelle uten barn, visste → 6 G;
+  - visste ikke → lovens arv;
+  - «Vet ikke» → varsel og ingen redusert sum.
+- `texts.test.js`: varselteksten for samboer og ektefelle.
+
+## 8. Skille: hva hører hjemme i PR #63, og hva tas senere
+
+**A. Juridiske tekstendringer i PR #63. Må godkjennes før merge:**
+- runde 1: T3, T6, T9, T10, T11 og T12;
+- runde 2: T16–T21, T23–T32 og T34–T38.
+
+Alle er tekst. Ingen endrer hva veiviseren regner ut eller spør om.
+
+**B. Produkt- og SEO-endringer i PR #63. Godkjennes av produkteier:**
+- T1, T2, T4, T5, T7, T8, T13, T14, T15 og T22;
+- T33 (samme som sjanse-sjekken);
+- utseendet på mobil;
+- datoen i avsenderlinjen.
+
+**C. Tekniske forbedringer i egne PR-er etter merge. Ikke del av PR #63:**
+
+| # | Endring | Type | Prioritet |
+|---|---|---|---|
+| F11 | Etterkommere i flere ledd (trinn 1: stopp) | Spørsmål og blokkering | 1 |
+| F13 | Samboerens 4 G ved testament, unntak for varsling | Beregning (etter juridisk avklaring) | 2 |
+| F2 | Stebarn er ikke avdødes arvinger (hint) | Spørsmålstekst | 3 |
+| F12 | Grensen for bo av liten verdi | Beregning og tekst | 4 |
+| F3 | «Snakk med advokat» ved utland, felles testament, landbruk og stor skjevdeling | Regler | 5 |
+| F4–F10 | Se avsnitt 2 | Ulike | Senere |
+
+## 9. Sjekkliste før PR #63 kan merges
+
+- [ ] **Jurist** har lest A-listen (avsnitt 8) mot gjeldende lovtekst på Lovdata, og godkjent eller rettet hver endring.
+- [ ] **T32 (bankkonto)** er kontrollert mot bankene eller Finans Norge, eller tatt ut.
+- [ ] **T36:** formuleringen om arv over 100 000 kr er kontrollert mot Skatteetaten (gjort, se T37).
+- [ ] **Produkteier** har godkjent B-listen (avsnitt 8).
+- [ ] **`UPDATED`** i `sections.js` er satt til datoen PR-en flettes, og fasiten er laget på nytt hvis noe er endret etter godkjenningen.
+- [ ] **CI** er grønn på siste commit: testene, databasen, SEO-sjekken og røyktesten mot forhåndsvisningen.
+- [ ] **Forhåndsvisningen** er sett på mobil og PC av en person.
+- [ ] **F11, F12 og F13** er registrert som egne oppgaver. F11 bør komme rett etter merge.
