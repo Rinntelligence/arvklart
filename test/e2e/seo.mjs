@@ -246,7 +246,7 @@ await check('Uten innlogging: «/» er forsiden; /app og app-sider ender der, me
   }
 }, { loggedIn: false })
 
-await check('Personvern og veiviser får sin canonical og tittel fra pages.js i nettleseren', async page => {
+await check('Sider som ikke er forhåndsrendret (personvern) får sin canonical og tittel fra pages.js i nettleseren', async page => {
   for (const p of PUBLIC_PAGES.filter(p => !p.prerender)) {
     await page.goto(BASE + p.path)
     await page.waitForFunction(t => document.title === t, p.title)

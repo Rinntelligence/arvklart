@@ -39,7 +39,7 @@ async function signedImages(page) {
 }
 
 await check('Hodene sendes på appen og på veiviseren', async () => {
-  for (const path of ['/', '/estate/x', '/veiviser.html']) {
+  for (const path of ['/', '/estate/x', '/veiviser', '/arveveiviser/ramme.html']) {
     const h = (await fetch(BASE + path)).headers
     assert(h.get('content-security-policy')?.includes("frame-ancestors 'self'"), `CSP mangler på ${path}`)
     assert(h.get('x-content-type-options') === 'nosniff', `nosniff mangler på ${path}`)
@@ -65,14 +65,33 @@ for (const [name, path] of [['Forsiden', '/'], ['Innlogging', '/logg-inn'], ['Pe
   }, { loggedIn: false })
 }
 
-await check('Veiviseren i rammen: skriptene kjører, og PDF-biblioteket fra cdnjs kan lastes', async page => {
+// jsPDF lastes fra cdnjs når brukeren laster ned PDF-en (pdf.js); kontrolleres i siden og i rammen
+const loadJsPdf = target => target.evaluate(() => new Promise(r => {
+  const s = document.createElement('script')
+  s.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js'
+  s.onload = () => r(!!window.jspdf?.jsPDF); s.onerror = () => r(false)
+  document.head.appendChild(s)
+}))
+
+await check('Veiviseren på /veiviser (i siden): skriptene kjører, og PDF-biblioteket fra cdnjs kan lastes', async page => {
   const get = await violations(page)
   await page.route('https://cdnjs.cloudflare.com/**', route => route.fulfill({ path: JSPDF, contentType: 'text/javascript' }))
   await page.goto(`${BASE}/veiviser`)
+  await page.locator('#arvWizard:not([data-prerendered]) .aw-card').first().waitFor()  // ui.js har tatt over veiviseren
+  await page.locator('#veiviser .phase-head').first().click()  // page.js (tidslinjen)
+  assert(await page.locator('#veiviser .phase.open').count() === 1, 'fasen åpnes ikke')
+  assert(await loadJsPdf(page), 'jsPDF fra cdnjs ble ikke lastet')
+  await none(get)
+}, { loggedIn: false })
+
+await check('Veiviseren i rammen (fra et bo): skriptene kjører, og PDF-biblioteket fra cdnjs kan lastes', async page => {
+  const get = await violations(page)
+  await page.route('https://cdnjs.cloudflare.com/**', route => route.fulfill({ path: JSPDF, contentType: 'text/javascript' }))
+  await page.goto(`${BASE}/estate/${EST}/guide`)
   const frame = page.frameLocator('iframe')
   await frame.locator('#timelineWrap > *').first().waitFor()   // page.js (tidslinjen)
   await frame.locator('#arvWizard .aw-card').first().waitFor()  // ui.js (veiviseren)
-  const guide = page.frames().find(f => f.url().includes('/veiviser.html'))
+  const guide = page.frames().find(f => f.url().includes('/arveveiviser/ramme.html'))
   const loaded = await guide.evaluate(() => new Promise(r => {
     const s = document.createElement('script')
     s.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js'
@@ -81,11 +100,11 @@ await check('Veiviseren i rammen: skriptene kjører, og PDF-biblioteket fra cdnj
   }))
   assert(loaded, 'jsPDF fra cdnjs ble ikke lastet')
   await none(get)
-}, { loggedIn: false })
+})
 
 await check('Engelsk veiviser (?lang=en): språkskriptet kjører før siden vises', async page => {
   const get = await violations(page)
-  await page.goto(`${BASE}/veiviser.html?lang=en`)
+  await page.goto(`${BASE}/arveveiviser/ramme.html?lang=en`)
   await page.locator('#timelineWrap > *').first().waitFor()
   assert(await page.evaluate(() => document.documentElement.lang) === 'en', 'språket ble ikke satt')
   assert((await page.locator('h1').first().textContent()).startsWith('From death'), 'den engelske teksten vises ikke')

@@ -7,7 +7,7 @@ import LoginPage from './pages/LoginPage'
 import ResetPasswordPage from './pages/ResetPasswordPage'
 import LandingPage from './pages/LandingPage'
 import FounderGate from './components/FounderGate'
-import GuidePage from './pages/GuidePage'
+import GuidePage, { VeiviserHostGuard } from './pages/GuidePage'
 import { JoinPage, CategoriesPage, PrivacyPage, AccountPage } from './pages/OtherPages'
 import ContactPage from './pages/ContactPage'
 import ArticlePage from './pages/ArticlePage'
@@ -156,6 +156,7 @@ export default function App({ prerendered = false }) {
     return (
       <>
         <RouteMeta />
+        <VeiviserHostGuard />
         <AnalyticsConsent loggedIn={false} />
         <Toasts success={toast} errors={errors} onDismiss={dismissError} />
         <Routes>
@@ -183,8 +184,10 @@ export default function App({ prerendered = false }) {
 
   return (
     <PlanProvider session={session}>
-      <div style={{ minHeight: '100vh', background: '#FBF9F5' }}>
+      {/* app-shell: på /veiviser står veiviseren under appen i siden, og høyden følger da innholdet (veiviserHost.js) */}
+      <div className="app-shell" style={{ minHeight: '100vh', background: '#FBF9F5' }}>
         <RouteMeta />
+        <VeiviserHostGuard />
         {/* Innlogget: aldri statistikk; lastet fra en offentlig side, lastes siden på nytt uten */}
         <AnalyticsConsent loggedIn />
         <TopBar profile={profile} session={session} onToast={showToast} />

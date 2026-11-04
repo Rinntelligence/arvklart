@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { signIn, signUp } from '../lib/supabase'
 import { isDemoEmail } from '../lib/demo'
 import {
@@ -8,17 +8,51 @@ import {
 } from '../lib/wizardEstate'
 import { L, isEn } from '../lib/lang'
 import { HOME, LANDING_STATE } from '../lib/routes'
+import { usePageData } from '../seo/pageData'
 
 // Hindrer at en ventende lagring kjøres to ganger hvis siden monteres på nytt underveis
 let processingPending = false
 
+// Veiviseren kan vises på to måter:
+//  - Direkte i siden (/veiviser lastet fra serveren): byggesteget legger hele veiviseren i <main id="veiviser"
+//    data-veiviser-host> etter appen (src/seo/veiviserHost.js), så søkemotorer leser innholdet uten JavaScript.
+//    GuidePage viser «Tilbake»-linjen og dialogene og snakker med veiviseren i samme vindu (postMessage til window).
+//  - I en iframe (/arveveiviser/ramme.html): fra et bo (/estate/:id/guide), når /veiviser åpnes ved navigering inne
+//    i appen, og for engelsk når den engelske veiviseren er slått på. Som før.
+// Meldingene (veiviser-ready, -context, -save, -saved, -back, -navigate) er de samme i begge tilfeller.
+const hostEl = () => (typeof document === 'undefined' ? null : document.querySelector('[data-veiviser-host]'))
+const useIsoLayoutEffect = typeof window === 'undefined' ? useEffect : useLayoutEffect
+// Veiviseren i siden vises bare mens /veiviser er åpen; navigerer man videre i appen, skjules den
+function setHostActive(on) {
+  const el = hostEl()
+  if (!el) return
+  el.hidden = !on
+  document.documentElement.classList.toggle('vv-off', !on)
+}
+// Ligger i begge trærne i App: skjuler veiviseren i siden på alle andre ruter enn /veiviser
+export function VeiviserHostGuard() {
+  const { pathname } = useLocation()
+  useIsoLayoutEffect(() => {
+    const el = hostEl()
+    if (el && !el.hasAttribute('data-vv-active')) setHostActive(false)
+  }, [pathname])
+  return null
+}
+
 // Engelsk arveveiviser vises bare når den er slått på (VITE_GUIDE_EN=true) etter juridisk gjennomgang av de
 // engelske tekstene. Til da får engelske brukere den norske veiviseren med en forklaring.
 const GUIDE_EN = import.meta.env.VITE_GUIDE_EN === 'true'
+// Veiviseren som egen side, til iframen (noindex; /veiviser.html sendes permanent til /veiviser)
+const FRAME = '/arveveiviser/ramme.html'
 
 export default function GuidePage({ standalone = false, session = null, onToast = () => {} }) {
   const navigate = useNavigate()
   const { id } = useParams()
+  const { pathname } = useLocation()
+  const pageData = usePageData()
+  // Veiviseren ligger i siden (se over): bare /veiviser lastet fra serveren, og ikke engelsk veiviser (den er i rammen)
+  const inline = !id && pageData?.kind === 'veiviser' && pageData.path === pathname && !(isEn() && GUIDE_EN)
+    && (typeof document === 'undefined' || Boolean(hostEl()))
   const frameRef = useRef(null)
   const contextRef = useRef(null)
   const contextSeq = useRef(0)
@@ -42,8 +76,25 @@ export default function GuidePage({ standalone = false, session = null, onToast 
   const toast = useCallback((...args) => toastRef.current?.(...args), [])
 
   const toFrame = useCallback(msg => {
-    frameRef.current?.contentWindow?.postMessage(msg, window.location.origin)
-  }, [])
+    const target = inline ? window : frameRef.current?.contentWindow
+    target?.postMessage(msg, window.location.origin)
+  }, [inline])
+
+  useIsoLayoutEffect(() => {
+    if (!inline) return
+    const el = hostEl()
+    el.setAttribute('data-vv-active', '')
+    setHostActive(true)
+    // Linjen øverst (#root) blir stående når man blar: det veiviseren ruller fram (neste spørsmål) og
+    // tastaturfokus skal havne under den, ikke bak den
+    const html = document.documentElement
+    const bar = document.getElementById('root')
+    const pad = () => { html.style.scrollPaddingTop = `${bar.offsetHeight}px` }
+    pad()
+    const ro = typeof ResizeObserver === 'function' ? new ResizeObserver(pad) : null
+    ro?.observe(bar)
+    return () => { ro?.disconnect(); html.style.scrollPaddingTop = ''; el.removeAttribute('data-vv-active'); setHostActive(false) }
+  }, [inline])
 
   // Forteller veiviseren hvem som er innlogget, hvilket bo den er åpnet fra og hva som er lagret der.
   // Veiviseren lagrer svarene i nettleseren per bruker og bo ut fra dette.
@@ -105,7 +156,7 @@ export default function GuidePage({ standalone = false, session = null, onToast 
 
   useEffect(() => {
     const onMessage = async (e) => {
-      if (e.origin !== window.location.origin || e.source !== frameRef.current?.contentWindow) return
+      if (e.origin !== window.location.origin || e.source !== (inline ? window : frameRef.current?.contentWindow)) return
       const m = e.data || {}
       if (m.type === 'veiviser-back') goBack()
       if (m.type === 'veiviser-ready') sendContext()
@@ -144,10 +195,11 @@ export default function GuidePage({ standalone = false, session = null, onToast 
     }
     window.addEventListener('message', onMessage)
     return () => window.removeEventListener('message', onMessage)
-  }, [goBack, navigate, sendContext, doSave, toFrame, userId, id, isDemo])
+  }, [goBack, navigate, sendContext, doSave, toFrame, userId, id, isDemo, inline])
 
-  // Ny kontekst når innlogging eller bo endres mens veiviseren er åpen
-  useEffect(() => { if (contextRef.current) sendContext() }, [sendContext])
+  // Ny kontekst når innlogging eller bo endres mens veiviseren er åpen. I siden sendes den også straks: veiviseren
+  // kan ha sagt «ready» før appen begynte å lytte (og svarer appen før veiviseren lytter, kommer «ready» etterpå).
+  useEffect(() => { if (inline || contextRef.current) sendContext() }, [sendContext, inline])
 
   const closeModal = useCallback(() => {
     setModal(null)
@@ -179,10 +231,7 @@ export default function GuidePage({ standalone = false, session = null, onToast 
     await saveInto(estate.id, estate.name)
   }
 
-  return (
-    <div className={standalone ? 'guide-shell standalone' : 'guide-shell'} style={{ height: standalone ? '100vh' : 'calc(100vh - 56px)', display: 'flex', flexDirection: 'column' }}>
-      {/* Mobilnettlesere regner adresselinjen med i vh; dvh er den synlige høyden (lik vh på PC) */}
-      <style>{`@supports (height: 100dvh) { .guide-shell { height: calc(100dvh - 56px) !important; } .guide-shell.standalone { height: 100dvh !important; } }`}</style>
+  const bar = (
       <div style={{ padding: '12px 20px', background: '#FBF9F5', borderBottom: '1px solid #D9CFC0', display: 'flex', alignItems: 'center', gap: '12px' }}>
         <button onClick={goBack} style={{ background: 'none', border: 'none', color: '#75604B', cursor: 'pointer', fontSize: '0.875rem', fontFamily: 'Karla, sans-serif' }}>
           {id ? L('← Tilbake til boet', '← Back to the estate') : L('← Tilbake til hjemmesiden', '← Back to the home page')}
@@ -190,18 +239,33 @@ export default function GuidePage({ standalone = false, session = null, onToast 
         {busy && <span style={{ fontSize: '0.8125rem', color: '#5F6E52', fontFamily: 'Karla, sans-serif' }}>{L('Lagrer i boet …', 'Saving to the estate …')}</span>}
         {isEn() && !GUIDE_EN && <span style={{ fontSize: '0.8125rem', color: '#75604B', fontFamily: 'Karla, sans-serif', marginLeft: 'auto' }}>The inheritance guide follows Norwegian law and is only available in Norwegian.</span>}
       </div>
-      <iframe
-        ref={frameRef}
-        src={(id ? `/veiviser.html?bo=${encodeURIComponent(id)}` : '/veiviser.html?back=home') + (isEn() && GUIDE_EN ? '&lang=en' : '')}
-        style={{ flex: 1, border: 'none', width: '100%' }}
-        title={L('Arveprosess-veiviser', 'Inheritance process guide')}
-      />
+  )
+  const modals = (
+    <>
       {modal?.kind === 'auth' && (
         <AuthModal startInLogin={modal.login} request={modal.request} onClose={closeModal} />
       )}
       {modal?.kind === 'choose' && (
         <ChooseEstateModal userId={userId} busy={busy} onClose={closeModal} onChoose={saveInto} onCreate={createAndSave} />
       )}
+    </>
+  )
+
+  // Veiviseren står i siden under appen: bare linjen og dialogene her (linjen blir stående øverst, se veiviserHost.js)
+  if (inline) return <>{bar}{modals}</>
+
+  return (
+    <div className={standalone ? 'guide-shell standalone' : 'guide-shell'} style={{ height: standalone ? '100vh' : 'calc(100vh - 56px)', display: 'flex', flexDirection: 'column' }}>
+      {/* Mobilnettlesere regner adresselinjen med i vh; dvh er den synlige høyden (lik vh på PC) */}
+      <style>{`@supports (height: 100dvh) { .guide-shell { height: calc(100dvh - 56px) !important; } .guide-shell.standalone { height: 100dvh !important; } }`}</style>
+      {bar}
+      <iframe
+        ref={frameRef}
+        src={(id ? `${FRAME}?bo=${encodeURIComponent(id)}` : `${FRAME}?back=home`) + (isEn() && GUIDE_EN ? '&lang=en' : '')}
+        style={{ flex: 1, border: 'none', width: '100%' }}
+        title={L('Arveprosess-veiviser', 'Inheritance process guide')}
+      />
+      {modals}
     </div>
   )
 }

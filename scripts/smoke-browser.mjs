@@ -96,9 +96,18 @@ await check('Invitasjonslenke uten innlogging: til innlogging, med beskjed om in
   await page.getByText(/Du er invitert til et bo/).waitFor()
 })
 
-await check('Veiviseren og personvern vises', async page => {
+await check('Veiviseren (i siden, uten iframe) virker, og personvern vises', async page => {
   await page.goto(`${BASE}/veiviser`)
-  await page.frameLocator('iframe').locator('h1').first().waitFor({ timeout: 20000 })
+  await page.locator('#veiviser h1').waitFor({ timeout: 20000 })
+  assert(await page.locator('iframe').count() === 0, 'veiviseren ligger i en iframe')
+  await page.locator('#arvWizard:not([data-prerendered]) .aw-card').first().waitFor({ timeout: 20000 }) // ui.js har tatt over
+  const phase = page.locator('#veiviser .phase-head').first()
+  await phase.click()
+  assert(await phase.getAttribute('aria-expanded') === 'true', 'fasen åpnes ikke')
+  await page.getByRole('button', { name: 'Start', exact: true }).click()
+  await page.getByRole('heading', { name: 'Hvem er du i dette arveoppgjøret?' }).waitFor()
+  const old = await page.request.get(`${BASE}/veiviser.html`, { maxRedirects: 0, headers: secret ? { 'x-vercel-protection-bypass': secret } : {} })
+  assert([301, 308].includes(old.status()), `/veiviser.html: ${old.status()}`)
   await page.goto(`${BASE}/personvern`)
   await page.getByRole('heading', { level: 1 }).waitFor()
 })

@@ -2,7 +2,7 @@
 // testinnholdet (test/fixtures/content) og reglene fra vercel.json. Kjøres av test/e2e/run.sh.
 import { createRequire } from 'node:module'
 import { BASE, launch, checker, assert } from './fixtures.mjs'
-import { SITE_URL } from '../../src/seo/pages.js'
+import { SITE_URL, PUBLIC_PAGES } from '../../src/seo/pages.js'
 
 const browser = await launch()
 const results = []
@@ -40,7 +40,7 @@ await check('Uten JavaScript: H1, tekst, forfatter og datoer, kilder, «Les ogs�
     assert(await page.getByText(text, { exact: false }).first().isVisible(), `mangler «${text}»`)
   assert(await page.locator('nav[aria-label="Brødsmulesti"] a[href="/"]').count() === 1, 'brødsmulestien mangler')
   assert(await page.locator('nav[aria-label="Brødsmulesti"] [aria-current="page"]').textContent() === TITLE, 'siste ledd i brødsmulestien')
-  assert(await page.locator('aside a[href="/veiviser"]').textContent() === 'Veiviser — Arvklart', '«Les også» bruker sidens tittel')
+  assert(await page.locator('aside a[href="/veiviser"]').textContent() === PUBLIC_PAGES.find(p => p.path === '/veiviser').title, '«Les også» bruker sidens tittel')
   assert(await page.locator('a[href="https://lovdata.no/dokument/NL/lov/2019-06-14-21"]').count() === 1, 'kilden mangler')
   await ctx.close()
 }, { loggedIn: false })

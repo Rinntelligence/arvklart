@@ -18,7 +18,7 @@ const PRIVATE = ['/app', '/logg-inn', '/nytt-passord', '/join/ABC123', '/estate/
 export const NOT_FOUND = ['/finnes-ikke', '/guider/finnes-ikke', '/guider/mal-for-guide', '/guider', '/a/b', '/index', '/shell', '/home.html']
 
 // Stiene som alltid vises i rapporten (status og hoder), så reglene kan leses av ekte svar
-export const REPORT_PATHS = ['/', '/home', '/kontakt', '/personvern', '/veiviser', '/veiviser.html', '/robots.txt', '/sitemap.xml',
+export const REPORT_PATHS = ['/', '/home', '/kontakt', '/personvern', '/veiviser', '/veiviser.html', '/arveveiviser/ramme.html', '/robots.txt', '/sitemap.xml',
   '/app', '/logg-inn', '/nytt-passord', '/join/ABC123', '/estate/x', '/konto', '/finnes-ikke', '/guider/finnes-ikke', '/a/b', '/home.html', '/shell.html']
 
 const assert = (cond, msg) => { if (!cond) throw new Error(msg) }
@@ -202,8 +202,20 @@ export async function runHttpChecks(base, { headers = {}, preview = false, fetch
       assert(ruleTag(r) === 'noindex', `${path}: treffes ikke av noindex-regelen i vercel.json (X-Arvklart-Robots: ${ruleTag(r)})`)
       assert(!r.body.includes('rel="canonical"') || path.endsWith('.html'), `${path}: skallet har canonical`)
     }
-    const guide = await get('/veiviser.html')
-    assert((robotsTag(guide) || '').includes('indexifembedded') && ruleTag(guide) === 'noindex, indexifembedded', `/veiviser.html: ${robotsTag(guide)} / ${ruleTag(guide)}`)
+    // Rammen (iframen fra et bo) er ikke en egen side: noindex, uten indexifembedded (innholdet står på /veiviser)
+    const frame = await get('/arveveiviser/ramme.html')
+    assert(frame.status === 200 && ruleTag(frame) === 'noindex', `/arveveiviser/ramme.html: ${frame.status} ${ruleTag(frame)}`)
+  })
+
+  await check('/veiviser uten JavaScript: hele veiviseren står i HTML-en (ingen iframe); /veiviser.html sendes permanent dit', async () => {
+    const r = await get('/veiviser')
+    assert(r.status === 200, `status ${r.status}`)
+    assert(/<main id="veiviser" data-veiviser-host>/.test(r.body) && !/<iframe/.test(r.body), 'veiviseren står ikke i siden')
+    for (const text of ['Fra dødsfall til fordelt bo — steg for steg', 'Hvem arver – og hvor mye?', 'Prosessen i fem faser', 'Rett etter dødsfallet',
+      'Søke <strong>skifteattest</strong> hos tingretten', 'Pliktdelsarv', 'Jussformidlingen i Bergen', 'Klar for å fordele eiendelene?'])
+      assert(r.body.includes(text), `mangler «${text}»`)
+    const old = await get('/veiviser.html')
+    assert(PERMANENT.includes(old.status) && new URL(old.headers.get('location') || '', base + '/').pathname === '/veiviser', `/veiviser.html: ${old.status} ${old.headers.get('location')}`)
   })
 
   await check(`Offentlige sider: første JavaScript er innenfor budsjettet (${JS_BUDGET_GZIP / 1024} kB gzip)`, async () => {
@@ -225,7 +237,7 @@ export async function runHttpChecks(base, { headers = {}, preview = false, fetch
   })
 
   await check('Sikkerhetshodene sendes på sidene, appen og robots.txt', async () => {
-    for (const path of ['/', '/app', '/kontakt', '/estate/x', '/veiviser.html', '/robots.txt', '/sitemap.xml', '/finnes-ikke']) {
+    for (const path of ['/', '/app', '/kontakt', '/estate/x', '/veiviser', '/arveveiviser/ramme.html', '/robots.txt', '/sitemap.xml', '/finnes-ikke']) {
       const h = (await get(path)).headers
       assert(h.get('content-security-policy')?.startsWith("default-src 'self'; script-src 'self' https://cdnjs.cloudflare.com"), `CSP mangler på ${path}`)
       assert(!/unsafe-eval/.test(h.get('content-security-policy')) && !/script-src[^;]*'unsafe-inline'/.test(h.get('content-security-policy')), `CSP tillater eval eller skript i HTML-en på ${path}`)
