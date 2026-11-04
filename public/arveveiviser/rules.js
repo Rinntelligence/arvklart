@@ -145,7 +145,7 @@ export const NOTICES = [
     id: 'grandparentsInherit', area: 'meaning', level: 'info',
     when: { fact: 'order', eq: 3 },
     title: 'Besteforeldrene og deres familie arver', title_en: 'The grandparents and their family inherit',
-    text: 'Når det verken finnes barn, foreldre, søsken, nevøer eller nieser, går arven halvt til farssiden og halvt til morssiden. Der arver besteforeldrene. Er en besteforelder død, går delen til tanter og onkler, og etter en tante eller onkel som er død, til hans eller hennes barn (søskenbarn).', text_en: 'When there are no children, parents, siblings, nephews or nieces, the inheritance goes half to the father\'s side and half to the mother\'s side. There the grandparents inherit. If a grandparent has died, the share goes to aunts and uncles, and after an aunt or uncle who has died, to his or her children (cousins).',
+    text: 'Når det verken finnes barn, foreldre, søsken, nevøer eller nieser, går arven halvt til farssiden og halvt til morssiden. Finnes ingen arvinger på den ene siden, får den andre siden alt. Der arver besteforeldrene. Er en besteforelder død, går delen til tanter og onkler, og etter en tante eller onkel som er død, til hans eller hennes barn (søskenbarn).', text_en: 'When there are no children, parents, siblings, nephews or nieces, the inheritance goes half to the father\'s side and half to the mother\'s side. If there are no heirs on one side, the other side gets everything. There the grandparents inherit. If a grandparent has died, the share goes to aunts and uncles, and after an aunt or uncle who has died, to his or her children (cousins).',
     sources: ['arveloven_tredje_arvegang', 'domstol_hvem_arver'],
   },
   {

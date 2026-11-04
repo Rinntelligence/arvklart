@@ -429,7 +429,7 @@ export const QUESTIONS = [
     showIf: { q: 'testamentContent', includes: 'limitsPartner' },
     title: 'Fikk {partner} vite om testamentet mens avdøde levde?', title_en: 'Did {partner} learn about the will while the deceased was alive?',
     titleSurvivor: 'Fikk du vite om testamentet mens avdøde levde?', titleSurvivor_en: 'Did you learn about the will while the deceased was alive?',
-    why: 'Et testament kan bare gi ektefelle eller samboer mindre enn loven sier, dersom de fikk vite om testamentet før dødsfallet. Ektefellens minstearv er uansett beskyttet.', why_en: 'A will can only give a spouse or cohabitant less than the law says if they learned about the will before the death. A spouse\'s minimum inheritance is protected in any case.',
+    why: 'Et testament kan bare gi ektefelle eller samboer mindre enn loven sier, dersom de fikk vite om testamentet før dødsfallet, eller det var umulig eller urimelig vanskelig å varsle dem. Ektefellens minstearv er uansett beskyttet.', why_en: 'A will can only give a spouse or cohabitant less than the law says if they learned about the will before the death, or it was impossible or unreasonably difficult to notify them. A spouse\'s minimum inheritance is protected in any case.',
     options: YES_NO_UNKNOWN,
     learnMore: { sources: ['arveloven_testament_ektefelle', 'arveloven_testament_samboer'] },
   },
@@ -461,7 +461,7 @@ export const QUESTIONS = [
     ],
     learnMore: {
       title: 'Hva er forskudd på arv (avkorting)?', title_en: 'What is an advance on inheritance (avkorting)?',
-      text: 'En gave til et barn trekkes bare fra arven dersom avdøde bestemte det da gaven ble gitt, eller senere i et testament. Vanlige gaver til jul og bursdag, og vanlig forsørgelse og utdanning, regnes normalt ikke som forskudd.', text_en: 'A gift to a child is only deducted from the inheritance if the deceased decided so when the gift was given, or later in a will. Ordinary Christmas and birthday presents, and ordinary support and education, are normally not regarded as advances.',
+      text: 'En gave til et barn trekkes bare fra arven dersom avdøde satte det som betingelse da gaven ble gitt. For gaver gitt før 2021 kunne avdøde også bestemme det senere, men senest 31. desember 2020. Vanlige gaver til jul og bursdag, og vanlig forsørgelse og utdanning, regnes normalt ikke som forskudd.', text_en: 'A gift to a child is only deducted from the inheritance if the deceased made it a condition when the gift was given. For gifts given before 2021, the deceased could also decide this later, but no later than 31 December 2020. Ordinary Christmas and birthday presents, and ordinary support and education, are normally not regarded as advances.',
       sources: ['arveloven_avkorting'],
     },
   },

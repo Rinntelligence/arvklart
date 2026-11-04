@@ -186,6 +186,26 @@ Hver rad oppgir kildene. Alle rader merket **Krever juridisk godkjenning før me
 - **Pliktdelsarven** (2/3, høyst 15 G per barn) stemmer med `rules.js` compulsoryShare og arveloven § 50.
 - **Sjanse-sjekken for gravferdsstønad** (30 898 kr i 2026, båretransport over 20 km) ble kontrollert i runde 1 og må oppdateres hvert år.
 
+## 4c. Uavhengig gjennomgang, runde 4: før, etter og kilde
+
+En uavhengig gjennomgang pekte på seks punkter, og alle er kontrollert:
+- Punkt 1–5 stemmer og er rettet her (T39–T44).
+- Punkt 6 gjelder planen for F11 og er rettet i avsnitt 7.
+- Kontrollen avdekket i tillegg T44: en feil i veiviserens hjelpetekst om forskudd som gjennomgangen ikke nevnte.
+
+Beregningsmotoren er ikke endret. Endringene i `questions.js` og `rules.js` er bare tekst.
+
+Lovdata er fortsatt sperret fra arbeidsmiljøet. Kildene under er utdrag fra søk: Lovdata-utdrag der de finnes, ellers forarbeider og kommentarer. Alle rader krever jurist.
+
+| # | Sted | Før | Etter | Hvorfor | Kilder | Status |
+|---|---|---|---|---|---|---|
+| T39 | «Hvem arver», 1. klasse (punkt 1) | Barna, og barnebarn i stedet for et barn som er dødt. Alle barna arver likt. | Barna, som arver likt. Er et barn dødt, går dets del til barnets barn, og videre til oldebarn og fjernere etterkommere. | Livsarvinger har ingen grense nedover. Fjernere livsarvinger arver på samme måte, med lik andel per gren. Teksten stoppet ved barnebarn. Beregningen regner fortsatt bare ett ledd (F11); resultatteksten representation sier det allerede | Arveloven § 4 ([Lovdata](https://lovdata.no/lov/2019-06-14-21)); Prop. 107 L (2017–2018); [Stortingets lovvedtak 55 (2018–2019)](https://www.stortinget.no/no/Saker-og-publikasjoner/Vedtak/Beslutninger/Lovvedtak/2018-2019/vedtak-201819-055/) | **Krever juridisk godkjenning før merge** |
+| T40 | «Hvem arver», 3. klasse, og `rules.js` grandparentsInherit (punkt 2) | … til hans eller hennes barn (søskenbarn). Lenger går ikke arveretten etter loven. | … Finnes ingen arvinger på den ene siden, arver den andre siden alt. Lenger enn til søskenbarn går ikke arveretten etter loven. (Resultatteksten: «Finnes ingen arvinger på den ene siden, får den andre siden alt.») | § 6 sier at hele arven går til arvingene på den andre siden når den ene siden ikke har arvinger. Beregningen gjør det allerede (`heirs.js` thirdOrder bruker bare sider med arvinger; testen «besteforeldre: farfar og en halvtante på farssiden, ingen på morssiden») | Arveloven § 6 ([Lovdata](https://lovdata.no/lov/2019-06-14-21)); [NOU 2014: 1 kap. 2](https://www.regjeringen.no/no/dokumenter/nou-2014-1/id750736/?ch=3); [paragrafer.no: § 6](https://www.paragrafer.no/arverett/arveloven-6/) (kommentar) | **Krever juridisk godkjenning før merge** |
+| T41 | Testament og kravet om at ektefelle eller samboer visste om det (punkt 3): «Hvem arver», ordlisten (minstearv), `glossary.js` (minstearv) og hjelpeteksten til testamentPartnerKnew i `questions.js` | … kan bare begrenses hvis de fikk vite om testamentet før dødsfallet. | … hvis de fikk vite om testamentet før dødsfallet, eller det var umulig eller urimelig vanskelig å varsle dem. | Unntaket står i § 10 første ledd annet punktum (ektefelle) og gjelder tilsvarende for samboer (§ 12). Spørsmålet i veiviseren er fortsatt Ja / Nei / Vet ikke, og beregningen tar ikke hensyn til unntaket (F13) | Arveloven §§ 10 og 12 ([Lovdata](https://lovdata.no/lov/2019-06-14-21)); [NOU 2014: 1 kap. 4](https://www.regjeringen.no/no/dokumenter/nou-2014-1/id750736/?ch=4); [paragrafer.no: § 10](https://www.paragrafer.no/arverett/arveloven-10/) og [§ 12](https://www.paragrafer.no/arverett/arveloven-12/) (kommentar) | **Krever juridisk godkjenning før merge** |
+| T42 | Fase 2, 60-dagersfristen (punkt 4) | Fristen er 60 dager etter dødsfallet: innen da må minst én arving ha påtatt seg gjelden og meldt privat skifte til tingretten, eller gjenlevende ektefelle eller samboer ha meldt at de vil sitte i uskifte. … | Skal boet skiftes privat, må minst én arving ha påtatt seg ansvaret for gjelden innen 60 dager etter dødsfallet. Vil gjenlevende ektefelle eller samboer sitte i uskifte, må det også meldes innen 60 dager. Retten kan sette en annen frist. Arvingene kan i stedet kreve offentlig skifte, og overtar ingen boet, kan tingretten selv bestemme offentlig skifte. … | «Innen da må … eller …» kunne leses som at privat skifte og uskifte er de eneste mulighetene. Offentlig skifte (etter krav eller fordi ingen overtar) og bo av liten verdi (står i «Hva er det») er også mulig | Arveloven §§ 117–118, 19 og 28; [Domstolene: Forskjellige former for skifte](https://www.domstol.no/no/dodsfall-arv-og-skifte/forskjellige-former-for-skifte/) («Retten kan også selv beslutte offentlig skifte dersom ingen av arvingene overtar boet til privat skifte»); [Domstolene: Hva må arvinger gjøre?](https://www.domstol.no/no/dodsfall-arv-og-skifte/hva-ma-arvinger-gjore-etter-et-dodsfall/) | **Krever juridisk godkjenning før merge** |
+| T43 | Fase 3, forskudd, og ordlisten (side og `glossary.js`) (punkt 5) | … penger eller gjenstander avdøde ga til en arving mens de levde, og som avdøde bestemte at skulle trekkes fra arven senere. / En gave til et barn som avdøde sa skulle trekkes fra barnets arv senere (avkorting). | … ga til et barn eller barnebarn, på den betingelsen at det skulle trekkes fra arven senere. Betingelsen må ha vært satt da gaven ble gitt. / En gave til et barn eller barnebarn, gitt på den betingelsen at den skal trekkes fra arven senere (avkorting). Betingelsen må være satt da gaven ble gitt. | Etter arveloven 2019 må avkorting være satt som betingelse da ytelsen ble gitt, så mottakeren kunne avslå. Arvelateren kan ikke bestemme det ensidig senere. Avkorting gjelder livsarvinger, ikke «en arving» generelt | Arveloven § 75 ([Lovdata](https://lovdata.no/lov/2019-06-14-21)); [Advokatbladet: Avkortning i arv må bestemmes før 1. januar 2021](https://www.advokatbladet.no/arveloven/avkortning-i-arv-ma-bestemmes-for-1-januar-2021/152880); [paragrafer.no: § 75](https://www.paragrafer.no/arverett/arveloven-75/) (kommentar) | **Krever juridisk godkjenning før merge.** Vurder om «barn eller barnebarn» bør være «livsarving» |
+| T44 | Veiviserens hjelpetekst «Hva er forskudd på arv (avkorting)?» (`questions.js`, bare tekst; ikke nevnt i gjennomgangen) | En gave til et barn trekkes bare fra arven dersom avdøde bestemte det da gaven ble gitt, eller senere i et testament. | En gave til et barn trekkes bare fra arven dersom avdøde satte det som betingelse da gaven ble gitt. For gaver gitt før 2021 kunne avdøde også bestemme det senere, men senest 31. desember 2020. | «Eller senere i et testament» er feil etter arveloven 2019. Overgangsregelen tillot senere fastsettelse for eldre gaver bare til og med 31.12.2020. Veiviseren gjelder dødsfall fra 2021, så overgangsregelen er relevant. Spørsmålet og beregningen er uendret | Som T43 (overgangsregelen: Advokatbladet) | **Krever juridisk godkjenning før merge.** Juristen bør bekrefte overgangsregelen og fristen |
+
 ## 5. Uenighet mellom innholdet og beregningslogikken
 
 | # | Innhold | Logikk | Status |
@@ -230,14 +250,18 @@ Disse endrer hva veiviseren regner ut eller hvilke spørsmål den stiller. De ta
   - Arveloven §§ 4 og 5 setter ingen grense nedover i 1. og 2. klasse.
 - **3. klasse er riktig:** søskenbarns barn arver ikke (§ 6), og veiviseren spør bare om søskenbarn som lever.
 
-**Juridisk risiko: høy, men sjelden.** Feil arvinger og feil beløp vises uten varsel. I verste fall flyttes arven til en annen arvegangsklasse, og pliktdelsarven blir feil. Brukeren har ingen grunn til å mistenke feilen.
+**Juridisk risiko: høy, men sjelden.**
+- Feil arvinger og feil beløp kan vises. I verste fall flyttes arven til en annen arvegangsklasse, og pliktdelsarven blir feil.
+- I 1. klasse står det allerede et varsel når barnebarn arver: «Veiviseren regner bare ett ledd ned» (`rules.js` representation, more).
+- Varselet mangler i 2. klasse, og når hele linjen faller bort, fordi da vises ingen arvinger i den linjen.
 
 **Anbefalt løsning i to trinn:**
 1. **Trinn 1: stopp i stedet for feil svar** (liten PR, lav risiko).
    - Nytt spørsmål når et barn eller søsken er dødt: «Er noen av barna til {navn} også døde, og etterlot de seg barn?» (Ja / Nei / Vet ikke).
    - «Ja» eller «Vet ikke» gir en blokkering i `engine.js` collectBlockers: «Veiviseren regner ikke ut arv i flere ledd. Kontakt tingretten eller en advokat.»
    - Tekstene i ledetekstene presiseres: «… som lever» i 1. klasse, og «Tell bare barn som lever» i 2. klasse.
-   - Lagrede svar uten spørsmålet tolkes som «Nei», slik at eksisterende bo ikke endres. Det må sies i resultatet: «Forutsetter at ingen barnebarn, nevøer eller nieser er døde og har etterlatt barn.»
+   - **Lagrede svar uten det nye spørsmålet behandles som «Uavklart», ikke «Nei».** Veiviseren viser spørsmålet når brukeren åpner det lagrede svaret, og gir ikke tall før det er besvart. «Nei» ville gjentatt den stille feilen for nettopp dem som allerede har lagret et svar. (Endret etter uavhengig gjennomgang, punkt 6.)
+   - **Konsekvens:** Brukere med lagrede svar der et barn eller søsken er dødt, ser et nytt spørsmål i stedet for tallene de så før. Det bør stå hvorfor: «Vi har lagt til et spørsmål for å regne riktig når flere ledd er døde.» Lagrede svar uten noe barn eller søsken som er dødt, berøres ikke, fordi spørsmålet bare vises da.
 2. **Trinn 2: full beregning** (større PR, middels risiko; bare hvis trinn 1 viser at det trengs).
    - Etterkommere registreres som et tre i stedet for et antall.
    - `heirs.js` deler rekursivt per stamme.
@@ -253,7 +277,9 @@ Disse endrer hva veiviseren regner ut eller hvilke spørsmål den stiller. De ta
 - `scenarios.test.js`, regresjon: søskenbarns barn arver aldri.
 - `flow.test.js`: spørsmålet vises bare når et barn eller søsken er dødt, og «Vet ikke» stopper.
 - `texts.test.js`: norsk og engelsk tekst finnes.
-- `changes.test.js`: lagrede svar uten det nye feltet gir uendret resultat.
+- `changes.test.js`:
+  - lagrede svar uten det nye feltet, der et barn eller søsken er dødt, gir «Uavklart» (blokkering med spørsmålet), ikke tall;
+  - lagrede svar uten noe barn eller søsken som er dødt, gir uendret resultat.
 - e2e `journey.mjs`: én vei gjennom veiviseren som ender i blokkeringen.
 
 ### F12 – grensen for bo av liten verdi
@@ -303,7 +329,8 @@ To mangler i tillegg:
 
 **A. Juridiske tekstendringer i PR #63. Må godkjennes før merge:**
 - runde 1: T3, T6, T9, T10, T11 og T12;
-- runde 2: T16–T21, T23–T32 og T34–T38.
+- runde 2: T16–T21, T23–T32 og T34–T38;
+- runde 4 (uavhengig gjennomgang): T39–T44.
 
 Alle er tekst. Ingen endrer hva veiviseren regner ut eller spør om.
 
