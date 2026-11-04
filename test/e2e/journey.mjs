@@ -158,10 +158,10 @@ await check('Arving: ser egne ønsker ett trykk unna, ikke admin-verktøyene', a
 
 // Arveveiviseren på engelsk (E1): bare med ?lang=en, som appen sender når VITE_GUIDE_EN er slått på
 await check('Veiviser: norsk som standard, engelsk grensesnitt med ?lang=en og merknad om at norsk gjelder', async page => {
-  await page.goto(`${BASE}/veiviser.html`)
+  await page.goto(`${BASE}/arveveiviser/ramme.html`)
   await page.getByRole('heading', { name: 'Hvem arver – og hvor mye?' }).waitFor()
   assert(await page.evaluate(() => document.documentElement.lang) === 'no', 'html lang er ikke no')
-  await page.goto(`${BASE}/veiviser.html?lang=en`)
+  await page.goto(`${BASE}/arveveiviser/ramme.html?lang=en`)
   await page.getByRole('heading', { name: 'Who inherits – and how much?' }).waitFor()
   await page.getByText('the Norwegian version is the authoritative one', { exact: false }).first().waitFor()
   await page.getByRole('heading', { name: 'Glossary' }).waitFor()

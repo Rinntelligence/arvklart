@@ -85,7 +85,7 @@ test('robots.txt: alt tillatt (noindex styres av hodene), og sitemap oppgitt', (
 // FILES er filene bygget lager (registeret med testinnhold) pluss public/. Utkast og ukjente sider har ingen fil.
 const FIXTURES = 'test/fixtures/content'
 const registryFx = publicRegistry(FIXTURES)
-const PUBLIC_FILES = ['robots.txt', 'seo-early.js', 'veiviser.html', '404.html', 'hero-bg.jpg', 'favicon.svg']
+const PUBLIC_FILES = ['robots.txt', 'seo-early.js', 'arveveiviser/ramme.html', '404.html', 'hero-bg.jpg', 'favicon.svg']
 const FILES = new Set([SHELL_FILE, 'sitemap.xml', ...PUBLIC_FILES, ...registryFx.filter(p => p.prerender).map(p => prerenderFile(p.path))])
 function route(path, files = FILES) {
   const redirect = vercel.redirects.find(r => matches(r.source, path))
@@ -139,10 +139,15 @@ test('ruting: forhåndsrendrede sider og guider uten egne regler; «/» og /home
   for (const p of registryFx.filter(p => p.prerender)) assert.deepEqual(route(p.path), { status: 200, file: prerenderFile(p.path) }, p.path)
   assert.deepEqual(route('/'), { status: 200, file: 'index.html' })
   assert.deepEqual(route('/home'), { status: 308, location: '/' })
-  for (const p of ['/personvern', '/veiviser']) assert.equal(route(p).file, SHELL_FILE, `${p} rendres i nettleseren`)
+  assert.equal(route('/personvern').file, SHELL_FILE, '/personvern rendres i nettleseren')
+  // /veiviser er forhåndsrendret med hele veiviseren (src/seo/veiviserHost.js); den gamle filen sendes dit
+  assert.deepEqual(route('/veiviser'), { status: 200, file: 'veiviser.html' })
+  assert.deepEqual(route('/veiviser.html'), { status: 308, location: '/veiviser' })
+  assert.deepEqual(route('/arveveiviser/ramme.html'), { status: 200, file: 'arveveiviser/ramme.html' })
+  assert.equal(route('/veiviser/noe').status, 404)
   assert.ok(!vercel.rewrites.some(r => r.source === '/(.*)'), 'ingen omskriving av alt: ukjente adresser skal gi 404')
   assert.ok(!vercel.rewrites.some(r => registryFx.some(p => p.path !== '/' && r.source === p.path)), 'ingen omskriving per side')
-  assert.ok(!('cleanUrls' in vercel), 'cleanUrls ville sendt /veiviser.html videre til /veiviser')
+  assert.ok(!('cleanUrls' in vercel), 'cleanUrls ville gitt hver fil to adresser (/side og /side.html)')
   for (const s of [...vercel.rewrites, ...vercel.headers, ...vercel.redirects].map(r => r.source)) {
     assert.doesNotMatch(s, /(^|\/):[a-z]/i, `${s}: :param tolkes ikke likt av testserveren`); new RegExp(s)
   }
@@ -153,14 +158,15 @@ test('noindex: private stier og alt utenfor de offentlige mønstrene; aldri offe
   for (const p of registryFx) assert.deepEqual(robotsRule(p.path), [], `${p.path} har noindex`)
   for (const path of ['/robots.txt', '/sitemap.xml', '/assets/index-abc.js', '/hero-bg.jpg', '/ARVKLART Horizontal Negative.svg', '/seo-early.js', '/arveveiviser/ui.js'])
     assert.deepEqual(robotsRule(path), [], `${path} skal ikke ha noindex`)
-  assert.deepEqual(robotsRule('/veiviser.html'), ['noindex, indexifembedded'])
+  // Rammen (iframen fra et bo) er ikke en egen side: noindex, og ikke indexifembedded, siden innholdet står på /veiviser
+  assert.deepEqual(robotsRule('/arveveiviser/ramme.html'), ['noindex'])
   // X-Arvklart-Robots speiler reglene (Vercel setter selv noindex på forhåndsvisninger, men aldri dette hodet)
   for (const h of vercel.headers.filter(h => h.headers.some(x => x.key === 'X-Robots-Tag')))
     assert.equal(h.headers.find(x => x.key === 'X-Arvklart-Robots')?.value, h.headers.find(x => x.key === 'X-Robots-Tag').value, `${h.source}: X-Arvklart-Robots må være lik X-Robots-Tag`)
 })
 
-test('vercel.json: gamle /home sendes permanent til forsiden «/», og ingenting annet videresendes', () => {
-  assert.deepEqual(vercel.redirects, [{ source: '/home', destination: '/', permanent: true }])
+test('vercel.json: gamle /home sendes permanent til forsiden «/», /veiviser.html til /veiviser, og ingenting annet videresendes', () => {
+  assert.deepEqual(vercel.redirects, [{ source: '/home', destination: '/', permanent: true }, { source: '/veiviser.html', destination: '/veiviser', permanent: true }])
   assert.ok(!vercel.rewrites.some(r => r.source === '/home'), '/home skal ikke lenger omskrives')
   assert.ok(PUBLIC_PAGES.some(p => p.path === '/') && !PUBLIC_PAGES.some(p => p.path === '/home'))
   for (const p of ['/estate/x', '/estate/x/item/y', '/join/ABC', '/nytt-passord', '/logg-inn'])

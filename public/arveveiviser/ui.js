@@ -12,6 +12,8 @@ import { GRANDPARENT_SIDES, childLines } from './heirs.js'
 import { fill, kr as krPlain, pct } from './text.js'
 import { estateRows, answerSummary, toEstatePayload } from './report.js'
 import { tr, field, isEn, dateLocale } from './i18n.js'
+import { ICON } from './icons.js'
+import { introHtml } from './intro.js'
 
 const root = document.getElementById('arvWizard')
 document.documentElement.lang = isEn() ? 'en' : 'no'
@@ -78,7 +80,10 @@ function adoptAnonymous() {
 
 // Kontakt med Arvklart-appen rundt veiviseren (iframe i GuidePage). Appen tar seg av
 // innlogging og lagring i boet; veiviseren sender bare svarene og ferdig beregnede data.
-const embedded = window.parent !== window
+// Appen rundt veiviseren: GuidePage i rammen over (iframe, fra et bo), eller i samme vindu på /veiviser, der
+// veiviseren ligger direkte i siden (data-veiviser-host, se src/seo/veiviserHost.js). Uten app (rammen åpnet alene): null.
+const HOST = window.parent !== window ? window.parent : (document.querySelector('[data-veiviser-host]') ? window : null)
+const embedded = HOST !== null
 const host = { ready: false, loggedIn: false, estate: null, saved: null, saving: false, message: null }
 let pdfBusy = false
 // Gir et svar et varsel, må brukeren trykke «OK» på det før veiviseren går videre.
@@ -90,25 +95,13 @@ const unacked = q => {
   return key && state.acks?.[q.id] !== key ? key : ''
 }
 let pdfError = null
-const toHost = msg => { if (embedded) window.parent.postMessage(msg, window.location.origin) }
+const toHost = msg => { if (HOST) HOST.postMessage(msg, window.location.origin) }
 
 // ── Hjelpere ─────────────────────────────────────────────────
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
 const kr = krPlain
 const uid = () => Math.random().toString(36).slice(2, 9)
 
-const ICON = {
-  arrow: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>',
-  back: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M11 18l-6-6 6-6"/></svg>',
-  check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>',
-  info: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v5.5M12 8h.01"/></svg>',
-  warn: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 2 20h20L12 3z"/><path d="M12 10v4.5M12 17.5h.01"/></svg>',
-  ext: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17L17 7M8 7h9v9"/></svg>',
-  plus: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
-  download: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>',
-  save: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21V9l8-6 8 6v12"/><path d="M9 21v-7h6v7"/></svg>',
-  edit: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19 9l-4-4L4 16v4z"/></svg>',
-}
 
 // Erstatter plassholdere og gjør fagord om til klikkbare forklaringer – både ord som er
 // markert med [[fagord]], og kjente fagord som står i teksten (se linkTerms i glossary.js).
@@ -201,9 +194,11 @@ function prevQuestion() {
 // ── Visninger ────────────────────────────────────────────────
 function render() {
   if (!storageKey) {
-    root.innerHTML = `<div class="aw-card"><p class="aw-why">${tr('Laster veiviseren …', 'Loading the guide …')}</p></div>`
+    // På /veiviser står startkortet ferdig i HTML-en: det blir stående til appen har sagt hvem som er innlogget
+    if (!root.hasAttribute('data-prerendered')) root.innerHTML = `<div class="aw-card"><p class="aw-why">${tr('Laster veiviseren …', 'Loading the guide …')}</p></div>`
     return
   }
+  root.removeAttribute('data-prerendered')
   const a = pruneAnswers(state.answers)
   const facts = deriveFacts(a)
   let html = ''
@@ -217,25 +212,7 @@ function render() {
 }
 
 function renderIntro() {
-  const hasProgress = Object.keys(state.answers).length > 0
-  return `
-  <div class="aw-card aw-intro">
-    <span class="eyebrow">${tr('Arveveiviser', 'Inheritance guide')}</span>
-    <h2>${tr('Hvem arver – og hvor mye?', 'Who inherits – and how much?')}</h2>
-    <p>${tr('Svar på noen enkle spørsmål om familien og økonomien. Du får en oversikt over hvem som arver, omtrent hvor mye hver får, og hva dere bør gjøre nå.', 'Answer a few simple questions about the family and finances. You get an overview of who inherits, roughly how much each person gets, and what you should do now.')}</p>
-    ${isEn() ? '<p class="aw-hint aw-hint-box">This guide explains Norwegian inheritance law. It is a translation for guidance only; the Norwegian version is the authoritative one.</p>' : ''}
-    <ul class="aw-intro-list">
-      <li>${ICON.check}<span>${tr('Du trenger ikke kunne noe om arveregler – vi forklarer underveis.', 'You do not need to know anything about inheritance rules – we explain as we go.')}</span></li>
-      <li>${ICON.check}<span>${tr('Det tar omtrent 5 minutter. Omtrentlige tall holder.', 'It takes about 5 minutes. Approximate figures are fine.')}</span></li>
-      <li>${ICON.check}<span>${tr('Svarene lagres bare i din egen nettleser.', 'Your answers are only stored in your own browser.')}</span></li>
-    </ul>
-    <div class="aw-actions">
-      ${hasProgress
-        ? `<button type="button" class="aw-btn primary" data-action="resume">${tr('Fortsett der du slapp', 'Continue where you left off')} ${ICON.arrow}</button>
-           <button type="button" class="aw-btn ghost" data-action="restart">${tr('Start på nytt', 'Start again')}</button>`
-        : `<button type="button" class="aw-btn primary" data-action="start">${tr('Start', 'Start')} ${ICON.arrow}</button>`}
-    </div>
-  </div>`
+  return introHtml(Object.keys(state.answers).length > 0)
 }
 
 function renderProgress(qs, idx, q, a) {
@@ -826,6 +803,7 @@ function setPath(path, value) {
 }
 
 root.addEventListener('click', e => {
+  if (!storageKey) return // før appen har svart (startkortet fra HTML-en): ingenting å lagre i ennå
   const term = e.target.closest('.aw-term')
   if (term) {
     const open = term.getAttribute('aria-expanded') === 'true'
@@ -940,7 +918,7 @@ document.addEventListener('click', e => {
 
 // Meldinger fra Arvklart-appen
 window.addEventListener('message', e => {
-  if (e.origin !== window.location.origin || e.source !== window.parent) return
+  if (e.origin !== window.location.origin || !HOST || e.source !== HOST) return
   const m = e.data || {}
   if (m.type === 'veiviser-context') {
     const estateId = m.estateId || m.estate?.id || null

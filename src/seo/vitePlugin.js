@@ -18,6 +18,7 @@ import react from '@vitejs/plugin-react'
 import { SHELL_FILE, dataBlock, defaultHeadTags, headTags, prerenderFile, sitemapXml } from './pages.js'
 import { CONTENT_DIR, clientMeta, publicRegistry } from './content.js'
 import { PAGE_DATA_ID } from './pageData.js'
+import { VEIVISER_PATH, injectVeiviser, veiviserHostParts } from './veiviserHost.js'
 
 const SEO_PLACEHOLDER = '<!--seo-->'
 const SEO_BLOCK = /<!--seo:start-->[\s\S]*?<!--seo:end-->/
@@ -103,13 +104,19 @@ export default function seoPlugin({ contentDir = CONTENT_DIR } = {}) {
         const { render } = await server.ssrLoadModule(ENTRY)
         const registry = publicRegistry(root())
         for (const page of registry.filter(p => p.prerender)) {
-          const data = page.kind === 'guide' ? guideData(page) : null
+          // /veiviser: veiviseren legges direkte i siden etter appen (src/seo/veiviserHost.js), og appen (GuidePage)
+          // vet det fra sidedataene
+          const veiviser = page.path === VEIVISER_PATH
+          const data = page.kind === 'guide' ? guideData(page) : veiviser ? { kind: 'veiviser', path: page.path } : null
           const markup = unescapeStyles(render(page.path, data))
-          const h1 = (markup.match(/<h1[\s>]/g) || []).length
+          let html = injectRoot(injectHead(template, headTags(page)), markup, data)
+          if (veiviser) html = injectVeiviser(html, await veiviserHostParts(config.root))
+          const body = html.slice(html.indexOf('<body'))
+          const h1 = (body.match(/<h1[\s>]/g) || []).length
           if (h1 !== 1) throw new Error(`SEO: ${page.path} ble rendret med ${h1} <h1> (skal være én)`)
           const file = resolve(outDir, prerenderFile(page.path))
           await mkdir(dirname(file), { recursive: true })
-          await writeFile(file, injectRoot(injectHead(template, headTags(page)), markup, data))
+          await writeFile(file, html)
         }
         await writeFile(resolve(outDir, 'sitemap.xml'), sitemapXml(registry))
       } finally {

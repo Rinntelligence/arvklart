@@ -48,12 +48,14 @@ export const PUBLIC_PAGES = [
     sitemap: true,
   },
   {
+    // Hele veiviseren står i HTML-en (src/seo/veiviserHost.js). Tittel og beskrivelse er satt sammen av tekst som
+    // står på siden: «Arveveiviser», «Hvem arver – og hvor mye?», H1 og innledningen.
     path: '/veiviser',
-    title: 'Veiviser — Arvklart',
-    title_en: 'Guide — Arvklart',
+    title: 'Arveveiviser: Hvem arver – og hvor mye? — Arvklart',
+    title_en: 'Inheritance guide: Who inherits – and how much? — Arvklart',
     description: 'Fra dødsfall til fordelt bo — steg for steg. Finn ut hvem som arver og hvor mye, basert på din situasjon.',
     description_en: 'From death to a distributed estate — step by step. Find out who inherits and how much, based on your situation.',
-    prerender: false,
+    prerender: true,
     sitemap: true,
   },
 ]
