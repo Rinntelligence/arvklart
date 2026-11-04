@@ -2,7 +2,8 @@
 // Brukes av byggesteget (src/seo/vitePlugin.js), bare i Node.
 //
 // Kilden er rammen /arveveiviser/ramme.html (samme markering og CSS som brukerne har sett i iframen) og
-// innholdsmodulene i public/arveveiviser: sections.js (de fem fasene, ordlisten og ressursene) og intro.js
+// innholdsmodulene i public/arveveiviser: sections.js (avsenderlinjen, «Hvem arver etter loven?», oversikten og de fem
+// fasene, ordlisten og ressursene) og intro.js
 // (startkortet i veiviseren). Byggesteget fyller dem inn i HTML-en; teksten skrives ikke om. I nettleseren kobler
 // page.js og ui.js på knappene og tar over veiviseren, og GuidePage (appen) snakker med den i samme vindu
 // (data-veiviser-host) i stedet for gjennom iframen.
@@ -109,6 +110,9 @@ export async function veiviserHostParts(root = process.cwd()) {
   const noscript = markup.match(/<div id="arvWizard">(<noscript>[\s\S]*?<\/noscript>)<\/div>/)
   if (!noscript) throw new Error('veiviser: fant ikke #arvWizard')
   markup = markup.replace(noscript[0], () => `<div id="arvWizard" data-prerendered>${noscript[1]}${introHtml(false)}</div>`)
+  markup = fill(markup, '<div class="byline" id="bylineWrap">', s.bylineHtml())
+  markup = fill(markup, '<div class="who" id="whoWrap">', s.whoInheritsHtml())
+  markup = fill(markup, '<div id="phaseOverviewWrap">', s.phaseOverviewHtml())
   markup = fill(markup, '<div class="timeline" id="timelineWrap">', s.timelineHtml())
   markup = fill(markup, '<div class="glossary-grid" id="glossaryWrap">', s.glossaryHtml())
   markup = fill(markup, '<div id="resourcesWrap">', s.resourcesHtml())

@@ -27,7 +27,10 @@ export const SOURCES = {
   arveloven_forsorgelse: law(56, 'Barn som avdøde forsørget', 'Children the deceased supported'),
   arveloven_testament_form: law(42, 'Krav til testament', 'Requirements for a will'),
   arveloven_testament_melding: law(65, 'Testamentsarvinger må melde seg innen seks måneder', 'Heirs under a will must come forward within six months'),
-  arveloven_avkorting: law(75, 'Forskudd på arv (avkorting)', 'Advance on inheritance (avkorting)'),
+  arveloven_avkorting: law(75, 'Forskudd på arv (avkorting) for gaver fra 2021', 'Advance on inheritance (avkorting) for gifts from 2021'),
+  // Gaver gitt før 1. januar 2021 følger arveloven 1972 § 38 (§ 180 sjette ledd), også når avkorting ble bestemt etter 2020 (HR-2025-1182-A)
+  arveloven_1972_avkorting: { title: 'Arveloven 1972 § 38 – Avkorting for gaver gitt før 2021', title_en: 'Inheritance Act 1972 § 38 – Avkorting for gifts given before 2021 (in Norwegian)', short: 'Arveloven 1972 § 38', short_en: 'Inheritance Act 1972 § 38', url: 'https://lovdata.no/lov/1972-03-03-5/§38' },
+  hr_2025_1182: { title: 'Høyesterett HR-2025-1182-A – avkorting for gaver gitt før 2021', title_en: 'Supreme Court HR-2025-1182-A – avkorting for gifts given before 2021 (in Norwegian)', short: 'HR-2025-1182-A', short_en: 'HR-2025-1182-A', url: 'https://www.domstol.no/globalassets/upload/hret/avgjorelser/2025/juni/hr-2025-1182--a.pdf' },
   arveloven_staten: law(76, 'Når det ikke finnes arvinger', 'When there are no heirs'),
   arveloven_internasjonal: law(78, 'Hvilket lands arvelov gjelder', 'Which country\'s inheritance law applies'),
   arveloven_ikraft: law(180, 'Hvilke dødsfall den nye arveloven gjelder for', 'Which deaths the new Inheritance Act applies to'),
@@ -55,6 +58,8 @@ export const SOURCES = {
   arveloven_overta: law(113, 'Ektefellens rett til å overta bolig og innbo', 'The spouse\'s right to take over the home and contents'),
   skifteloven_proklama: law(102, 'Proklama: kreditorer må melde krav innen seks uker', 'Proklama: creditors must report claims within six weeks'),
   arveloven_privat_skifte: law(116, 'Privat skifte og ansvar for gjeld', 'Private settlement and liability for debts'),
+  // Endringslov 16. juni 2023 nr. 59, i kraft 1. oktober 2023: lemping av gjeldsansvaret (arveloven §§ 20, 35 og 116)
+  arveloven_2023_gjeld: { title: 'Endringslov 2023 – lemping av arvingenes gjeldsansvar (i kraft 1. oktober 2023)', title_en: 'Amending act 2023 – reduction of heirs\' liability for debts (in force 1 October 2023) (in Norwegian)', short: 'Lov 16. juni 2023 nr. 59', short_en: 'Act of 16 June 2023 no. 59', url: 'https://lovdata.no/lov/2023-06-16-59' },
   arveloven_privat_frist: law(117, 'Frist på 60 dager for privat skifte', 'Deadline of 60 days for private settlement'),
   arveloven_skifteattest: law(118, 'Skifteattest', 'Probate certificate (skifteattest)'),
   arveloven_offentlig: law(127, 'Hvem som kan kreve offentlig skifte', 'Who can demand public administration of the estate'),
