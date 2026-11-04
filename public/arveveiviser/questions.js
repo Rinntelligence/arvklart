@@ -431,7 +431,7 @@ export const QUESTIONS = [
     titleSurvivor: 'Fikk du vite om testamentet mens avdøde levde?', titleSurvivor_en: 'Did you learn about the will while the deceased was alive?',
     why: 'Et testament kan bare gi ektefelle eller samboer mindre enn loven sier, dersom de fikk vite om testamentet før dødsfallet, eller det var umulig eller urimelig vanskelig å varsle dem. Ektefellens minstearv er uansett beskyttet.', why_en: 'A will can only give a spouse or cohabitant less than the law says if they learned about the will before the death, or it was impossible or unreasonably difficult to notify them. A spouse\'s minimum inheritance is protected in any case.',
     options: YES_NO_UNKNOWN,
-    learnMore: { sources: ['arveloven_testament_ektefelle', 'arveloven_testament_samboer'] },
+    learnMore: { sources: ['arveloven_testament_ektefelle', 'arveloven_samboer_arv'] },
   },
   {
     id: 'cohabitantFiveYears',
@@ -461,8 +461,8 @@ export const QUESTIONS = [
     ],
     learnMore: {
       title: 'Hva er forskudd på arv (avkorting)?', title_en: 'What is an advance on inheritance (avkorting)?',
-      text: 'En gave til et barn trekkes bare fra arven dersom avdøde satte det som betingelse da gaven ble gitt. For gaver gitt før 2021 kunne avdøde også bestemme det senere, men senest 31. desember 2020. Vanlige gaver til jul og bursdag, og vanlig forsørgelse og utdanning, regnes normalt ikke som forskudd.', text_en: 'A gift to a child is only deducted from the inheritance if the deceased made it a condition when the gift was given. For gifts given before 2021, the deceased could also decide this later, but no later than 31 December 2020. Ordinary Christmas and birthday presents, and ordinary support and education, are normally not regarded as advances.',
-      sources: ['arveloven_avkorting'],
+      text: 'Reglene avhenger av når gaven ble gitt. En gave gitt fra 1. januar 2021 trekkes bare fra arven dersom avdøde satte det som betingelse da gaven ble gitt. For gaver gitt før 2021 gjelder den gamle arveloven: en større gave kan trekkes fra hvis avdøde bestemte det, også etter 2020, eller hvis det er godtgjort at det var avdødes forutsetning. Veiviseren spør ikke om når gavene ble gitt. Vanlige gaver til jul og bursdag, og vanlig forsørgelse og utdanning, regnes normalt ikke som forskudd.', text_en: 'The rules depend on when the gift was given. A gift given from 1 January 2021 is only deducted from the inheritance if the deceased made it a condition when the gift was given. For gifts given before 2021 the old Inheritance Act applies: a larger gift can be deducted if the deceased decided so, also after 2020, or if it is shown that this was the deceased\'s assumption. The guide does not ask when the gifts were given. Ordinary Christmas and birthday presents, and ordinary support and education, are normally not regarded as advances.',
+      sources: ['arveloven_avkorting', 'arveloven_1972_avkorting', 'hr_2025_1182'],
     },
   },
   {

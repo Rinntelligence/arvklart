@@ -184,14 +184,14 @@ export const NOTICES = [
     when: { all: [{ fact: 'testamentLimitsPartner' }, { q: 'testamentPartnerKnew', eq: 'yes' }] },
     title: 'Testamentet begrenser arven til {partnerDeg}', title_en: 'The will limits the inheritance for {partnerDeg}',
     text: 'Fordi {partnerDu} visste om testamentet, kan det gi mindre enn loven ellers sier. Med testamentet blir arven {partnerAmount}. Ektefellens minstearv kan ikke tas bort, men samboerens arv kan begrenses.', text_en: 'Because {partnerDu} knew about the will, it can give less than the law otherwise says. With the will, the inheritance is {partnerAmount}. A spouse\'s minimum inheritance cannot be taken away, but a cohabitant\'s inheritance can be limited.',
-    sources: ['arveloven_testament_ektefelle', 'arveloven_testament_samboer'],
+    sources: ['arveloven_testament_ektefelle', 'arveloven_samboer_arv'],
   },
   {
     id: 'testamentLimitsPartnerNotKnew', area: 'meaning', level: 'warning',
     when: { all: [{ fact: 'testamentLimitsPartner' }, { q: 'testamentPartnerKnew', ne: 'yes' }] },
     title: 'Testamentet kan trolig ikke redusere arven til {partnerDeg}', title_en: 'The will probably cannot reduce the inheritance for {partnerDeg}',
     text: 'Et testament kan bare gi ektefelle eller samboer mindre enn loven sier, hvis de fikk vite om testamentet mens avdøde levde. Vi har derfor regnet med full arv etter loven.', text_en: 'A will can only give a spouse or cohabitant less than the law says if they learned about the will while the deceased was alive. We have therefore calculated with the full statutory inheritance.',
-    sources: ['arveloven_testament_ektefelle', 'arveloven_testament_samboer'],
+    sources: ['arveloven_testament_ektefelle', 'arveloven_samboer_arv'],
   },
   {
     id: 'testamentCohabitant', area: 'meaning', level: 'info',
@@ -272,9 +272,9 @@ export const NOTICES = [
   {
     id: 'advancementGifts', area: 'meaning', level: 'info',
     when: { fact: 'advancementGifts' },
-    title: 'Vanlige gaver trekkes ikke fra arven', title_en: 'Ordinary gifts are not deducted from the inheritance',
-    text: 'En gave trekkes bare fra arven hvis avdøde gjorde det til en betingelse at det var forskudd på arv. Det bør helst ha vært skriftlig og kjent for de andre barna.', text_en: 'A gift is only deducted from the inheritance if the deceased made it a condition that it was an advance on inheritance. Ideally this should have been in writing and known to the other children.',
-    sources: ['arveloven_avkorting'],
+    title: 'Gavene er ikke trukket fra arven', title_en: 'The gifts have not been deducted from the inheritance',
+    text: 'Veiviseren har ikke trukket fra gavene. For gaver gitt fra 2021 er det riktig når avdøde ikke satte det som betingelse da gaven ble gitt. For gaver gitt før 2021 gjelder den gamle arveloven: en større gave kan likevel trekkes fra hvis avdøde bestemte det, også senere, eller hvis det var avdødes forutsetning. Avklar dette før dere fordeler.', text_en: 'The guide has not deducted the gifts. For gifts given from 2021 this is right when the deceased did not make it a condition when the gift was given. For gifts given before 2021 the old Inheritance Act applies: a larger gift can still be deducted if the deceased decided so, also later, or if it was the deceased\'s assumption. Clarify this before you distribute.',
+    sources: ['arveloven_avkorting', 'arveloven_1972_avkorting', 'hr_2025_1182'],
   },
   {
     id: 'previousUskifte', area: 'meaning', level: 'warning',

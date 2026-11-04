@@ -27,7 +27,10 @@ export const SOURCES = {
   arveloven_forsorgelse: law(56, 'Barn som avdøde forsørget', 'Children the deceased supported'),
   arveloven_testament_form: law(42, 'Krav til testament', 'Requirements for a will'),
   arveloven_testament_melding: law(65, 'Testamentsarvinger må melde seg innen seks måneder', 'Heirs under a will must come forward within six months'),
-  arveloven_avkorting: law(75, 'Forskudd på arv (avkorting)', 'Advance on inheritance (avkorting)'),
+  arveloven_avkorting: law(75, 'Forskudd på arv (avkorting) for gaver fra 2021', 'Advance on inheritance (avkorting) for gifts from 2021'),
+  // Gaver gitt før 1. januar 2021 følger arveloven 1972 § 38 (§ 180 sjette ledd), også når avkorting ble bestemt etter 2020 (HR-2025-1182-A)
+  arveloven_1972_avkorting: { title: 'Arveloven 1972 § 38 – Avkorting for gaver gitt før 2021', title_en: 'Inheritance Act 1972 § 38 – Avkorting for gifts given before 2021 (in Norwegian)', short: 'Arveloven 1972 § 38', short_en: 'Inheritance Act 1972 § 38', url: 'https://lovdata.no/lov/1972-03-03-5/§38' },
+  hr_2025_1182: { title: 'Høyesterett HR-2025-1182-A – avkorting for gaver gitt før 2021', title_en: 'Supreme Court HR-2025-1182-A – avkorting for gifts given before 2021 (in Norwegian)', short: 'HR-2025-1182-A', short_en: 'HR-2025-1182-A', url: 'https://www.domstol.no/globalassets/upload/hret/avgjorelser/2025/juni/hr-2025-1182--a.pdf' },
   arveloven_staten: law(76, 'Når det ikke finnes arvinger', 'When there are no heirs'),
   arveloven_internasjonal: law(78, 'Hvilket lands arvelov gjelder', 'Which country\'s inheritance law applies'),
   arveloven_ikraft: law(180, 'Hvilke dødsfall den nye arveloven gjelder for', 'Which deaths the new Inheritance Act applies to'),

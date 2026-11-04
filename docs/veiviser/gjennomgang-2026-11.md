@@ -7,7 +7,7 @@ Gjelder draft-PR-en på grenen `claude/veiviser-innhold` (bygger på PR #62, der
 - I veiviseren er definisjonen av minstearv (`glossary.js`), to resultattekster i `rules.js` (T18, T23) og én hjelpetekst i `questions.js` (T38) rettet, fordi de var upresise eller motsa beregningen. Hvilket varsel som vises, og beløpene, er uendret.
 - Forslag som ville endret beregningen, står i avsnitt 7.
 
-**Kildekontroll.** Lovdata, Domstolene, NAV og Skatteetaten kunne ikke åpnes direkte fra arbeidsmiljøet (Lovdata er sperret i nettverkspolicyen). Påstandene er derfor kontrollert mot utdrag av primærkildene fra søk, og mot kildelisten veiviseren allerede bruker (`public/arveveiviser/sources.js`). Alt som er merket **Krever juridisk godkjenning før merge**, må leses av en jurist mot gjeldende tekst før PR-en flettes.
+**Kildekontroll.** Lovdata, Domstolene, NAV og Skatteetaten kunne ikke åpnes direkte fra arbeidsmiljøet (lovdata.no og domstol.no er sperret i nettverkspolicyen). Se avsnitt 4d for hva som er bekreftet og hva som er usikkert. Ingenting her er juridisk godkjenning. Påstandene er derfor kontrollert mot utdrag av primærkildene fra søk, og mot kildelisten veiviseren allerede bruker (`public/arveveiviser/sources.js`). Alt som er merket **Krever juridisk godkjenning før merge**, må leses av en jurist mot gjeldende tekst før PR-en flettes.
 
 ---
 
@@ -40,8 +40,8 @@ Forklaring på statusene i tabellen:
 | Testament som begrenser samboerens arv (§ 12) | Korrekt (teksten rettet i T23) | `calculate.js:149`, `rules.js` testamentLimitsPartnerKnew | Beregningen gir 0 kr. Før sa teksten «Minstearven er likevel beskyttet». Jurist bør bekrefte 0 kr (F13) |
 | Testament med bestemte gjenstander eller ulik fordeling | Delvis | `engine.js` complexReasons testamentUneven | Viser lovens hovedregel med varsel |
 | Testament om uskifte, felles eller gjensidig testament | Delvis | testamentUskifte, testamentOther | Varsel; ordlyden vurderes ikke. Felles eller gjensidig testament er ikke et eget valg («Noe annet») |
-| Forskudd på arv til barn, med beskjed fra avdøde | Korrekt (testet) | scenarios 19 | Trekkes fra; aldri tilbakebetaling |
-| Gaver uten beskjed om forskudd | Korrekt | `rules.js` advancementGifts | Trekkes ikke fra; forklart |
+| Forskudd på arv til barn, med beskjed fra avdøde | **Kan villede** | scenarios 19 | Trekkes alltid fra. For gaver fra 2021 er det bare riktig hvis betingelsen ble satt da gaven ble gitt. Se F14 |
+| Gaver uten beskjed om forskudd | **Kan villede** | `rules.js` advancementGifts | Trekkes aldri fra. For gaver gitt før 2021 kan de likevel avkortes (arveloven 1972 § 38, HR-2025-1182-A). Teksten varsler nå (T48); tallene er uendret. Se F14 |
 | Forskudd til andre enn barn (barnebarn, søsken) | Ikke støttet | `questions.js` advancements (bare «noen av barna») | |
 | Uskifte for ektefelle, med og uten særkullsbarn | Korrekt (testet) | scenarios 1–4 | Samtykke fra særkullsbarn, delvis uskifte (§ 16) |
 | Uskifte for samboer (bolig, innbo, bil, fritidsbolig) | Korrekt / delvis | `calculate.js:312`; scenarios 8 | Uklart om samboeren i tillegg kan få 4 G; varsles (uskifteCohabitantRest) |
@@ -203,8 +203,85 @@ Lovdata er fortsatt sperret fra arbeidsmiljøet. Kildene under er utdrag fra sø
 | T40 | «Hvem arver», 3. klasse, og `rules.js` grandparentsInherit (punkt 2) | … til hans eller hennes barn (søskenbarn). Lenger går ikke arveretten etter loven. | … Finnes ingen arvinger på den ene siden, arver den andre siden alt. Lenger enn til søskenbarn går ikke arveretten etter loven. (Resultatteksten: «Finnes ingen arvinger på den ene siden, får den andre siden alt.») | § 6 sier at hele arven går til arvingene på den andre siden når den ene siden ikke har arvinger. Beregningen gjør det allerede (`heirs.js` thirdOrder bruker bare sider med arvinger; testen «besteforeldre: farfar og en halvtante på farssiden, ingen på morssiden») | Arveloven § 6 ([Lovdata](https://lovdata.no/lov/2019-06-14-21)); [NOU 2014: 1 kap. 2](https://www.regjeringen.no/no/dokumenter/nou-2014-1/id750736/?ch=3); [paragrafer.no: § 6](https://www.paragrafer.no/arverett/arveloven-6/) (kommentar) | **Krever juridisk godkjenning før merge** |
 | T41 | Testament og kravet om at ektefelle eller samboer visste om det (punkt 3): «Hvem arver», ordlisten (minstearv), `glossary.js` (minstearv) og hjelpeteksten til testamentPartnerKnew i `questions.js` | … kan bare begrenses hvis de fikk vite om testamentet før dødsfallet. | … hvis de fikk vite om testamentet før dødsfallet, eller det var umulig eller urimelig vanskelig å varsle dem. | Unntaket står i § 10 første ledd annet punktum (ektefelle) og gjelder tilsvarende for samboer (§ 12). Spørsmålet i veiviseren er fortsatt Ja / Nei / Vet ikke, og beregningen tar ikke hensyn til unntaket (F13) | Arveloven §§ 10 og 12 ([Lovdata](https://lovdata.no/lov/2019-06-14-21)); [NOU 2014: 1 kap. 4](https://www.regjeringen.no/no/dokumenter/nou-2014-1/id750736/?ch=4); [paragrafer.no: § 10](https://www.paragrafer.no/arverett/arveloven-10/) og [§ 12](https://www.paragrafer.no/arverett/arveloven-12/) (kommentar) | **Krever juridisk godkjenning før merge** |
 | T42 | Fase 2, 60-dagersfristen (punkt 4) | Fristen er 60 dager etter dødsfallet: innen da må minst én arving ha påtatt seg gjelden og meldt privat skifte til tingretten, eller gjenlevende ektefelle eller samboer ha meldt at de vil sitte i uskifte. … | Skal boet skiftes privat, må minst én arving ha påtatt seg ansvaret for gjelden innen 60 dager etter dødsfallet. Vil gjenlevende ektefelle eller samboer sitte i uskifte, må det også meldes innen 60 dager. Retten kan sette en annen frist. Arvingene kan i stedet kreve offentlig skifte, og overtar ingen boet, kan tingretten selv bestemme offentlig skifte. … | «Innen da må … eller …» kunne leses som at privat skifte og uskifte er de eneste mulighetene. Offentlig skifte (etter krav eller fordi ingen overtar) og bo av liten verdi (står i «Hva er det») er også mulig | Arveloven §§ 117–118, 19 og 28; [Domstolene: Forskjellige former for skifte](https://www.domstol.no/no/dodsfall-arv-og-skifte/forskjellige-former-for-skifte/) («Retten kan også selv beslutte offentlig skifte dersom ingen av arvingene overtar boet til privat skifte»); [Domstolene: Hva må arvinger gjøre?](https://www.domstol.no/no/dodsfall-arv-og-skifte/hva-ma-arvinger-gjore-etter-et-dodsfall/) | **Krever juridisk godkjenning før merge** |
-| T43 | Fase 3, forskudd, og ordlisten (side og `glossary.js`) (punkt 5) | … penger eller gjenstander avdøde ga til en arving mens de levde, og som avdøde bestemte at skulle trekkes fra arven senere. / En gave til et barn som avdøde sa skulle trekkes fra barnets arv senere (avkorting). | … ga til et barn eller barnebarn, på den betingelsen at det skulle trekkes fra arven senere. Betingelsen må ha vært satt da gaven ble gitt. / En gave til et barn eller barnebarn, gitt på den betingelsen at den skal trekkes fra arven senere (avkorting). Betingelsen må være satt da gaven ble gitt. | Etter arveloven 2019 må avkorting være satt som betingelse da ytelsen ble gitt, så mottakeren kunne avslå. Arvelateren kan ikke bestemme det ensidig senere. Avkorting gjelder livsarvinger, ikke «en arving» generelt | Arveloven § 75 ([Lovdata](https://lovdata.no/lov/2019-06-14-21)); [Advokatbladet: Avkortning i arv må bestemmes før 1. januar 2021](https://www.advokatbladet.no/arveloven/avkortning-i-arv-ma-bestemmes-for-1-januar-2021/152880); [paragrafer.no: § 75](https://www.paragrafer.no/arverett/arveloven-75/) (kommentar) | **Krever juridisk godkjenning før merge.** Vurder om «barn eller barnebarn» bør være «livsarving» |
-| T44 | Veiviserens hjelpetekst «Hva er forskudd på arv (avkorting)?» (`questions.js`, bare tekst; ikke nevnt i gjennomgangen) | En gave til et barn trekkes bare fra arven dersom avdøde bestemte det da gaven ble gitt, eller senere i et testament. | En gave til et barn trekkes bare fra arven dersom avdøde satte det som betingelse da gaven ble gitt. For gaver gitt før 2021 kunne avdøde også bestemme det senere, men senest 31. desember 2020. | «Eller senere i et testament» er feil etter arveloven 2019. Overgangsregelen tillot senere fastsettelse for eldre gaver bare til og med 31.12.2020. Veiviseren gjelder dødsfall fra 2021, så overgangsregelen er relevant. Spørsmålet og beregningen er uendret | Som T43 (overgangsregelen: Advokatbladet) | **Krever juridisk godkjenning før merge.** Juristen bør bekrefte overgangsregelen og fristen |
+| T43 | Fase 3, forskudd, og ordlisten (side og `glossary.js`) (punkt 5) | … penger eller gjenstander avdøde ga til en arving mens de levde, og som avdøde bestemte at skulle trekkes fra arven senere. / En gave til et barn som avdøde sa skulle trekkes fra barnets arv senere (avkorting). | … ga til et barn eller barnebarn, på den betingelsen at det skulle trekkes fra arven senere. Betingelsen må ha vært satt da gaven ble gitt. / En gave til et barn eller barnebarn, gitt på den betingelsen at den skal trekkes fra arven senere (avkorting). Betingelsen må være satt da gaven ble gitt. | Etter arveloven 2019 må avkorting være satt som betingelse da ytelsen ble gitt, så mottakeren kunne avslå. Arvelateren kan ikke bestemme det ensidig senere. Avkorting gjelder livsarvinger, ikke «en arving» generelt | Arveloven § 75 ([Lovdata](https://lovdata.no/lov/2019-06-14-21)); [Advokatbladet: Avkortning i arv må bestemmes før 1. januar 2021](https://www.advokatbladet.no/arveloven/avkortning-i-arv-ma-bestemmes-for-1-januar-2021/152880); [paragrafer.no: § 75](https://www.paragrafer.no/arverett/arveloven-75/) (kommentar) | **Erstattet av T45 og T46** (skilte ikke mellom gaver før og etter 2021) |
+| T44 | Veiviserens hjelpetekst «Hva er forskudd på arv (avkorting)?» (`questions.js`, bare tekst; ikke nevnt i gjennomgangen) | En gave til et barn trekkes bare fra arven dersom avdøde bestemte det da gaven ble gitt, eller senere i et testament. | En gave til et barn trekkes bare fra arven dersom avdøde satte det som betingelse da gaven ble gitt. For gaver gitt før 2021 kunne avdøde også bestemme det senere, men senest 31. desember 2020. | «Eller senere i et testament» er feil etter arveloven 2019. Overgangsregelen tillot senere fastsettelse for eldre gaver bare til og med 31.12.2020. Veiviseren gjelder dødsfall fra 2021, så overgangsregelen er relevant. Spørsmålet og beregningen er uendret | Som T43 (overgangsregelen: Advokatbladet) | **Feil, erstattet av T47.** Fristen 31.12.2020 er feil etter HR-2025-1182-A |
+
+## 4d. Runde 5: forskudd på arv etter HR-2025-1182-A, og ny kontroll av kildene
+
+### Hva var galt
+T44 (runde 4) sa at avkorting for gaver gitt før 2021 «senest» måtte være bestemt 31. desember 2020. Det er feil.
+- Kilden var en artikkel i Advokatbladet fra 2020. Den ble skrevet før Høyesterett tok stilling.
+- Jeg sjekket ikke om nyere rettspraksis hadde endret forståelsen.
+- T43 sa at betingelsen «må være satt da gaven ble gitt», uten å skille på når gaven ble gitt.
+
+### Hva Høyesterett avgjorde
+HR-2025-1182-A (24. juni 2025) tolker overgangsregelen i arveloven § 180 sjette ledd:
+- Gaver gitt **før 1. januar 2021** følger arveloven 1972 § 38. Det gjelder også når arvelateren først bestemte eller forutsatte avkorting etter 2020.
+- Gaver gitt **fra 1. januar 2021** følger arveloven § 75: avkorting må være satt som betingelse da gaven ble gitt.
+- Lagmannsrettens dom ble opphevet.
+
+Arveloven 1972 § 38, etter utdrag fra Lovdata:
+- En «monaleg gåve» til en livsarving skal avkortes når de andre livsarvingene ikke har fått tilsvarende.
+- Det gjelder når arvelateren har bestemt det, eller det er godtgjort at avkortingen samsvarer med arvelaterens forutsetninger.
+- Det er ikke formkrav, og bestemmelsen kan komme etter gaven.
+- Utlegg til underhold, sykehjelp og utdanning innenfor foreldrenes forsørgelsesplikt regnes ikke som forskudd.
+
+**Kildestatus:**
+- **Dommen er ikke lest i fulltekst.** Både domstol.no og lovdata.no er sperret i nettverkspolicyen her, og avsnitt 19–43 er derfor ikke kontrollert.
+- **Innholdet er hentet fra flere uavhengige sammendrag**, som er enige om hovedpunktet: [Hjort](https://www.hjort.no/hoyesterettsdom-om-tolkningen-av-overgangsreglene-om-avkortning-i-arv/), [Harris](https://harris.no/aktuelt/avkortning-av-arveforskudd-avklaring-i-ny-dom-fra-hoyesterett/), [Stiegler](https://stiegler.no/aktuelt/ny-dom-fra-hogsterett-om-avkorting-i-arv-for-gaver-gjevne-for-2021/), [Halvorsen & Co](https://halvorsenco.no/en/articles/family-and-heritage/supreme-court-judgement-hr-2025-1182-a-reduction-in-inheritance-and-transitional-rules/), [Langseth](https://www.langsethadvokat.no/avkortning-av-gaver-gitt-for-2021/) og [Dehn](https://www.dehn.no/aktuelt/hoeyesterettsdom-om-avkortning-i-arv-hva-betyr-dette-for-deg/).
+- **Halvorsen & Co sitt engelske sammendrag** har én setning om «concurrency requirement» som kan leses motsatt. Den avviker fra de andre og fra brukerens lesning av dommen. Jurist bør lese avsnitt 19–43 selv.
+
+Primærkilder:
+- [HR-2025-1182-A](https://www.domstol.no/globalassets/upload/hret/avgjorelser/2025/juni/hr-2025-1182--a.pdf);
+- [arveloven 1972 § 38](https://lovdata.no/lov/1972-03-03-5/§38);
+- [arveloven §§ 75 og 180](https://lovdata.no/lov/2019-06-14-21).
+
+### Rettelser (T45–T48)
+
+| # | Sted | Før | Etter | Status |
+|---|---|---|---|---|
+| T45 (erstatter T43) | Fase 3, forskudd | Forskudd på arv er penger eller gjenstander avdøde ga til et barn eller barnebarn, på den betingelsen at det skulle trekkes fra arven senere. Betingelsen må ha vært satt da gaven ble gitt. | Forskudd på arv er en gave til et barn eller barnebarn som skal trekkes fra arven senere (avkorting). Reglene avhenger av når gaven ble gitt. For gaver gitt fra 1. januar 2021 må avdøde ha satt det som betingelse da gaven ble gitt. For gaver gitt før 2021 gjelder den gamle arveloven: en større gave kan trekkes fra hvis avdøde bestemte det, også senere, eller hvis det er godtgjort at det var avdødes forutsetning. / «Slik gjør du det» har fått: «Noter når hver gave ble gitt, og hva avdøde sa eller skrev om den.» | **Krever juridisk godkjenning før merge** |
+| T46 (erstatter T43) | Ordlisten, forskudd på arv (side og `glossary.js`) | En gave til et barn eller barnebarn, gitt på den betingelsen at den skal trekkes fra arven senere (avkorting). Betingelsen må være satt da gaven ble gitt. | En gave til et barn eller barnebarn som skal trekkes fra arven senere (avkorting). For gaver gitt fra 2021 må det være satt som betingelse da gaven ble gitt. For gaver gitt før 2021 kan avdøde ha bestemt det senere. | **Krever juridisk godkjenning før merge** |
+| T47 (erstatter T44) | Veiviserens hjelpetekst «Hva er forskudd på arv (avkorting)?» (`questions.js`, bare tekst og kilder) | … dersom avdøde satte det som betingelse da gaven ble gitt. For gaver gitt før 2021 kunne avdøde også bestemme det senere, men senest 31. desember 2020. | Reglene avhenger av når gaven ble gitt. En gave gitt fra 1. januar 2021 trekkes bare fra arven dersom avdøde satte det som betingelse da gaven ble gitt. For gaver gitt før 2021 gjelder den gamle arveloven: en større gave kan trekkes fra hvis avdøde bestemte det, også etter 2020, eller hvis det er godtgjort at det var avdødes forutsetning. Veiviseren spør ikke om når gavene ble gitt. | **Krever juridisk godkjenning før merge** |
+| T48 | Resultatteksten advancementGifts (`rules.js`, bare tekst og kilder), som vises når brukeren svarer «Noen fikk gaver, men det ble ikke sagt noe om forskudd» | **Vanlige gaver trekkes ikke fra arven.** En gave trekkes bare fra arven hvis avdøde gjorde det til en betingelse at det var forskudd på arv. Det bør helst ha vært skriftlig og kjent for de andre barna. | **Gavene er ikke trukket fra arven.** Veiviseren har ikke trukket fra gavene. For gaver gitt fra 2021 er det riktig når avdøde ikke satte det som betingelse da gaven ble gitt. For gaver gitt før 2021 gjelder den gamle arveloven: en større gave kan likevel trekkes fra hvis avdøde bestemte det, også senere, eller hvis det var avdødes forutsetning. Avklar dette før dere fordeler. | **Krever juridisk godkjenning før merge.** Teksten fantes før PR #63, og var feil for gaver gitt før 2021 |
+
+Kildene til veiviseren (`sources.js`) har fått arveloven 1972 § 38 og HR-2025-1182-A, og § 75 er merket «for gaver fra 2021». Hjelpeteksten og T48 viser til alle tre.
+
+### Selvkritisk kontroll av de andre juridiske endringene
+
+Søkt etter nyere avgjørelser fra Høyesterett og lovendringer for hvert tema. Det jeg ikke fant, er ikke bevis for at det ikke finnes noe. Søk i Lovdata ble ikke gjort, fordi Lovdata er sperret.
+
+| Tema (T-nr.) | Funn | Konsekvens |
+|---|---|---|
+| Ansvar for gjeld ved privat skifte (T25, T26, T42) | Endringslov [LOV-2023-06-16-59](https://lovdata.no/lov/2023-06-16-59), i kraft 1.10.2023, endret §§ 20, 35, 92, 116, 118 og 139. Retten kan i særlige tilfeller lempe arvingens ansvar overfor enkelte kreditorer (§ 92). Arvinger som etter testament bare får et bestemt gode av liten verdi, kan ikke påta seg gjeldsansvar (§ 116) | Hovedregelen i teksten (minst én arving påtar seg gjelden) står seg. Lempingen er ikke nevnt; det er en forenkling, ikke en feil |
+| Uskifte, frist (T26, T42) | Kildene spriker om paragrafnummeret for fristen ved ektefelleuskifte (§ 19 eller § 20), og § 20 ble endret i 2023 | Siden nevner ikke paragrafnummeret. I dette dokumentet er «§ 19» usikkert |
+| Samboer (T20, T30, T41) | Ingen ny avgjørelse fra Høyesterett funnet. NOU 2025: 6 *Samboerloven* (mai 2025; lenke ikke kontrollert) er en utredning, ikke vedtatt lov | Teksten står seg. Samboerreglene kan endres senere og bør følges med |
+| Uskifte, gaver fra uskifteboet | [HR-2022-2157-A](https://www.domstol.no/globalassets/upload/hret/avgjorelser/2022/november-2022/hr-2022-2157-a.pdf) om gaver fra uskiftet bo (faresone 10–30 % av nettoverdien) | Berører ikke tekstene i PR #63 |
+| Pliktdelsarv (T3, «Hvem arver») | Ingen ny avgjørelse fra Høyesterett funnet om § 50 | Ingen endring |
+| Arvegangsklassene (T16, T17, T39, T40) | Ingen ny avgjørelse funnet. Bekreftet mot utdrag av §§ 4–6, NOU 2014: 1 og kommentarer | Ingen endring |
+| Kjennskap til testament (T21, T41) | Ingen ny avgjørelse funnet. Unntaket bekreftet for § 10; for samboer bare i kommentar og regjeringen.no | Ingen endring; § 12 bør leses av jurist |
+| Gravferd (T31) | Gravplassloven § 9 ser ikke ut til å være endret etter 2011. Rekkefølgen stemmer i alle kilder | Ingen endring |
+| Summarisk skifte (T29) | «§ 141» kommer bare fra et sekundært sammendrag | Paragrafnummeret er usikkert; teksten på siden nevner det ikke |
+| Arv over 100 000 kr (T37) | Bekreftet mot Skatteetatens side for etterlatte | Ingen endring |
+| Kildehenvisning, samboer og testament | Varselene testamentLimitsPartnerKnew og -NotKnew, og hjelpeteksten til testamentPartnerKnew, viste til § 13 (testament *til* samboer etter fem år). Regelen om å begrense samboerens arv står i § 12 | Rettet: viser nå til § 12 (`arveloven_samboer_arv`). Ingen tekst er endret |
+
+### Hva er bekreftet, og hva er fortsatt usikkert
+- **Bekreftet av flere uavhengige kilder** (men ikke av fulltekst fra Lovdata eller domstol.no):
+  - gavetidspunktet avgjør (HR-2025-1182-A);
+  - arvegangsklassene;
+  - kravet om kjennskap til testament og unntaket fra det (§ 10);
+  - 60-dagersfristen og offentlig skifte;
+  - bo av liten verdi;
+  - samboerens uskifte;
+  - gravferdsrekkefølgen;
+  - Skatteetatens punkter.
+- **Usikkert:**
+  - ordlyden i dommens avsnitt 19–43;
+  - unntaket fra kjennskapskravet for samboer (§ 12);
+  - om samboerens 4 G kan begrenses helt (F13);
+  - paragrafnumrene § 19/§ 20 og § 141;
+  - bankpraksis (T32).
+- **Ingenting i dette dokumentet er juridisk godkjenning.** Kontrollen er gjort med AI mot tilgjengelige kilder og skal leses av jurist.
 
 ## 5. Uenighet mellom innholdet og beregningslogikken
 
@@ -233,7 +310,7 @@ Alle er nå behandlet i runde 2.
 | K7 | Proklama, seks uker (ordlisten) | Presisert (T28) |
 | K8 | Gravferdsstønad (fase 1 og sjanse-sjekken) | Rettet i fase 1 (T33); beløpet må oppdateres hvert år |
 
-## 7. Plan for endringer i beregningslogikken (F11–F13, ikke gjort)
+## 7. Plan for endringer i beregningslogikken (F11–F14, ikke gjort)
 
 Disse endrer hva veiviseren regner ut eller hvilke spørsmål den stiller. De tas i egne PR-er etter at PR #63 er godkjent, og hver av dem krever juridisk godkjenning av tekst og resultat.
 
@@ -301,6 +378,47 @@ Disse endrer hva veiviseren regner ut eller hvilke spørsmål den stiller. De ta
 - `texts.test.js`: ingen kronebeløp i teksten;
 - `report.test.js`: rapporten viser rådet bare under grensen.
 
+### F14 – forskudd på arv: gaver før og etter 1. januar 2021 (ny, høy prioritet)
+
+**Hva er galt** (`questions.js` advancements, `facts.js`, `calculate.js`):
+- Veiviseren spør ikke om når gavene ble gitt.
+  - «Ja, og avdøde sa at det skulle trekkes fra arven» gir alltid avkorting.
+  - «Noen fikk gaver, men det ble ikke sagt noe om forskudd» gir aldri avkorting.
+- **For gaver gitt fra 2021:**
+  - «Ja» er bare riktig hvis betingelsen ble satt da gaven ble gitt.
+  - Har avdøde sagt det senere, trekker veiviseren fra for mye.
+- **For gaver gitt før 2021** (arveloven 1972 § 38, HR-2025-1182-A):
+  - «Ja» kan være riktig selv om det ble bestemt etter 2020.
+  - «Noen fikk gaver …» kan være feil: en større gave kan avkortes hvis avdøde bestemte det senere, eller hvis det var avdødes forutsetning.
+  - Mange bo etter dødsfall fra 2021 har gaver fra før 2021, så dette er ikke sjeldent.
+- Kravet i § 38 om en «monaleg» (betydelig) gave, og om at de andre livsarvingene ikke har fått tilsvarende, er heller ikke spurt om.
+
+**Juridisk risiko: høy.** Veiviseren kan:
+- si at gaver ikke trekkes fra når de kanskje skal;
+- trekke fra gaver som ikke skal trekkes fra.
+
+Fordelingen mellom barna blir da feil. Resultatteksten (T48) varsler nå om dette, men tallene er uendret.
+
+**Anbefalt løsning (egen PR, etter F11):**
+1. **Nytt spørsmål** når det er svart «Ja» eller «Noen fikk gaver»: «Når ble gavene gitt?» med valgene «Før 2021», «Fra 2021», «Begge deler» og «Vet ikke».
+2. **«Fra 2021» + «Ja»:** ett oppfølgingsspørsmål, «Ble det sagt da gaven ble gitt?». «Nei» eller «Vet ikke» gir ingen avkorting og et varsel.
+3. **«Før 2021» + «Noen fikk gaver»:** ingen automatisk avkorting. Situasjonen markeres som sammensatt (complexReasons), med varselet om at gaver før 2021 kan avkortes etter den gamle loven, og råd om advokat ved større gaver.
+4. **«Begge deler» eller «Vet ikke»:** ingen tall for fordelingen mellom barna før det er avklart, eller begge alternativene vises (med og uten avkorting).
+5. **Lagrede svar** uten det nye spørsmålet behandles som «Uavklart», som i F11.
+6. **Veiviseren skal ikke vurdere selv** om en gave var «monaleg», eller om det var avdødes forutsetning. Det er skjønn og overlates til familien eller advokat.
+
+**Tester:**
+- `scenarios.test.js`:
+  - før 2021 + «Ja» → avkorting;
+  - fra 2021 + «Ja» + sagt da gaven ble gitt → avkorting;
+  - fra 2021 + «Ja» + sagt senere → ingen avkorting og varsel;
+  - før 2021 + «Noen fikk gaver» → ingen avkorting og «sammensatt»;
+  - «Vet ikke» → blokkering eller to alternativer.
+- `flow.test.js`: spørsmålene vises bare når de er relevante.
+- `changes.test.js`: lagrede svar gir «Uavklart».
+- `texts.test.js` og `i18n.test.js`: begge språk.
+- e2e `journey.mjs`: én vei med gave før 2021.
+
 ### F13 – samboerens 4 G og testament
 
 **Hva det gjelder:** `calculate.js` partnerInheritance gir `protected: 0` for samboer. Når et testament begrenser samboerens arv og samboeren visste om det, blir arven 0 kr. For ektefelle gir det minstearv (4 G / 6 G).
@@ -330,7 +448,8 @@ To mangler i tillegg:
 **A. Juridiske tekstendringer i PR #63. Må godkjennes før merge:**
 - runde 1: T3, T6, T9, T10, T11 og T12;
 - runde 2: T16–T21, T23–T32 og T34–T38;
-- runde 4 (uavhengig gjennomgang): T39–T44.
+- runde 4 (uavhengig gjennomgang): T39–T42 (T43 og T44 er erstattet);
+- runde 5 (forskudd etter HR-2025-1182-A): T45–T48.
 
 Alle er tekst. Ingen endrer hva veiviseren regner ut eller spør om.
 
@@ -345,6 +464,7 @@ Alle er tekst. Ingen endrer hva veiviseren regner ut eller spør om.
 | # | Endring | Type | Prioritet |
 |---|---|---|---|
 | F11 | Etterkommere i flere ledd (trinn 1: stopp) | Spørsmål og blokkering | 1 |
+| F14 | Forskudd: gaver før og etter 2021 | Spørsmål, «sammensatt» og beregning | 1–2 (sammen med eller rett etter F11) |
 | F13 | Samboerens 4 G ved testament, unntak for varsling | Beregning (etter juridisk avklaring) | 2 |
 | F2 | Stebarn er ikke avdødes arvinger (hint) | Spørsmålstekst | 3 |
 | F12 | Grensen for bo av liten verdi | Beregning og tekst | 4 |
@@ -353,6 +473,7 @@ Alle er tekst. Ingen endrer hva veiviseren regner ut eller spør om.
 
 ## 9. Sjekkliste før PR #63 kan merges
 
+- [ ] **Jurist** har lest HR-2025-1182-A (særlig avsnitt 19–43) og arveloven 1972 § 38 og §§ 75 og 180, og bekreftet T45–T48.
 - [ ] **Jurist** har lest A-listen (avsnitt 8) mot gjeldende lovtekst på Lovdata, og godkjent eller rettet hver endring.
 - [ ] **T32 (bankkonto)** er kontrollert mot bankene eller Finans Norge, eller tatt ut.
 - [ ] **T36:** formuleringen om arv over 100 000 kr er kontrollert mot Skatteetaten (gjort, se T37).
@@ -360,4 +481,4 @@ Alle er tekst. Ingen endrer hva veiviseren regner ut eller spør om.
 - [ ] **`UPDATED`** i `sections.js` er satt til datoen PR-en flettes, og fasiten er laget på nytt hvis noe er endret etter godkjenningen.
 - [ ] **CI** er grønn på siste commit: testene, databasen, SEO-sjekken og røyktesten mot forhåndsvisningen.
 - [ ] **Forhåndsvisningen** er sett på mobil og PC av en person.
-- [ ] **F11, F12 og F13** er registrert som egne oppgaver. F11 bør komme rett etter merge.
+- [ ] **F11, F14, F13 og F12** er registrert som egne oppgaver. F11 og F14 bør komme rett etter merge.
