@@ -1,11 +1,15 @@
 {
- "kilde": "main 1fa54de, /veiviser.html?back=home etter at skriptene har kjørt",
+ "kilde": "Fasit etter innholdsendringene i PR 5 (claude/veiviser-innhold): /arveveiviser/ramme.html?back=home etter at skriptene har kjørt. Forskjellene fra fasiten før (main 28f8601) er dokumentert i docs/veiviser/gjennomgang-2026-11.md",
  "texts": [
   "Arvklart",
   "· veiviser",
   "Om arveprosessen",
-  "Fra dødsfall til fordelt bo — steg for steg",
+  "Arveveiviser: fra dødsfall til fordelt bo, steg for steg",
   "Finn ut hvem som arver og hvor mye, basert på din situasjon. Under finner du også en oversikt over hele prosessen, ord og ressurser.",
+  "Skrevet av Arvklart · Sist oppdatert",
+  "4. november 2026",
+  "·",
+  "Kontakt oss",
   "Arveveiviser",
   "Hvem arver – og hvor mye?",
   "Svar på noen enkle spørsmål om familien og økonomien. Du får en oversikt over hvem som arver, omtrent hvor mye hver får, og hva dere bør gjøre nå.",
@@ -13,8 +17,37 @@
   "Det tar omtrent 5 minutter. Omtrentlige tall holder.",
   "Svarene lagres bare i din egen nettleser.",
   "Start",
+  "Hvem arver etter loven?",
+  "Uten testament arver den nærmeste familien i en fast rekkefølge:",
+  "Barna",
+  ", og barnebarn i stedet for et barn som er dødt. Alle barna arver likt.",
+  "Finnes ingen barn eller barnebarn:",
+  "foreldrene",
+  ", og søsken, nevøer og nieser i stedet for en forelder som er død.",
+  "Finnes ingen av dem:",
+  "besteforeldrene",
+  ", og tanter, onkler og søskenbarn i stedet for en besteforelder som er død.",
+  "Var avdøde gift",
+  ", arver ektefellen en fjerdedel når det finnes barn, og halvparten når det ikke gjør det, men alltid minst 4 G med barn og 6 G uten (minstearv). Finnes verken barn, foreldre, søsken, nevøer eller nieser, arver ektefellen alt.",
+  "En samboer",
+  "arver 4 G bare når samboerne har, har hatt eller venter barn sammen.",
+  "Et testament kan endre fordelingen, men barna har krav på",
+  "pliktdelsarv",
+  ": to tredjedeler av arven, høyst 15 G per barn.",
+  "G er grunnbeløpet i folketrygden.",
+  "Veiviseren over",
+  "viser hvem som arver og omtrent hvor mye i deres situasjon.",
+  "Kilder:",
+  "Arveloven §§ 4–6, 8, 9, 12 og 50",
+  "·",
+  "Domstolene: Hvem er arvinger?",
   "Prosessen i fem faser",
   "Klikk på en fase for å se hva som skjer automatisk, og hva som krever handling fra deg.",
+  "Rett etter dødsfallet",
+  "Kartlegging av boet",
+  "Verdivurdering og avklaring",
+  "Fordeling",
+  "Avslutning",
   "1",
   "Rett etter dødsfallet",
   "Registrering og de første avklaringene",
@@ -89,7 +122,7 @@
   "Verdivurdering og avklaring",
   "Hva er eiendelene faktisk verdt",
   "Her hjelper Arvklart deg",
-  "Arvklart lar dere registrere verdivurderinger og forskudd på arv på ett sted, slik at fordelingen senere bygger på et ryddig og omforent grunnlag.",
+  "Arvklart lar dere registrere eiendelene med bilde og verdi på ett sted, slik at fordelingen senere bygger på et felles grunnlag.",
   "Krever handling fra deg",
   "Verdsette eiendeler, eventuelt med hjelp fra en takstmann.",
   "Hva er det:",
@@ -98,7 +131,7 @@
   "For bolig, kunst og andre dyrere gjenstander, bestill en uavhengig takstmann. For vanlig innbo holder ofte en felles, skjønnsmessig vurdering mellom arvingene.",
   "Avklare om noen arvinger har mottatt forskudd på arv.",
   "Hva er det:",
-  "Forskudd på arv er penger eller gjenstander avdøde ga til en arving mens de levde, som normalt trekkes fra vedkommendes andel senere.",
+  "Forskudd på arv er penger eller gjenstander avdøde ga til en arving mens de levde, og som avdøde bestemte at skulle trekkes fra arven senere.",
   "Slik gjør du det:",
   "Snakk åpent om dette i familien tidlig, og se etter gaver som er dokumentert i avdødes økonomi eller nevnt i testamentet.",
   "Kartlegge ønsker — hvem vil ha hva.",
@@ -110,13 +143,13 @@
   "Fordeling",
   "Eiendelene fordeles mellom arvingene",
   "Her hjelper Arvklart deg",
-  "Arvklart gjør selve fordelingen ryddig, sporbar og rettferdig for alle arvinger — også når dere er uenige.",
+  "Arvklart viser hvem som ønsker hva, og gir dere loddtrekning, runder eller jevn fordeling etter verdi når flere vil ha det samme. Det er dere som avgjør.",
   "Krever handling fra deg",
   "Fordele eiendelene mellom arvingene.",
   "Hva er det:",
   "Selve prosessen der eiendelene formelt tildeles hver arving, basert på verdivurdering og ønsker.",
   "Slik gjør du det:",
-  "Bruk Arvklart til å registrere eiendeler, ønsker og verdier, og la plattformen foreslå en rettferdig fordeling dere kan justere sammen.",
+  "Bruk Arvklart til å registrere eiendeler, ønsker og verdier. Når flere vil ha det samme, kan dere bruke loddtrekning, runder eller jevn fordeling etter verdi som utgangspunkt, og justere sammen.",
   "Ved uenighet: loddtrekning, mekling, eller i siste instans offentlig skifte.",
   "Hva er det:",
   "Tre trinn for å løse uenighet — fra det enkleste, loddtrekning om enkeltgjenstander, til det mest omfattende, offentlig skifte via tingretten.",
@@ -137,17 +170,11 @@
   "Den formelle overføringen av eierskap — for eksempel tinglysing av bolig, omregistrering av bil, eller overføring av bankkonti.",
   "Slik gjør du det:",
   "For eiendom: send skjøte til Kartverket for tinglysing. For kjøretøy: meld eierskifte til Statens vegvesen. For konti: kontakt banken med skifteattesten.",
-  "Be om forhåndsligning av dødsboet hos Skatteetaten.",
+  "Be om forhåndsfastsetting av dødsboet hos Skatteetaten.",
   "Hva er det:",
-  "En forhåndsligning avklarer boets skattemessige stilling før det avsluttes formelt, slik at arvingene slipper skatteoverraskelser i etterkant.",
+  "Forhåndsfastsetting avklarer boets skattemessige stilling før det avsluttes formelt, slik at arvingene slipper skatteoverraskelser i etterkant.",
   "Slik gjør du det:",
-  "Ta kontakt med Skatteetaten i forbindelse med boets avslutning og be om forhåndsligning.",
-  "Skatteetaten",
-  "Sende arvemelding til Skatteetaten.",
-  "Hva er det:",
-  "En melding som gir Skatteetaten oversikt over hva hver arving har mottatt — viktig for korrekt skattlegging senere, for eksempel ved salg av arvet eiendom.",
-  "Slik gjør du det:",
-  "Fyll ut og send arvemelding elektronisk via Skatteetatens tjenester, senest tre måneder etter at fordelingen er klar.",
+  "Ta kontakt med Skatteetaten i forbindelse med boets avslutning og be om forhåndsfastsetting.",
   "Skatteetaten",
   "Ordliste",
   "Klikk på et begrep for forklaringen.",
@@ -176,7 +203,7 @@
   "Felleseie",
   "Utgangspunktet i et ekteskap: det ektefellene eier, deles likt når ekteskapet opphører – også ved dødsfall.",
   "Minstearv",
-  "Et minstebeløp ektefelle (4 G eller 6 G) eller samboer med felles barn (4 G) arver, uansett testament.",
+  "Et minstebeløp ektefelle (4 G eller 6 G) arver, uansett testament. Samboer med felles barn arver 4 G, men et testament kan begrense det hvis samboeren visste om testamentet.",
   "Forskudd på arv",
   "En gave til et barn som avdøde sa skulle trekkes fra barnets arv senere (avkorting).",
   "Formuesfullmakt",
@@ -203,14 +230,50 @@
   "Norsk Pensjon",
   "Samlet oversikt over pensjon og forsikringer.",
   "Klar for å fordele eiendelene?",
-  "Når boet er kartlagt og verdsatt, gjør Arvklart selve fordelingen ryddig, sporbar og rettferdig for alle arvinger.",
+  "Når boet er kartlagt og verdsatt, gir Arvklart dere oversikt over hvem som ønsker hva, og et skriftlig grunnlag for fordelingen som alle arvingene kan se.",
   "Tilbake til hjemmesiden",
   "Arvklart er en støttemodul for informasjon — ikke juridisk rådgivning. Ved tvil, kontakt kvalifisert juridisk hjelp."
  ],
  "links": [
   {
+   "text": "Kontakt oss",
+   "href": "/kontakt"
+  },
+  {
+   "text": "Veiviseren over",
+   "href": "#arv"
+  },
+  {
+   "text": "Arveloven §§ 4–6, 8, 9, 12 og 50",
+   "href": "https://lovdata.no/lov/2019-06-14-21"
+  },
+  {
+   "text": "Domstolene: Hvem er arvinger?",
+   "href": "https://www.domstol.no/no/dodsfall-arv-og-skifte/hvem-er-arvinger/"
+  },
+  {
+   "text": "Rett etter dødsfallet",
+   "href": "#fase-1"
+  },
+  {
+   "text": "Kartlegging av boet",
+   "href": "#fase-2"
+  },
+  {
+   "text": "Verdivurdering og avklaring",
+   "href": "#fase-3"
+  },
+  {
+   "text": "Fordeling",
+   "href": "#fase-4"
+  },
+  {
+   "text": "Avslutning",
+   "href": "#fase-5"
+  },
+  {
    "text": "Domstol.no",
-   "href": "https://www.domstol.no"
+   "href": "https://www.domstol.no/no/dodsfall-arv-og-skifte/hva-ma-arvinger-gjore-etter-et-dodsfall/"
   },
   {
    "text": "Norsk Pensjon",
@@ -222,7 +285,7 @@
   },
   {
    "text": "Domstol.no",
-   "href": "https://www.domstol.no"
+   "href": "https://www.domstol.no/no/dodsfall-arv-og-skifte/forskjellige-former-for-skifte/"
   },
   {
    "text": "Skatteetaten",
@@ -230,11 +293,7 @@
   },
   {
    "text": "Domstol.no",
-   "href": "https://www.domstol.no"
-  },
-  {
-   "text": "Skatteetaten",
-   "href": "https://www.skatteetaten.no"
+   "href": "https://www.domstol.no/no/dodsfall-arv-og-skifte/forskjellige-former-for-skifte/"
   },
   {
    "text": "Skatteetaten",
@@ -290,7 +349,6 @@
   "Mer informasjon om dette punktet",
   "Mer informasjon om dette punktet",
   "Mer informasjon om dette punktet",
-  "Mer informasjon om dette punktet",
   "Den delen av arven barn (livsarvinger) har krav på uansett testament: 2/3 av arven, men høyst 15 G per barn.",
   "Direkte etterkommer — barn, barnebarn og videre nedover — med lovbestemt rett til pliktdelsarv.",
   "Dokument fra tingretten som gir deg rett til å representere dødsboet overfor banker og andre.",
@@ -303,7 +361,7 @@
   "Et barn avdøde har fra et annet forhold – altså ikke et felles barn med gjenlevende ektefelle eller samboer. Særkullsbarn må samtykke til uskifte.",
   "Eiendeler som holdes utenfor delingen mellom ektefeller, fordi det er avtalt i en ektepakt eller bestemt av den som ga en gave eller arv.",
   "Utgangspunktet i et ekteskap: det ektefellene eier, deles likt når ekteskapet opphører – også ved dødsfall.",
-  "Et minstebeløp ektefelle (4 G eller 6 G) eller samboer med felles barn (4 G) arver, uansett testament.",
+  "Et minstebeløp ektefelle (4 G eller 6 G) arver, uansett testament. Samboer med felles barn arver 4 G, men et testament kan begrense det hvis samboeren visste om testamentet.",
   "En gave til et barn som avdøde sa skulle trekkes fra barnets arv senere (avkorting).",
   "Fullmakt fra tingretten som gir en arving rett til å innhente opplysninger om avdødes formue og gjeld, som grunnlag for å velge skifteform.",
   "Offentlig kunngjøring som ber avdødes kreditorer melde krav innen seks uker, slik at boets gjeld blir klarlagt før fordeling."

@@ -102,6 +102,23 @@
   .intro p{ color: var(--ink-muted); font-size: 1rem; max-width: 56ch; margin:0; }
 
   section{ margin-bottom: 52px; }
+  /* Avsender og dato under innledningen */
+  .byline{ margin-top: 12px; font-size: 0.82rem; color: var(--ink-muted); }
+  .byline a{ color: var(--primary); }
+  /* «Hvem arver etter loven?»: kort, som en lesbar spalte */
+  .who{ background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-m); padding: 18px 20px; box-shadow: var(--shadow); max-width: 68ch; }
+  .who p{ margin: 0 0 10px; font-size: 0.95rem; }
+  .who ol{ margin: 0 0 12px; padding-left: 1.3em; font-size: 0.95rem; }
+  .who li{ margin-bottom: 6px; }
+  .who strong{ font-weight: 600; }
+  .who .who-note{ color: var(--ink-muted); font-size: 0.88rem; }
+  .who .who-sources{ color: var(--ink-muted); font-size: 0.8rem; margin: 0; }
+  .who a{ color: var(--primary); }
+  /* Oversikt over fasene over trekkspillene */
+  .phase-overview{ margin: 0 0 16px; padding-left: 1.4em; font-size: 0.92rem; color: var(--ink-muted); columns: 2 14em; column-gap: 24px; }
+  .phase-overview li{ margin-bottom: 4px; break-inside: avoid; }
+  .phase-overview a{ color: var(--ink); font-weight: 600; }
+  .phase{ scroll-margin-top: 16px; }
   .section-head{ margin-bottom: 18px; }
   .section-head h2{ font-size: 1.3rem; font-weight: 600; }
   .section-head p{ color: var(--ink-muted); font-size: 0.92rem; margin: 6px 0 0; max-width: 58ch; }
@@ -560,6 +577,12 @@
   .aw-money-field input{ width: 150px; text-align: right; }
   .aw-money-field span{ color: var(--ink-faint); font-size: .85rem; }
   @media (max-width: 520px){
+    /* Mobil: merkelappen «Her hjelper Arvklart deg» under tittelen, så tittelen ikke presses til ett ord per linje */
+    .phase-head{ display: grid; grid-template-columns: auto 1fr auto; column-gap: 14px; row-gap: 6px; }
+    .phase-num{ grid-row: 1 / span 2; }
+    .phase-title-wrap{ grid-column: 2; grid-row: 1; }
+    .phase-badge{ grid-column: 2; grid-row: 2; justify-self: start; }
+    .chevron{ grid-column: 3; grid-row: 1 / span 2; }
     .aw-money{ flex-direction: column; align-items: stretch; gap: 6px; }
     .aw-money-field input{ width: 100%; }
   }
@@ -735,7 +758,7 @@
 
   @media print{
     body{ background: #fff; }
-    .masthead, #timeline, #glossary, #resources, #cta, footer.note, .aw-nav, .aw-choice, .aw-link, .aw-toolbar, .aw-save{ display:none !important; }
+    .masthead, #hvem-arver, #timeline, #glossary, #resources, #cta, footer.note, .aw-nav, .aw-choice, .aw-link, .aw-toolbar, .aw-save{ display:none !important; }
     .aw-card{ box-shadow:none; border:none; padding:0; }
     .aw-method{ display:block; }
   }
@@ -755,12 +778,20 @@
 
   <div class="intro">
     <span class="eyebrow" data-en="About the inheritance process">Om arveprosessen</span>
-    <h1 data-en="From death to a distributed estate — step by step">Fra dødsfall til fordelt bo — steg for steg</h1>
+    <h1 data-en="Inheritance guide: from death to a distributed estate, step by step">Arveveiviser: fra dødsfall til fordelt bo, steg for steg</h1>
     <p data-en="Find out who inherits and how much, based on your situation. Below you will also find an overview of the whole process, terms and resources.">Finn ut hvem som arver og hvor mye, basert på din situasjon. Under finner du også en oversikt over hele prosessen, ord og ressurser.</p>
+    <div class="byline" id="bylineWrap"></div>
   </div>
 
   <section id="arv" aria-label="Arveveiviser">
     <div id="arvWizard"><noscript>Arveveiviseren krever JavaScript. / The inheritance guide requires JavaScript.</noscript></div>
+  </section>
+
+  <section id="hvem-arver">
+    <div class="section-head">
+      <h2 data-en="Who inherits under the law?">Hvem arver etter loven?</h2>
+    </div>
+    <div class="who" id="whoWrap"></div>
   </section>
 
   <section id="timeline">
@@ -768,6 +799,7 @@
       <h2 data-en="The process in five phases">Prosessen i fem faser</h2>
       <p data-en="Click a phase to see what happens automatically and what requires action from you.">Klikk på en fase for å se hva som skjer automatisk, og hva som krever handling fra deg.</p>
     </div>
+    <div id="phaseOverviewWrap"></div>
     <div class="timeline" id="timelineWrap"></div>
   </section>
 
@@ -790,7 +822,7 @@
   <section id="cta">
     <div class="cta-band">
       <h2 data-en="Ready to divide the belongings?">Klar for å fordele eiendelene?</h2>
-      <p data-en="Once the estate has been mapped and valued, Arvklart makes the distribution itself orderly, traceable and fair for all heirs.">Når boet er kartlagt og verdsatt, gjør Arvklart selve fordelingen ryddig, sporbar og rettferdig for alle arvinger.</p>
+      <p data-en="Once the estate has been mapped and valued, Arvklart gives you an overview of who wants what, and a written basis for the distribution that all the heirs can see.">Når boet er kartlagt og verdsatt, gir Arvklart dere oversikt over hvem som ønsker hva, og et skriftlig grunnlag for fordelingen som alle arvingene kan se.</p>
       <button class="cta-btn" id="ctaBtn" type="button">
         <span id="ctaLabel" data-en="Back to the estate">Tilbake til boet</span>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
