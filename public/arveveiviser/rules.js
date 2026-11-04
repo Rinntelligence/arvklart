@@ -145,7 +145,7 @@ export const NOTICES = [
     id: 'grandparentsInherit', area: 'meaning', level: 'info',
     when: { fact: 'order', eq: 3 },
     title: 'Besteforeldrene og deres familie arver', title_en: 'The grandparents and their family inherit',
-    text: 'Når det verken finnes barn, foreldre, søsken, nevøer eller nieser, går arven halvt til farssiden og halvt til morssiden. Der arver besteforeldrene – eller tanter, onkler og søskenbarn i stedet for en besteforelder som er død.', text_en: 'When there are no children, parents, siblings, nephews or nieces, the inheritance goes half to the father\'s side and half to the mother\'s side. There the grandparents inherit – or aunts, uncles and cousins in place of a grandparent who has died.',
+    text: 'Når det verken finnes barn, foreldre, søsken, nevøer eller nieser, går arven halvt til farssiden og halvt til morssiden. Der arver besteforeldrene. Er en besteforelder død, går delen til tanter og onkler, og etter en tante eller onkel som er død, til hans eller hennes barn (søskenbarn).', text_en: 'When there are no children, parents, siblings, nephews or nieces, the inheritance goes half to the father\'s side and half to the mother\'s side. There the grandparents inherit. If a grandparent has died, the share goes to aunts and uncles, and after an aunt or uncle who has died, to his or her children (cousins).',
     sources: ['arveloven_tredje_arvegang', 'domstol_hvem_arver'],
   },
   {
@@ -183,7 +183,7 @@ export const NOTICES = [
     id: 'testamentLimitsPartnerKnew', area: 'meaning', level: 'info',
     when: { all: [{ fact: 'testamentLimitsPartner' }, { q: 'testamentPartnerKnew', eq: 'yes' }] },
     title: 'Testamentet begrenser arven til {partnerDeg}', title_en: 'The will limits the inheritance for {partnerDeg}',
-    text: 'Fordi {partnerDu} visste om testamentet, kan det gi mindre enn loven ellers sier. Minstearven er likevel beskyttet, og her blir arven {partnerAmount}.', text_en: 'Because {partnerDu} knew about the will, it can give less than the law otherwise says. The minimum inheritance is still protected, and here the inheritance is {partnerAmount}.',
+    text: 'Fordi {partnerDu} visste om testamentet, kan det gi mindre enn loven ellers sier. Med testamentet blir arven {partnerAmount}. Ektefellens minstearv kan ikke tas bort, men samboerens arv kan begrenses.', text_en: 'Because {partnerDu} knew about the will, it can give less than the law otherwise says. With the will, the inheritance is {partnerAmount}. A spouse\'s minimum inheritance cannot be taken away, but a cohabitant\'s inheritance can be limited.',
     sources: ['arveloven_testament_ektefelle', 'arveloven_testament_samboer'],
   },
   {
