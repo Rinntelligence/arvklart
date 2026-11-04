@@ -58,6 +58,8 @@ export const SOURCES = {
   arveloven_overta: law(113, 'Ektefellens rett til å overta bolig og innbo', 'The spouse\'s right to take over the home and contents'),
   skifteloven_proklama: law(102, 'Proklama: kreditorer må melde krav innen seks uker', 'Proklama: creditors must report claims within six weeks'),
   arveloven_privat_skifte: law(116, 'Privat skifte og ansvar for gjeld', 'Private settlement and liability for debts'),
+  // Endringslov 16. juni 2023 nr. 59, i kraft 1. oktober 2023: lemping av gjeldsansvaret (arveloven §§ 20, 35 og 116)
+  arveloven_2023_gjeld: { title: 'Endringslov 2023 – lemping av arvingenes gjeldsansvar (i kraft 1. oktober 2023)', title_en: 'Amending act 2023 – reduction of heirs\' liability for debts (in force 1 October 2023) (in Norwegian)', short: 'Lov 16. juni 2023 nr. 59', short_en: 'Act of 16 June 2023 no. 59', url: 'https://lovdata.no/lov/2023-06-16-59' },
   arveloven_privat_frist: law(117, 'Frist på 60 dager for privat skifte', 'Deadline of 60 days for private settlement'),
   arveloven_skifteattest: law(118, 'Skifteattest', 'Probate certificate (skifteattest)'),
   arveloven_offentlig: law(127, 'Hvem som kan kreve offentlig skifte', 'Who can demand public administration of the estate'),
