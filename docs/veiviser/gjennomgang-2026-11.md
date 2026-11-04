@@ -353,6 +353,36 @@ Etter at nettverkstilgangen ble utvidet, er primærkildene lest direkte der det 
 - Gravferdsstønadens beløp for 2026.
 - Domstolenes side om skifteformene.
 
+## 4f. Runde 7: senere lovendringer (lovvedtaket fra 2019 er ikke gjeldende rett alene)
+
+Lovvedtak 55 (2018–2019) viser loven slik den ble vedtatt. Det er brukt til å kontrollere ordlyden, men ikke alene som dokumentasjon på gjeldende rett. Dette er de kjente endringene i arveloven etter 2019:
+
+| Endringslov | Ikrafttredelse | Hva er endret | Berører tekstene i PR #63? |
+|---|---|---|---|
+| [LOV-2020-12-18-149](https://lovdata.no/dokument/LTI/lov/2020-12-18-149) (landbrukseiendommer i dødsbo mv.) | Ikke kontrollert | Regler om landbrukseiendom ved skifte | Nei. Veiviseren støtter ikke landbrukseiendom (F9) |
+| [LOV-2022-06-22-81](https://lovdata.no/LTI/lov/2022-06-22-81) (digitalt skifte av dødsbo) | 22.6.2022 (etter søkeutdrag) | Ny § 88 a | Nei |
+| [LOV-2023-06-16-59](https://lovdata.no/lov/2023-06-16-59) (ansvaret for arvelaterens forpliktelser), [Prop. 86 L (2022–2023)](https://www.regjeringen.no/no/dokumenter/prop.-86-l-20222023/id2968728/), [Innst. 407 L (2022–2023)](https://www.stortinget.no/no/Saker-og-publikasjoner/Publikasjoner/Innstillinger/Stortinget/2022-2023/inns-202223-407l/?all=true) | 1.10.2023 ([FOR-2023-06-16-934](https://lovdata.no/dokument/LTI/forskrift/2023-06-16-934)); gjelder dødsfall etter ikrafttredelsen | Se punktene under tabellen | Nei, ikke det som står. Lemping, ansvarsgrensen under 3 G og regelen om testamentsarving med et lite gode er ikke nevnt. Det er forenklinger, ikke feil |
+| En endringslov fra 7. mai 2021 (nummer ikke funnet) | Ikke kontrollert | Ukjent innhold | Ukjent; må sjekkes i Lovdata |
+
+Endringene i LOV-2023-06-16-59, etter søkeutdrag:
+- **§ 116, nye ledd:** retten kan i ekstraordinære tilfeller lempe arvingens ansvar overfor enkeltstående kreditorer når boet ikke strekker til. Det gjelder ikke krav arvingen kjente til, eller burde kjent til, da ansvaret ble overtatt.
+- **§ 116, ny regel:** en testamentsarving som bare skal få et bestemt, avgrenset gode av liten verdi, regnes ikke som arving når det gjelder ansvaret for gjelden.
+- **§§ 20 og 35:** ny setning om at § 116 femte ledd (lempingen) gjelder tilsvarende ved uskifte.
+- **§ 92 (fullmakter) og eventuelt §§ 118 og 139:** innholdet er ikke kontrollert.
+- **§ 116 første ledd:** hovedregelen ser ut til å stå uendret: minst én myndig arving må påta seg gjelden ved privat skifte.
+
+**Kildestatus:**
+- **Ikke lest i fulltekst:** endringslovene og den konsoliderte lovteksten. Lovdata sperrer forespørsler fra arbeidsmiljøet, og stortinget.no og regjeringen.no svarte 403 i denne runden.
+- **Grunnlaget for innholdet over:** søkeutdrag fra Lovdata, regjeringen.no og Stortinget, og Advokatforeningens høringsuttalelse.
+- **Konklusjon:** ingen av tekstene som er endret i PR #63, strider mot endringene. Det er likevel ikke kontrollert mot den konsoliderte lovteksten, og en jurist bør se på det.
+
+### Funn i veiviserens resultattekster (ikke endret i PR #63)
+- **`rules.js` (neste steg ved privat skifte):** «Arvklart kan hjelpe dere med å fordele eiendelene rettferdig.» Dette er samme produktløfte som ble rettet på siden (T7, T13). Det bør rettes; det er en produktbeslutning.
+- **`rules.js` (privat skifte):** «Det koster ingenting.» Det er ikke kontrollert om skifteattest alltid er gebyrfri.
+- **`rules.js` (gjeld større enn eiendeler):** «Men overtar dere boet ved privat skifte, blir dere personlig ansvarlige for gjelden.» Det stemmer som hovedregel. Det sier ikke at ansvaret er begrenset når boet er under 3 G (§ 116 tredje ledd), eller at det kan lempes (fra 2023). Brukere med små bo kan bli unødig skremt.
+- **`rules.js` (bo av liten verdi):** «Tingretten bruker i praksis en grense rundt 170 000 kroner.» Kildene spriker (F12).
+- **`rules.js` (avdøde under 25 år):** veiviseren sier selv at den ikke tar hensyn til regelen i § 5 tredje ledd. Det er en kjent begrensning, og den er opplyst.
+
 ## 5. Uenighet mellom innholdet og beregningslogikken
 
 | # | Innhold | Logikk | Status |
@@ -553,3 +583,84 @@ Alle er tekst. Ingen endrer hva veiviseren regner ut eller spør om.
 - [ ] **CI** er grønn på siste commit: testene, databasen, SEO-sjekken og røyktesten mot forhåndsvisningen.
 - [ ] **Forhåndsvisningen** er sett på mobil og PC av en person.
 - [ ] **F11, F14, F13 og F12** er registrert som egne oppgaver. F11 og F14 bør komme rett etter merge.
+
+## 10. Sluttrapport (4. november 2026)
+
+Rapporten bygger på kontroll med AI mot tilgjengelige primærkilder. **Den er ikke juridisk godkjenning.**
+
+### 1. Rettet og kontrollert mot primærkilder
+
+**Lest i fulltekst:**
+- HR-2025-1182-A;
+- arveloven slik den ble vedtatt (lovvedtak 55, 2018–2019);
+- Domstolenes sider om arv og skifte;
+- Skatteetatens sider om dødsfall, arv og forhåndsfastsetting.
+
+**Rettet og bekreftet mot disse kildene:**
+- arvegangsklassene, med oldebarn, én side som arver alt og grensen ved søskenbarn;
+- ektefellens og samboerens arv, og testament med kravet om kjennskap og unntaket fra det;
+- pliktdelsarven;
+- forskudd før og etter 2021;
+- 60-dagersfristen og alternativene til privat skifte;
+- proklama;
+- bo av liten verdi og summarisk skifte;
+- samboerens uskifte;
+- skattemelding og arv over 100 000 kr;
+- forhåndsfastsetting.
+
+Se T16–T53 og avsnitt 4c–4f.
+
+**Kontrollert mot søkeutdrag, ikke fulltekst:**
+- endringene fra 2020, 2022 og 2023;
+- gravplassloven § 9;
+- bankpraksis.
+
+### 2. Fortsatt juridisk usikkert
+1. **Gjeldende, konsolidert lovtekst.** Endringene fra 2020, 2021, 2022 og 2023 er ikke lest i fulltekst (avsnitt 4f).
+2. **Samboerens 4 G ved testament (F13).** Ordlyden i § 12 støtter at arven kan begrenses helt, men det er ikke bekreftet i forarbeider eller rettspraksis.
+3. **Summarisk skifte (T50).** Vilkåret i § 141 annet ledd om at en arving har påtatt seg gjelden, er ikke forklart, og begrepet står ikke i loven.
+4. **Gravplassloven § 9 (T31)** er ikke lest i Lovdata.
+5. **Bankkonto (T32)** bygger på bankpraksis.
+6. **«Barn eller barnebarn»** i stedet for «livsarving» i tekstene om forskudd (T45–T47) er en forenkling.
+7. **Grensen for bo av liten verdi** (170 000 kr eller 1 G).
+
+### 3. Feil i beregningsmotoren som kan gi brukerne feil svar
+Ingen av disse er rettet i PR #63.
+
+| # | Feil | Risiko | Varsler veiviseren i dag? |
+|---|---|---|---|
+| F14 | Forskudd: veiviseren spør ikke når gaven ble gitt. «Gaver uten beskjed» trekkes aldri fra (kan være feil for gaver før 2021); «Ja, avdøde sa det» trekkes alltid fra (kan være feil for gaver fra 2021) | **Høy.** Gjelder mange bo | Delvis (T47 og T48 varsler; tallene er uendret) |
+| F11 | Bare ett ledd under et barn eller søsken som er dødt. Oldebarn og barn av en nevø eller niese som er død, mangler. I verste fall faller en hel linje bort, og arven går til feil arvegangsklasse | **Høy, men sjelden** | Delvis (1. klasse ja, 2. klasse nei) |
+| F13 | Testament som begrenser samboerens arv gir 0 kr. Unntaket fra varselkravet er ikke et valg i spørsmålet | **Middels** | Ja (T23, T38) |
+| F2 | Hintet sier ikke at ektefellens eller samboerens særkullsbarn ikke arver avdøde | **Middels** | Nei |
+| F12 | Bo av liten verdi: rådet utløses ved 170 000 kr uten sikker kilde | **Lav** (bare et råd) | – |
+| – | Regelen om avdøde under 25 år (§ 5 tredje ledd) er ikke regnet med | **Lav** | Ja |
+
+### 4. Hva som må løses før merge, og hva som kan vente
+
+**Før merge av PR #63:**
+- [ ] Jurist leser og godkjenner eller retter de juridiske tekstendringene: T3, T6, T9–T12, T16–T21, T23–T32, T34–T42 og T45–T52.
+- [ ] Jurist kontrollerer avsnitt 4f mot den konsoliderte lovteksten på Lovdata. Det gjelder særlig endringene fra 2023 og den ukjente endringen fra 2021.
+- [ ] T32 (bankkonto) kontrolleres eller tas ut.
+- [ ] Produkteier godkjenner produkt- og SEO-tekstene: T1, T2, T4, T5, T7, T8, T13–T15, T22, T33 og T53.
+- [ ] `UPDATED` settes til datoen for merge; fasiten lages på nytt ved senere endringer.
+- [ ] CI er grønn på siste commit, og en person ser forhåndsvisningen på mobil og PC.
+
+**Kan vente til egne PR-er, men bør ikke vente lenge:**
+- **F14 og F11:** beregningsfeil med høy risiko. Bør komme rett etter merge.
+- **F13:** etter at juristen har svart.
+- **F2 og F12.**
+- **Produktløftet i neste steg ved privat skifte** («fordele … rettferdig»).
+- **Ansvarsgrensen under 3 G og lempingen fra 2023** i tekstene om gjeld.
+
+### 5. Anbefaling
+**PR #63 er klar til juridisk og produktmessig gjennomgang, men ikke til merge.** Tekstene på siden er nå mer presise og bedre underbygd enn i produksjon. Dette er rettet:
+- forskudd;
+- arvemeldingen;
+- 60-dagersfristen;
+- summarisk skifte;
+- samboerens minstearv.
+
+Uten PR-en blir disse feilene stående i produksjon. PR-en bør flettes så snart juristen har godkjent tekstene.
+
+Beregningsfeilene F14 og F11 finnes allerede i produksjon og blir ikke verre av PR #63. De bør prioriteres rett etter merge. Inntil de er rettet, varsler veiviseren bare delvis om dem.
