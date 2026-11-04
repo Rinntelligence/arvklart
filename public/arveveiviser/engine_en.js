@@ -36,7 +36,7 @@ export function describeSituation(a, f, calc) {
     for (const c of children.filter(x => x.alive === 'no')) {
       const k = Number(c.grandchildren) || 0
       const name = c.name?.trim() || 'One of the children'
-      s.push(k > 0 ? `${cap(name)} has died, and ${k === 1 ? 'their child inherits' : `their ${count(k)} children inherit`} instead.` : `${cap(name)} has died without leaving children.`)
+      s.push(k > 0 ? `${cap(name)} has died, and ${k === 1 ? 'their child inherits' : `their ${count(k)} children inherit`} instead.` : `${cap(name)} has died without living children.`)
     }
   } else if (hasChildren === 'no') {
     s.push('The deceased had no children.')

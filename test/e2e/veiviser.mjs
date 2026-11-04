@@ -265,6 +265,43 @@ await check('Navigering i appen til /veiviser (uten ny lasting) bruker iframen, 
   assert(await page.locator('iframe').getAttribute('src') === '/arveveiviser/ramme.html?back=home', 'rammen')
 })
 
+// Sikkerhetskontroller (F11, F14): et svar lagret før de nye spørsmålene fantes, gir «Uavklart» – ingen tall
+const savedResult = (page, answers) => page.addInitScript(([k, a]) => {
+  localStorage.setItem('hs_analytics_consent', JSON.stringify({ v: 1, choice: 'denied' })) // samtykkespørsmålet dekker ellers knappene
+  if (!localStorage.getItem(k)) localStorage.setItem(k, JSON.stringify({ answers: a, view: 'result', current: null, acks: {} }))
+}, [STORE, answers])
+const storedAnswers = page => page.evaluate(k => JSON.parse(localStorage.getItem(k)).answers, STORE)
+
+await check('F11: lagret svar med et barn som er dødt, uten spørsmålet om flere ledd, gir ingen beregning før det er besvart', async page => {
+  await savedResult(page, { ...ANSWERS, hasChildren: 'yes', children: [{ id: 'c1', alive: 'no', name: 'Per', grandchildren: '0' }], parents: 'both', assets: { bank: '500000' } })
+  await page.goto(`${BASE}/veiviser`)
+  await ready(page)
+  const text = await page.locator('#arvWizard').innerText()
+  assert(text.includes('Vi trenger litt mer informasjon'), 'ikke blokkert')
+  assert(text.includes('Svar på spørsmålet om flere ledd'), 'blokkeringen om flere ledd mangler')
+  assert(!/\d[\d ]* kr/.test(text), 'viser beløp selv om beregningen er blokkert')
+  await page.locator('#arvWizard [data-action="edit"][data-q="deeperDescendants"]').click()
+  await page.getByText('Er noen av barnebarna også døde, og etterlot de seg egne barn?').waitFor()
+  await page.locator('#arvWizard button.aw-option[data-value="no"]').click()
+  // Når spørsmålet er besvart, går veiviseren tilbake til resultatet, som nå kan beregnes
+  await page.getByText('Slik blir arveoppgjøret – basert på svarene dine').waitFor()
+  assert((await storedAnswers(page)).deeperDescendants === 'no', 'svaret ble ikke lagret')
+}, { loggedIn: false })
+
+await check('F14: lagret «Ja, forskudd» uten gavetidspunkt gir ingen fordeling mellom barna før tidspunktet er besvart', async page => {
+  await savedResult(page, { ...ANSWERS, hasChildren: 'yes', children: [{ id: 'c1', alive: 'yes', name: 'Kari' }, { id: 'c2', alive: 'yes', name: 'Ola' }], advancements: 'yes', advancementAmounts: { c1: '300000' }, assets: { bank: '900000' } })
+  await page.goto(`${BASE}/veiviser`)
+  await ready(page)
+  const text = await page.locator('#arvWizard').innerText()
+  assert(text.includes('Vi kan ikke beregne fordelingen mellom barna sikkert'), 'blokkeringen om forskudd mangler')
+  assert(!/\d[\d ]* kr/.test(text), 'viser beløp selv om beregningen er blokkert')
+  await page.locator('#arvWizard [data-action="edit"][data-q="advancementTiming"]').click()
+  await page.getByText('Når ble gavene gitt?').waitFor()
+  await page.locator('#arvWizard button.aw-option[data-value="before2021"]').click()
+  await page.locator('#arvWizard [data-action="next"]').click()
+  assert((await storedAnswers(page)).advancementTiming === 'before2021', 'svaret ble ikke lagret')
+}, { loggedIn: false })
+
 await check('Tilgjengelighet (axe, WCAG 2.2 AA) og tastatur på mobil og PC', async () => {
   for (const viewport of [{ width: 390, height: 844 }, { width: 1280, height: 900 }]) {
     const ctx = await browser.newContext({ viewport, bypassCSP: true })

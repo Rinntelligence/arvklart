@@ -380,7 +380,7 @@ function renderChildren(list, facts) {
       ${facts.hasPartner ? `<div class="aw-field"><span>${esc(commonQ)}</span>${seg(`children.${i}.common`, c.common, [{ value: 'yes', label: tr('Ja, felles barn', 'Yes, a joint child') }, { value: 'no', label: tr('Nei, fra et annet forhold', 'No, from another relationship') }])}</div>` : ''}
       ${facts.previousUskifte ? `<div class="aw-field"><span>${esc(fill(tr('Er dette også barnet til {first}?', 'Is this also the child of {first}?'), facts))}</span>${seg(`children.${i}.firstCommon`, c.firstCommon, [{ value: 'yes', label: tr('Ja', 'Yes') }, { value: 'no', label: tr('Nei, fra et annet forhold', 'No, from another relationship') }])}</div>` : ''}
       <div class="aw-field"><span>${tr('Lever barnet?', 'Is the child alive?')}</span>${seg(`children.${i}.alive`, c.alive, [{ value: 'yes', label: tr('Ja', 'Yes') }, { value: 'no', label: tr('Nei, er død', 'No, has died') }])}</div>
-      ${c.alive === 'no' ? `<div class="aw-field"><span>${tr('Hvor mange barn etterlot barnet seg?', 'How many children did the child leave?')} <small>${tr('Skriv 0 hvis ingen', 'Enter 0 if none')}</small></span>${countInput(`children.${i}.grandchildren`, c.grandchildren)}</div>` : ''}
+      ${c.alive === 'no' ? `<div class="aw-field"><span>${tr('Hvor mange av barnets barn lever?', 'How many of the child\'s children are alive?')} <small>${tr('Skriv 0 hvis ingen', 'Enter 0 if none')}</small></span>${countInput(`children.${i}.grandchildren`, c.grandchildren)}</div>` : ''}
       ${c.alive === 'yes' ? `<label class="aw-check"><input type="checkbox" data-path="children.${i}.minor" ${c.minor ? 'checked' : ''}> ${tr('Barnet er under 18 år', 'The child is under 18')}</label>` : ''}
     </div>`).join('')}
     <button type="button" class="aw-add" data-action="add" data-path="children">${ICON.plus} ${tr('Legg til barn', 'Add child')}</button>
@@ -399,7 +399,7 @@ function renderOtherChildren(list) {
         ${children.length > 1 ? `<button type="button" class="aw-remove" data-action="remove" data-path="${path}" data-index="${i}" aria-label="${tr(`Fjern barn ${i + 1}`, `Remove child ${i + 1}`)}">${tr('Fjern', 'Remove')}</button>` : ''}
       </div>
       <div class="aw-field"><span>${tr('Lever barnet?', 'Is the child alive?')}</span>${seg(`${path}.${i}.alive`, c.alive, [{ value: 'yes', label: tr('Ja', 'Yes') }, { value: 'no', label: tr('Nei, er død', 'No, has died') }])}</div>
-      ${c.alive === 'no' ? `<div class="aw-field"><span>${tr('Hvor mange barn etterlot barnet seg?', 'How many children did the child leave?')} <small>${tr('Skriv 0 hvis ingen', 'Enter 0 if none')}</small></span>${countInput(`${path}.${i}.grandchildren`, c.grandchildren)}</div>` : ''}
+      ${c.alive === 'no' ? `<div class="aw-field"><span>${tr('Hvor mange av barnets barn lever?', 'How many of the child\'s children are alive?')} <small>${tr('Skriv 0 hvis ingen', 'Enter 0 if none')}</small></span>${countInput(`${path}.${i}.grandchildren`, c.grandchildren)}</div>` : ''}
     </div>`).join('')}
     <button type="button" class="aw-add" data-action="add" data-path="${path}">${ICON.plus} ${tr('Legg til barn', 'Add child')}</button>
   </div>`

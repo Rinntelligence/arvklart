@@ -4,7 +4,7 @@ import { test, describe } from 'node:test'
 import assert from 'node:assert/strict'
 import { validationError } from '../../public/arveveiviser/flow.js'
 import { QUESTION_BY_ID } from '../../public/arveveiviser/questions.js'
-import { G, child, sibling, married, single, base, run, amountOf, byRelation, sumPeople } from './helpers.js'
+import { G, child, sibling, married, single, base, run, amountOf, byRelation, sumPeople, ADVANCE_OK } from './helpers.js'
 
 const sixMillion = { home: '5000000', bank: '1000000', mortgage: '1000000' }
 
@@ -405,17 +405,17 @@ describe('18: Avdøde satt i uskifte etter en tidligere ektefelle eller samboer'
 describe('19: Forskudd på arv', () => {
   test('forskudd trekkes fra hos mottakeren', () => {
     const kids = [child(), child(), child()]
-    const r = run(single({ hasChildren: 'yes', children: kids, advancements: 'yes', advancementAmounts: { [kids[0].id]: '300000' }, assets: { bank: '900000' } }))
+    const r = run(single({ hasChildren: 'yes', children: kids, ...ADVANCE_OK, advancementAmounts: { [kids[0].id]: '300000' }, assets: { bank: '900000' } }))
     assert.deepEqual(byRelation(r, 'Barn').map(p => p.amount), [100000, 400000, 400000])
   })
   test('forskudd større enn andelen – ingen tilbakebetaling', () => {
     const kids = [child(), child(), child()]
-    const r = run(single({ hasChildren: 'yes', children: kids, advancements: 'yes', advancementAmounts: { [kids[0].id]: '1000000' }, assets: { bank: '900000' } }))
+    const r = run(single({ hasChildren: 'yes', children: kids, ...ADVANCE_OK, advancementAmounts: { [kids[0].id]: '1000000' }, assets: { bank: '900000' } }))
     assert.deepEqual(byRelation(r, 'Barn').map(p => p.amount), [0, 450000, 450000])
   })
   test('forskudd påvirker ikke ektefellens arv', () => {
     const kids = [child({ common: 'yes' }), child({ common: 'yes' })]
-    const r = run(married({ hasChildren: 'yes', children: kids, advancements: 'yes', advancementAmounts: { [kids[0].id]: '200000' }, assets: sixMillion }))
+    const r = run(married({ hasChildren: 'yes', children: kids, ...ADVANCE_OK, advancementAmounts: { [kids[0].id]: '200000' }, assets: sixMillion }))
     assert.equal(amountOf(r, 'partner'), 625000)
     assert.deepEqual(byRelation(r, 'Barn').map(p => p.amount), [837500, 1037500])
   })
@@ -444,7 +444,7 @@ describe('20: Kombinasjoner', () => {
   })
   test('samboer med felles barn + dødt barn med barnebarn + forskudd', () => {
     const kids = [child({ common: 'yes' }), child({ common: 'yes', alive: 'no', grandchildren: 2 })]
-    const r = run(base({ maritalStatus: 'cohabitant', cohabitantChildren: 'yes', previousUskifte: 'no', children: kids, advancements: 'yes', advancementAmounts: { [kids[0].id]: '100000' }, assets: { bank: String(4 * G + 1000000) } }))
+    const r = run(base({ maritalStatus: 'cohabitant', cohabitantChildren: 'yes', previousUskifte: 'no', children: kids, ...ADVANCE_OK, advancementAmounts: { [kids[0].id]: '100000' }, assets: { bank: String(4 * G + 1000000) } }))
     assert.equal(amountOf(r, 'partner'), 4 * G)
     // pool 1 000 000 + forskudd 100 000 = 1 100 000 / 2 = 550 000
     assert.equal(byRelation(r, 'Barn')[0].amount, 450000)

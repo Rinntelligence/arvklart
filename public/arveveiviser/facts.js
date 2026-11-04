@@ -35,6 +35,10 @@ export function deriveFacts(a = {}) {
   f.separateChildrenMinor = f.hasPartner && lines.some(l => l.common === 'no' && l.alive === 'yes' && l.minor)
   f.minorChildren = lines.some(l => l.alive === 'yes' && l.minor)
   f.representation = lines.some(l => l.alive === 'no')
+  // Sikkerhetskontroll (F11): veiviseren regner bare ett ledd under et barn som er dødt. Spørsmålet stilles
+  // for alle barn som er døde, også når ingen barnebarn lever (da filtreres linjen ellers bort).
+  f.deadChild = hasChildren === 'yes' && Array.isArray(a.children) && a.children.some(c => c.alive === 'no')
+  f.deeperDescendantsUnresolved = f.deadChild && a.deeperDescendants !== 'no'
 
   f.needsParents = f.descendantsKnownNone
   f.parentDead = ['mother', 'father', 'none'].includes(a.parents)
@@ -43,6 +47,9 @@ export function deriveFacts(a = {}) {
   f.secondOrderKnownNone = f.needsParents && a.parents === 'none' && (a.hasSiblings === 'no' || (a.hasSiblings === 'yes' && !anySiblingLine))
   // Ektefelle arver alt når det ikke finnes arvinger i første eller andre arvegang.
   f.needsGrandparents = f.secondOrderKnownNone && !f.married
+  // F11 for søsken: bare ett ledd under et søsken som er dødt (arveloven § 5 har ingen grense nedover).
+  f.deadSibling = f.needsSiblings && a.hasSiblings === 'yes' && (a.siblings || []).some(s => s.alive === 'no')
+  f.deeperSiblingUnresolved = f.deadSibling && a.deeperSiblingDescendants !== 'no'
 
   f.separateProperty = f.married && a.separateProperty === 'yes' && a.separatePropertyAtDeath !== 'yes'
   f.separatePropertyUnknown = f.married && a.separateProperty === 'unknown'
@@ -63,9 +70,33 @@ export function deriveFacts(a = {}) {
   f.testamentUskifte = f.testament && tc.includes('uskifte')
   f.testamentOther = f.testament && tc.includes('other')
 
-  f.advancements = f.hasDescendants && a.advancements === 'yes'
-  f.advancementGifts = f.hasDescendants && a.advancements === 'gift'
-  f.advancementsUnknown = f.hasDescendants && a.advancements === 'unknown'
+  // Forskudd (F14). Gavetidspunktet avgjør reglene (arveloven § 180 sjette ledd, HR-2025-1182-A):
+  //   gitt fra 1.1.2021: § 75, avkorting må være satt som betingelse da gaven ble gitt (muntlig er nok)
+  //   gitt før 2021: arveloven 1972 § 38, en betydelig gave uten at de andre fikk tilsvarende, og avdøde har
+  //   bestemt det (også senere) eller det er godtgjort at det var avdødes forutsetning.
+  // Avkorting påvirker bare fordelingen mellom livsarvingene (§ 75 fjerde ledd d), så med én linje er alt som før.
+  // Fradrag beregnes bare når vilkårene er avklart; ellers blokkeres beregningen (advancementsUnresolved).
+  const advMatters = f.hasDescendants && lines.length > 1
+  const adv = f.hasDescendants ? a.advancements : undefined
+  const giftBefore = ['before2021', 'both'].includes(a.advancementTiming)
+  const giftAfter = ['from2021', 'both'].includes(a.advancementTiming)
+  let deduct = false, notMet = false, unresolved = null
+  if (adv === 'yes' || adv === 'gift') {
+    if (!advMatters) deduct = adv === 'yes'
+    else if (!giftBefore && !giftAfter) unresolved = 'advancementTiming'
+    else if (adv === 'yes') {
+      if (giftAfter && a.advancementConditionAtGift !== 'yes') unresolved = 'advancementConditionAtGift'
+      else if (giftBefore && a.advancementSubstantial === 'no' && !giftAfter) notMet = true
+      else if (giftBefore && a.advancementSubstantial !== 'yes') unresolved = 'advancementSubstantial'
+      else deduct = true
+    } else if (giftBefore && a.advancementSubstantial !== 'no') unresolved = 'advancementSubstantial'
+    else notMet = true
+  } else if (adv === 'unknown' && advMatters) unresolved = 'advancements'
+  f.advancements = deduct
+  f.advancementGifts = notMet
+  f.advancementsUnknown = adv === 'unknown' && !advMatters
+  f.advancementsUnresolved = unresolved
+  f.advancementsMatter = advMatters
 
   // Bare enslige og samboere kan ha sittet i uskifte: et nytt ekteskap krever at uskifteboet skiftes først.
   f.askPreviousUskifte = ['none', 'cohabitant'].includes(a.maritalStatus)
@@ -77,6 +108,9 @@ export function deriveFacts(a = {}) {
   f.firstCommonLines = f.previousUskifte ? lines.filter(l => l.firstCommon === 'yes').length : 0
   f.firstOtherLines = f.previousUskifte && a.previousSpouseChildren === 'yes' ? childLines(a.previousSpouseChildrenList || []).length : 0
   f.firstOtherChildrenUnknown = f.previousUskifte && a.previousSpouseChildren === 'unknown'
+  // F11 for barna til den som døde først (uskifte)
+  f.deadFirstSpouseChild = f.previousUskifte && a.previousSpouseChildren === 'yes' && (a.previousSpouseChildrenList || []).some(c => c.alive === 'no')
+  f.deeperFirstSpouseUnresolved = f.deadFirstSpouseChild && a.deeperFirstSpouseDescendants !== 'no'
   f.firstHeirsRelatives = f.previousUskifte && Boolean(a.previousSpouseChildren) && f.firstCommonLines + f.firstOtherLines === 0
 
   f.debtUncertain = a.debtOverview === 'no'
