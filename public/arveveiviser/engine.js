@@ -162,6 +162,39 @@ function collectBlockers(a, f) {
     sources: ['arveloven_samboer_arv'],
   })
   if (f.childrenUnknown) b.push(missingBlocker('hasChildren'))
+  // Sikkerhetskontroller: beregn heller ikke enn å vise et resultat som kan være feil.
+  // Manglende svar (også i eldre lagrede svar) behandles som uavklart, aldri som «Nei».
+  const deeper = (id, answer, sources, who, who_en) => answer === 'yes'
+    ? { id, hard: true, questionId: id, sources,
+        title: 'Arven går videre i flere ledd enn veiviseren kan beregne', title_en: 'The inheritance passes down more generations than the guide can calculate',
+        text: `Når både ${who} er døde, går arven videre til neste ledd. Veiviseren regner bare ett ledd ned og kan derfor ikke gi et pålitelig svar på hvem som arver og hvor mye. Kontakt tingretten for veiledning.`,
+        text_en: `When both ${who_en} have died, the inheritance passes on to the next generation. The guide only calculates one generation down and therefore cannot give a reliable answer about who inherits and how much. Contact the district court for guidance.` }
+    : { id, hard: true, questionId: id, sources,
+        title: 'Svar på spørsmålet om flere ledd før vi beregner arven', title_en: 'Answer the question about further generations before we calculate the inheritance',
+        text: 'Er et barnebarn, en nevø eller en niese også død og har egne barn, arver de i stedet. Vi beregner ikke arven før dette er avklart, fordi resultatet ellers kan bli feil.',
+        text_en: 'If a grandchild, nephew or niece has also died and has children of their own, those children inherit instead. We do not calculate the inheritance until this is clarified, because the result could otherwise be wrong.' }
+  if (f.deeperDescendantsUnresolved) b.push(deeper('deeperDescendants', a.deeperDescendants, ['arveloven_livsarvinger'], 'et barn og barnets barn', 'a child and that child\'s child'))
+  if (f.deeperFirstSpouseUnresolved) b.push(deeper('deeperFirstSpouseDescendants', a.deeperFirstSpouseDescendants, ['arveloven_uskifte_arvinger', 'arveloven_livsarvinger'], 'et barn og barnets barn', 'a child and that child\'s child'))
+  if (f.deeperSiblingUnresolved) b.push(deeper('deeperSiblingDescendants', a.deeperSiblingDescendants, ['arveloven_andre_arvegang'], 'et søsken og søskenets barn', 'a sibling and that sibling\'s child'))
+  if (f.advancementsUnresolved) {
+    const q = f.advancementsUnresolved
+    const judgement = a.advancements === 'gift' && a.advancementSubstantial === 'yes'
+    const saidLater = q === 'advancementConditionAtGift' && a.advancementConditionAtGift === 'no'
+    b.push({
+      id: 'advancementsUnresolved', hard: true, questionId: q, sources: ['arveloven_avkorting', 'arveloven_1972_avkorting', 'hr_2025_1182'],
+      title: 'Vi kan ikke beregne fordelingen mellom barna sikkert', title_en: 'We cannot calculate the distribution between the children reliably',
+      text: judgement
+        ? 'En betydelig gave gitt før 2021 kan trekkes fra arven hvis det var avdødes forutsetning, selv om det ikke ble sagt. Det er en skjønnsvurdering veiviseren ikke kan gjøre. Få hjelp av en advokat eller tingretten før dere fordeler.'
+        : saidLater
+          ? 'For gaver gitt fra 2021 trekkes en gave bare fra hvis det ble satt som betingelse senest da gaven ble gitt. Ble det sagt senere, eller gjelder svarene gaver både før og etter 2021, kan veiviseren ikke beregne fordelingen sikkert. Få hjelp av en advokat eller tingretten før dere fordeler.'
+          : 'Om gavene skal trekkes fra arven, avhenger av når de ble gitt, hva avdøde sa og, for gaver før 2021, om gaven var betydelig. Svar på spørsmålet, eller få hjelp av en advokat eller tingretten før dere fordeler.',
+      text_en: judgement
+        ? 'A substantial gift given before 2021 can be deducted from the inheritance if it was the deceased\'s assumption, even if it was not said. That is a judgement the guide cannot make. Get help from a lawyer or the district court before you distribute.'
+        : saidLater
+          ? 'For gifts given from 2021, a gift is only deducted if it was made a condition no later than when the gift was given. If it was said later, or your answers concern gifts both before and after 2021, the guide cannot calculate the distribution reliably. Get help from a lawyer or the district court before you distribute.'
+          : 'Whether the gifts are to be deducted from the inheritance depends on when they were given, what the deceased said and, for gifts before 2021, whether the gift was substantial. Answer the question, or get help from a lawyer or the district court before you distribute.',
+    })
+  }
   return b
 }
 
@@ -223,7 +256,7 @@ function describeSituation(a, f, calc) {
       const k = Number(c.grandchildren) || 0
       const name = c.name?.trim() || 'Ett av barna'
       const dead = c.name?.trim() ? 'død' : 'dødt' // «Kari er død», men «Ett av barna er dødt»
-      s.push(k > 0 ? `${cap(name)} er ${dead}, og ${k === 1 ? 'barnet hans eller hennes' : `de ${count(k)} barna hans eller hennes`} arver i stedet.` : `${cap(name)} er ${dead} uten å etterlate seg barn.`)
+      s.push(k > 0 ? `${cap(name)} er ${dead}, og ${k === 1 ? 'barnet hans eller hennes' : `de ${count(k)} barna hans eller hennes`} arver i stedet.` : `${cap(name)} er ${dead} uten barn som lever.`)
     }
   } else if (hasChildren === 'no') {
     s.push('Avdøde hadde ikke barn.')

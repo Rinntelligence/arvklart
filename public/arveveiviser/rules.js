@@ -272,9 +272,9 @@ export const NOTICES = [
   {
     id: 'advancementGifts', area: 'meaning', level: 'info',
     when: { fact: 'advancementGifts' },
-    title: 'Vanlige gaver trekkes ikke fra arven', title_en: 'Ordinary gifts are not deducted from the inheritance',
-    text: 'En gave trekkes bare fra arven hvis avdøde gjorde det til en betingelse at det var forskudd på arv. Det bør helst ha vært skriftlig og kjent for de andre barna.', text_en: 'A gift is only deducted from the inheritance if the deceased made it a condition that it was an advance on inheritance. Ideally this should have been in writing and known to the other children.',
-    sources: ['arveloven_avkorting'],
+    title: 'Gavene er ikke trukket fra arven', title_en: 'The gifts have not been deducted from the inheritance',
+    text: 'Ut fra svarene dine er vilkårene for å trekke gavene fra arven ikke oppfylt. For gaver gitt fra 2021 må det ha vært satt som betingelse da gaven ble gitt. For gaver gitt før 2021 må gaven ha vært betydelig, uten at de andre barna har fått tilsvarende.', text_en: 'Based on your answers, the conditions for deducting the gifts from the inheritance are not met. For gifts given from 2021, it must have been made a condition when the gift was given. For gifts given before 2021, the gift must have been substantial, without the other children having received the equivalent.',
+    sources: ['arveloven_avkorting', 'arveloven_1972_avkorting', 'hr_2025_1182'],
   },
   {
     id: 'previousUskifte', area: 'meaning', level: 'warning',

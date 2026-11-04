@@ -13,6 +13,8 @@ export function base(overrides = {}) {
   return {
     role: 'relative', deathDate: DATE, residence: 'yes',
     testament: 'no', debtOverview: 'yes', circumstances: ['none'],
+    // Sikkerhetsspørsmålene om flere ledd (F11) vises bare når noen er døde; «Nei» gir samme resultat som før
+    deeperDescendants: 'no', deeperSiblingDescendants: 'no', deeperFirstSpouseDescendants: 'no',
     ...overrides,
   }
 }
@@ -32,3 +34,6 @@ export function run(answers) {
 export const amountOf = (r, id) => r.skifte.people.find(p => p.id === id)?.amount
 export const byRelation = (r, rel) => r.skifte.people.filter(p => p.relation === rel)
 export const sumPeople = r => r.skifte.people.reduce((s, p) => s + p.amount, 0) + r.skifte.toCharity
+
+// Forskudd (F14) der vilkårene for avkorting er oppfylt: betydelig gave gitt før 2021, og avdøde sa det
+export const ADVANCE_OK = { advancements: 'yes', advancementTiming: 'before2021', advancementSubstantial: 'yes' }
