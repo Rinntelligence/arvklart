@@ -211,7 +211,7 @@ export async function runHttpChecks(base, { headers = {}, preview = false, fetch
     const r = await get('/veiviser')
     assert(r.status === 200, `status ${r.status}`)
     assert(/<main id="veiviser" data-veiviser-host>/.test(r.body) && !/<iframe/.test(r.body), 'veiviseren står ikke i siden')
-    for (const text of ['Fra dødsfall til fordelt bo — steg for steg', 'Hvem arver – og hvor mye?', 'Prosessen i fem faser', 'Rett etter dødsfallet',
+    for (const text of ['Arveveiviser: fra dødsfall til fordelt bo, steg for steg', 'Hvem arver – og hvor mye?', 'Prosessen i fem faser', 'Rett etter dødsfallet',
       'Søke <strong>skifteattest</strong> hos tingretten', 'Pliktdelsarv', 'Jussformidlingen i Bergen', 'Klar for å fordele eiendelene?'])
       assert(r.body.includes(text), `mangler «${text}»`)
     const old = await get('/veiviser.html')

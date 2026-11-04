@@ -84,12 +84,16 @@ await check('Metadata, overskrifter og indeksering: tittel, beskrivelse, canonic
   const html = await res.text()
   assert(!res.headers.get('x-robots-tag'), `X-Robots-Tag på /veiviser: ${res.headers.get('x-robots-tag')}`)
   assert(!/name="robots"/.test(html), 'robots-meta i HTML-en')
-  assert(html.includes('<title>Arveveiviser: Hvem arver – og hvor mye? — Arvklart</title>'), 'tittelen')
-  assert(html.includes('<meta name="description" content="Fra dødsfall til fordelt bo — steg for steg. Finn ut hvem som arver og hvor mye, basert på din situasjon." />'), 'beskrivelsen')
+  assert(html.includes('<title>Arveveiviser: fra dødsfall til fordelt bo — Arvklart</title>'), 'tittelen')
+  assert(html.includes('<meta name="description" content="Arveveiviser: se hva som skjer i hver fase av arveoppgjøret, fra dødsfall til fordelt bo, hva sentrale begreper betyr og hvor du finner offentlige ressurser." />'), 'beskrivelsen')
+  assert(/<h1[^>]*>Arveveiviser: fra dødsfall til fordelt bo, steg for steg<\/h1>/.test(html), 'H1 begynner med «Arveveiviser»')
   assert((html.match(/<link rel="canonical"/g) || []).length === 1 && html.includes(`<link rel="canonical" href="${SITE_URL}/veiviser" />`), 'canonical')
   assert((html.match(/<h1[\s>]/g) || []).length === 1, 'skal ha én H1')
   const h2 = [...html.matchAll(/<h2[^>]*>([^<]+)/g)].map(m => m[1])
   assert(JSON.stringify(h2) === JSON.stringify(['Hvem arver – og hvor mye?', 'Prosessen i fem faser', 'Ordliste', 'Ressurser', 'Klar for å fordele eiendelene?']), `H2: ${h2}`)
+  assert(/Skrevet av Arvklart · Sist oppdatert <time datetime="\d{4}-\d{2}-\d{2}">/.test(html), 'avsender og dato')
+  assert(!/faglig gjennomgått|juridisk kontrollert/i.test(html), 'påstand om faglig gjennomgang')
+  assert((html.match(/<ol class="phase-overview">/g) || []).length === 1 && [1, 2, 3, 4, 5].every(n => html.includes(`id="fase-${n}"`) && html.includes(`href="#fase-${n}"`)), 'oversikten over fasene og lenkene til dem')
   assert((html.match(/<h3 class="phase-h">/g) || []).length === 5 && (html.match(/<h3 class="resource-cat-title">/g) || []).length === 3, 'H3 for fasene og ressursgruppene')
   assert(/<main id="veiviser" data-veiviser-host>/.test(html) && !/<iframe/.test(html), 'veiviseren skal stå i <main>, uten iframe')
   const old = await fetch(`${BASE}/veiviser.html`, { redirect: 'manual' })
@@ -112,7 +116,7 @@ await check('Norsk, ikke innlogget: hydrering uten feil, startkortet blinker ikk
   assert(await page.evaluate(() => window.__loading) === false, '«Laster veiviseren …» ble vist')
   assert(await page.locator('iframe').count() === 0, 'iframe')
   assert(await page.locator('#root').getByRole('button', { name: '← Tilbake til hjemmesiden' }).isVisible(), 'linjen øverst')
-  assert(await page.title() === 'Arveveiviser: Hvem arver – og hvor mye? — Arvklart', `tittel: ${await page.title()}`)
+  assert(await page.title() === 'Arveveiviser: fra dødsfall til fordelt bo — Arvklart', `tittel: ${await page.title()}`)
   assert(errors.length === 0, `feil: ${errors.join(' | ')}`)
 }, { loggedIn: false })
 
@@ -169,6 +173,23 @@ await check('Fasene, ordlisten, gravferdssjekken, lenkene og «Tilbake til hjemm
   await page.getByText('Trolig rett på et redusert beløp').waitFor()
   await page.locator('#root').getByRole('button', { name: '← Tilbake til hjemmesiden' }).click()
   await page.waitForURL(`${BASE}/`)
+}, { loggedIn: false })
+
+await check('Oversikten over fasene: lenken åpner fasen og ruller dit, under linjen øverst', async page => {
+  await page.goto(`${BASE}/veiviser`)
+  await ready(page)
+  await page.locator('#veiviser .phase-overview a[href="#fase-4"]').click()
+  await page.waitForTimeout(600)
+  assert(await page.locator('#fase-4 .phase-head').getAttribute('aria-expanded') === 'true', 'fasen åpnes ikke')
+  const pos = await page.evaluate(() => ({ phase: document.getElementById('fase-4').getBoundingClientRect().top, bar: document.getElementById('root').getBoundingClientRect().bottom }))
+  assert(pos.phase >= pos.bar - 1 && pos.phase < 300, `fasen står ikke synlig under linjen: ${JSON.stringify(pos)}`)
+}, { loggedIn: false })
+
+await check('Mobil: startkortet står i første skjermbilde', async page => {
+  await page.goto(`${BASE}/veiviser`)
+  await ready(page)
+  const start = await page.getByRole('button', { name: 'Start', exact: true }).boundingBox()
+  assert(start && start.y + start.height <= 844, `Start-knappen er under første skjermbilde: ${JSON.stringify(start)}`)
 }, { loggedIn: false })
 
 await check('Linjen øverst blir stående når man blar (som over iframen), på mobil', async page => {

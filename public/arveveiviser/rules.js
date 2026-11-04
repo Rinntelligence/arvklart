@@ -474,7 +474,7 @@ export const NEXT_STEPS = [
     id: 'divide',
     when: { all: [{ not: { fact: 'insolvent' } }, { not: { fact: 'partnerTakesAll' } }, { not: { fact: 'toCharity' } }] },
     title: 'Fordel eiendelene og gjør opp boet', title_en: 'Distribute the belongings and settle the estate',
-    text: 'Med skifteattesten kan dere betale gjeld, selge eller overta eiendeler og fordele resten. Skriv ned hvem som får hva i et skifteoppgjør som alle arvingene signerer. Arvklart kan hjelpe dere med å fordele eiendelene rettferdig.', text_en: 'With the probate certificate you can pay debts, sell or take over assets and distribute the rest. Write down who gets what in a settlement document that all the heirs sign. Arvklart can help you divide the belongings fairly.',
+    text: 'Med skifteattesten kan dere betale gjeld, selge eller overta eiendeler og fordele resten. Skriv ned hvem som får hva i et skifteoppgjør som alle arvingene signerer. Arvklart kan vise hvem som ønsker hva, og gi dere loddtrekning, runder eller jevn fordeling etter verdi som utgangspunkt. Det er dere som avgjør.', text_en: 'With the probate certificate you can pay debts, sell or take over assets and distribute the rest. Write down who gets what in a settlement document that all the heirs sign. Arvklart can show who wants what, and give you drawing lots, rounds or an even split by value as a starting point. You make the decisions.',
     sources: ['domstol_privat_skifte'],
   },
   {
