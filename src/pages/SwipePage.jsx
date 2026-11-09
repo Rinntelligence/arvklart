@@ -9,6 +9,9 @@ import { categoryLabel } from '../lib/categories'
 import { formatNOK } from '../lib/format'
 import StoredImage from '../components/StoredImage'
 
+// Bildet tar høyst 30 % av vindushøyden (vh virker i alle nettlesere), aldri mer enn før (320 px)
+const SWIPE_IMAGE_HEIGHT = 'min(320px, 30vh)'
+
 export default function SwipePage({ session, profile, onToast }) {
   const { id } = useParams()
   const navigate = useNavigate()
@@ -204,8 +207,11 @@ export default function SwipePage({ session, profile, onToast }) {
     </div>
   )
 
+  // Mobil: siden står under toppfeltet (56 px) og eventuelt demobanneret. Bildet krymper på lave skjermer, og knappene
+  // ligger i en blokk som står fast nederst i vinduet, så «Nei takk» og «Vil ha» alltid kan nås uten å scrolle.
+  // Resten av kortet kan fortsatt scrolles fram. Uten støtte for svh faller minstehøyden bort (ingen annen endring).
   return (
-    <div style={{ minHeight:'100vh', background:'#FBF9F5', fontFamily:'Karla, sans-serif', display:'flex', flexDirection:'column' }}
+    <div style={{ minHeight:'calc(100svh - 56px)', background:'#FBF9F5', fontFamily:'Karla, sans-serif', display:'flex', flexDirection:'column' }}
       onMouseMove={onMouseMove} onMouseUp={onMouseUp} onMouseLeave={onMouseUp}>
 
       {/* Header */}
@@ -242,7 +248,7 @@ export default function SwipePage({ session, profile, onToast }) {
         {/* Next card (background) */}
         {items[index + 1] && (
           <div style={{ position:'absolute', width:'min(380px, 90vw)', background:'#fff', borderRadius:'20px', overflow:'hidden', boxShadow:'0 4px 20px rgba(0,0,0,0.08)', transform:'scale(0.95) translateY(10px)', zIndex:0 }}>
-            <div style={{ height:'320px', background:'#E8DFD0' }} />
+            <div style={{ height:SWIPE_IMAGE_HEIGHT, background:'#E8DFD0' }} />
           </div>
         )}
 
@@ -252,7 +258,7 @@ export default function SwipePage({ session, profile, onToast }) {
           onMouseDown={onMouseDown}>
 
           {/* Image */}
-          <div style={{ height:'320px', background:'#E8DFD0', display:'flex', alignItems:'center', justifyContent:'center', overflow:'hidden' }}>
+          <div style={{ height:SWIPE_IMAGE_HEIGHT, background:'#E8DFD0', display:'flex', alignItems:'center', justifyContent:'center', overflow:'hidden' }}>
             {currentItem.image_url
               ? <StoredImage src={currentItem.image_url} alt={currentItem.title} style={{ width:'100%', height:'100%', objectFit:'contain', pointerEvents:'none' }} />
               : <span style={{ fontSize:'3rem', color:'#75604B' }}>{currentItem.categories?.emoji || '·'}</span>
@@ -285,10 +291,12 @@ export default function SwipePage({ session, profile, onToast }) {
         </div>
       </div>
 
+      {/* Angre, knappene og hintet står fast nederst i vinduet */}
+      <div style={{ position:'sticky', bottom:0, zIndex:2, background:'#FBF9F5', paddingBottom:'max(12px, env(safe-area-inset-bottom))' }}>
       {undoBar}
 
       {/* Buttons */}
-      <div style={{ padding:'16px 20px 32px', display:'flex', justifyContent:'center', gap:'20px', alignItems:'center' }}>
+      <div style={{ padding:'12px 20px', display:'flex', justifyContent:'center', gap:'20px', alignItems:'center' }}>
         <button onClick={() => handleAction('pass')} style={{
           width:'80px', height:'80px', borderRadius:'50%', border:'2px solid #D9CFC0',
           background:'#fff', cursor:'pointer',
@@ -305,8 +313,9 @@ export default function SwipePage({ session, profile, onToast }) {
       </div>
 
       {/* Hint */}
-      <div style={{ textAlign:'center', paddingBottom:'16px', fontSize:'0.8125rem', color:'#75604B' }}>
+      <div style={{ textAlign:'center', fontSize:'0.8125rem', color:'#75604B' }}>
         {L('Du kan også sveipe: ← nei takk · → vil ha', 'You can also swipe: ← no thanks · → want')}
+      </div>
       </div>
     </div>
   )
