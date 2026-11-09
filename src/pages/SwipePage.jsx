@@ -9,6 +9,24 @@ import { categoryLabel } from '../lib/categories'
 import { formatNOK } from '../lib/format'
 import StoredImage from '../components/StoredImage'
 
+// Layout på sveipesiden: siden er nøyaktig like høy som det synlige vinduet (svh: med adresselinjen synlig), og deles i
+// linjen med «Tilbake», kortområdet og knappeområdet (angrelinjen, «Si hvorfor», knappene, hintet). Kortområdet tar
+// plassen som er igjen og kan scrolles; knappeområdet ligger under det, så ingenting legger seg over kortet. Bildet får
+// det som er igjen i kortområdet når infodelen (tittel på to linjer, kategori, tre linjer beskrivelse og «N personer er
+// interessert») er trukket fra, så beskrivelsen går foran et stort bilde. Bildet er 96–320 px; infodelen er målt med
+// Karla/Fraunces ved 16 og 20 px grunnstørrelse (74 px + 8,4 rem) pluss 4 px margin, og følger skriftstørrelsen.
+// Bare på denne siden (.app-shell:has(> .swipe-root)). Nettlesere uten :has eller container queries får vanlig flyt der
+// siden scrolles; heller ikke der ligger noe over noe annet.
+const SWIPE_CSS = `
+.swipe-img { height: min(320px, 30vh); }
+@supports selector(:has(a)) and (container-type: size) {
+  .app-shell:has(> .swipe-root) { display: flex; flex-direction: column; height: 100vh; height: 100svh; min-height: 0 !important; }
+  .app-shell:has(> .swipe-root) > * { flex-shrink: 0; }
+  .app-shell:has(> .swipe-root) > .swipe-root { flex: 1 1 0; min-height: 0; }
+  .swipe-cards { flex: 1 1 0; min-height: 112px; overflow-y: auto; container-type: size; }
+  .swipe-img { height: clamp(96px, calc(100cqh - (78px + 8.4rem)), 320px); }
+}`
+
 export default function SwipePage({ session, profile, onToast }) {
   const { id } = useParams()
   const navigate = useNavigate()
@@ -205,11 +223,12 @@ export default function SwipePage({ session, profile, onToast }) {
   )
 
   return (
-    <div style={{ minHeight:'100vh', background:'#FBF9F5', fontFamily:'Karla, sans-serif', display:'flex', flexDirection:'column' }}
+    <div className="swipe-root" style={{ background:'#FBF9F5', fontFamily:'Karla, sans-serif', display:'flex', flexDirection:'column' }}
       onMouseMove={onMouseMove} onMouseUp={onMouseUp} onMouseLeave={onMouseUp}>
+      <style>{SWIPE_CSS}</style>
 
       {/* Header */}
-      <div style={{ padding:'16px 20px', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+      <div style={{ padding:'12px 20px', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
         <button onClick={() => navigate(`/estate/${id}`)} style={{ background:'none', border:'none', color:'#75604B', cursor:'pointer', fontSize:'0.875rem', fontFamily:'Karla, sans-serif' }}>
           {L('← Tilbake', '← Back')}
         </button>
@@ -224,8 +243,8 @@ export default function SwipePage({ session, profile, onToast }) {
         <div style={{ height:'100%', background:'#3A2F26', width:`${((index) / items.length) * 100}%`, transition:'width 0.3s', borderRadius:'2px' }} />
       </div>
 
-      {/* Card area */}
-      <div style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', padding:'20px', position:'relative' }}>
+      {/* Card area: tar plassen som er igjen og kan scrolles; kortet står midt i når det er plass */}
+      <div className="swipe-cards" style={{ display:'flex', flexDirection:'column', alignItems:'center', padding:'12px 20px', position:'relative' }}>
 
         {/* Action indicators */}
         {action === 'like' && (
@@ -239,20 +258,19 @@ export default function SwipePage({ session, profile, onToast }) {
           </div>
         )}
 
-        {/* Next card (background) */}
+        <div style={{ position:'relative', width:'min(380px, 90vw)', margin:'auto 0' }}>
+        {/* Next card (background): like stort som kortet, bak det */}
         {items[index + 1] && (
-          <div style={{ position:'absolute', width:'min(380px, 90vw)', background:'#fff', borderRadius:'20px', overflow:'hidden', boxShadow:'0 4px 20px rgba(0,0,0,0.08)', transform:'scale(0.95) translateY(10px)', zIndex:0 }}>
-            <div style={{ height:'320px', background:'#E8DFD0' }} />
-          </div>
+          <div style={{ position:'absolute', inset:0, background:'#fff', borderRadius:'20px', boxShadow:'0 4px 20px rgba(0,0,0,0.08)', transform:'scale(0.95) translateY(10px)', zIndex:0 }} />
         )}
 
         {/* Main card */}
-        <div ref={cardRef} style={{ ...cardStyle, width:'min(380px, 90vw)', background:'#fff', borderRadius:'20px', overflow:'hidden', boxShadow:'0 8px 40px rgba(0,0,0,0.12)', zIndex:1, position:'relative' }}
+        <div ref={cardRef} style={{ ...cardStyle, background:'#fff', borderRadius:'20px', overflow:'hidden', boxShadow:'0 8px 40px rgba(0,0,0,0.12)', zIndex:1, position:'relative' }}
           onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd}
           onMouseDown={onMouseDown}>
 
           {/* Image */}
-          <div style={{ height:'320px', background:'#E8DFD0', display:'flex', alignItems:'center', justifyContent:'center', overflow:'hidden' }}>
+          <div className="swipe-img" style={{ background:'#E8DFD0', display:'flex', alignItems:'center', justifyContent:'center', overflow:'hidden' }}>
             {currentItem.image_url
               ? <StoredImage src={currentItem.image_url} alt={currentItem.title} style={{ width:'100%', height:'100%', objectFit:'contain', pointerEvents:'none' }} />
               : <span style={{ fontSize:'3rem', color:'#75604B' }}>{currentItem.categories?.emoji || '·'}</span>
@@ -283,12 +301,15 @@ export default function SwipePage({ session, profile, onToast }) {
             )}
           </div>
         </div>
+        </div>
       </div>
 
+      {/* Angre, «Si hvorfor», knappene og hintet: egen plass under kortområdet, aldri over kortet */}
+      <div className="swipe-actions" style={{ paddingBottom:'max(12px, env(safe-area-inset-bottom))' }}>
       {undoBar}
 
       {/* Buttons */}
-      <div style={{ padding:'16px 20px 32px', display:'flex', justifyContent:'center', gap:'20px', alignItems:'center' }}>
+      <div style={{ padding:'8px 20px', display:'flex', justifyContent:'center', gap:'20px', alignItems:'center' }}>
         <button onClick={() => handleAction('pass')} style={{
           width:'80px', height:'80px', borderRadius:'50%', border:'2px solid #D9CFC0',
           background:'#fff', cursor:'pointer',
@@ -305,8 +326,9 @@ export default function SwipePage({ session, profile, onToast }) {
       </div>
 
       {/* Hint */}
-      <div style={{ textAlign:'center', paddingBottom:'16px', fontSize:'0.8125rem', color:'#75604B' }}>
+      <div style={{ textAlign:'center', fontSize:'0.8125rem', color:'#75604B' }}>
         {L('Du kan også sveipe: ← nei takk · → vil ha', 'You can also swipe: ← no thanks · → want')}
+      </div>
       </div>
     </div>
   )

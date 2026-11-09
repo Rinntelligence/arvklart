@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Starter Vite mot en falsk Supabase-adresse (alle kall simuleres i testen) og kjører akseptansetestene.
 # Krever Chromium (CHROMIUM_PATH, standard /opt/pw-browsers/chromium). Kjør: npm run test:e2e
+# swipe.mjs sjekker at sveipeknappene synes uten scrolling på vanlige mobilskjermer.
 # csp.mjs, seo.mjs, guides.mjs, veiviser.mjs, chunks.mjs og analytics.mjs kjøres til slutt mot bygget (dist, med testinnholdet i
 # test/fixtures/content) med hodene og omskrivingene fra vercel.json
 # (test/e2e/staticServer.mjs); seo.mjs trenger de forhåndsrendrede sidene, som bare finnes i bygget.
@@ -13,7 +14,7 @@ VITE=$!
 trap 'kill $VITE 2>/dev/null || true' EXIT
 until curl -sf "localhost:$PORT" >/dev/null 2>&1; do sleep 1; done
 FAILED=()
-for t in test/e2e/addItemsPage.mjs test/e2e/a11y.mjs test/e2e/journey.mjs test/e2e/itemGuard.mjs test/e2e/reason.mjs test/e2e/language.mjs test/e2e/images.mjs test/e2e/market.mjs test/e2e/distribution.mjs; do
+for t in test/e2e/addItemsPage.mjs test/e2e/a11y.mjs test/e2e/journey.mjs test/e2e/itemGuard.mjs test/e2e/reason.mjs test/e2e/language.mjs test/e2e/images.mjs test/e2e/market.mjs test/e2e/distribution.mjs test/e2e/swipe.mjs; do
   [ -f "$t" ] || continue
   BASE_URL="http://localhost:$PORT" node "$t" || FAILED+=("$t")
 done
