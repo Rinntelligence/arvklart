@@ -327,17 +327,17 @@ export default function LandingPage({ loggedIn = false }) {
               </div>
               <div className="demo-conflict">
                 <div className="demo-conflict-left">
-                  <h4>{L('Grønn 3-seters sofa', 'Green three-seater sofa')}</h4>
-                  <span>{L('Lars og Mona ble enige', 'Lars and Mona agreed')}</span>
+                  <h4>{L('Oljemaleri av blomster', 'Oil painting of flowers')}</h4>
+                  <span>{L('Kari og Lars ønsker det', 'Kari and Lars want it')}</span>
                 </div>
-                <span className="demo-badge">{L('Avklart', 'Settled')}</span>
+                <span className="demo-badge orange">{L('Avventer', 'Pending')}</span>
               </div>
               <div className="demo-conflict">
                 <div className="demo-conflict-left">
-                  <h4>{L('Mahognibokhylle', 'Mahogany bookcase')}</h4>
-                  <span>{L('Lars er eneste interesserte', 'Lars is the only one interested')}</span>
+                  <h4>{L('Grønn 3-seters sofa', 'Green three-seater sofa')}</h4>
+                  <span>{L('Lars ønsker den', 'Lars wants it')}</span>
                 </div>
-                <span className="demo-badge">{L('Avklart', 'Settled')}</span>
+                <span className="demo-badge orange">{L('Avventer', 'Pending')}</span>
               </div>
             </div>
           </div>

@@ -11,8 +11,9 @@
 --    item-images (lastes opp uten EXIF med supabase/seed/upload_demo_images.mjs); ellers gjøres ingenting.
 --
 -- Eksempelsvarene (ønskene i reset_demo_estate()) er skrevet om, så et besøk viser at flere i familien kan ønske seg
--- det samme og begrunne det, også med minner, og at de kan snakke sammen om det. Gjenstander som flere ønsker:
--- gyngestolen, sofaen, maleriet, gifteringene og albumet; resten har én interessent. Ellers er reset_demo_estate()
+-- det samme og begrunne det, også med minner, og at de kan snakke sammen om det. Den besøkende er Mona (administrator)
+-- og svarer selv: bare Kari og Lars har svart. Begge ønsker gyngestolen, maleriet og albumet; sofaen, gitaren og
+-- bokhylla ønsker bare Lars, vasen og gifteringene bare Kari. Ellers er reset_demo_estate()
 -- lik 20261109190000_demo_identity.sql (demomerket, sperrene). Nullstillingen rører ikke tittel, beskrivelse eller
 -- bilde, så rettelsene står etter hver demoinnlogging. Verdiene endres ikke. Demoen nullstilles til slutt, så de nye
 -- svarene gjelder straks. Kan kjøres flere ganger.
@@ -122,21 +123,15 @@ begin
     ('face0001-0000-0000-0000-000000000001'::uuid, 'lars' , 'Jeg husker den fra barndommen — bestemor satt alltid der og strikket'),
     ('face0001-0000-0000-0000-000000000001'::uuid, 'kari' , 'Mamma elsket den stolen. Jeg vil ta vare på den til barna mine'),
     ('face0002-0000-0000-0000-000000000002'::uuid, 'lars' , 'Vi har plass til den i stua, og den passer perfekt hos oss'),
-    ('face0002-0000-0000-0000-000000000002'::uuid, 'mona' , 'Her satt vi alle sammen på julaften. Den vil jeg gjerne ha hjemme hos oss'),
     ('face0004-0000-0000-0000-000000000004'::uuid, 'kari' , 'Det hørte alltid til i stua. Jeg kan ikke forestille meg det noe annet sted'),
-    ('face0004-0000-0000-0000-000000000004'::uuid, 'lars' , 'Pappa var veldig glad i dette maleriet. Jeg vil beholde minnet'),
-    ('face0004-0000-0000-0000-000000000004'::uuid, 'mona' , 'Det minner meg om søndagsmiddagene hjemme. Kanskje vi kan snakke sammen om hvem som tar vare på det?'),
+    ('face0004-0000-0000-0000-000000000004'::uuid, 'lars' , 'Pappa var veldig glad i dette maleriet. Ønsker flere det, tar vi en prat først'),
     ('face0006-0000-0000-0000-000000000006'::uuid, 'kari' , 'Mamma og pappa bar disse ringene i over 60 år. De betyr mye for meg'),
-    ('face0006-0000-0000-0000-000000000006'::uuid, 'mona' , 'Jeg vil gjerne at ringene går videre til barnebarna. Det kan vi bli enige om sammen'),
     ('face0008-0000-0000-0000-000000000008'::uuid, 'kari' , 'Jeg bruker musikkanlegg daglig og dette er av fantastisk kvalitet'),
     ('face0008-0000-0000-0000-000000000008'::uuid, 'lars' , 'Er stor B&O-fan. Har alltid likt dette anlegget'),
     ('face0012-0000-0000-0000-000000000012'::uuid, 'kari' , 'Bildene betyr alt for meg. Jeg vil gjerne skanne dem og dele dem med alle i familien'),
     ('face0012-0000-0000-0000-000000000012'::uuid, 'lars' , 'Vi bør alle få tilgang til bildene — men noen må ta vare på originalene'),
-    ('face0012-0000-0000-0000-000000000012'::uuid, 'mona' , 'Barna mine har aldri sett disse bildene. Jeg vil gjerne vise dem hvor de kommer fra'),
     ('face0005-0000-0000-0000-000000000005'::uuid, 'kari' , 'Har alltid vært fascinert av den. Vil gjerne ha den i hylla mi'),
-    ('face0007-0000-0000-0000-000000000007'::uuid, 'mona' , 'Mamma hadde det på seg på alle store familiedager. Jeg vil ta godt vare på det'),
     ('face0003-0000-0000-0000-000000000003'::uuid, 'lars' , 'Jeg har plass til den, og jeg vil gjerne ta vare på bøkene til pappa'),
-    ('face0009-0000-0000-0000-000000000009'::uuid, 'mona' , 'Vil bruke det når hele familien samles til jul'),
     ('db1836d7-4b59-4036-b95b-37443affed62'::uuid, 'lars' , 'Pappa lærte meg de første grepene på denne gitaren. Jeg vil gjerne spille på den igjen')
   ) as s(item_id, who, reason)
   where exists (select 1 from items where id = s.item_id and estate_id = v_estate)

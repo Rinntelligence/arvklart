@@ -17,10 +17,11 @@ Bildene til gjenstandene i `seed/demo_estate.sql`, lagret i repoet så demoen ik
 | `face0008.jpg` | `photo-1593305841991-05c297ba4575` |
 | `face0010.jpg` | `photo-1560472354-b33ff0c44a43` |
 | `face0012.jpg` | `photo-1558618666-fcd25c85cd64` |
+| `db1836d7.jpg` | Familiens eget bilde av gitaren, gitt til demoen av Bård 2026-11-09. Skalert til 600 px og lagret på nytt uten metadata (ingen EXIF/GPS, XMP, ICC eller kommentarer). Ingen personer eller private detaljer. |
 
 Gjenstandene `face0005`, `face0007`, `face0009` og `face0011` har ikke bilde: Unsplash-bildene de pekte på, finnes ikke lenger (404) eller viste noe annet.
 
-**Gitaren (`db1836d7`, «Sigma akustisk gitar») mangler bilde.** Det skal være familiens eget bilde, med samtykke, uten
-personer, adresser eller andre private detaljer, og lagret uten EXIF. Legg fila her som `db1836d7.jpg` med en rad i
-tabellen, last den opp med `upload_demo_images.mjs db1836d7 --apply`, og kjør `20261109210000_demo_content_fixes.sql`
-på nytt: den kobler bildet til gitaren bare når fila finnes i bøtten. Den slettede originalfila brukes ikke.
+**Gitaren (`db1836d7`, «Sigma akustisk gitar»):** bildet over lastes opp som `deed0001-…/demo__db1836d7.jpg` (med
+`upload_demo_images.mjs db1836d7 --apply`, eller i Supabase-dashbordet under Storage → item-images → `deed0001-…`, med
+nøyaktig det filnavnet). `20261109210000_demo_content_fixes.sql` kobler bildet til gitaren bare når fila finnes i
+bøtten, så last opp først og kjør migreringen etterpå (eller kjør den på nytt). Den slettede originalfila brukes ikke.

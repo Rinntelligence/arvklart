@@ -71,7 +71,8 @@ await check('Vanlig bruker: «Logg ut» logger ut overalt som før (scope=global
 
 // ── Brukerreisen i demoen på mobil, med eksempelsvarene fra nullstillingen ─────────────────────────────────────
 // Tekstene hentes fra den siste migreringen med reset_demo_estate(), så testen viser det besøkende faktisk ser:
-// oversikten over boet, en gjenstand som alle tre ønsker med begrunnelsene side om side, og «Snakk sammen først».
+// hvem man er (Mona, administrator), oversikten over boet, en gjenstand som alle tre ønsker etter at den besøkende har
+// sagt «Vil ha» (Kari og Lars med begrunnelser side om side), og «Snakk sammen først».
 const MIG = readFileSync(new URL('../../supabase/migrations/20261109210000_demo_content_fixes.sql', import.meta.url), 'utf8')
 const wish = (item, who) => MIG.match(new RegExp(`\\('${item}-[0-9a-f-]+'::uuid, '${who}'\\s*,\\s+'([^']+)'\\)`))[1]
 const KARI = '11111111-0000-0000-0000-00000000000b', LARS = '11111111-0000-0000-0000-00000000000c'
@@ -84,11 +85,11 @@ const people = [
 const ids = { mona: UID, kari: KARI, lars: LARS }
 const demoItems = [
   ['f1', 'Bestemors gyngestol', 'face0001', ['lars', 'kari']],
-  ['f2', 'Grønn 3-seters sofa', 'face0002', ['lars', 'mona']],
+  ['f2', 'Grønn 3-seters sofa', 'face0002', ['lars']],
   ['f4', 'Oljemaleri av blomster', 'face0004', ['kari', 'lars', 'mona']],
-  ['f9', 'Middagsservise', 'face0009', ['mona']],
+  ['f9', 'Middagsservise', 'face0009', []],
 ]
-const interests = demoItems.flatMap(([id, , key, who]) => who.map(w => ({ id: `${id}-${w}`, item_id: id, user_id: ids[w], reason: wish(key, w), created_at: FIXTURES.items[0].created_at })))
+const interests = demoItems.flatMap(([id, , key, who]) => who.map(w => ({ id: `${id}-${w}`, item_id: id, user_id: ids[w], reason: w === 'mona' ? null : wish(key, w), created_at: FIXTURES.items[0].created_at })))
 const demoFixtures = {
   estates: [hansen], profiles: people,
   estate_members: people.map((p, i) => ({ estate_id: EST, user_id: p.user_id, role: i === 0 ? 'admin' : 'member', joined_at: FIXTURES.items[0].created_at, estates: hansen, profiles: p })),
@@ -101,6 +102,7 @@ const noSideScroll = page => page.evaluate(() => document.documentElement.scroll
 await check('Mobil (390×664): oversikt over boet, gjenstanden alle ønsker med begrunnelsene, og «Snakk sammen først»', async page => {
   await page.goto(`${BASE}/estate/${EST}`)
   await page.getByText(BANNER).waitFor()
+  await page.getByText(/Du er Mona, en av tre arvinger og administrator; Kari og Lars har allerede svart\./).waitFor()
   await page.getByRole('heading', { name: 'Fam. Hansen sitt bo' }).first().waitFor()
   for (const t of ['Bestemors gyngestol', 'Grønn 3-seters sofa', 'Middagsservise']) assert(await page.getByText(t).count() > 0, `oversikten viser ikke ${t}`)
   assert(await noSideScroll(page), 'oversikten kan rulles sidelengs på mobil')

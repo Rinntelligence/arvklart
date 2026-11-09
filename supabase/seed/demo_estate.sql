@@ -184,12 +184,12 @@ BEGIN
 
   -- ============================================================
   -- DEL 5: Interesser — konflikter
-  --   Gyngestol        → du + Kari
-  --   Sofa             → Lars + Mona
-  --   Oljemaleri       → du + Lars + Mona (3-veis!)
-  --   Gifteringer      → Kari + Mona
-  --   B&O              → du + Lars
-  --   Familiealbum 1954–1959 → Kari + Lars + Mona (3-veis!)
+  --   Gyngestol        → Kari + Lars
+  --   Sofa             → Lars
+  --   Oljemaleri       → Kari + Lars
+  --   Gifteringer      → Kari
+  --   B&O              → Kari + Lars
+  --   Familiealbum 1954–1959 → Kari + Lars
   -- ============================================================
 
   -- Rydd først eventuelle gamle interesser for disse gjenstandene
@@ -215,28 +215,22 @@ BEGIN
     ('face0001-0000-0000-0000-000000000001', kari_id,
      'Mamma elsket den stolen. Jeg vil ta vare på den til barna mine');
 
-  -- Sofa: Lars + Mona
+  -- Sofa: Lars
   INSERT INTO interests (item_id, user_id, reason) VALUES
     ('face0002-0000-0000-0000-000000000002', lars_id,
-     'Vi har plass til den i stua, og den passer perfekt hos oss'),
-    ('face0002-0000-0000-0000-000000000002', mona_id,
-     'Her satt vi alle sammen på julaften. Den vil jeg gjerne ha hjemme hos oss');
+     'Vi har plass til den i stua, og den passer perfekt hos oss');
 
-  -- Oljemaleri: Kari + Lars + Mona
+  -- Oljemaleri: Kari + Lars
   INSERT INTO interests (item_id, user_id, reason) VALUES
     ('face0004-0000-0000-0000-000000000004', kari_id,
      'Det hørte alltid til i stua. Jeg kan ikke forestille meg det noe annet sted'),
     ('face0004-0000-0000-0000-000000000004', lars_id,
-     'Pappa var veldig glad i dette maleriet. Jeg vil beholde minnet'),
-    ('face0004-0000-0000-0000-000000000004', mona_id,
-     'Det minner meg om søndagsmiddagene hjemme. Kanskje vi kan snakke sammen om hvem som tar vare på det?');
+     'Pappa var veldig glad i dette maleriet. Ønsker flere det, tar vi en prat først');
 
-  -- Gifteringer: Kari + Mona
+  -- Gifteringer: Kari
   INSERT INTO interests (item_id, user_id, reason) VALUES
     ('face0006-0000-0000-0000-000000000006', kari_id,
-     'Mamma og pappa bar disse ringene i over 60 år. De betyr mye for meg'),
-    ('face0006-0000-0000-0000-000000000006', mona_id,
-     'Jeg vil gjerne at ringene går videre til barnebarna. Det kan vi bli enige om sammen');
+     'Mamma og pappa bar disse ringene i over 60 år. De betyr mye for meg');
 
   -- B&O: Kari + Lars
   INSERT INTO interests (item_id, user_id, reason) VALUES
@@ -245,34 +239,24 @@ BEGIN
     ('face0008-0000-0000-0000-000000000008', lars_id,
      'Er stor B&O-fan. Har alltid likt dette anlegget');
 
-  -- Familiealbum: Kari + Lars + Mona
+  -- Familiealbum: Kari + Lars
   INSERT INTO interests (item_id, user_id, reason) VALUES
     ('face0012-0000-0000-0000-000000000012', kari_id,
      'Bildene betyr alt for meg. Jeg vil gjerne skanne dem og dele dem med alle i familien'),
     ('face0012-0000-0000-0000-000000000012', lars_id,
-     'Vi bør alle få tilgang til bildene — men noen må ta vare på originalene'),
-    ('face0012-0000-0000-0000-000000000012', mona_id,
-     'Barna mine har aldri sett disse bildene. Jeg vil gjerne vise dem hvor de kommer fra');
+     'Vi bør alle få tilgang til bildene — men noen må ta vare på originalene');
 
   -- Kinesisk vase: kun Kari
   INSERT INTO interests (item_id, user_id, reason) VALUES
     ('face0005-0000-0000-0000-000000000005', kari_id,
      'Har alltid vært fascinert av den. Vil gjerne ha den i hylla mi');
 
-  -- Halskjede: kun Mona
-  INSERT INTO interests (item_id, user_id, reason) VALUES
-    ('face0007-0000-0000-0000-000000000007', mona_id,
-     'Mamma hadde det på seg på alle store familiedager. Jeg vil ta godt vare på det');
 
   -- Bokhylle: kun Lars
   INSERT INTO interests (item_id, user_id, reason) VALUES
     ('face0003-0000-0000-0000-000000000003', lars_id,
      'Jeg har plass til den, og jeg vil gjerne ta vare på bøkene til pappa');
 
-  -- Servise: kun Mona
-  INSERT INTO interests (item_id, user_id, reason) VALUES
-    ('face0009-0000-0000-0000-000000000009', mona_id,
-     'Vil bruke det når hele familien samles til jul');
 
   -- Familiealbum 1958–2010 og Kristallglass: ingen interesserte (vises som "ingen vil ha")
 

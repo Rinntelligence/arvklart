@@ -28,7 +28,7 @@ const seedItem = id => {
 describe('demoinnholdet', () => {
   test('nullstillingen er den nyeste og har ønskene', () => {
     assert.equal(resetFile, '20261109210000_demo_content_fixes.sql')
-    assert.ok(resetWishes.length >= 15, `fant ${resetWishes.length} ønsker`)
+    assert.ok(resetWishes.length >= 12, `fant ${resetWishes.length} ønsker`)
     // Sikkerheten fra 20261109190000 er beholdt: bare demomerket, sperre mot kontoer i andre bo
     assert.match(RESET, /raw_app_meta_data ->> 'arvklart_demo' = v_role/)
     assert.match(RESET, /er medlem eller eier i et annet bo; den røres ikke/)
@@ -41,7 +41,7 @@ describe('demoinnholdet', () => {
     assert.match(sofa, /sofa i mørkegrønn velur/)
     assert.doesNotMatch(sofa, /spisebord|eik|bord/i)
     for (const w of resetWishes.filter(w => w.item === 'face0002')) assert.doesNotMatch(w.reason, /spisebord|bord/i, w.reason)
-    assert.equal(resetWishes.filter(w => w.item === 'face0002').length, 2)
+    assert.equal(resetWishes.filter(w => w.item === 'face0002').length, 1)
     assert.doesNotMatch(read('src/pages/LandingPage.jsx'), /eiketresbord/i)
   })
 
@@ -57,23 +57,32 @@ describe('demoinnholdet', () => {
     for (const w of resetWishes.filter(w => w.item === 'face0006')) assert.doesNotMatch(w.reason, /\bur\b|klokke/i, w.reason)
     assert.doesNotMatch(seedItem('face0004'), /Andreassen|80×120|Fjord/)
     assert.match(seedItem('face0012'), /'Familiealbum 1954–1959'/)
+    assert.match(read('supabase/seed/demo-images/README.md'), /`db1836d7\.jpg`/)
     assert.doesNotMatch(seedItem('face0012'), /Singer|sykmaskin/i)
   })
 
-  test('eksempelsvarene viser at flere ønsker det samme, med minner, og at familien snakker sammen', () => {
+  test('eksempelsvarene: Kari og Lars har svart med minner, flere ønsker det samme, og Mona (den besøkende) svarer selv', () => {
     const per = {}
     for (const w of resetWishes) (per[w.item] ||= new Set()).add(w.who)
-    const contested = Object.values(per).filter(s => s.size >= 2)
-    assert.ok(contested.length >= 5, `${contested.length} gjenstander som flere ønsker`)
-    assert.ok(Object.values(per).some(s => s.size === 3), 'minst én gjenstand som alle tre ønsker')
+    assert.deepEqual(new Set(resetWishes.map(w => w.who)), new Set(['kari', 'lars']), 'Mona skal ikke ha forhåndsutfylte ønsker')
+    const both = Object.entries(per).filter(([, s]) => s.size === 2).map(([i]) => i).sort()
+    assert.ok(['face0001', 'face0004', 'face0012'].every(i => both.includes(i)), `gyngestolen, maleriet og albumet ønskes av begge: ${both}`)
     assert.ok(Object.values(per).filter(s => s.size === 1).length >= 4, 'flere gjenstander som bare én ønsker')
-    assert.ok(resetWishes.filter(w => /mamma|pappa|bestemor|barndom|barna|julaften|søndag|minne/i.test(w.reason)).length >= 8, 'begrunnelser med minner')
-    assert.ok(resetWishes.some(w => /snakke sammen|bli enige|alle få tilgang|dele dem med alle/i.test(w.reason)), 'samarbeid')
+    assert.ok(resetWishes.filter(w => /mamma|pappa|bestemor|barndom|barna|minne/i.test(w.reason)).length >= 6, 'begrunnelser med minner')
+    assert.ok(resetWishes.some(w => /tar vi en prat|snakke sammen|bli enige/i.test(w.reason)), 'samarbeid')
     for (const w of resetWishes) {
       assert.ok(w.reason.length <= 120, `for lang: ${w.reason}`)
       assert.doesNotMatch(w.reason, /\bkr\b|kroner|arvklart|juridisk|rett til/i, w.reason) // ingen priser, løfter eller påstander om fordelingen
     }
-    assert.deepEqual(new Set(resetWishes.map(w => w.who)), new Set(['kari', 'lars', 'mona']))
+  })
+
+  test('banneret sier hvem den besøkende er, og forsiden viser utgangspunktet, ikke en ferdig fordeling', () => {
+    assert.match(read('src/App.jsx'), /Du er Mona, en av tre arvinger og administrator; Kari og Lars har allerede svart\./)
+    const landing = read('src/pages/LandingPage.jsx')
+    const at = landing.indexOf('className="demo-mockup"')
+    const mock = landing.slice(at, landing.indexOf('</section>', at))
+    assert.match(mock, /10 gjenstander · 3 arvinger/)
+    assert.doesNotMatch(mock, /Tildelt|ble enige|Avklart|eiketresbord|Erik/, 'illustrasjonen viser noe nullstillingen fjerner eller som ikke finnes i demoen')
   })
 
   test('seed og nullstilling har de samme ønsketekstene', () => {
