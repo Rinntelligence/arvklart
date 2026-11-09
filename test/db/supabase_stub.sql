@@ -42,5 +42,5 @@ insert into auth.users (id, email) values
   ('00000000-0000-0000-0000-0000000000e1', 'eva@test.no'),
   ('00000000-0000-0000-0000-0000000000f1', 'frank@test.no'),
   ('00000000-0000-0000-0000-0000000000a9', 'outsider@test.no');
--- Demokontoene er merket som i produksjon etter scripts/demo-identity.mjs --apply-mark (20261109_demo_identity.sql)
+-- Demokontoene er merket som i produksjon etter scripts/demo-identity.mjs --apply-mark (20261109190000_demo_identity.sql)
 update auth.users set raw_app_meta_data = jsonb_build_object('arvklart_demo', split_part(email, '.', 1)) where email like '%.demo@heirsplit.no';

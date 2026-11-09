@@ -1,4 +1,4 @@
-// Demokontoenes identitet (se supabase/migrations/20261109_demo_identity.sql). Kjøres bare med godkjenning.
+// Demokontoenes identitet (se supabase/migrations/20261109190000_demo_identity.sql). Kjøres bare med godkjenning.
 //
 //   SUPABASE_URL=… SUPABASE_SERVICE_ROLE_KEY=… node scripts/demo-identity.mjs --project=<ref> [flagg]
 //
