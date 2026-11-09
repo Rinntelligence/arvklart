@@ -317,18 +317,18 @@ export default function LandingPage({ loggedIn = false }) {
             </div>
             <div className="demo-body">
               <div className="demo-title">{L('Fam. Hansen sitt bo', 'The Hansen family estate')}</div>
-              <div className="demo-sub">{L('12 gjenstander · 4 arvinger', '12 items · 4 heirs')}</div>
+              <div className="demo-sub">{L('10 gjenstander · 3 arvinger', '10 items · 3 heirs')}</div>
               <div className="demo-conflict">
                 <div className="demo-conflict-left">
                   <h4>{L('Bestemors gyngestol', "Grandmother's rocking chair")}</h4>
-                  <span>{L('Erik og Mona er interesserte', 'Erik and Mona are interested')}</span>
+                  <span>{L('Kari og Lars ønsker den', 'Kari and Lars want it')}</span>
                 </div>
                 <span className="demo-badge orange">{L('Avventer', 'Pending')}</span>
               </div>
               <div className="demo-conflict">
                 <div className="demo-conflict-left">
-                  <h4>{L('Antikk eiketresbord', 'Antique oak table')}</h4>
-                  <span>{L('Tildelt Mona', 'Assigned to Mona')}</span>
+                  <h4>{L('Grønn 3-seters sofa', 'Green three-seater sofa')}</h4>
+                  <span>{L('Lars og Mona ble enige', 'Lars and Mona agreed')}</span>
                 </div>
                 <span className="demo-badge">{L('Avklart', 'Settled')}</span>
               </div>

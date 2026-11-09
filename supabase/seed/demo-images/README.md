@@ -2,7 +2,8 @@
 
 Bildene til gjenstandene i `seed/demo_estate.sql`, lagret i repoet så demoen ikke henter bilder fra andre nettsteder (innholdsreglene i `vercel.json` tillater bare bilder fra Supabase-prosjektet).
 
-- Filnavnet er gjenstandens id-prefiks (`face0001.jpg` → `face0001-0000-0000-0000-000000000001`).
+- Filnavnet er gjenstandens id-prefiks (`face0001.jpg` → `face0001-0000-0000-0000-000000000001`, `db1836d7.jpg` → gitaren).
+- Ingen bilder kan ha EXIF/GPS, XMP, IPTC eller kommentarer; `test/lib/demoContent.test.js` sjekker det, og at hver fil står i tabellen under med kilde.
 - De lastes opp til den private bøtten `item-images` som `deed0001-0000-0000-0000-000000000001/demo__<gjenstand>.jpg` med `upload_demo_images.mjs` (se toppen av skriptet), og vises med signerte URL-er som alle andre bilder.
 - Kilde: Unsplash (lastet ned 2026-10-25, 600 px bredde, uten EXIF). Brukt etter [Unsplash-lisensen](https://unsplash.com/license), som tillater gratis bruk uten kreditering.
 
@@ -18,3 +19,8 @@ Bildene til gjenstandene i `seed/demo_estate.sql`, lagret i repoet så demoen ik
 | `face0012.jpg` | `photo-1558618666-fcd25c85cd64` |
 
 Gjenstandene `face0005`, `face0007`, `face0009` og `face0011` har ikke bilde: Unsplash-bildene de pekte på, finnes ikke lenger (404) eller viste noe annet.
+
+**Gitaren (`db1836d7`, «Sigma akustisk gitar») mangler bilde.** Det skal være familiens eget bilde, med samtykke, uten
+personer, adresser eller andre private detaljer, og lagret uten EXIF. Legg fila her som `db1836d7.jpg` med en rad i
+tabellen, last den opp med `upload_demo_images.mjs db1836d7 --apply`, og kjør `20261109210000_demo_content_fixes.sql`
+på nytt: den kobler bildet til gitaren bare når fila finnes i bøtten. Den slettede originalfila brukes ikke.

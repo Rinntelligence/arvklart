@@ -22,7 +22,7 @@ if (!url || !key) { console.error('SUPABASE_URL og SUPABASE_SERVICE_ROLE_KEY må
 const admin = createClient(url, key, { auth: { persistSession: false } })
 
 const sha = buf => createHash('sha256').update(buf).digest('hex')
-const files = (await readdir(DIR)).filter(f => /^face\d{4}\.jpg$/.test(f)).map(f => f.slice(0, -4))
+const files = (await readdir(DIR)).filter(f => /^(face\d{4}|[0-9a-f]{8})\.jpg$/.test(f)).map(f => f.slice(0, -4))
 const ids = only.length ? only : files
 const missing = ids.filter(id => !files.includes(id))
 if (missing.length) { console.error('Finnes ikke i demo-images:', missing.join(', ')); process.exit(1) }
