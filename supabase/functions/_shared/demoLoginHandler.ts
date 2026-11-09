@@ -2,9 +2,8 @@
 // Avhengighetene sendes inn, så dette kan testes uten nettverk (test/functions/demoLoginHandler.test.js).
 //
 // Regler:
-//  - Kontoen må være Mona: merket app_metadata.arvklart_demo = 'mona' (settes bare med service role), eller i
-//    overgangen den gamle e-posten mona.demo@heirsplit.no uten noe merke. En annen konto røres aldri, selv om
-//    DEMO_USER_ID skulle peke feil.
+//  - Kontoen må være merket app_metadata.arvklart_demo = 'mona' (settes bare med service role). E-posten avgjør
+//    ingenting. En annen konto røres aldri, selv om DEMO_USER_ID skulle peke feil.
 //  - Nullstillingen må lykkes før noen slippes inn; ellers kunne besøkende havne i forrige besøkendes demo.
 //  - Det logges inn med e-posten kontoen har nå. Feiler innloggingen (passordet kan være endret fra en demoøkt),
 //    settes bare passordet tilbake; e-posten endres aldri herfra.
@@ -18,8 +17,7 @@ export type DemoLoginDeps = {
   password?: string | null
   demoUserId?: string | null
   getUserById: (id: string) => Promise<AuthUser | null>
-  // Når DEMO_USER_ID ikke er satt: kontoen med merket 'mona', ellers (overgang) den gamle e-posten. null hvis
-  // ingen eller flere passer.
+  // Når DEMO_USER_ID ikke er satt: den ene kontoen med merket 'mona'; null hvis ingen eller flere er merket.
   findMona: () => Promise<AuthUser | null>
   resetDemo: () => Promise<{ error?: unknown }>
   signIn: (email: string, password: string) => Promise<Tokens | null>
@@ -27,15 +25,9 @@ export type DemoLoginDeps = {
   log?: (line: string) => void
 }
 
-export const LEGACY_MONA_EMAIL = 'mona.demo@heirsplit.no'
 const UNAVAILABLE = { error: 'Demoen er ikke tilgjengelig akkurat nå' }
 
-export const isMona = (user?: AuthUser | null): boolean => {
-  if (!user) return false
-  if (demoRole(user) === 'mona') return true
-  const marked = user.app_metadata?.arvklart_demo
-  return (marked === undefined || marked === null || marked === '') && (user.email || '').toLowerCase() === LEGACY_MONA_EMAIL
-}
+export const isMona = (user?: AuthUser | null): boolean => demoRole(user) === 'mona'
 
 export async function handleDemoLogin(req: Request, d: DemoLoginDeps): Promise<Response> {
   const pre = d.preflight(req)

@@ -12,7 +12,9 @@ const preflight = req => (req.method === 'OPTIONS' ? new Response('ok') : null)
 // Simulert Supabase Auth: bare «gyldig» gir en bruker; mangler, er ugyldig eller utløpt → null
 const users = {
   'Bearer gyldig': { id: 'u-me', email: 'meg@test.no' },
-  'Bearer demo': { id: 'u-mona', email: 'mona.demo@heirsplit.no' },
+  'Bearer demo': { id: 'u-mona', email: 'mona.demo@heirsplit.no', app_metadata: { provider: 'email', arvklart_demo: 'mona' } },
+  // Den gamle demoadressen uten merke: e-posten avgjør ingenting
+  'Bearer gammel-adresse': { id: 'u-x', email: 'x.demo@heirsplit.no', app_metadata: { provider: 'email' } },
   // Merket demokonto med ny e-post (etter byttet til @arvklart.no, eller etter et forsøk på å ta over kontoen)
   'Bearer demo-merket': { id: 'u-mona', email: 'mona.demo@arvklart.no', app_metadata: { arvklart_demo: 'mona' } },
   // Vanlig bruker som har satt et «merke» selv: user_metadata styrer brukeren, app_metadata bare service role
@@ -61,6 +63,12 @@ describe('delete-account', { skip }, () => {
     assert.equal(res.status, 403)
     assert.equal((await res.json()).code, 'demo')
     assert.deepEqual(deleted, [])
+  })
+  test('e-postadressen alene gjør ingen til demo', async () => {
+    const { deleted, deps } = setup()
+    const res = await mod.handleDeleteAccount(req('POST', 'Bearer gammel-adresse'), deps)
+    assert.equal(res.status, 200)
+    assert.deepEqual(deleted, ['u-x'])
   })
   test('en vanlig bruker blir ikke demo av et merke i user_metadata, og kan slette kontoen sin', async () => {
     const { deleted, deps } = setup()

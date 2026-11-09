@@ -18,7 +18,7 @@ const env = (name: string) => {
 }
 
 // Hvem som er demokonto (merket i app_metadata), i en egen modul uten avhengigheter så den kan testes i Node
-export { DEMO_ROLES, demoRole, isDemoEmail, isDemoUser } from './demoIdentity.ts'
+export { DEMO_ROLES, demoRole, isDemoUser } from './demoIdentity.ts'
 
 // Brukeren som eier JWT-en i Authorization-headeren, eller null. Anon-nøkkelen gir null.
 export async function getUser(req: Request): Promise<User | null> {

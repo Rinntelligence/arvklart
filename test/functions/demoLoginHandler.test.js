@@ -1,4 +1,4 @@
-// demo-login: bare demokontoen Mona, nullstilling før innlogging, og bare passordet settes tilbake (aldri e-posten).
+// demo-login: bare kontoen merket Mona, nullstilling før innlogging, og bare passordet settes tilbake (aldri e-posten).
 import { test, describe } from 'node:test'
 import assert from 'node:assert/strict'
 
@@ -38,9 +38,10 @@ describe('demo-login', { skip }, () => {
     assert.deepEqual(calls.map(c => c[0]), ['getUserById', 'reset', 'signIn'])
     assert.equal(calls.find(c => c[0] === 'signIn')[1], 'mona.demo@arvklart.no')
   })
-  test('overgang: den gamle e-posten uten merke godtas', async () => {
-    const { deps } = setup({ users: { 'u-mona': LEGACY } })
-    assert.equal((await mod.handleDemoLogin(req(), deps)).status, 200)
+  test('den gamle e-posten uten merke er ikke Mona: ingenting nullstilles eller endres', async () => {
+    const { deps, calls } = setup({ users: { 'u-mona': LEGACY } })
+    assert.equal((await mod.handleDemoLogin(req(), deps)).status, 503)
+    assert.deepEqual(calls.map(c => c[0]), ['getUserById'])
   })
   test('uten DEMO_USER_ID letes Mona opp etter merket', async () => {
     const { deps, calls } = setup({ demoUserId: null })

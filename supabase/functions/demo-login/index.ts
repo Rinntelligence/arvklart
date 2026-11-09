@@ -5,25 +5,20 @@
 //   DEMO_PASSWORD  – passordet til demokontoen Mona. Settes på nytt ved behov, så demoen virker selv om noen har
 //                    endret passordet fra en demoøkt.
 //   DEMO_USER_ID   – bruker-ID-en til Mona (anbefalt). Uten den letes det etter kontoen med merket
-//                    app_metadata.arvklart_demo = 'mona', og i overgangen etter den gamle e-posten.
+//                    app_metadata.arvklart_demo = 'mona'.
 import { adminClient, anonClient, json, preflight } from '../_shared/http.ts'
-import { handleDemoLogin, LEGACY_MONA_EMAIL, type AuthUser } from '../_shared/demoLoginHandler.ts'
+import { handleDemoLogin, type AuthUser } from '../_shared/demoLoginHandler.ts'
 
 async function findMona(): Promise<AuthUser | null> {
   const admin = adminClient()
   const marked: AuthUser[] = []
-  let legacy: AuthUser | null = null
   for (let page = 1; page <= 20; page++) {
     const { data, error } = await admin.auth.admin.listUsers({ page, perPage: 1000 })
     if (error) throw error
-    for (const u of data.users) {
-      if (u.app_metadata?.arvklart_demo === 'mona') marked.push(u)
-      else if (u.email?.toLowerCase() === LEGACY_MONA_EMAIL) legacy = u
-    }
+    for (const u of data.users) if (u.app_metadata?.arvklart_demo === 'mona') marked.push(u)
     if (data.users.length < 1000) break
   }
-  if (marked.length > 1) return null // to kontoer merket som Mona: ingen av dem brukes
-  return marked[0] || legacy
+  return marked.length === 1 ? marked[0] : null // ingen eller flere merket som Mona: ingen av dem brukes
 }
 
 Deno.serve(req => handleDemoLogin(req, {
