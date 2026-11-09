@@ -4,7 +4,9 @@ create role authenticated nologin;
 create role service_role nologin bypassrls;
 create extension if not exists pgcrypto;
 create schema auth;
-create table auth.users (id uuid primary key default gen_random_uuid(), email text unique, created_at timestamptz default now());
+-- raw_app_meta_data: som i Supabase; settes bare med service role (Auth Admin API), aldri av brukeren
+create table auth.users (id uuid primary key default gen_random_uuid(), email text unique, created_at timestamptz default now(),
+  raw_app_meta_data jsonb not null default '{}');
 -- Som i Supabase: les fra enkeltinnstilling (tester) eller fra JWT-en PostgREST setter
 create function auth.claim(k text) returns text language sql stable as $$
   select coalesce(nullif(current_setting('request.jwt.claim.' || k, true), ''), nullif(current_setting('request.jwt.claims', true), '')::jsonb ->> k) $$;
