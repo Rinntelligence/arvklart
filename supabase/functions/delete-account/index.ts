@@ -3,13 +3,13 @@
 // innlogget, ikke demo, bare egen konto) i _shared/deleteAccountHandler.ts.
 // Deployes med --no-verify-jwt: innloggingen sjekkes her med getUser() mot Supabase Auth (signatur, utløp og
 // at brukeren finnes), som er strengere enn gatewayens JWT-sjekk.
-import { adminClient, getUser, isDemoEmail, json, preflight } from '../_shared/http.ts'
+import { adminClient, getUser, isDemoUser, json, preflight } from '../_shared/http.ts'
 import { deleteAccountData } from '../_shared/deleteAccount.ts'
 import { handleDeleteAccount } from '../_shared/deleteAccountHandler.ts'
 import { safeError } from '../_shared/cleanup.ts'
 
 Deno.serve(req => handleDeleteAccount(req, {
-  preflight, getUser, isDemoEmail, json, safeError,
+  preflight, getUser, isDemoUser, json, safeError,
   deleteData: userId => deleteAccountData(adminClient(), userId),
   log: line => console.log(line),
 }))

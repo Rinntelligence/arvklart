@@ -1,11 +1,11 @@
 // Forespørselen til delete-account: bare POST (og CORS-preflight), bare innlogget bruker, aldri demokontoene,
 // og bare kontoen som eier innloggingen – ingenting i forespørselen kan peke på en annen bruker.
 // Avhengighetene sendes inn, så dette kan testes uten nettverk (test/functions/deleteAccountHandler.test.js).
-type User = { id: string; email?: string | null }
+type User = { id: string; email?: string | null; app_metadata?: Record<string, unknown> | null }
 export type DeleteAccountDeps = {
   preflight: (req: Request) => Response | null
   getUser: (req: Request) => Promise<User | null>
-  isDemoEmail: (email?: string | null) => boolean
+  isDemoUser: (user: User) => boolean
   deleteData: (userId: string) => Promise<Record<string, unknown>>
   json: (body: unknown, status?: number) => Response
   log?: (line: string) => void
@@ -19,7 +19,7 @@ export async function handleDeleteAccount(req: Request, d: DeleteAccountDeps): P
   try {
     const user = await d.getUser(req)
     if (!user?.id) return d.json({ success: false, code: 'unauthorized', error: 'Du må være logget inn' }, 401)
-    if (d.isDemoEmail(user.email)) return d.json({ success: false, code: 'demo', error: 'Demokontoen kan ikke slettes' }, 403)
+    if (d.isDemoUser(user)) return d.json({ success: false, code: 'demo', error: 'Demokontoen kan ikke slettes' }, 403)
     const result = await d.deleteData(user.id)
     d.log?.(JSON.stringify({ fn: 'delete-account', ...result }))
     return d.json({ success: true })
