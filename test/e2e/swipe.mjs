@@ -2,8 +2,11 @@
 // tittel og beskrivelse, med demobanneret, med tekststørrelsen «Ekstra stor» og når angrelinjen og begrunnelsesfeltet
 // er åpne. Kjøres av test/e2e/run.sh.
 //
-// Merk: Chromium i testen etterligner ikke adresselinjen i Safari eller Chrome på mobil. Det må sjekkes på en ekte
-// telefon; denne testen viser bare at layouten passer i vinduet den får.
+// Normale beskrivelser (de første ca. 100 tegnene, som kortet viser) skal også synes uten scrolling der skjermen tillater
+// det, og bildet skal være minst 140 px (320 px når det er plass, som på desktop).
+//
+// Merk: Chromium i testen etterligner ikke adresselinjen i Safari eller Chrome på mobil. Derfor testes også vinduer med
+// høyden som er synlig når adresselinjen vises (VISIBLE). På en ekte telefon må det likevel sjekkes for hånd.
 import { BASE, EST, UID, ITEM, now, category, launch, checker, assert } from './fixtures.mjs'
 
 const browser = await launch()
@@ -59,7 +62,12 @@ async function assertUsable(page, label) {
   await fullyVisible(page.getByRole('button', { name: 'Vil ha' }), `${label}: «Vil ha»`)
 }
 
-const VIEWPORTS = [{ width: 375, height: 667 }, { width: 375, height: 812 }, { width: 390, height: 844 }, { width: 430, height: 932 }]
+// Hele skjermen, og det som er synlig med adresselinjen: iPhone SE, mini/X/11 Pro, 12–16, Plus/Pro Max og en vanlig Android
+const FULL = [{ width: 375, height: 667 }, { width: 375, height: 812 }, { width: 390, height: 844 }, { width: 430, height: 932 }]
+const VISIBLE = [{ width: 375, height: 548 }, { width: 375, height: 635 }, { width: 390, height: 664 }, { width: 430, height: 746 }, { width: 412, height: 780 }]
+const VIEWPORTS = [...FULL, ...VISIBLE]
+// iPhone SE med adresselinjen har ikke plass til bilde, tittel, tre linjer og knappene; der kreves bare knappene og tittelen
+const DESCRIPTION_FITS = vp => vp.height >= 635
 const SESSIONS = [{ who: 'vanlig bruker', email: null }, { who: 'demo', email: 'mona.demo@heirsplit.no' }]
 
 for (const vp of VIEWPORTS) {
@@ -82,7 +90,9 @@ for (const vp of VIEWPORTS) {
         await assertUsable(page, 'med angrelinjen')
         await fullyVisible(page.getByRole('button', { name: 'Angre' }), 'med angrelinjen: «Angre»')
 
-        // Begrunnelsesfeltet åpnes i blokken nederst; knappene kan fortsatt brukes
+        // Begrunnelsesfeltet åpnes i blokken nederst; knappene kan fortsatt brukes. Unntak: iPhone SE med adresselinjen og
+        // «Ekstra stor», der feltet og knappene til sammen er høyere enn plassen (mens man skriver, dekker tastaturet dem uansett).
+        if (vp.height < 635 && textSize) return
         await page.getByRole('button', { name: '+ Si hvorfor' }).click()
         const field = page.getByLabel(/Hvorfor vil du ha/)
         await field.waitFor()
@@ -93,6 +103,50 @@ for (const vp of VIEWPORTS) {
     }
   }
 }
+
+// En vanlig beskrivelse (kortet viser høyst 100 tegn), med tittel på én og to linjer
+const DESC = 'Middagsservise i hvitt porselen med blå kant. Brukt hver jul siden 1970. Noen tallerkener er litt slitt.'
+const TITLES = ['Lampe i messing', 'Julemiddagsservise fra Porsgrund, 24 deler']
+
+// Hele beskrivelsen ligger i vinduet over knappeblokken, og ingenting dekker siste linje
+async function descriptionVisible(page, label) {
+  const r = await page.getByText(DESC.slice(0, 40)).evaluate(p => {
+    const box = p.getBoundingClientRect()
+    const sticky = [...document.querySelectorAll('div')].find(d => d.style.position === 'sticky' && d.style.bottom === '0px')
+    const lastLine = document.elementFromPoint(box.left + 20, box.bottom - 4)
+    return { top: box.top, bottom: box.bottom, stickyTop: sticky.getBoundingClientRect().top, covered: !(lastLine && (p === lastLine || p.contains(lastLine))) }
+  })
+  assert(r.top >= 0 && r.bottom <= r.stickyTop + 0.5, `${label}: beskrivelsen (${Math.round(r.top)}–${Math.round(r.bottom)}) går under knappeblokken (${Math.round(r.stickyTop)})`)
+  assert(!r.covered, `${label}: siste linje i beskrivelsen er dekket`)
+}
+const imageHeight = page => page.locator('.swipe-img').last().evaluate(el => el.getBoundingClientRect().height)
+
+for (const vp of VIEWPORTS.filter(DESCRIPTION_FITS)) {
+  for (const { who, email } of SESSIONS) {
+    for (const title of TITLES) {
+      await check(`Sveip ${vp.width}×${vp.height}, ${who}, «${title}»: beskrivelsen synes uten scrolling, bildet er minst 140 px`, async page => {
+        await decisionsTables(page)
+        await page.goto(`${BASE}/estate/${EST}/swipe`)
+        await page.getByRole('heading', { name: title }).waitFor()
+        if (email) await page.getByText(/Du ser på en/).waitFor()
+        await page.evaluate(() => document.fonts.ready)
+        await assertUsable(page, 'kortet')
+        await descriptionVisible(page, 'kortet')
+        const h = await imageHeight(page)
+        assert(h >= 139.5, `bildet er bare ${Math.round(h)} px`)
+        if (vp.height >= 844) assert(Math.round(h) === 320, `bildet er ${Math.round(h)} px på en høy skjerm, ventet 320 som før`)
+      }, { viewport: vp, email, fixtures: { items: [item(ITEM, title, DESC), item(ITEM2, 'Lampe', 'Bordlampe i messing')] } })
+    }
+  }
+}
+
+await check('Sveip 375×548 (iPhone SE med adresselinjen), demo: bildet er minst 140 px', async page => {
+  await decisionsTables(page)
+  await page.goto(`${BASE}/estate/${EST}/swipe`)
+  await page.getByRole('heading', { name: LONG_TITLE }).waitFor()
+  const h = await imageHeight(page)
+  assert(h >= 139.5, `bildet er bare ${Math.round(h)} px`)
+}, { viewport: { width: 375, height: 548 }, email: 'mona.demo@heirsplit.no', fixtures })
 
 await check('Sveip på mobil: hele kortet kan scrolles fram, og knappene dekker ikke slutten av det', async page => {
   await decisionsTables(page)
@@ -108,6 +162,7 @@ await check('Sveip på desktop: knappene står rett under kortet, uten scrolling
   await page.goto(`${BASE}/estate/${EST}/swipe`)
   await page.getByRole('heading', { name: LONG_TITLE }).waitFor()
   await assertUsable(page, 'desktop')
+  assert(Math.round(await imageHeight(page)) === 320, 'bildet er ikke 320 px på desktop som før')
 }, { viewport: { width: 1280, height: 900 }, fixtures })
 
 await browser.close()

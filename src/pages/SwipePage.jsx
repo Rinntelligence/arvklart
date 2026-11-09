@@ -9,10 +9,17 @@ import { categoryLabel } from '../lib/categories'
 import { formatNOK } from '../lib/format'
 import StoredImage from '../components/StoredImage'
 
-// Bildet tar høyst 30 % av vindushøyden (vh virker i alle nettlesere), aldri mer enn før (320 px)
-const SWIPE_IMAGE_HEIGHT = 'min(320px, 30vh)'
+// Bildet får plassen som er igjen i vinduet når det som skal synes uten scrolling, er trukket fra: toppfeltet,
+// demobanneret, linjen med «Tilbake», en tittel på to linjer, kategori og verdi, tre linjer beskrivelse og knappeblokken.
+// Tekstdelen er i rem, så reserven følger skriftstørrelsen (også iOS-tekststørrelse og «Ekstra stor»). svh er vinduet med
+// adresselinjen synlig, så bildet hopper ikke når den glir bort; uten svh brukes vh. Bildet er 140–320 px.
+// Målt i Chromium med Karla/Fraunces ved 16 og 20 px grunnstørrelse (tittel på to linjer, tre linjer beskrivelse, demobanneret
+// på tre linjer), pluss 4 px margin. test/e2e/swipe.mjs feiler hvis tekstene eller avstandene endres så dette ikke lenger holder.
+const SWIPE_RESERVE = 'calc(263px + 9.4rem)'
+const SWIPE_RESERVE_DEMO = 'calc(277px + 12.4rem)'
+const SWIPE_CSS = `.swipe-img { height: clamp(140px, calc(100vh - var(--swipe-reserve)), 320px); height: clamp(140px, calc(100svh - var(--swipe-reserve)), 320px); }`
 
-export default function SwipePage({ session, profile, onToast }) {
+export default function SwipePage({ session, profile, onToast, isDemo }) {
   const { id } = useParams()
   const navigate = useNavigate()
   const [items, setItems] = useState([])
@@ -209,13 +216,15 @@ export default function SwipePage({ session, profile, onToast }) {
 
   // Mobil: siden står under toppfeltet (56 px) og eventuelt demobanneret. Bildet krymper på lave skjermer, og knappene
   // ligger i en blokk som står fast nederst i vinduet, så «Nei takk» og «Vil ha» alltid kan nås uten å scrolle.
-  // Resten av kortet kan fortsatt scrolles fram. Uten støtte for svh faller minstehøyden bort (ingen annen endring).
+  // Resten av kortet kan fortsatt scrolles fram. Minstehøyden fyller vinduet under toppfeltet (kortet midt på, knappene
+  // nederst, som før); i demoen kommer banneret i tillegg, så der droppes den, ellers skyves kortet ned med banneret.
   return (
-    <div style={{ minHeight:'calc(100svh - 56px)', background:'#FBF9F5', fontFamily:'Karla, sans-serif', display:'flex', flexDirection:'column' }}
+    <div style={{ minHeight: isDemo ? undefined : 'calc(100svh - 56px)', background:'#FBF9F5', fontFamily:'Karla, sans-serif', display:'flex', flexDirection:'column', '--swipe-reserve': isDemo ? SWIPE_RESERVE_DEMO : SWIPE_RESERVE }}
       onMouseMove={onMouseMove} onMouseUp={onMouseUp} onMouseLeave={onMouseUp}>
+      <style>{SWIPE_CSS}</style>
 
       {/* Header */}
-      <div style={{ padding:'16px 20px', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+      <div style={{ padding:'12px 20px', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
         <button onClick={() => navigate(`/estate/${id}`)} style={{ background:'none', border:'none', color:'#75604B', cursor:'pointer', fontSize:'0.875rem', fontFamily:'Karla, sans-serif' }}>
           {L('← Tilbake', '← Back')}
         </button>
@@ -231,7 +240,7 @@ export default function SwipePage({ session, profile, onToast }) {
       </div>
 
       {/* Card area */}
-      <div style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', padding:'20px', position:'relative' }}>
+      <div style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', padding:'12px 20px', position:'relative' }}>
 
         {/* Action indicators */}
         {action === 'like' && (
@@ -248,7 +257,7 @@ export default function SwipePage({ session, profile, onToast }) {
         {/* Next card (background) */}
         {items[index + 1] && (
           <div style={{ position:'absolute', width:'min(380px, 90vw)', background:'#fff', borderRadius:'20px', overflow:'hidden', boxShadow:'0 4px 20px rgba(0,0,0,0.08)', transform:'scale(0.95) translateY(10px)', zIndex:0 }}>
-            <div style={{ height:SWIPE_IMAGE_HEIGHT, background:'#E8DFD0' }} />
+            <div className="swipe-img" style={{ background:'#E8DFD0' }} />
           </div>
         )}
 
@@ -258,7 +267,7 @@ export default function SwipePage({ session, profile, onToast }) {
           onMouseDown={onMouseDown}>
 
           {/* Image */}
-          <div style={{ height:SWIPE_IMAGE_HEIGHT, background:'#E8DFD0', display:'flex', alignItems:'center', justifyContent:'center', overflow:'hidden' }}>
+          <div className="swipe-img" style={{ background:'#E8DFD0', display:'flex', alignItems:'center', justifyContent:'center', overflow:'hidden' }}>
             {currentItem.image_url
               ? <StoredImage src={currentItem.image_url} alt={currentItem.title} style={{ width:'100%', height:'100%', objectFit:'contain', pointerEvents:'none' }} />
               : <span style={{ fontSize:'3rem', color:'#75604B' }}>{currentItem.categories?.emoji || '·'}</span>
