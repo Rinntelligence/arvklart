@@ -193,7 +193,8 @@ export default function App({ prerendered = false }) {
         <TopBar profile={profile} session={session} onToast={showToast} />
         {isDemo && (
           <div style={{ background: '#DCE3D2', borderBottom: '1px solid #B8C8A8', padding: '8px 20px', textAlign: 'center', fontSize: '0.8125rem', color: '#3A5A30', fontFamily: 'Karla, sans-serif' }}>
-            {L('Du ser på en', 'You are viewing a')} <strong>demo</strong> — {L('Mona sitt bo. Du kan vise interesse, sveipe og prøve fordelingen, men ikke endre boet.', "Mona's estate. You can show interest, swipe and try the distribution, but not change the estate.")}
+            {/* Alle besøkende deler demoen (samme konto og bo), og den nullstilles når noen åpner den */}
+            {L('Du ser på en', 'You are viewing a')} <strong>demo</strong> {L('av Fam. Hansen sitt bo. Dette er et offentlig eksempelbo. Ikke skriv personopplysninger. Endringer kan bli nullstilt når andre prøver demoen.', 'of the Hansen family estate. This is a public example estate. Do not enter personal information. Changes may be reset when others try the demo.')}
           </div>
         )}
         <Toasts success={toast} errors={errors} onDismiss={dismissError} />
