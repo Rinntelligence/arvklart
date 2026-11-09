@@ -107,10 +107,12 @@ Tilgjengelighet (WCAG 2.2 AA): ikke bruk `outline:'none'`; fokus vises med `:foc
 - Storage: `estate-docs` er privat (`documents/<bo-id>/…`, åpnes med `createSignedUrl`); `item-images` vises med tidsbegrensede, signerte URL-er via `<StoredImage>` (`src/components/StoredImage.jsx`, `src/lib/imageUrls.js`). Databasen lagrer fortsatt den offentlige URL-en som identifikator. Bøtten gjøres privat i S3, så bruk aldri `<img src={item.image_url}>` direkte. Nye filer lagres under `<bo-id>/…` (`src/lib/images.js`)
 
 ## Demokonto
-`mona.demo@heirsplit.no` er en demo-bruker — ikke slett eller endre dennes data i databasen.
-- «Test ut demo» kaller edge-funksjonen `demo-login`, som nullstiller demo-boet (`reset_demo_estate()`) og returnerer en økt. Passordet ligger bare i hemmeligheten `DEMO_PASSWORD`, aldri i frontend
+Demokontoene Mona, Kari og Lars (i dag `*.demo@heirsplit.no`, byttes til `*.demo@arvklart.no`) er syntetiske demobrukere — ikke slett eller endre dataene deres i databasen.
+- Demokontoene kjennes igjen på merket `app_metadata.arvklart_demo` (`mona`/`kari`/`lars`), som bare service role kan sette (`scripts/demo-identity.mjs`, med tørrkjøring som standard), og som følger kontoen selv om e-posten endres. Samme regel i `is_demo_user()`, `reset_demo_estate()` (fra `20261109_demo_identity.sql`), edge-funksjonene (`_shared/demoIdentity.ts`) og appen (`src/lib/demoIdentity.js`). I overgangen godtas også det gamle e-postmønsteret; det fjernes når e-postene er byttet (Arvklart eier ikke heirsplit.no). Bruk aldri e-postdomenet alene for å avgjøre om noen er demo
+- «Test ut demo» kaller edge-funksjonen `demo-login` (`_shared/demoLoginHandler.ts`), som nullstiller demo-boet (`reset_demo_estate()`) og returnerer en økt. Passordet ligger bare i hemmeligheten `DEMO_PASSWORD`, aldri i frontend. Kontoen må være merket Mona (`DEMO_USER_ID` anbefales); feiler nullstillingen, slipper ingen inn (503); ved feil settes bare passordet tilbake, aldri e-posten
+- Alle besøkende deler demokontoen: utlogging fra demoen er lokal (`signOutDemo()` i `src/lib/demo.js`, `scope: 'local'`), ellers ville én besøkende logget ut alle andre. Banneret sier at demoen er et offentlig eksempelbo uten personopplysninger
 - Demoboet har bare syntetiske kontoer (Kari, Lars og Mona, som eier det). `reset_demo_estate()` fjerner ekte kontoer og alt de har lagt inn i demoboet ved hver demoinnlogging (fra `20261024`); legg aldri en ekte konto inn i demoboet
-- Alle `*.demo@heirsplit.no`-kontoer er skrivebeskyttet i databasen: de kan vise interesse, si nei takk og prøve fordelingen, ikke noe annet
+- Alle demokontoene er skrivebeskyttet i databasen: de kan vise interesse, si nei takk og prøve fordelingen, ikke noe annet
 - Demoen kan prøve AI-analyse og verdiestimat på «Legg til gjenstand» (5 forsøk per besøk), men ikke lagre. Da vises «Dette er en demo. Du må opprette et arveoppgjør i Arvklart for å bruke denne funksjonen.»
 
 ## Vanlige kommandoer

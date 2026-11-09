@@ -43,7 +43,7 @@ Fra sikkerhetsgjennomgangen 2026-10-11. Må settes for hånd i Supabase Dashboar
 | `analyze-item` | AI-analyse av bilde av en gjenstand (Claude Haiku, teller mot AI-kvoten) | `ANTHROPIC_API_KEY`, valgfri `AI_MODEL` |
 | `estimate-value` | AI-verdiestimat (Claude Haiku, teller mot AI-kvoten) | `ANTHROPIC_API_KEY`, valgfri `AI_MODEL` |
 | `delete-account` | Sletting av egen konto (GDPR) | – |
-| `demo-login` | «Test ut demo»: nullstiller demo-boet og logger inn | `DEMO_PASSWORD`, valgfri `DEMO_USER_ID` |
+| `demo-login` | «Test ut demo»: nullstiller demo-boet og logger inn (bare den merkede demokontoen Mona; feiler nullstillingen, slipper ingen inn) | `DEMO_PASSWORD`, `DEMO_USER_ID` (anbefalt; ellers letes det etter merket) |
 | `cleanup-closed-estates` | Sletter bo som har vært avsluttet i over 12 måneder (daglig, cron) | `CRON_SECRET` |
 | `cleanup-orphan-images` | Manuell opprydding av foreldreløse bilder (aldri cron) | `CRON_SECRET` |
 
@@ -59,7 +59,8 @@ supabase functions deploy demo-login --no-verify-jwt --use-api
 supabase functions deploy cleanup-closed-estates --no-verify-jwt --use-api
 supabase functions deploy cleanup-orphan-images --no-verify-jwt --use-api
 
-supabase secrets set DEMO_PASSWORD='<passordet til mona.demo@heirsplit.no>'
+supabase secrets set DEMO_PASSWORD='<passordet til demokontoen Mona>'
+supabase secrets set DEMO_USER_ID='<bruker-id-en til Mona (vises av scripts/demo-identity.mjs)>'
 supabase secrets set CRON_SECRET="$(openssl rand -hex 32)"
 ```
 
