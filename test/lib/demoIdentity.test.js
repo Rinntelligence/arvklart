@@ -1,5 +1,5 @@
-// Hvem som er demokonto i appen (src/lib/demoIdentity.js): merket app_metadata.arvklart_demo, som bare serveren kan
-// sette, og i overgangen det gamle e-postmønsteret. Samme regel som is_demo_user() og edge-funksjonene.
+// Hvem som er demokonto i appen (src/lib/demoIdentity.js): bare merket app_metadata.arvklart_demo, som bare serveren
+// kan sette. E-postdomenet teller ikke. Samme regel som is_demo_user() og edge-funksjonene.
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { demoRole, isDemoUser, isDemoSession } from '../../src/lib/demoIdentity.js'
@@ -29,7 +29,8 @@ test('merkede demokontoer er demo uansett e-post', () => {
   }
 })
 
-test('overgang: de gamle e-postene uten merke er fortsatt demo', () => {
-  assert.equal(isDemoSession(session({ email: 'mona.demo@heirsplit.no' })), true)
-  assert.equal(isDemoSession(session({ email: 'Kari.Demo@HeirSplit.no' })), true)
+test('e-posten alene gjør ingen til demo, heller ikke de gamle demoadressene', () => {
+  assert.equal(isDemoSession(session({ email: 'mona.demo@heirsplit.no' })), false)
+  assert.equal(isDemoSession(session({ email: 'kari.demo@arvklart.no' })), false)
+  assert.equal(isDemoSession(session({ email: 'mona.demo@heirsplit.no', app_metadata: { arvklart_demo: 'mona' } })), true)
 })

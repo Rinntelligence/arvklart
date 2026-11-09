@@ -4,7 +4,7 @@ import { supabase } from './supabase'
 import { L } from './lang'
 
 // Hvem som er demokonto (merket i app_metadata), i en egen modul uten avhengigheter (test/lib/demoIdentity.test.js)
-export { demoRole, isDemoEmail, isDemoUser, isDemoSession } from './demoIdentity'
+export { demoRole, isDemoUser, isDemoSession } from './demoIdentity'
 
 // Alle besøkende deler demokontoen. Utlogging fra demoen gjelder derfor bare denne nettleseren (scope: local);
 // global utlogging (standard i supabase-js) ville logget ut alle andre som prøver demoen samtidig.

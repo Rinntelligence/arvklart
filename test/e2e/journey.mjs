@@ -1,5 +1,5 @@
 // Akseptansetester for kundereisen (bølge 1B), i Chromium med simulert Supabase. Kjøres av test/e2e/run.sh.
-import { BASE, EST, UID, ITEM, FIXTURES, now, category, launch, checker, assert } from './fixtures.mjs'
+import { BASE, EST, UID, ITEM, FIXTURES, now, category, launch, checker, assert, DEMO } from './fixtures.mjs'
 
 const browser = await launch()
 const results = []
@@ -228,7 +228,7 @@ await check('Demoen viser ikke snarveien til dokumentarkivet', async page => {
   await page.getByText(/Du ser på en/).waitFor() // demobanneret: økten er en demoøkt
   await page.getByRole('button', { name: /^Sjekkliste/ }).waitFor()
   assert(await page.getByRole('button', { name: /^Dokumenter/ }).count() === 0, 'demoen viser «Dokumenter»')
-}, { email: 'mona.demo@heirsplit.no' })
+}, { ...DEMO })
 
 await check('Innloggingen lover ikke kunder eller partnere som ikke finnes', async page => {
   await page.goto(`${BASE}/logg-inn`)

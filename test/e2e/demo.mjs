@@ -1,13 +1,13 @@
-// Demoen i appen: hvem som er demo (merket app_metadata.arvklart_demo, eller i overgangen den gamle e-posten),
+// Demoen i appen: hvem som er demo (bare merket app_metadata.arvklart_demo; e-posten avgjør ingenting),
 // banneret, og at utlogging fra demoen bare gjelder denne nettleseren. Alle besøkende deler demokontoen, så global
 // utlogging ville kastet ut alle andre. Vanlige brukere logges ut globalt som før. Kjøres av test/e2e/run.sh.
-import { BASE, EST, launch, checker, assert } from './fixtures.mjs'
+import { BASE, EST, launch, checker, assert, DEMO } from './fixtures.mjs'
 
 const browser = await launch()
 const results = []
 const check = checker(browser, results)
 
-const MONA = { email: 'mona.demo@arvklart.no', meta: { app_metadata: { provider: 'email', arvklart_demo: 'mona' } } }
+const MONA = DEMO
 const BANNER = /Dette er et offentlig eksempelbo\. Ikke skriv personopplysninger\. Endringer kan bli nullstilt når andre prøver demoen\./
 
 // Fanger utloggingskallet til Supabase Auth (POST /auth/v1/logout?scope=…)
@@ -25,9 +25,11 @@ await check('Merket demokonto (ny e-post): demobanneret med teksten om offentlig
   assert(await page.getByRole('button', { name: /tilbakemelding/i }).count() === 0, 'tilbakemeldingsknappen vises i demoen')
 }, MONA)
 
-await check('Overgang: den gamle demoe-posten uten merke er fortsatt demo', async page => {
+await check('Den gamle demoe-posten uten merke er ikke demo (ingen demobanner)', async page => {
   await page.goto(`${BASE}/estate/${EST}`)
-  await page.getByText(BANNER).waitFor()
+  await page.getByRole('heading', { level: 1 }).first().waitFor()
+  await page.waitForTimeout(300)
+  assert(await page.getByText(/Du ser på en/).count() === 0, 'demobanneret vises for en konto uten merke')
 }, { email: 'mona.demo@heirsplit.no' })
 
 await check('Vanlig bruker med «merke» i user_metadata er ikke demo (ingen demobanner)', async page => {

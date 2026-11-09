@@ -25,8 +25,8 @@ export const FIXTURES = {
   heirs: [{ id: 'h1', estate_id: EST, name: 'Kari', email: 'kari@test.no', relationship: 'Barn', percentage: 0, created_at: now }],
 }
 
-// email: logg inn med en annen e-post, f.eks. en demokonto (*.demo@heirsplit.no). meta: { app_metadata, user_metadata }
-// på brukeren og i JWT-en, f.eks. demomerket app_metadata.arvklart_demo.
+// email: logg inn med en annen e-post. meta: { app_metadata, user_metadata } på brukeren og i JWT-en, f.eks.
+// demomerket app_metadata.arvklart_demo (DEMO under).
 export const sessionFor = (email, meta = {}) => {
   const t = `${b64({ alg: 'HS256', typ: 'JWT' })}.${b64({ sub: UID, email, role: 'authenticated', exp, session_id: 's1', ...meta })}.sig`
   return { ...session, access_token: t, user: { ...session.user, email, ...meta, user_metadata: { ...session.user.user_metadata, ...meta.user_metadata } } }
@@ -34,6 +34,10 @@ export const sessionFor = (email, meta = {}) => {
 
 // consent: valget om statistikk (src/lib/analytics.js) som settes hvis det ikke finnes; standard «denied», så
 // spørsmålet ikke dekker knappene i testene. null: ikke valgt (test/e2e/analytics.mjs).
+// Demokontoen Mona slik den er etter merkingen: merket app_metadata.arvklart_demo = 'mona' (bare serveren kan sette det).
+// Brukes som setup-valg ({ ...DEMO }) eller med sessionFor(DEMO.email, DEMO.meta).
+export const DEMO = { email: 'mona.demo@arvklart.no', meta: { app_metadata: { provider: 'email', arvklart_demo: 'mona' } } }
+
 export async function setup(browser, { loggedIn = true, viewport = { width: 390, height: 844 }, textSize = null, fixtures = {}, rpc = {}, email = null, meta = null, consent = 'denied' } = {}) {
   const data = { ...FIXTURES, ...fixtures }
   const s0 = email || meta ? sessionFor(email || session.user.email, meta || {}) : session

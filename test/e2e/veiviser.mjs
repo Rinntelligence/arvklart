@@ -10,7 +10,7 @@
 // Kjøres av test/e2e/run.sh med det ekte innholdet i veiviseren (public/arveveiviser).
 import { readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
-import { BASE, EST, UID, launch, checker, assert, session, sessionFor, FIXTURES } from './fixtures.mjs'
+import { BASE, EST, UID, launch, checker, assert, session, sessionFor, FIXTURES, DEMO } from './fixtures.mjs'
 import { SITE_URL } from '../../src/seo/pages.js'
 
 const FASIT = JSON.parse(readFileSync(new URL('../fixtures/veiviser-tekst.json', import.meta.url), 'utf8'))
@@ -265,7 +265,7 @@ await check('Demo: kan ikke lagre, og får forklaringen', async page => {
   await ready(page)
   await page.getByRole('button', { name: /Lagre i et bo|Lagre i boet|Lagre resultatet/ }).first().click()
   await page.getByText('Demo-kontoen kan ikke lagre', { exact: false }).waitFor()
-}, { email: 'mona.demo@heirsplit.no' })
+}, { ...DEMO })
 
 await check('Engelsk (uten engelsk veiviser): norsk veiviser i siden med forklaring, uten feil', async page => {
   const errors = errorsOf(page)
