@@ -1,6 +1,9 @@
 // Demokontoenes identitet (se supabase/migrations/20261109_demo_identity.sql). Kjøres bare med godkjenning.
 //
-//   SUPABASE_URL=… SUPABASE_SERVICE_ROLE_KEY=… node scripts/demo-identity.mjs [flagg]
+//   SUPABASE_URL=… SUPABASE_SERVICE_ROLE_KEY=… node scripts/demo-identity.mjs --project=<ref> [flagg]
+//
+// --project=<ref> er påkrevd: skriptet stopper hvis SUPABASE_URL ikke er https://<ref>.supabase.co, så det aldri
+// kjøres mot et annet prosjekt enn det du har bestemt (produksjon: swmuztsejghweqmaogol).
 //
 // Uten flagg: tørrkjøring. Viser de tre demokontoene (id, e-post, merke, stengt) og hva som ville blitt gjort.
 // Endrer ingenting. Id-ene herfra brukes i --expect-ids etter at du har kontrollert dem.
@@ -39,6 +42,11 @@ const expected = Object.fromEntries(expectArg.split(',').filter(Boolean).map(p =
 const url = process.env.SUPABASE_URL
 const key = process.env.SUPABASE_SERVICE_ROLE_KEY
 if (!url || !key) { console.error('SUPABASE_URL og SUPABASE_SERVICE_ROLE_KEY må være satt'); process.exit(1) }
+const projectArg = (process.argv.find(a => a.startsWith('--project=')) || '').slice('--project='.length)
+const host = (() => { try { return new URL(url).hostname } catch { return '' } })()
+if (!projectArg) { console.error('STOPP: --project=<ref> mangler (produksjon: --project=swmuztsejghweqmaogol)'); process.exit(1) }
+if (host.split('.')[0] !== projectArg) { console.error(`STOPP: SUPABASE_URL peker på ${host}, ikke prosjektet ${projectArg}`); process.exit(1) }
+console.log(`Prosjekt: ${host}`)
 const admin = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } })
 const stop = msg => { console.error(`STOPP: ${msg}`); process.exit(1) }
 
@@ -92,7 +100,7 @@ if (!mode) {
     const others = await otherEstates(u.id)
     console.log(`${r}: ${u.app_metadata?.arvklart_demo ? 'merket' : 'ville blitt merket'}; ${others ? `ADVARSEL: medlem/eier i ${others} andre bo, blir ikke merket` : 'bare i demoboet'}; e-post ${u.email} ${u.email?.toLowerCase() === NEW(r) ? '(ny)' : `→ ${NEW(r)} i fase 5`}; ${u.banned_until ? 'stengt' : r === 'mona' ? 'åpen (skal være åpen)' : 'åpen → stenges med --apply-lock'}`)
   }
-  console.log(`Ingenting er endret. Kontroller id-ene over, og bruk dem i: --apply-mark --expect-ids=${ROLES.map(r => `${r}:${accounts[r].id}`).join(',')}`)
+  console.log(`Ingenting er endret. Kontroller id-ene over, og bruk dem i: --project=${projectArg} --apply-mark --expect-ids=${ROLES.map(r => `${r}:${accounts[r].id}`).join(',')}`)
   process.exit(0)
 }
 

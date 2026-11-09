@@ -45,7 +45,8 @@ function fakeSupabase({ users, otherEstates = {} }) {
   return new Promise(resolve => server.listen(0, '127.0.0.1', () => resolve({ server, writes, url: `http://127.0.0.1:${server.address().port}` })))
 }
 
-const run = (url, args) => new Promise(resolve => execFile(process.execPath, [SCRIPT, ...args], {
+// Den simulerte serveren lytter på 127.0.0.1, så prosjektet heter «127» her
+const run = (url, args, project = '--project=127') => new Promise(resolve => execFile(process.execPath, [SCRIPT, ...(project ? [project] : []), ...args], {
   env: { ...process.env, SUPABASE_URL: url, SUPABASE_SERVICE_ROLE_KEY: 'test-nokkel-som-aldri-skrives-ut' },
 }, (error, stdout, stderr) => resolve({ code: error ? error.code : 0, out: stdout + stderr })))
 
@@ -110,6 +111,19 @@ describe('scripts/demo-identity.mjs', () => {
     assert.equal((await run(f.url, ['--remove-lock'])).code, 0)
     f.server.close()
     assert.ok(!users.find(u => u.id === '00000000-0000-4000-8000-00000000000b').banned_until && !users.find(u => u.id === '00000000-0000-4000-8000-00000000000c').banned_until)
+  })
+  test('uten --project, eller med feil prosjekt, stopper skriptet før det kontakter Supabase', async () => {
+    for (const project of [null, '--project=swmuztsejghweqmaogol']) {
+      const f = await fakeSupabase({ users: demoUsers() })
+      let calls = 0
+      f.server.on('request', () => { calls++ })
+      const r = await run(f.url, ['--apply-mark', '--expect-ids=kari:x,lars:y,mona:z'], project)
+      f.server.close()
+      assert.notEqual(r.code, 0)
+      assert.match(r.out, /STOPP: (--project=<ref> mangler|SUPABASE_URL peker på 127\.0\.0\.1, ikke prosjektet swmuztsejghweqmaogol)/)
+      assert.equal(calls, 0, 'skriptet kontaktet Supabase')
+      assert.deepEqual(f.writes, [])
+    }
   })
   test('--apply-email nekter før kontoene er merket', async () => {
     const f = await fakeSupabase({ users: demoUsers() })
