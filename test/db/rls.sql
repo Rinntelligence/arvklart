@@ -6,13 +6,24 @@ begin
   perform set_config('request.jwt.claim.sub', coalesce((select id::text from auth.users where email = p_email), ''), false);
   perform set_config('request.jwt.claim.email', coalesce(p_email, ''), false);
   perform set_config('request.jwt.claim.role', case when p_email is null then 'anon' else 'authenticated' end, false);
+  -- Som i Supabase: JWT-en har app_metadata fra kontoen (bl.a. demomerket)
+  perform set_config('request.jwt.claims', coalesce((select jsonb_build_object('sub', id, 'email', email, 'role', 'authenticated', 'app_metadata', raw_app_meta_data)::text
+    from auth.users where email = p_email), ''), false);
+end $$;
+-- Innlogget med en hel JWT (som PostgREST setter), f.eks. med app_metadata. auth.jwt() leser denne.
+create or replace function public.t_as_claims(p_user uuid, p_email text, p_extra jsonb) returns void language plpgsql as $$
+begin
+  perform set_config('request.jwt.claim.sub', p_user::text, false);
+  perform set_config('request.jwt.claim.email', p_email, false);
+  perform set_config('request.jwt.claim.role', 'authenticated', false);
+  perform set_config('request.jwt.claims', (jsonb_build_object('sub', p_user, 'email', p_email, 'role', 'authenticated') || p_extra)::text, false);
 end $$;
 create or replace function public.t_eq(actual anyelement, expected anyelement, label text) returns void language plpgsql as $$
 begin
   if actual is distinct from expected then raise exception 'FAIL %: fikk %, ventet %', label, actual, expected; end if;
   raise notice 'OK   %', label;
 end $$;
-grant execute on function public.t_as(text), public.t_eq(anyelement, anyelement, text) to anon, authenticated;
+grant execute on function public.t_as(text), public.t_as_claims(uuid, text, jsonb), public.t_eq(anyelement, anyelement, text) to anon, authenticated;
 -- Fra 20261023 trekkes lodd bare når alle har svart på gjenstanden; testene lar de som mangler, si nei takk
 create or replace function public.t_settle(p_item uuid) returns void language sql security definer set search_path = public as $$
   insert into item_passes (item_id, user_id) select p_item, u from unnest(public.item_pending_members(p_item)) u on conflict do nothing
@@ -559,6 +570,133 @@ select t_eq((select count(*)::int from items i cross join estate_members m
     and m.user_id <> (select id from auth.users where email = 'mona.demo@heirsplit.no')
     and not exists (select 1 from interests x where x.item_id = i.id and x.user_id = m.user_id)
     and not exists (select 1 from item_passes p where p.item_id = i.id and p.user_id = m.user_id)), 0, 'alle andre enn Mona har tatt stilling');
+
+-- Demoidentitet (20261109): demokontoene kjennes igjen bare på merket app_metadata.arvklart_demo, som bare service
+-- role kan sette, ikke på e-postdomenet (heirsplit.no eies ikke av Arvklart). Vanlige brukere er ikke demo.
+reset role; select t_as('eva@test.no'); set role authenticated;
+select t_eq(is_demo_user(), false, 'vanlig bruker er ikke demo');
+reset role; select t_as('mona.demo@heirsplit.no'); set role authenticated;
+select t_eq(is_demo_user(), true, 'merket demokonto er demo');
+-- Den gamle demoe-posten alene gjør ingen til demo (domenet eies ikke av Arvklart)
+reset role;
+begin;
+insert into auth.users (id, email) values ('00000000-0000-0000-0000-0000000000dd', 'ny.demo@heirsplit.no');
+select t_as('ny.demo@heirsplit.no'); set role authenticated;
+select t_eq(is_demo_user(), false, 'en konto med demoe-post på heirsplit.no, men uten merke, er ikke demo');
+reset role;
+rollback;
+reset role; select t_as_claims('00000000-0000-0000-0000-0000000000e1', 'eva@test.no', '{"user_metadata":{"arvklart_demo":"mona"}}'); set role authenticated;
+select t_eq(is_demo_user(), false, 'merke i user_metadata (som brukeren selv styrer) gjør ingen til demo');
+reset role; select t_as_claims('00000000-0000-0000-0000-0000000000e1', 'eva@test.no', '{"app_metadata":{"arvklart_demo":"admin"}}'); set role authenticated;
+select t_eq(is_demo_user(), false, 'ukjent verdi i merket gjør ingen til demo');
+-- Brukeren kan ikke merke seg selv (i Supabase har klientene ingen rettigheter på auth.users; stubben speiler det)
+reset role; select t_as('eva@test.no'); set role authenticated;
+do $$ begin
+  update auth.users set raw_app_meta_data = '{"arvklart_demo":"mona"}' where id = auth.uid();
+  raise exception 'FAIL: brukeren kunne sette app_metadata selv';
+exception when insufficient_privilege then raise notice 'OK   brukeren kan ikke sette app_metadata selv';
+end $$;
+-- Merket demokonto med ny e-post (etter byttet, eller etter et forsøk på å ta over kontoen) er fortsatt skrivebeskyttet
+reset role; select t_as_claims('00000000-0000-0000-0000-00000000000d', 'mona.demo@arvklart.no', '{"app_metadata":{"arvklart_demo":"mona"}}'); set role authenticated;
+select t_eq(is_demo_user(), true, 'merket demokonto er demo uansett e-post');
+do $$ begin
+  update items set title = 'Endret' where id = 'face0002-0000-0000-0000-000000000002';
+  raise exception 'FAIL: merket demokonto kunne endre tittel';
+exception when insufficient_privilege then raise notice 'OK   merket demokonto med ny e-post kan ikke endre gjenstander';
+end $$;
+do $$ begin
+  insert into comments (item_id, user_id, content) values ('face0002-0000-0000-0000-000000000002', auth.uid(), 'Hei');
+  raise exception 'FAIL: merket demokonto kunne kommentere';
+exception when insufficient_privilege then raise notice 'OK   merket demokonto med ny e-post kan ikke kommentere';
+end $$;
+reset role; select t_as(null);
+
+-- Nullstillingen etter at e-postene er byttet til @arvklart.no (rulles tilbake)
+begin;
+update profiles set email = replace(email, '@heirsplit.no', '@arvklart.no') where email like '%.demo@heirsplit.no';
+update heirs set email = replace(email, '@heirsplit.no', '@arvklart.no') where email like '%.demo@heirsplit.no';
+update auth.users set email = replace(email, '@heirsplit.no', '@arvklart.no') where email like '%.demo@heirsplit.no';
+insert into estate_members (estate_id, user_id, role) values ('deed0001-0000-0000-0000-000000000001', '00000000-0000-0000-0000-00000000000a', 'admin') on conflict do nothing;
+insert into heirs (estate_id, name, email, relationship) values ('deed0001-0000-0000-0000-000000000001', 'Olav Ekte', 'owner@test.no', 'Barn');
+select reset_demo_estate();
+select t_eq((select string_agg(email, ',' order by email) from heirs where estate_id = 'deed0001-0000-0000-0000-000000000001'),
+  'kari.demo@arvklart.no,lars.demo@arvklart.no,mona.demo@arvklart.no', 'etter e-postbyttet: demoens tre personer står, den ekte er fjernet');
+select t_eq((select count(*)::int from estate_members m where m.estate_id = 'deed0001-0000-0000-0000-000000000001'
+  and not exists (select 1 from auth.users u where u.id = m.user_id and u.raw_app_meta_data ? 'arvklart_demo')), 0, 'etter e-postbyttet: ingen ekte kontoer er medlemmer');
+select t_eq((select owner_id from estates where id = 'deed0001-0000-0000-0000-000000000001'), '00000000-0000-0000-0000-00000000000d'::uuid, 'etter e-postbyttet: Mona eier demoboet');
+select t_eq((select count(*)::int from interests where item_id::text like 'face%'), 18, 'etter e-postbyttet: alle interessene er gjenopprettet');
+rollback;
+
+-- Nullstillingen stopper med feil i stedet for å la besøkende inn i en demo som ikke er nullstilt
+begin;
+update auth.users set raw_app_meta_data = '{"arvklart_demo":"mona"}' where email in ('eva@test.no', 'mona.demo@heirsplit.no');
+do $$ begin
+  perform reset_demo_estate();
+  raise exception 'FAIL: nullstillingen godtok to kontoer merket som mona';
+exception when raise_exception then
+  if sqlerrm like 'FAIL%' then raise; end if;
+  raise notice 'OK   nullstillingen stopper når to kontoer er merket som samme demokonto';
+end $$;
+rollback;
+begin;
+update auth.users set raw_app_meta_data = raw_app_meta_data - 'arvklart_demo' where email = 'mona.demo@heirsplit.no';
+do $$ begin
+  perform reset_demo_estate();
+  raise exception 'FAIL: nullstillingen gikk uten Mona';
+exception when no_data_found then raise notice 'OK   nullstillingen stopper når ingen konto er merket som Mona (e-posten alene teller ikke)';
+end $$;
+rollback;
+-- En ekte konto som er merket ved en feil (medlem i andre bo), røres aldri: nullstillingen stopper
+begin;
+update auth.users set raw_app_meta_data = raw_app_meta_data - 'arvklart_demo' where email = 'kari.demo@heirsplit.no';
+update auth.users set raw_app_meta_data = raw_app_meta_data || '{"arvklart_demo":"kari"}' where email = 'eva@test.no';
+create temp table t_eva as select display_name from profiles where email = 'eva@test.no';
+do $$ begin
+  perform reset_demo_estate();
+  raise exception 'FAIL: nullstillingen brukte en ekte konto som demokonto';
+exception when raise_exception then
+  if sqlerrm like 'FAIL%' then raise; end if;
+  raise notice 'OK   nullstillingen stopper når en merket konto er medlem i et annet bo';
+end $$;
+select t_eq((select display_name from profiles where email = 'eva@test.no'), (select display_name from t_eva), 'den feilmerkede ekte kontoen beholder navnet sitt');
+rollback;
+
+-- Nullstillingen endrer ingen rader utenfor demoboet (og ingen brukerkontoer)
+create temp table t_outside as
+  select 'estates' t, (select md5(coalesce(string_agg(x::text, '|' order by x.id), '')) from estates x where id <> 'deed0001-0000-0000-0000-000000000001') h
+  union all select 'items' t, (select md5(coalesce(string_agg(x::text, '|' order by x.id), '')) from items x where estate_id <> 'deed0001-0000-0000-0000-000000000001') h
+  union all select 'interests' t, (select md5(coalesce(string_agg(x::text, '|' order by x.id), '')) from interests x join items i on i.id = x.item_id where i.estate_id <> 'deed0001-0000-0000-0000-000000000001') h
+  union all select 'item_passes' t, (select md5(coalesce(string_agg(x::text, '|' order by x::text), '')) from item_passes x join items i on i.id = x.item_id where i.estate_id <> 'deed0001-0000-0000-0000-000000000001') h
+  union all select 'heirs' t, (select md5(coalesce(string_agg(x::text, '|' order by x.id), '')) from heirs x where estate_id <> 'deed0001-0000-0000-0000-000000000001') h
+  union all select 'estate_members' t, (select md5(coalesce(string_agg(x::text, '|' order by x::text), '')) from estate_members x where estate_id <> 'deed0001-0000-0000-0000-000000000001') h
+  union all select 'comments' t, (select md5(coalesce(string_agg(x::text, '|' order by x.id), '')) from comments x join items i on i.id = x.item_id where i.estate_id <> 'deed0001-0000-0000-0000-000000000001') h
+  union all select 'estate_events' t, (select md5(coalesce(string_agg(x::text, '|' order by x.id), '')) from estate_events x where estate_id <> 'deed0001-0000-0000-0000-000000000001') h
+  union all select 'distribution_versions' t, (select md5(coalesce(string_agg(x::text, '|' order by x.id), '')) from distribution_versions x where estate_id <> 'deed0001-0000-0000-0000-000000000001') h
+  union all select 'distribution_responses' t, (select md5(coalesce(string_agg(x::text, '|' order by x::text), '')) from distribution_responses x join distribution_versions v on v.id = x.version_id where v.estate_id <> 'deed0001-0000-0000-0000-000000000001') h
+  union all select 'heir_representatives' t, (select md5(coalesce(string_agg(x::text, '|' order by x.id), '')) from heir_representatives x where estate_id <> 'deed0001-0000-0000-0000-000000000001') h
+  union all select 'tasks' t, (select md5(coalesce(string_agg(x::text, '|' order by x.id), '')) from tasks x where estate_id <> 'deed0001-0000-0000-0000-000000000001') h
+  union all select 'ai_usage' t, (select md5(coalesce(string_agg(x::text, '|' order by x::text), '')) from ai_usage x) h
+  union all select 'profiles' t, (select md5(coalesce(string_agg(x::text, '|' order by x.user_id), '')) from profiles x where not exists (select 1 from auth.users u where u.id = x.user_id and u.raw_app_meta_data ? 'arvklart_demo')) h
+  union all select 'auth.users' t, (select md5(coalesce(string_agg(x::text, '|' order by x.id), '')) from auth.users x) h;
+select reset_demo_estate();
+select t_eq((select string_agg(o.t, ', ') from t_outside o where o.h is distinct from (case o.t
+  when 'estates' then (select md5(coalesce(string_agg(x::text, '|' order by x.id), '')) from estates x where id <> 'deed0001-0000-0000-0000-000000000001')
+  when 'items' then (select md5(coalesce(string_agg(x::text, '|' order by x.id), '')) from items x where estate_id <> 'deed0001-0000-0000-0000-000000000001')
+  when 'interests' then (select md5(coalesce(string_agg(x::text, '|' order by x.id), '')) from interests x join items i on i.id = x.item_id where i.estate_id <> 'deed0001-0000-0000-0000-000000000001')
+  when 'item_passes' then (select md5(coalesce(string_agg(x::text, '|' order by x::text), '')) from item_passes x join items i on i.id = x.item_id where i.estate_id <> 'deed0001-0000-0000-0000-000000000001')
+  when 'heirs' then (select md5(coalesce(string_agg(x::text, '|' order by x.id), '')) from heirs x where estate_id <> 'deed0001-0000-0000-0000-000000000001')
+  when 'estate_members' then (select md5(coalesce(string_agg(x::text, '|' order by x::text), '')) from estate_members x where estate_id <> 'deed0001-0000-0000-0000-000000000001')
+  when 'comments' then (select md5(coalesce(string_agg(x::text, '|' order by x.id), '')) from comments x join items i on i.id = x.item_id where i.estate_id <> 'deed0001-0000-0000-0000-000000000001')
+  when 'estate_events' then (select md5(coalesce(string_agg(x::text, '|' order by x.id), '')) from estate_events x where estate_id <> 'deed0001-0000-0000-0000-000000000001')
+  when 'distribution_versions' then (select md5(coalesce(string_agg(x::text, '|' order by x.id), '')) from distribution_versions x where estate_id <> 'deed0001-0000-0000-0000-000000000001')
+  when 'distribution_responses' then (select md5(coalesce(string_agg(x::text, '|' order by x::text), '')) from distribution_responses x join distribution_versions v on v.id = x.version_id where v.estate_id <> 'deed0001-0000-0000-0000-000000000001')
+  when 'heir_representatives' then (select md5(coalesce(string_agg(x::text, '|' order by x.id), '')) from heir_representatives x where estate_id <> 'deed0001-0000-0000-0000-000000000001')
+  when 'tasks' then (select md5(coalesce(string_agg(x::text, '|' order by x.id), '')) from tasks x where estate_id <> 'deed0001-0000-0000-0000-000000000001')
+  when 'ai_usage' then (select md5(coalesce(string_agg(x::text, '|' order by x::text), '')) from ai_usage x)
+  when 'profiles' then (select md5(coalesce(string_agg(x::text, '|' order by x.user_id), '')) from profiles x where not exists (select 1 from auth.users u where u.id = x.user_id and u.raw_app_meta_data ? 'arvklart_demo'))
+  when 'auth.users' then (select md5(coalesce(string_agg(x::text, '|' order by x.id), '')) from auth.users x) end)), null::text,
+  'nullstillingen endrer ingen rader utenfor demoboet: bo, gjenstander, ønsker, nei takk, arvinger, medlemmer, kommentarer, logg, forslag, svar, representanter, oppgaver, AI-bruk, profiler og kontoer');
+drop table t_outside;
 
 -- AI-kvote: demoen får 5 forsøk per økt, vanlige brukere 30 i timen; klienten kan ikke kalle funksjonen
 select t_as('eva@test.no'); set role authenticated;

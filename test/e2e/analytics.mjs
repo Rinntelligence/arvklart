@@ -2,7 +2,7 @@
 // bygde nettstedet med hodene fra vercel.json (CSP-en gjelder). Google simuleres: gtm.js er et lite skript som sender
 // til google-analytics.com, så testen viser at innholdsreglene slipper gjennom det GA4 trenger. Kjøres av run.sh.
 import { createRequire } from 'node:module'
-import { BASE, EST, launch, checker, assert, session, sessionFor } from './fixtures.mjs'
+import { BASE, EST, launch, checker, assert, session, sessionFor, DEMO } from './fixtures.mjs'
 
 const AXE = createRequire(import.meta.url).resolve('axe-core/axe.min.js')
 const browser = await launch()
@@ -135,7 +135,7 @@ await check('Med samtykke, innlogget: /app, et bo og forsiden fra appen laster a
 }, { consent: 'granted' })
 
 await check('Med samtykke: demoen fra forsiden laster siden på nytt uten GTM, så demo-boet aldri måles', async page => {
-  const demo = sessionFor('mona.demo@heirsplit.no')
+  const demo = sessionFor(DEMO.email, DEMO.meta)
   await page.route('https://test.supabase.co/functions/v1/demo-login', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ access_token: demo.access_token, refresh_token: 'r' }) }))
   await page.route('https://test.supabase.co/auth/v1/user', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(demo.user) }))
   const w = await watch(page)

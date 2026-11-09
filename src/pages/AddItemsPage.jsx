@@ -4,7 +4,8 @@
 // AI fyller ikke inn verdi her: verdien er valgfri og skrives inn av brukeren.
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { getCategories, supabase, signOut } from '../lib/supabase'
+import { getCategories, supabase } from '../lib/supabase'
+import { signOutDemo } from '../lib/demo'
 import { downscaleImage, removeImages, uploadEstateImage } from '../lib/images'
 import { hasAiConsent, giveAiConsent } from '../lib/aiConsent'
 import { formatNOK, parseNOK } from '../lib/format'
@@ -865,7 +866,7 @@ export default function AddItemsPage({ session, profile, onToast, isDemo }) {
         />
       )}
 
-      {demoBlocked && <DemoNotice onClose={() => setDemoBlocked(false)} onSignup={async () => { await signOut(); navigate('/logg-inn') }} />}
+      {demoBlocked && <DemoNotice onClose={() => setDemoBlocked(false)} onSignup={async () => { await signOutDemo(); navigate('/logg-inn') }} />}
     </div>
   )
 }

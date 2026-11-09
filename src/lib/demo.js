@@ -3,9 +3,12 @@
 import { supabase } from './supabase'
 import { L } from './lang'
 
-// Alle demokontoene (mona, kari, lars) er skrivebeskyttet, også i databasen (is_demo_user()).
-export const isDemoEmail = (email) => /\.demo@heirsplit\.no$/i.test(email || '')
-export const isDemoSession = (session) => isDemoEmail(session?.user?.email)
+// Hvem som er demokonto (merket i app_metadata), i en egen modul uten avhengigheter (test/lib/demoIdentity.test.js)
+export { demoRole, isDemoUser, isDemoSession } from './demoIdentity'
+
+// Alle besøkende deler demokontoen. Utlogging fra demoen gjelder derfor bare denne nettleseren (scope: local);
+// global utlogging (standard i supabase-js) ville logget ut alle andre som prøver demoen samtidig.
+export const signOutDemo = () => supabase.auth.signOut({ scope: 'local' })
 
 // Vises når demoen prøver noe som krever et eget arveoppgjør (lagring, eller AI etter 5 forsøk)
 export const demoFeatureMessage = () => L(

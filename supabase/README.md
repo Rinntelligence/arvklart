@@ -22,7 +22,8 @@ Kjør i SQL Editor, i denne rekkefølgen:
 
 ## Migrasjoner
 
-- Kjør migrasjonen i SQL Editor **før** frontend som trenger den deployes.
+- Kjør migrasjonen i SQL Editor **før** frontend som trenger den deployes (unntak står i `APPLIED.md`, f.eks. `20261109190000`, der frontend og edge-funksjonene kommer først).
+- Nye filer heter `YYYYMMDDHHMMSS_navn.sql`. Kjøres en migrering for hånd, registreres den i samme transaksjon i `supabase_migrations.schema_migrations` med nøyaktig samme versjon og navn som fila. Bruk aldri `supabase db push` mot prod før historikken er reparert («Plan for varig sporing» i `APPLIED.md`): de eldre filene har 8-sifrede, delvis like versjoner som ikke står i prod.
 - `20261007_security_hardening.sql` fjerner alle policies på app-tabellene og lager dem på nytt. Nye policies legges derfor inn der, eller i en ny migrasjon. Ikke legg dem inn manuelt i dashboardet.
 - Test endringer lokalt med `npm run test:db` (krever Docker). Testen bygger databasen fra filene over og sjekker tilgangsreglene i `test/db/rls.sql`.
 - Nye funksjoner er stengt for klientene til de registreres i `client_functions` og `select apply_function_grants()` er kjørt (fra `20261022_function_grants.sql`, se CLAUDE.md). `test:db` feiler ellers.
@@ -43,7 +44,7 @@ Fra sikkerhetsgjennomgangen 2026-10-11. Må settes for hånd i Supabase Dashboar
 | `analyze-item` | AI-analyse av bilde av en gjenstand (Claude Haiku, teller mot AI-kvoten) | `ANTHROPIC_API_KEY`, valgfri `AI_MODEL` |
 | `estimate-value` | AI-verdiestimat (Claude Haiku, teller mot AI-kvoten) | `ANTHROPIC_API_KEY`, valgfri `AI_MODEL` |
 | `delete-account` | Sletting av egen konto (GDPR) | – |
-| `demo-login` | «Test ut demo»: nullstiller demo-boet og logger inn | `DEMO_PASSWORD`, valgfri `DEMO_USER_ID` |
+| `demo-login` | «Test ut demo»: nullstiller demo-boet og logger inn (bare den merkede demokontoen Mona; feiler nullstillingen, slipper ingen inn) | `DEMO_PASSWORD`, `DEMO_USER_ID` (anbefalt; ellers letes det etter merket) |
 | `cleanup-closed-estates` | Sletter bo som har vært avsluttet i over 12 måneder (daglig, cron) | `CRON_SECRET` |
 | `cleanup-orphan-images` | Manuell opprydding av foreldreløse bilder (aldri cron) | `CRON_SECRET` |
 
@@ -51,15 +52,19 @@ Fra sikkerhetsgjennomgangen 2026-10-11. Må settes for hånd i Supabase Dashboar
 
 ```bash
 # --use-api pakker funksjonene hos Supabase; Docker i Codespaces når ikke esm.sh
-# analyze-item sjekker innloggingen selv (getUser) og kjører i prod med verify_jwt av; behold det
+# Prosjektet: `supabase link --project-ref <ref>` først, eller per kommando --project-ref <ref> (CLI 2.x) / --remote=<ref>
+# (CLI 3.x; --project-ref virker der med advarsel til v4). CLI 3.x viser målprosjektet og ber om bekreftelse før endringer.
+# Repoet har ingen supabase/config.toml, så uten --no-verify-jwt slås verify_jwt på. Flaggene under er slik prod står
+# (2026-11-09): analyze-item og delete-account sjekker innloggingen selv (getUser) og har verify_jwt av; estimate-value på
 supabase functions deploy analyze-item --no-verify-jwt --use-api
 supabase functions deploy estimate-value --use-api
-supabase functions deploy delete-account --use-api
+supabase functions deploy delete-account --no-verify-jwt --use-api
 supabase functions deploy demo-login --no-verify-jwt --use-api
 supabase functions deploy cleanup-closed-estates --no-verify-jwt --use-api
 supabase functions deploy cleanup-orphan-images --no-verify-jwt --use-api
 
-supabase secrets set DEMO_PASSWORD='<passordet til mona.demo@heirsplit.no>'
+supabase secrets set DEMO_PASSWORD='<passordet til demokontoen Mona>'
+supabase secrets set DEMO_USER_ID='<bruker-id-en til Mona (vises av scripts/demo-identity.mjs)>'
 supabase secrets set CRON_SECRET="$(openssl rand -hex 32)"
 ```
 

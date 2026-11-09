@@ -4,16 +4,26 @@ import assert from 'node:assert/strict'
 
 const TS = !!process.features?.typescript
 const mod = TS ? await import('../../supabase/functions/_shared/deleteAccountHandler.ts') : null
+const demo = TS ? await import('../../supabase/functions/_shared/demoIdentity.ts') : null
 const skip = !TS && 'Node uten TypeScript-støtte'
 
 const json = (body, status = 200) => new Response(JSON.stringify(body), { status })
 const preflight = req => (req.method === 'OPTIONS' ? new Response('ok') : null)
 // Simulert Supabase Auth: bare «gyldig» gir en bruker; mangler, er ugyldig eller utløpt → null
-const users = { 'Bearer gyldig': { id: 'u-me', email: 'meg@test.no' }, 'Bearer demo': { id: 'u-mona', email: 'mona.demo@heirsplit.no' } }
+const users = {
+  'Bearer gyldig': { id: 'u-me', email: 'meg@test.no' },
+  'Bearer demo': { id: 'u-mona', email: 'mona.demo@heirsplit.no', app_metadata: { provider: 'email', arvklart_demo: 'mona' } },
+  // Den gamle demoadressen uten merke: e-posten avgjør ingenting
+  'Bearer gammel-adresse': { id: 'u-x', email: 'x.demo@heirsplit.no', app_metadata: { provider: 'email' } },
+  // Merket demokonto med ny e-post (etter byttet til @arvklart.no, eller etter et forsøk på å ta over kontoen)
+  'Bearer demo-merket': { id: 'u-mona', email: 'mona.demo@arvklart.no', app_metadata: { arvklart_demo: 'mona' } },
+  // Vanlig bruker som har satt et «merke» selv: user_metadata styrer brukeren, app_metadata bare service role
+  'Bearer selvmerket': { id: 'u-eva', email: 'eva@test.no', user_metadata: { arvklart_demo: 'mona' } },
+}
 const getUser = async req => users[req.headers.get('Authorization')] || null
 const setup = () => {
   const deleted = []
-  const deps = { preflight, getUser, json, isDemoEmail: e => /\.demo@heirsplit\.no$/i.test(e || ''), deleteData: async id => { deleted.push(id); return { ok: true } } }
+  const deps = { preflight, getUser, json, isDemoUser: demo.isDemoUser, deleteData: async id => { deleted.push(id); return { ok: true } } }
   return { deleted, deps }
 }
 const req = (method, auth, body) => new Request('https://x/functions/v1/delete-account', { method, headers: auth ? { Authorization: auth } : {}, body })
@@ -46,6 +56,25 @@ describe('delete-account', { skip }, () => {
     const res = await mod.handleDeleteAccount(req('POST', 'Bearer demo'), deps)
     assert.equal(res.status, 403)
     assert.deepEqual(deleted, [])
+  })
+  test('merket demokonto kan ikke slettes, heller ikke med ny e-post', async () => {
+    const { deleted, deps } = setup()
+    const res = await mod.handleDeleteAccount(req('POST', 'Bearer demo-merket'), deps)
+    assert.equal(res.status, 403)
+    assert.equal((await res.json()).code, 'demo')
+    assert.deepEqual(deleted, [])
+  })
+  test('e-postadressen alene gjør ingen til demo', async () => {
+    const { deleted, deps } = setup()
+    const res = await mod.handleDeleteAccount(req('POST', 'Bearer gammel-adresse'), deps)
+    assert.equal(res.status, 200)
+    assert.deepEqual(deleted, ['u-x'])
+  })
+  test('en vanlig bruker blir ikke demo av et merke i user_metadata, og kan slette kontoen sin', async () => {
+    const { deleted, deps } = setup()
+    const res = await mod.handleDeleteAccount(req('POST', 'Bearer selvmerket'), deps)
+    assert.equal(res.status, 200)
+    assert.deepEqual(deleted, ['u-eva'])
   })
   test('sletter bare kontoen som eier innloggingen, uansett hva forespørselen inneholder', async () => {
     const { deleted, deps } = setup()

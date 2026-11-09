@@ -2,7 +2,7 @@
 // måling av hvert kall og faste feilkoder. Logikken som kan testes uten nettverk ligger i aiCore.ts.
 import Anthropic from 'npm:@anthropic-ai/sdk@0.131.0'
 import type { User } from 'https://esm.sh/@supabase/supabase-js@2'
-import { adminClient, isDemoEmail, json } from './http.ts'
+import { adminClient, isDemoUser, json } from './http.ts'
 import {
   AiError, ERROR_STATUS, ERROR_TEXT, OUTCOME, buildParams, estimateCostUsd, interpretReply, nextAttempt, resolveModel,
   type AiErrorCode, type Effort, type Model, type Schema, type Usage, type Validation,
@@ -46,7 +46,7 @@ const DENIED: Record<string, { status: number; message: string }> = {
 
 // estateId: boet kallet gjelder (teller mot boets grense; brukeren må være medlem). null for eldre klienter.
 export async function claimAiCall(req: Request, user: User, fn: string, estateId: string | null = null): Promise<{ denied: Response | null; quota: Quota; usageId: number | null }> {
-  const isDemo = isDemoEmail(user.email)
+  const isDemo = isDemoUser(user)
   const { data, error } = await adminClient().rpc('claim_ai_call', {
     p_user_id: user.id, p_session_id: sessionId(req), p_fn: fn, p_is_demo: isDemo, ...(estateId ? { p_estate_id: estateId } : {}),
   })

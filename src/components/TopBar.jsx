@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import { signOut } from '../lib/supabase'
 import { getLang, L } from '../lib/lang'
 import { changeLanguage } from '../lib/languagePref'
-import { isDemoSession } from '../lib/demo'
+import { isDemoSession, signOutDemo } from '../lib/demo'
 import TextSizeControl from './TextSizeControl'
 import { APP_HOME, HOME, LANDING_STATE } from '../lib/routes'
 
@@ -50,13 +50,13 @@ export default function TopBar({ profile, session, estate }) {
     setLogoMenuOpen(false)
     setMenuOpen(false)
     // Demo sessions end when leaving so the landing page shows as for a new visitor
-    if (isDemo) await signOut()
+    if (isDemo) await signOutDemo()
     navigate(HOME, { state: LANDING_STATE })
   }
 
   const logout = async () => {
     setMenuOpen(false)
-    await signOut()
+    await (isDemo ? signOutDemo() : signOut())
     navigate(HOME)
   }
 

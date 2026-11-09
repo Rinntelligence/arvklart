@@ -2,7 +2,7 @@
 // (test/e2e/staticServer.mjs): forhåndsrendret HTML uten JavaScript, robots.txt og sitemap.xml som filer,
 // noindex på alt som ikke er offentlige sider, én canonical, og at hydreringen ikke endrer noe for brukerne
 // (norsk/engelsk, innlogget/ikke innlogget, demo, innlogging og direkte lenker). Kjøres av test/e2e/run.sh.
-import { BASE, EST, launch, checker, assert, sessionFor } from './fixtures.mjs'
+import { BASE, EST, launch, checker, assert, sessionFor, DEMO } from './fixtures.mjs'
 import { PUBLIC_PAGES, SITE_URL } from '../../src/seo/pages.js'
 import { runHttpChecks } from '../seo/httpChecks.mjs'
 
@@ -188,7 +188,7 @@ await check('Innlogging fra forsiden: etter innlogging til appen på /app', asyn
 }, { loggedIn: false })
 
 await check('Demo: «Test ut demo nå» fra forsiden «/» åpner demo-boet', async page => {
-  const demo = sessionFor('mona.demo@heirsplit.no')
+  const demo = sessionFor(DEMO.email, DEMO.meta)
   await page.route('https://test.supabase.co/functions/v1/demo-login', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ access_token: demo.access_token, refresh_token: 'r' }) }))
   await page.route('https://test.supabase.co/auth/v1/user', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(demo.user) }))
   const state = await observe(page)

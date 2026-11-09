@@ -14,7 +14,7 @@
 //
 // Chromium etterligner ikke adresselinjen i Safari. Derfor testes også den synlige høyden med adresselinjen (VISIBLE);
 // på en ekte telefon må det likevel sjekkes for hånd.
-import { BASE, EST, UID, ITEM, now, category, launch, checker, assert } from './fixtures.mjs'
+import { BASE, EST, UID, ITEM, now, category, launch, checker, assert, DEMO } from './fixtures.mjs'
 
 const browser = await launch()
 const results = []
@@ -106,11 +106,11 @@ async function checkButtons(page, label, { visible = true } = {}) {
 const FULL = [{ width: 375, height: 667 }, { width: 375, height: 812 }, { width: 390, height: 844 }, { width: 430, height: 932 }]
 // Synlig høyde med adresselinjen: iPhone SE, mini/X/11 Pro, 12–16, Plus/Pro Max og en vanlig Android
 const VISIBLE = [{ width: 375, height: 548 }, { width: 375, height: 635 }, { width: 390, height: 664 }, { width: 430, height: 746 }, { width: 412, height: 780 }]
-const SESSIONS = [{ who: 'vanlig bruker', email: null }, { who: 'demo', email: 'mona.demo@heirsplit.no' }]
+const SESSIONS = [{ who: 'vanlig bruker', email: null, meta: null }, { who: 'demo', ...DEMO }]
 
 for (const vp of [...FULL, ...VISIBLE]) {
   for (const textSize of [null, 'xlarge']) {
-    for (const { who, email } of SESSIONS) {
+    for (const { who, email, meta } of SESSIONS) {
       // «Vanlig mobil»: alt skal synes uten scrolling. Ellers kan beskrivelsen kreve scrolling, men aldri ligge under noe.
       const normal = !textSize && (vp.height >= 800 || (vp.width >= 390 && vp.height >= 664))
       const buttonsAlways = vp.height >= 635
@@ -154,15 +154,15 @@ for (const vp of [...FULL, ...VISIBLE]) {
         await checkButtons(page, 'etter «Nei takk»', { visible: buttonsAlways })
         if (normal) await fullyVisible(page.getByRole('heading', { name: CARDS[2].title }), 'etter «Nei takk»: tittelen på tredje kort')
         await checkDescription(page, CARDS[2], 'etter «Nei takk»', { visible: normal })
-      }, { viewport: vp, textSize, email, fixtures })
+      }, { viewport: vp, textSize, email, meta, fixtures })
     }
   }
 }
 
 const imageHeight = page => page.getByRole('heading', { name: CARDS[0].title }).evaluate(h => h.parentElement.previousElementSibling.getBoundingClientRect().height)
 for (const [vp, email, expect] of [
-  [{ width: 375, height: 548 }, 'mona.demo@heirsplit.no', 'min'], [{ width: 390, height: 664 }, 'mona.demo@heirsplit.no', 'min'],
-  [{ width: 390, height: 844 }, null, 320], [{ width: 430, height: 932 }, 'mona.demo@heirsplit.no', 320], [{ width: 1280, height: 900 }, null, 320],
+  [{ width: 375, height: 548 }, DEMO, 'min'], [{ width: 390, height: 664 }, DEMO, 'min'],
+  [{ width: 390, height: 844 }, null, 320], [{ width: 430, height: 932 }, DEMO, 320], [{ width: 1280, height: 900 }, null, 320],
 ]) {
   await check(`Sveip ${vp.width}×${vp.height}${email ? ', demo' : ''}: bildet er ${expect === 'min' ? 'minst 96 px' : '320 px som før'}`, async page => {
     await decisionsTables(page)
@@ -173,7 +173,7 @@ for (const [vp, email, expect] of [
     if (expect === 'min') assert(h >= 95.5, `bildet er bare ${Math.round(h)} px`)
     else assert(Math.round(h) === expect, `bildet er ${Math.round(h)} px, ventet ${expect}`)
     if (vp.width >= 1000) await checkButtons(page, 'desktop')
-  }, { viewport: vp, email, fixtures })
+  }, { viewport: vp, ...(email ? DEMO : {}), fixtures })
 }
 
 await browser.close()

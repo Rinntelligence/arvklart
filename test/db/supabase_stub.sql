@@ -4,15 +4,19 @@ create role authenticated nologin;
 create role service_role nologin bypassrls;
 create extension if not exists pgcrypto;
 create schema auth;
-create table auth.users (id uuid primary key default gen_random_uuid(), email text unique, created_at timestamptz default now());
+-- raw_app_meta_data: som i Supabase; settes bare med service role (Auth Admin API), aldri av brukeren
+create table auth.users (id uuid primary key default gen_random_uuid(), email text unique, created_at timestamptz default now(),
+  raw_app_meta_data jsonb not null default '{}');
 -- Som i Supabase: les fra enkeltinnstilling (tester) eller fra JWT-en PostgREST setter
 create function auth.claim(k text) returns text language sql stable as $$
   select coalesce(nullif(current_setting('request.jwt.claim.' || k, true), ''), nullif(current_setting('request.jwt.claims', true), '')::jsonb ->> k) $$;
 create function auth.uid() returns uuid language sql stable as $$ select auth.claim('sub')::uuid $$;
 create function auth.role() returns text language sql stable as $$ select auth.claim('role') $$;
 create function auth.email() returns text language sql stable as $$ select auth.claim('email') $$;
+-- Hele JWT-en (som PostgREST setter i request.jwt.claims), med aal fra enkeltinnstillingen hvis testene setter den
 create function auth.jwt() returns jsonb language sql stable as $$
-  select coalesce(nullif(current_setting('request.jwt.claims', true), '')::jsonb, jsonb_build_object('aal', auth.claim('aal'))) $$;
+  select coalesce(nullif(current_setting('request.jwt.claims', true), '')::jsonb, '{}'::jsonb)
+         || jsonb_strip_nulls(jsonb_build_object('aal', nullif(current_setting('request.jwt.claim.aal', true), ''))) $$;
 create table auth.mfa_factors (id uuid primary key default gen_random_uuid(), user_id uuid, status text);
 create role authenticator login password 'test' noinherit;
 grant anon, authenticated, service_role to authenticator;
@@ -38,3 +42,5 @@ insert into auth.users (id, email) values
   ('00000000-0000-0000-0000-0000000000e1', 'eva@test.no'),
   ('00000000-0000-0000-0000-0000000000f1', 'frank@test.no'),
   ('00000000-0000-0000-0000-0000000000a9', 'outsider@test.no');
+-- Demokontoene er merket som i produksjon etter scripts/demo-identity.mjs --apply-mark (20261109190000_demo_identity.sql)
+update auth.users set raw_app_meta_data = jsonb_build_object('arvklart_demo', split_part(email, '.', 1)) where email like '%.demo@heirsplit.no';

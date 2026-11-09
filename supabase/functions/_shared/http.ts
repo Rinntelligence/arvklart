@@ -17,8 +17,8 @@ const env = (name: string) => {
   return value
 }
 
-// Demokontoene (mona/kari/lars.demo@heirsplit.no) skal ikke kunne endre noe varig eller bruke AI.
-export const isDemoEmail = (email?: string | null) => /\.demo@heirsplit\.no$/i.test(email || '')
+// Hvem som er demokonto (merket i app_metadata), i en egen modul uten avhengigheter så den kan testes i Node
+export { DEMO_ROLES, demoRole, isDemoUser } from './demoIdentity.ts'
 
 // Brukeren som eier JWT-en i Authorization-headeren, eller null. Anon-nøkkelen gir null.
 export async function getUser(req: Request): Promise<User | null> {

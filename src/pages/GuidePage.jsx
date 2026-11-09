@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { signIn, signUp } from '../lib/supabase'
-import { isDemoEmail } from '../lib/demo'
+import { isDemoSession } from '../lib/demo'
 import {
   getPendingSave, setPendingSave, clearPendingSave,
   createWizardEstate, listAdminEstates, loadWizardContext, saveWizardToEstate,
@@ -64,7 +64,7 @@ export default function GuidePage({ standalone = false, session = null, onToast 
   const [busy, setBusy] = useState(false)
   const userId = session?.user?.id
   const userEmail = session?.user?.email || ''
-  const isDemo = isDemoEmail(userEmail)
+  const isDemo = isDemoSession(session)
   // Opened from the landing page (no estate) — go back to the home page instead
   // Tilbake til boet, eller til forsiden (også for innloggede, som /home før)
   const backPath = id ? `/estate/${id}` : HOME
