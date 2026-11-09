@@ -39,6 +39,15 @@ OPEN=$("${PSQL[@]}" -tA -c "select count(*) from protected_columns where has_col
 if [ "$OPEN" != "0" ]; then echo "Beskyttede kolonner ble åpnet igjen av en eldre migrering: $OPEN"; exit 1; fi
 for f in supabase/migrations/20261019*.sql supabase/migrations/2026102*.sql supabase/migrations/202611*.sql; do "${PSQL[@]}" < "$f" >/dev/null 2>&1 || { echo "Kan ikke kjøres på nytt: $f"; exit 1; }; done
 
+# Sperren i 20261109_demo_identity.sql: migreringen avbryter (og lagrer ingenting) hvis en demokonto ikke er merket,
+# eller hvis en merket konto er medlem i et annet bo enn demoboet (en ekte konto merket ved en feil)
+guard() { ( echo "begin; $1"; cat supabase/migrations/20261109_demo_identity.sql; echo "rollback;" ) | "${PSQL[@]}" 2>&1 >/dev/null || true; }
+OUT=$(guard "update auth.users set raw_app_meta_data = '{}' where email = 'lars.demo@heirsplit.no';")
+echo "$OUT" | grep -q "Avbrutt: 0 konto(er) er merket som demokontoen lars" || { echo "20261109 avbrøt ikke når Lars ikke var merket: $OUT"; exit 1; }
+OUT=$(guard "update auth.users set raw_app_meta_data = '{}' where email = 'kari.demo@heirsplit.no'; update auth.users set raw_app_meta_data = '{\"arvklart_demo\":\"kari\"}' where email = 'eva@test.no'; insert into estates (name, owner_id, invite_code) select 'Evas bo', id, 'EVA' || substr(md5(random()::text), 1, 5) from auth.users where email = 'eva@test.no';")
+echo "$OUT" | grep -q "Avbrutt: 1 merket konto(er) er medlem eller eier i et annet bo" || { echo "20261109 avbrøt ikke for en merket konto i et annet bo: $OUT"; exit 1; }
+if [ "$("${PSQL[@]}" -tA -c "select count(*) from auth.users where raw_app_meta_data ? 'arvklart_demo'")" != "3" ]; then echo "Sperretesten for 20261109 endret merkingen"; exit 1; fi
+
 # Ingen funksjon i public kan kalles av anon, og authenticated kan bare kalle dem i client_functions
 FNS="from pg_proc p where p.pronamespace = 'public'::regnamespace and not exists (select 1 from pg_depend d where d.classid = 'pg_proc'::regclass and d.objid = p.oid and d.deptype = 'e')"
 ANON=$("${PSQL[@]}" -tA -c "select string_agg(p.oid::regprocedure::text, ', ') $FNS and has_function_privilege('anon', p.oid, 'EXECUTE')")

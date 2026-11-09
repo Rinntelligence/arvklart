@@ -16,8 +16,10 @@ const USERS = {
   eva: ['00000000-0000-0000-0000-0000000000e1', 'eva@test.no'],
   outsider: ['00000000-0000-0000-0000-0000000000a9', 'outsider@test.no'],
 }
+// Som i Supabase: JWT-en har app_metadata fra kontoen; demokontoene er merket (20261109_demo_identity.sql)
+const APP_METADATA = { mona: { provider: 'email', arvklart_demo: 'mona' } }
 const as = name => new PostgrestClient('http://localhost:54330', {
-  headers: { Authorization: `Bearer ${jwt({ sub: USERS[name][0], email: USERS[name][1], role: 'authenticated' })}` },
+  headers: { Authorization: `Bearer ${jwt({ sub: USERS[name][0], email: USERS[name][1], role: 'authenticated', app_metadata: APP_METADATA[name] || { provider: 'email' } })}` },
 })
 const DEMO = 'deed0001-0000-0000-0000-000000000001'
 

@@ -1,32 +1,58 @@
--- Demokontoene kjennes igjen på et merke serveren setter, ikke bare på e-postdomenet.
+-- Demokontoene kjennes igjen på et merke serveren setter, ikke på e-postdomenet.
 --
 -- Hvorfor: demokontoene har e-post på heirsplit.no, et domene Arvklart ikke eier. Sperren for demoen
 -- (is_demo_user()), nullstillingen og edge-funksjonene kjente dem igjen bare på e-postmønsteret. Den som registrerer
 -- domenet, kan be om nytt passord for en demokonto, endre e-posten og bli vanlig administrator i demoboet; da finner
 -- heller ikke nullstillingen kontoen.
 --
--- Nå: app_metadata.arvklart_demo = 'mona' | 'kari' | 'lars'. app_metadata kan bare settes med service role (Auth Admin
--- API, scripts/demo-identity.mjs), aldri av brukeren selv, og ligger i JWT-en som e-posten. Merket følger kontoen
--- selv om e-posten endres.
+-- Nå: bare merket app_metadata.arvklart_demo = 'mona' | 'kari' | 'lars'. app_metadata kan bare settes med service
+-- role (Auth Admin API, scripts/demo-identity.mjs), aldri av brukeren selv, og ligger i JWT-en. Merket følger kontoen
+-- selv om e-posten endres. E-postdomenet brukes ikke lenger til noe. For vanlige brukere er is_demo_user() false før
+-- og etter (de har ikke merket, og kan ikke sette det).
 --
--- Overgang: is_demo_user() godtar merket ELLER det gamle e-postmønsteret (token som er utstedt før merket ble satt,
--- mangler det i inntil en time). Sperren blir aldri svakere enn før. Mønsteret fjernes i en senere migrering når
--- e-postene er byttet til @arvklart.no. For vanlige brukere er is_demo_user() false før og etter (de har verken
--- merket eller mønsteret; brukeren kan ikke sette app_metadata).
---
--- reset_demo_estate(): finner kontoene etter merket (e-postmønsteret bare for en konto uten merke), fjerner personer
--- på listen etter konto-id og demokontoenes e-post i stedet for e-postdomenet, og stopper med feil hvis en demokonto
--- eller demoboet mangler (før: stille retur, og demo-login slapp besøkende inn i en demo som ikke var nullstilt).
+-- reset_demo_estate(): finner kontoene etter merket, fjerner personer på listen etter konto-id og demokontoenes
+-- e-post (ikke domenet), og stopper med feil (demo-login slipper da ingen inn) hvis
+--   • en demokonto mangler, eller to kontoer har samme merke
+--   • en merket konto er medlem eller eier i et annet bo enn demoboet: en ekte konto som er merket ved en feil, skal
+--     aldri få navnet til en demoperson eller ønsker lagt inn i sitt navn
+--   • demoboet ikke finnes.
 -- Ønskelisten er uendret.
 --
--- Rekkefølge i produksjon: merk kontoene (scripts/demo-identity.mjs --apply-mark) FØR denne migreringen; uten merke
--- virker alt som før via e-postmønsteret. Kan kjøres flere ganger.
+-- Rekkefølge i produksjon: merk kontoene (scripts/demo-identity.mjs --apply-mark), vent til alle tilgangstoken er
+-- fornyet (minst så lenge et token varer, vanligvis 1 t; ellers kunne en besøkende med et gammelt token uten merke få
+-- vanlige rettigheter i demoboet), og kjør så denne migreringen. Sperren under avbryter migreringen hvis merkingen
+-- ikke stemmer. Kan kjøres flere ganger.
 -- Tilbakerulling: rollback/20261109_demo_identity.down.sql (bare før e-postene er byttet til @arvklart.no).
+
+-- Sperre: der demoboet finnes, må nøyaktig én konto per rolle være merket, og ingen merket konto kan være medlem
+-- eller eier i et annet bo.
+do $$
+declare
+  v_estate constant uuid := 'deed0001-0000-0000-0000-000000000001';
+  v_role text;
+  v_n int;
+begin
+  if not exists (select 1 from public.estates where id = v_estate) then
+    return; -- ingen demo i denne databasen (f.eks. før seed): ingenting å kontrollere
+  end if;
+  foreach v_role in array array['kari', 'lars', 'mona'] loop
+    select count(*) into v_n from auth.users where raw_app_meta_data ->> 'arvklart_demo' = v_role;
+    if v_n <> 1 then
+      raise exception 'Avbrutt: % konto(er) er merket som demokontoen %, ventet 1. Kjør scripts/demo-identity.mjs --apply-mark først.', v_n, v_role;
+    end if;
+  end loop;
+  select count(*) into v_n from auth.users u
+  where u.raw_app_meta_data ? 'arvklart_demo'
+    and (exists (select 1 from public.estate_members m where m.user_id = u.id and m.estate_id <> v_estate)
+      or exists (select 1 from public.estates e where e.owner_id = u.id and e.id <> v_estate));
+  if v_n > 0 then
+    raise exception 'Avbrutt: % merket konto(er) er medlem eller eier i et annet bo enn demoboet. Kontroller merkingen.', v_n;
+  end if;
+end $$;
 
 create or replace function public.is_demo_user()
 returns boolean language sql stable set search_path = '' as $$
-  select coalesce(auth.jwt() -> 'app_metadata' ->> 'arvklart_demo', '') in ('mona', 'kari', 'lars')
-      or coalesce(lower(auth.email()) like '%.demo@heirsplit.no', false);
+  select coalesce(auth.jwt() -> 'app_metadata' ->> 'arvklart_demo', '') in ('mona', 'kari', 'lars');
 $$;
 
 create or replace function public.reset_demo_estate()
@@ -42,20 +68,17 @@ declare
   v_id uuid;
   v_n int;
 begin
-  -- Demokontoene finnes etter merket serveren setter (app_metadata.arvklart_demo). Det gamle e-postmønsteret brukes
-  -- bare for en konto som ikke er merket ennå (overgang; fjernes sammen med mønsteret i is_demo_user()).
-  -- Mangler en konto, eller er to merket likt, stopper nullstillingen med feil, og demo-login slipper ingen inn.
+  -- Demokontoene finnes bare etter merket serveren setter (app_metadata.arvklart_demo). Mangler en konto, er to merket
+  -- likt, eller er en merket konto medlem eller eier i et annet bo, stopper nullstillingen, og demo-login slipper ingen inn.
   foreach v_role in array array['kari', 'lars', 'mona'] loop
-    v_id := null;
     select count(*) into v_n from auth.users where raw_app_meta_data ->> 'arvklart_demo' = v_role;
+    if v_n = 0 then raise exception 'Demoen er ikke satt opp: ingen konto er merket som demokontoen %', v_role using errcode = 'P0002'; end if;
     if v_n > 1 then raise exception 'Flere kontoer er merket som demokontoen %', v_role; end if;
-    if v_n = 1 then
-      select id into v_id from auth.users where raw_app_meta_data ->> 'arvklart_demo' = v_role;
-    else
-      select id into v_id from auth.users
-      where lower(email) = v_role || '.demo@heirsplit.no' and coalesce(raw_app_meta_data ->> 'arvklart_demo', '') = '';
+    select id into v_id from auth.users where raw_app_meta_data ->> 'arvklart_demo' = v_role;
+    if exists (select 1 from estate_members where user_id = v_id and estate_id <> v_estate)
+       or exists (select 1 from estates where owner_id = v_id and id <> v_estate) then
+      raise exception 'Kontoen merket som demokontoen % er medlem eller eier i et annet bo; den røres ikke', v_role;
     end if;
-    if v_id is null then raise exception 'Demoen er ikke satt opp: fant ikke demokontoen %', v_role using errcode = 'P0002'; end if;
     v_demo := v_demo || v_id;
   end loop;
   v_kari := v_demo[1];
