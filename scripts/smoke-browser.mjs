@@ -137,6 +137,57 @@ await check('Demo: åpner demo-boet, og navigering i boet virker', async page =>
   }
 })
 
+// Demoinnholdet på mobil (20261109210000_demo_content_fixes): hvem den besøkende er, gitaren med bilde, tekstene
+// som var feil, begrunnelsene til Kari og Lars, «Vil ha» med sveip, «Løsningsmetoder», og at en ny demoinnlogging
+// nullstiller ønsket uten å ta rettelsene tilbake. Endrer bare demoboet, som hvert demobesøk gjør.
+const DEMO_EST = 'deed0001-0000-0000-0000-000000000001'
+const openDemo = async page => {
+  await page.goto(`${BASE}/`)
+  await page.getByRole('button', { name: /Test ut demo/ }).first().click()
+  await page.waitForURL(/\/estate\/[0-9a-f-]{36}$/, { timeout: 30000 })
+  await page.getByRole('heading', { name: 'Fam. Hansen sitt bo' }).first().waitFor({ timeout: 20000 })
+}
+await check('Demo på mobil: rollen, gitarbildet, tekstene, begrunnelsene, «Vil ha», løsningsmetoder og nullstilling', async page => {
+  await openDemo(page)
+  await page.getByText(/Du er Mona, en av tre arvinger og administrator; Kari og Lars har allerede svart\./).waitFor({ timeout: 15000 })
+  await page.getByText(/Du har 10 gjenstander du ikke har tatt stilling til/).first().waitFor({ timeout: 15000 })
+  assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), 'oversikten kan rulles sidelengs')
+
+  await page.goto(`${BASE}/estate/${DEMO_EST}/item/db1836d7-4b59-4036-b95b-37443affed62`)
+  const img = page.locator('img[src*="demo__db1836d7"]').first()
+  await img.waitFor({ timeout: 20000 })
+  await page.waitForFunction(el => el.complete && el.naturalWidth > 0, await img.elementHandle(), { timeout: 20000 })
+  notes.push(`INFO gitarbildet vises (${await img.evaluate(el => `${el.naturalWidth}×${el.naturalHeight}`)})`)
+
+  await page.goto(`${BASE}/estate/${DEMO_EST}/item/face0002-0000-0000-0000-000000000002`)
+  await page.getByText(/Tre-seters sofa i mørkegrønn velur/).waitFor({ timeout: 20000 })
+  assert(await page.getByText(/spisebord/i).count() === 0, 'sofaen omtaler et spisebord')
+  await page.goto(`${BASE}/estate/${DEMO_EST}/item/face0009-0000-0000-0000-000000000009`)
+  await page.getByText(/Antall deler og produsent er ikke registrert/).waitFor({ timeout: 20000 })
+  assert(await page.getByText(/Stavangerflint|\d+ deler/i).count() === 0, 'serviset har antall deler eller merke')
+
+  await page.goto(`${BASE}/estate/${DEMO_EST}/item/face0004-0000-0000-0000-000000000004`)
+  await page.getByText(/Ønsker flere det, tar vi en prat først/).first().waitFor({ timeout: 20000 })
+  await page.getByText(/Det hørte alltid til i stua/).first().waitFor()
+
+  await page.goto(`${BASE}/estate/${DEMO_EST}/swipe`)
+  const want = page.getByRole('button', { name: /^Vil ha/ }).first()
+  await want.waitFor({ timeout: 20000 })
+  const box = await want.boundingBox()
+  assert(box && box.y + box.height <= page.viewportSize().height, '«Vil ha» krever scrolling på mobil')
+  await want.click()
+  await page.getByRole('button', { name: 'Angre', exact: true }).waitFor({ timeout: 15000 })
+
+  await page.goto(`${BASE}/estate/${DEMO_EST}/conflicts`)
+  await page.getByRole('heading', { name: 'Løsningsmetoder' }).waitFor({ timeout: 20000 })
+  await page.getByText(/Du mangler å vise interesse eller si nei takk til 9 gjenstander/).first().waitFor({ timeout: 15000 })
+
+  // Ny demoinnlogging: ønsket over er nullstilt, rettelsene står
+  await openDemo(page)
+  await page.getByText(/Du har 10 gjenstander du ikke har tatt stilling til/).first().waitFor({ timeout: 15000 })
+  assert(await page.getByText('Grønn 3-seters sofa', { exact: true }).count() > 0, 'sofaen mangler etter nullstilling')
+})
+
 // ── Statistikk mot den ekte GTM-containeren (GTM-KQWKCWBC) og GA4-taggen ──────────────────────────────────────
 // gtm.js og GA4-taggen hentes fra Google. GA4s målinger (…/g/collect) fanges i nettleseren og besvares lokalt, så
 // testen ser nøyaktig hva som ville blitt sendt, uten at røyktesten havner i statistikken.
