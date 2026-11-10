@@ -48,6 +48,54 @@ OUT=$(guard "update auth.users set raw_app_meta_data = '{}' where email = 'kari.
 echo "$OUT" | grep -q "Avbrutt: 1 merket konto(er) er medlem eller eier i et annet bo" || { echo "20261109 avbrøt ikke for en merket konto i et annet bo: $OUT"; exit 1; }
 if [ "$("${PSQL[@]}" -tA -c "select count(*) from auth.users where raw_app_meta_data ? 'arvklart_demo'")" != "3" ]; then echo "Sperretesten for 20261109 endret merkingen"; exit 1; fi
 
+# 20261109210000_demo_content_fixes.sql mot demoboet slik det var i produksjon (sofa med spisebordtekst, servise med
+# «24 deler»/«18 deler» og merke, gitar uten bilde), i en transaksjon som rulles tilbake. Uten bildefil skal gitaren
+# stå uten bilde; med fila i item-images kobles den til. Andre gjenstander og verdiene endres ikke, og
+# nullstillingen etterpå tar ikke rettelsene tilbake.
+content_fix() { ( echo "begin;"; cat <<'SQL'
+update items set title = 'Grønn 3-seters sofa', description = 'Solid spisebord i eik, ca. 1920. Plass til 10 personer. Har vært familiens midtpunkt i tre generasjoner. Noe slitasje, men i god stand.' where id = 'face0002-0000-0000-0000-000000000002';
+update items set title = 'Jul middagsservise, 24 deler', description = 'Komplett middagsservise i Stavangerflint, 1960-modellen «Flint Blue». 18 deler. Noe slitasje på tallerkener, ingen sprekker.' where id = 'face0009-0000-0000-0000-000000000009';
+update interests set reason = 'Vi mangler et skikkelig spisebord — dette er drømmen' where item_id = 'face0002-0000-0000-0000-000000000002' and user_id = (select id from auth.users where email = 'mona.demo@heirsplit.no');
+update items set description = null where id = 'face0006-0000-0000-0000-000000000006';
+update items set description = 'Signert oljemaleri av norsk maler K. Andreassen, 1978. 80×120 cm. Har hengt i stua siden 1980. Originalt pynteramme i gull.' where id = 'face0004-0000-0000-0000-000000000004';
+update items set title = 'Familiealbum 1954-1959', description = 'Elektrisk Singer-sykmaskin fra 1938, arvet fra oldemor. Sjelden modell i trefrems-utførelse. Fungerer med ny ledning.' where id = 'face0012-0000-0000-0000-000000000012';
+insert into items (id, estate_id, title, description, condition, added_by_name, status) values ('db1836d7-4b59-4036-b95b-37443affed62', 'deed0001-0000-0000-0000-000000000001', 'Sigma akustisk gitar', 'Akustisk gitar fra Sigma Guitars.', 'good', 'Demo', 'active');
+create temp table f_before as select md5(string_agg(t::text, ',' order by t.id)) as others, (select md5(string_agg(concat_ws('/', id, estimated_value, agreed_value), ',' order by id)) from items) as vals
+  from items t where t.id not in ('face0002-0000-0000-0000-000000000002', 'face0009-0000-0000-0000-000000000009', 'face0004-0000-0000-0000-000000000004', 'face0006-0000-0000-0000-000000000006', 'face0012-0000-0000-0000-000000000012', 'db1836d7-4b59-4036-b95b-37443affed62');
+SQL
+echo "$1"; cat supabase/migrations/20261109210000_demo_content_fixes.sql; cat <<'SQL'
+do $$
+declare v_url text; v_other text;
+begin
+  if (select description from items where id = 'face0002-0000-0000-0000-000000000002') <> 'Tre-seters sofa i mørkegrønn velur, med to ryggputer, to valseputer og skrå ben i tre.' then raise exception 'FEIL: sofaen'; end if;
+  if (select title || ' | ' || description from items where id = 'face0009-0000-0000-0000-000000000009') <> 'Middagsservise | Middagsservise fra familiens kjøkken. Antall deler og produsent er ikke registrert.' then raise exception 'FEIL: serviset'; end if;
+  if (select description from items where id = 'face0006-0000-0000-0000-000000000006') <> 'To gifteringer i gull.'
+     or (select description from items where id = 'face0004-0000-0000-0000-000000000004') ~* 'andreassen|80×120'
+     or (select description from items where id = 'face0012-0000-0000-0000-000000000012') <> 'Familiealbum med bilder fra 1954–1959.' then raise exception 'FEIL: gifteringer, maleri eller album'; end if;
+  if exists (select 1 from interests x join items i on i.id = x.item_id where i.estate_id = 'deed0001-0000-0000-0000-000000000001' and x.reason ~* 'spisebord|stavangerflint|\mur\M') then raise exception 'FEIL: ønsketekst'; end if;
+  if (select count(*) from interests where item_id = 'db1836d7-4b59-4036-b95b-37443affed62') <> 1 then raise exception 'FEIL: gitaren har ikke Lars sitt ønske'; end if;
+  if (select count(*) from (select item_id from interests x join items i on i.id = x.item_id where i.estate_id = 'deed0001-0000-0000-0000-000000000001' group by item_id having count(*) >= 2) c) < 3 then raise exception 'FEIL: for få gjenstander som flere ønsker'; end if;
+  if (select md5(string_agg(t::text, ',' order by t.id)) from items t where t.id not in ('face0002-0000-0000-0000-000000000002', 'face0009-0000-0000-0000-000000000009', 'face0004-0000-0000-0000-000000000004', 'face0006-0000-0000-0000-000000000006', 'face0012-0000-0000-0000-000000000012', 'db1836d7-4b59-4036-b95b-37443affed62')) <> (select others from f_before) then raise exception 'FEIL: andre gjenstander endret'; end if;
+  if (select md5(string_agg(concat_ws('/', id, estimated_value, agreed_value), ',' order by id)) from items) <> (select vals from f_before) then raise exception 'FEIL: verdier endret'; end if;
+  select image_url into v_url from items where id = 'db1836d7-4b59-4036-b95b-37443affed62';
+  select regexp_replace(image_url, '[^/]+$', '') into v_other from items where id = 'face0001-0000-0000-0000-000000000001';
+  if exists (select 1 from storage.objects where name = 'deed0001-0000-0000-0000-000000000001/demo__db1836d7.jpg') then
+    if v_url is distinct from v_other || 'demo__db1836d7.jpg' then raise exception 'FEIL: gitarbildet ble ikke koblet til (%)', v_url; end if;
+  elsif v_url is not null then raise exception 'FEIL: gitaren fikk bilde uten fil'; end if;
+  perform reset_demo_estate();
+  if (select description from items where id = 'face0002-0000-0000-0000-000000000002') not like 'Tre-seters sofa%'
+     or (select title from items where id = 'face0009-0000-0000-0000-000000000009') <> 'Middagsservise' then raise exception 'FEIL: nullstillingen tok rettelsene tilbake'; end if;
+  if exists (select 1 from interests x join items i on i.id = x.item_id where i.estate_id = 'deed0001-0000-0000-0000-000000000001' and x.reason ~* 'spisebord|stavangerflint') then raise exception 'FEIL: nullstillingen la inn gamle ønsketekster'; end if;
+  if (select image_url from items where id = 'db1836d7-4b59-4036-b95b-37443affed62') is distinct from v_url then raise exception 'FEIL: nullstillingen endret gitarbildet'; end if;
+  raise notice 'INNHOLD OK';
+end $$;
+SQL
+echo "rollback;" ) | "${PSQL[@]}" 2>&1 >/dev/null || true; }
+OUT=$(content_fix "")
+echo "$OUT" | grep -q "INNHOLD OK" || { echo "20261109210000 (uten bildefil): $OUT"; exit 1; }
+OUT=$(content_fix "insert into storage.buckets (id, name) values ('item-images', 'item-images') on conflict do nothing; insert into storage.objects (bucket_id, name) values ('item-images', 'deed0001-0000-0000-0000-000000000001/demo__db1836d7.jpg');")
+echo "$OUT" | grep -q "INNHOLD OK" || { echo "20261109210000 (med bildefil): $OUT"; exit 1; }
+
 # Ingen funksjon i public kan kalles av anon, og authenticated kan bare kalle dem i client_functions
 FNS="from pg_proc p where p.pronamespace = 'public'::regnamespace and not exists (select 1 from pg_depend d where d.classid = 'pg_proc'::regclass and d.objid = p.oid and d.deptype = 'e')"
 ANON=$("${PSQL[@]}" -tA -c "select string_agg(p.oid::regprocedure::text, ', ') $FNS and has_function_privilege('anon', p.oid, 'EXECUTE')")

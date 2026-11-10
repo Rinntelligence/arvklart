@@ -559,7 +559,8 @@ select t_eq((select string_agg(display_name, ',' order by email) from profiles w
 select t_eq((select count(*)::int from (select item_id from interests where item_id in ('face0001-0000-0000-0000-000000000001', 'face0004-0000-0000-0000-000000000004', 'face0008-0000-0000-0000-000000000008') group by item_id having count(*) >= 2) x), 3,
   'de omstridte gjenstandene har fortsatt minst to interessenter (uten eieren)');
 select t_eq((select count(*)::int from estate_members where user_id = '00000000-0000-0000-0000-00000000000a'), (select count(*)::int from estate_members where user_id = '00000000-0000-0000-0000-00000000000a' and estate_id <> 'deed0001-0000-0000-0000-000000000001'), 'den ekte kontoen beholder sine andre bo');
-select t_eq((select count(*)::int from interests where item_id::text like 'face%'), 18, 'nullstilling gjenoppretter alle interesser');
+select t_eq((select count(*)::int from interests where item_id::text like 'face%'), 12, 'nullstilling gjenoppretter alle interesser');
+select t_eq((select count(*)::int from interests where user_id = (select id from auth.users where raw_app_meta_data ->> 'arvklart_demo' = 'mona')), 0, 'Mona (den besøkende) har ingen forhåndsutfylte ønsker etter nullstilling');
 select t_eq((select count(*)::int from estate_events where estate_id = 'deed0001-0000-0000-0000-000000000001'), 0, 'nullstilling tømmer demoens logg');
 select t_eq((select count(*)::int from items where estate_id = 'deed0001-0000-0000-0000-000000000001' and disposition is not null), 0, 'nullstilling fjerner disponeringene');
 select t_eq((select count(*)::int from items where estate_id = 'deed0001-0000-0000-0000-000000000001' and (status = 'assigned' or marked_for_disposal)), 0, 'nullstilling fjerner tildelinger og kast');
@@ -624,7 +625,7 @@ select t_eq((select string_agg(email, ',' order by email) from heirs where estat
 select t_eq((select count(*)::int from estate_members m where m.estate_id = 'deed0001-0000-0000-0000-000000000001'
   and not exists (select 1 from auth.users u where u.id = m.user_id and u.raw_app_meta_data ? 'arvklart_demo')), 0, 'etter e-postbyttet: ingen ekte kontoer er medlemmer');
 select t_eq((select owner_id from estates where id = 'deed0001-0000-0000-0000-000000000001'), '00000000-0000-0000-0000-00000000000d'::uuid, 'etter e-postbyttet: Mona eier demoboet');
-select t_eq((select count(*)::int from interests where item_id::text like 'face%'), 18, 'etter e-postbyttet: alle interessene er gjenopprettet');
+select t_eq((select count(*)::int from interests where item_id::text like 'face%'), 12, 'etter e-postbyttet: alle interessene er gjenopprettet');
 rollback;
 
 -- Nullstillingen stopper med feil i stedet for å la besøkende inn i en demo som ikke er nullstilt

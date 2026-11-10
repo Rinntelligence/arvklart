@@ -104,8 +104,8 @@ BEGIN
    8500, 'good', 'Demo', 'active'),
 
   ('face0002-0000-0000-0000-000000000002', 'deed0001-0000-0000-0000-000000000001',
-   'Antikk eiketresbord',
-   'Solid spisebord i eik, ca. 1920. Plass til 10 personer. Har vært familiens midtpunkt i tre generasjoner.',
+   'Grønn 3-seters sofa',
+   'Tre-seters sofa i mørkegrønn velur, med to ryggputer, to valseputer og skrå ben i tre.',
    'cafe0001-0000-0000-0000-000000000001',
    img_base || 'demo__face0002.jpg',
    24000, 'fair', 'Demo', 'active'),
@@ -118,8 +118,8 @@ BEGIN
    4800, 'good', 'Demo', 'active'),
 
   ('face0004-0000-0000-0000-000000000004', 'deed0001-0000-0000-0000-000000000001',
-   'Oljemaleri «Fjord i solnedgang»',
-   'Signert oljemaleri av norsk maler K. Andreassen, 1978. 80×120 cm. Originalt pynteramme i gull.',
+   'Oljemaleri av blomster',
+   'Oljemaleri med en stor blomsterbukett i vase mot mørk bakgrunn. Har hengt i stua så lenge barna kan huske.',
    'cafe0001-0000-0000-0000-000000000002',
    img_base || 'demo__face0004.jpg',
    35000, 'excellent', 'Demo', 'active'),
@@ -132,8 +132,8 @@ BEGIN
    6500, 'excellent', 'Demo', 'active'),
 
   ('face0006-0000-0000-0000-000000000006', 'deed0001-0000-0000-0000-000000000001',
-   'Vintage Rolex Oyster (1962)',
-   'Herreur i stål med originalt lær-armbånd. Kjøpt av Per Hansen i 1962. Originalkasse medfølger.',
+   'Gifteringer i gull, 2 stk.',
+   'To gifteringer i gull.',
    'cafe0001-0000-0000-0000-000000000003',
    img_base || 'demo__face0006.jpg',
    45000, 'fair', 'Demo', 'active'),
@@ -153,8 +153,8 @@ BEGIN
    12000, 'good', 'Demo', 'active'),
 
   ('face0009-0000-0000-0000-000000000009', 'deed0001-0000-0000-0000-000000000001',
-   'Stavangerflint porselen (18 deler)',
-   'Komplett middagsservise, 1960-modellen «Flint Blue». 18 deler. Noe slitasje, ingen sprekker.',
+   'Middagsservise',
+   'Middagsservise fra familiens kjøkken. Antall deler og produsent er ikke registrert.',
    'cafe0001-0000-0000-0000-000000000005',
    NULL,
    3200, 'fair', 'Demo', 'active'),
@@ -174,22 +174,22 @@ BEGIN
    NULL, 'good', 'Demo', 'active'),
 
   ('face0012-0000-0000-0000-000000000012', 'deed0001-0000-0000-0000-000000000001',
-   'Husflid-sykmaskin (Singer, 1938)',
-   'Elektrisk Singer-sykmaskin fra 1938. Sjelden modell. Fungerer med ny ledning.',
+   'Familiealbum 1954–1959',
+   'Familiealbum med bilder fra 1954–1959.',
    'cafe0001-0000-0000-0000-000000000006',
-   img_base || 'demo__face0012.jpg',
-   1200, 'fair', 'Demo', 'active')
+   NULL,
+   NULL, 'fair', 'Demo', 'active')
 
   ON CONFLICT (id) DO NOTHING;
 
   -- ============================================================
   -- DEL 5: Interesser — konflikter
-  --   Gyngestol        → du + Kari
-  --   Eiketresbord     → Lars + Mona
-  --   Oljemaleri       → du + Lars + Mona (3-veis!)
-  --   Rolex            → Kari + Mona
-  --   B&O              → du + Lars
-  --   Familiealbum     → Kari + Lars + Mona (3-veis!)
+  --   Gyngestol        → Kari + Lars
+  --   Sofa             → Lars
+  --   Oljemaleri       → Kari + Lars
+  --   Gifteringer      → Kari
+  --   B&O              → Kari + Lars
+  --   Familiealbum 1954–1959 → Kari + Lars
   -- ============================================================
 
   -- Rydd først eventuelle gamle interesser for disse gjenstandene
@@ -204,7 +204,8 @@ BEGIN
     'face0007-0000-0000-0000-000000000007',
     'face0008-0000-0000-0000-000000000008',
     'face0009-0000-0000-0000-000000000009',
-    'face0011-0000-0000-0000-000000000011'
+    'face0011-0000-0000-0000-000000000011',
+    'face0012-0000-0000-0000-000000000012'
   );
 
   -- Gyngestol: Lars + Kari
@@ -214,28 +215,22 @@ BEGIN
     ('face0001-0000-0000-0000-000000000001', kari_id,
      'Mamma elsket den stolen. Jeg vil ta vare på den til barna mine');
 
-  -- Eiketresbord: Lars + Mona
+  -- Sofa: Lars
   INSERT INTO interests (item_id, user_id, reason) VALUES
     ('face0002-0000-0000-0000-000000000002', lars_id,
-     'Vi har plass til det i stua og det vil passe perfekt med vår stil'),
-    ('face0002-0000-0000-0000-000000000002', mona_id,
-     'Vi mangler et skikkelig spisebord — dette er drømmen');
+     'Vi har plass til den i stua, og den passer perfekt hos oss');
 
-  -- Oljemaleri: Kari + Lars + Mona
+  -- Oljemaleri: Kari + Lars
   INSERT INTO interests (item_id, user_id, reason) VALUES
     ('face0004-0000-0000-0000-000000000004', kari_id,
      'Det hørte alltid til i stua. Jeg kan ikke forestille meg det noe annet sted'),
     ('face0004-0000-0000-0000-000000000004', lars_id,
-     'Pappa var veldig glad i dette maleriet. Jeg vil beholde minnet'),
-    ('face0004-0000-0000-0000-000000000004', mona_id,
-     'Det er det mest verdifulle i boet — og det er vakkert');
+     'Pappa var veldig glad i dette maleriet. Ønsker flere det, tar vi en prat først');
 
-  -- Rolex: Kari + Mona
+  -- Gifteringer: Kari
   INSERT INTO interests (item_id, user_id, reason) VALUES
     ('face0006-0000-0000-0000-000000000006', kari_id,
-     'Pappa hadde den på seg hver dag. Den betyr mye for meg'),
-    ('face0006-0000-0000-0000-000000000006', mona_id,
-     'Jeg er den eneste som bruker ur, og det er et klassisk stykke');
+     'Mamma og pappa bar disse ringene i over 60 år. De betyr mye for meg');
 
   -- B&O: Kari + Lars
   INSERT INTO interests (item_id, user_id, reason) VALUES
@@ -244,36 +239,26 @@ BEGIN
     ('face0008-0000-0000-0000-000000000008', lars_id,
      'Er stor B&O-fan. Har alltid likt dette anlegget');
 
-  -- Familiealbum: Kari + Lars + Mona
+  -- Familiealbum: Kari + Lars
   INSERT INTO interests (item_id, user_id, reason) VALUES
-    ('face0011-0000-0000-0000-000000000011', kari_id,
-     'Bildene betyr alt. Jeg vil skanne dem og dele digitalt med alle'),
-    ('face0011-0000-0000-0000-000000000011', lars_id,
-     'Vi bør alle ha tilgang — men noen må oppbevare originalene'),
-    ('face0011-0000-0000-0000-000000000011', mona_id,
-     'Jeg har barn som ikke har sett disse bildene ennå');
+    ('face0012-0000-0000-0000-000000000012', kari_id,
+     'Bildene betyr alt for meg. Jeg vil gjerne skanne dem og dele dem med alle i familien'),
+    ('face0012-0000-0000-0000-000000000012', lars_id,
+     'Vi bør alle få tilgang til bildene — men noen må ta vare på originalene');
 
   -- Kinesisk vase: kun Kari
   INSERT INTO interests (item_id, user_id, reason) VALUES
     ('face0005-0000-0000-0000-000000000005', kari_id,
      'Har alltid vært fascinert av den. Vil gjerne ha den i hylla mi');
 
-  -- Halskjede: kun Mona
-  INSERT INTO interests (item_id, user_id, reason) VALUES
-    ('face0007-0000-0000-0000-000000000007', mona_id,
-     'Jeg er eneste datter som bruker smykker — og det er mors smykke');
 
   -- Bokhylle: kun Lars
   INSERT INTO interests (item_id, user_id, reason) VALUES
     ('face0003-0000-0000-0000-000000000003', lars_id,
-     'Jeg er den eneste som har plass til den — og jeg er bibliofil');
+     'Jeg har plass til den, og jeg vil gjerne ta vare på bøkene til pappa');
 
-  -- Porselen: kun Mona
-  INSERT INTO interests (item_id, user_id, reason) VALUES
-    ('face0009-0000-0000-0000-000000000009', mona_id,
-     'Stavangerflint er en norsk klassiker. Vil bruke det til jul');
 
-  -- Sykmaskin og Kristallglass: ingen interesserte (vises som "ingen vil ha")
+  -- Familiealbum 1958–2010 og Kristallglass: ingen interesserte (vises som "ingen vil ha")
 
   RAISE NOTICE 'Demo-boet er klart! Kari: %, Lars: %, Mona (eier): %', kari_id, lars_id, mona_id;
 

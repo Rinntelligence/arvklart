@@ -59,11 +59,14 @@ test('interesser per bo med inner join og sideinndeling (getEstateInterests)', a
   const paged = await fetchAll(build, 5)
   assert.equal(paged.data.length, all.data.length)
   assert.deepEqual(new Set(paged.data.map(r => r.id)).size, all.data.length)
-  assert.ok(all.data.length >= 17)
+  assert.ok(all.data.length >= 12)
 })
 
 test('begrunnelse på eget ønske via PostgREST (setInterestReason), ikke på andres', async () => {
   const db = as('mona')
+  // Den besøkende (Mona) har ingen forhåndsutfylte ønsker etter nullstillingen; hun viser interesse selv først
+  const added = await db.from('interests').insert({ item_id: 'face0004-0000-0000-0000-000000000004', user_id: USERS.mona[0], reason: 'Min grunn' }).select('id')
+  assert.equal(added.error, null)
   const mine = await db.from('interests').select('item_id, reason').eq('user_id', USERS.mona[0]).limit(1).single()
   assert.equal(mine.error, null)
   const upd = await db.from('interests').update({ reason: 'Til hytta' }).eq('item_id', mine.data.item_id).eq('user_id', USERS.mona[0]).select('id')
@@ -73,6 +76,7 @@ test('begrunnelse på eget ønske via PostgREST (setInterestReason), ikke på an
   assert.equal(others.error, null)
   assert.equal(others.data.length, 0)
   await db.from('interests').update({ reason: mine.data.reason }).eq('item_id', mine.data.item_id).eq('user_id', USERS.mona[0])
+  await db.from('interests').delete().eq('item_id', 'face0004-0000-0000-0000-000000000004').eq('user_id', USERS.mona[0])
 })
 
 test('nei takk per bo (getEstatePasses)', async () => {
@@ -124,10 +128,16 @@ test('tildeling til personen (heir_id); mottakerstatus og tildelingen kan ikke e
 test('loddtrekning via draw_lot gir en av dem som ønsker gjenstanden', async () => {
   const db = as('mona')
   const item = 'face0004-0000-0000-0000-000000000004'
+  // Som i demoen: Kari og Lars har svart, og den besøkende (Mona) sier «Vil ha» før det trekkes lodd
+  const before = await db.rpc('draw_lot', { p_item: item })
+  assert.equal(before.error?.code, '22023', 'loddtrekning før alle har svart skal avvises')
+  const added = await db.from('interests').insert({ item_id: item, user_id: USERS.mona[0] }).select('id')
+  assert.equal(added.error, null)
   const { data, error } = await db.rpc('draw_lot', { p_item: item })
   assert.equal(error, null)
   const wanters = await db.from('interests').select('user_id').eq('item_id', item)
   assert.ok(wanters.data.map(w => w.user_id).includes(data.winner))
+  assert.equal(wanters.data.length, 3)
 })
 
 test('sletting gir tom liste når man ikke har lov (EstatePage.confirmDelete)', async () => {

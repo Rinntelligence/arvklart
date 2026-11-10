@@ -194,7 +194,7 @@ export default function App({ prerendered = false }) {
         {isDemo && (
           <div style={{ background: '#DCE3D2', borderBottom: '1px solid #B8C8A8', padding: '8px 20px', textAlign: 'center', fontSize: '0.8125rem', color: '#3A5A30', fontFamily: 'Karla, sans-serif' }}>
             {/* Alle besøkende deler demoen (samme konto og bo), og den nullstilles når noen åpner den */}
-            {L('Du ser på en', 'You are viewing a')} <strong>demo</strong> {L('av Fam. Hansen sitt bo. Dette er et offentlig eksempelbo. Ikke skriv personopplysninger. Endringer kan bli nullstilt når andre prøver demoen.', 'of the Hansen family estate. This is a public example estate. Do not enter personal information. Changes may be reset when others try the demo.')}
+            {L('Du ser på en', 'You are viewing a')} <strong>demo</strong> {L('av Fam. Hansen sitt bo. Du er Mona, en av tre arvinger og administrator; Kari og Lars har allerede svart. Dette er et offentlig eksempelbo. Ikke skriv personopplysninger. Endringer kan bli nullstilt når andre prøver demoen.', 'of the Hansen family estate. You are Mona, one of three heirs and the administrator; Kari and Lars have already answered. This is a public example estate. Do not enter personal information. Changes may be reset when others try the demo.')}
           </div>
         )}
         <Toasts success={toast} errors={errors} onDismiss={dismissError} />
