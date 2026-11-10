@@ -180,7 +180,7 @@ await check('Demo på mobil: rollen, gitarbildet, tekstene, begrunnelsene, «Vil
 
   await page.goto(`${BASE}/estate/${DEMO_EST}/conflicts`)
   await page.getByRole('heading', { name: 'Løsningsmetoder' }).waitFor({ timeout: 20000 })
-  await page.getByText(/Du mangler å vise interesse eller si nei takk til 9 gjenstander/).first().waitFor({ timeout: 15000 })
+  await page.getByText(/mangler å vise interesse eller si nei takk til 9 gjenstander/).first().waitFor({ timeout: 15000 }) // «Du» står i fet skrift for seg
 
   // Ny demoinnlogging: ønsket over er nullstilt, rettelsene står
   await openDemo(page)
