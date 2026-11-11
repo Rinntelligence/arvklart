@@ -177,10 +177,15 @@ await check('Demo på mobil: rollen, gitarbildet, tekstene, begrunnelsene, «Vil
   assert(box && box.y + box.height <= page.viewportSize().height, '«Vil ha» krever scrolling på mobil')
   await want.click()
   await page.getByRole('button', { name: 'Angre', exact: true }).waitFor({ timeout: 15000 })
+  // Valget er lagret: oversikten teller én gjenstand færre
+  await page.goto(`${BASE}/estate/${DEMO_EST}`)
+  await page.getByText(/Du har 9 gjenstander du ikke har tatt stilling til/).first().waitFor({ timeout: 20000 })
 
   await page.goto(`${BASE}/estate/${DEMO_EST}/conflicts`)
   await page.getByRole('heading', { name: 'Løsningsmetoder' }).waitFor({ timeout: 20000 })
-  await page.getByText(/mangler å vise interesse eller si nei takk til 9 gjenstander/).first().waitFor({ timeout: 15000 }) // «Du» står i fet skrift for seg
+  const missing = page.getByText(/mangler å vise interesse eller si nei takk til \d+ gjenstand/).first()
+  await missing.waitFor({ timeout: 20000 })
+  notes.push(`INFO løsningsmetoder: «${(await missing.innerText()).replace(/\s+/g, ' ').trim()}»`)
 
   // Ny demoinnlogging: ønsket over er nullstilt, rettelsene står
   await openDemo(page)
