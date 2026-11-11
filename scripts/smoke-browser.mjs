@@ -183,9 +183,12 @@ await check('Demo på mobil: rollen, gitarbildet, tekstene, begrunnelsene, «Vil
 
   await page.goto(`${BASE}/estate/${DEMO_EST}/conflicts`)
   await page.getByRole('heading', { name: 'Løsningsmetoder' }).waitFor({ timeout: 20000 })
-  const missing = page.getByText(/mangler å vise interesse eller si nei takk til \d+ gjenstand/).first()
-  await missing.waitFor({ timeout: 20000 })
-  notes.push(`INFO løsningsmetoder: «${(await missing.innerText()).replace(/\s+/g, ' ').trim()}»`)
+  // Administratoren ser enten hva som mangler, eller (når «Vil ha» over gjorde en omstridt gjenstand avklart) metodene
+  await page.waitForLoadState('networkidle').catch(() => {})
+  const pendingList = await page.getByText(/mangler å vise interesse eller si nei takk til \d+ gjenstand/).count()
+  const methods = await page.getByText(/Snakk sammen først|Trekk vinner|Loddtrekning/).count()
+  assert(pendingList || methods, '«Løsningsmetoder» viser verken hva som mangler eller metodene')
+  notes.push(`INFO løsningsmetoder: ${methods ? 'metodene vises for den avklarte gjenstanden' : 'viser hva som mangler'}`)
 
   // Ny demoinnlogging: ønsket over er nullstilt, rettelsene står
   await openDemo(page)
