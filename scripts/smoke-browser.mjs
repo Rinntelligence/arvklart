@@ -190,7 +190,8 @@ await check('Demo på mobil: rollen, gitarbildet, tekstene, begrunnelsene, «Vil
   assert(pendingList || methods, '«Løsningsmetoder» viser verken hva som mangler eller metodene')
   notes.push(`INFO løsningsmetoder: ${methods ? 'metodene vises for den avklarte gjenstanden' : 'viser hva som mangler'}`)
 
-  // Ny demoinnlogging: ønsket over er nullstilt, rettelsene står
+  // Ny demoinnlogging som en ny besøkende (uten økten over): ønsket er nullstilt, rettelsene står
+  await page.evaluate(() => { for (const k of Object.keys(localStorage)) if (k.startsWith('sb-')) localStorage.removeItem(k) })
   await openDemo(page)
   await page.getByText(/Du har 10 gjenstander du ikke har tatt stilling til/).first().waitFor({ timeout: 15000 })
   assert(await page.getByText('Grønn 3-seters sofa', { exact: true }).count() > 0, 'sofaen mangler etter nullstilling')
