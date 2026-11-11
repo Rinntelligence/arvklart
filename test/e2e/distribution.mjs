@@ -2,7 +2,7 @@
 // reglene (test/db/rls.sql); her sjekkes at appen bruker de sikre databasefunksjonene og viser det riktige.
 // Kjøres av test/e2e/run.sh.
 import { createRequire } from 'node:module'
-import { BASE, EST, UID, ITEM, FIXTURES, now, category, launch, checker, assert } from './fixtures.mjs'
+import { BASE, EST, UID, ITEM, FIXTURES, now, category, launch, checker, assert, DEMO } from './fixtures.mjs'
 const AXE = createRequire(import.meta.url).resolve('axe-core/axe.min.js')
 const axe = async page => {
   await page.addScriptTag({ path: AXE })
@@ -543,6 +543,19 @@ await check('Fordelingen: «Tildel alle som bare én ønsker» viser listen og s
   const a = rpc.find(c => c.name === 'assign_items')
   assert(a?.body.p_method === 'single' && a.body.p_assignments.length === 1 && a.body.p_assignments[0].item_id === 'it-3' && a.body.p_assignments[0].heir_id === H2, `feil kall: ${JSON.stringify(a?.body)}`)
 }, { fixtures: settledFx(), rpc: { assign_items: { body: { assigned: 1, skipped: [] } } } })
+
+await check('Demo: administrator kan prøve «Tildel alle som bare én ønsker» (nullstilles ved neste demoinnlogging)', async page => {
+  const { rpc } = watch(page)
+  await page.goto(`${BASE}/estate/${EST}/fordeling`)
+  await page.getByText(/Du ser på en/).waitFor()
+  await page.getByRole('button', { name: 'Tildel 1 gjenstand som bare én ønsker' }).click()
+  const dialog = page.getByRole('dialog', { name: 'Tildel det bare én ønsker' })
+  await dialog.getByText('Klokke → Kari').waitFor()
+  await dialog.getByRole('button', { name: 'Tildel 1' }).click()
+  await page.getByText('1 gjenstand tildelt').waitFor()
+  const a = rpc.find(c => c.name === 'assign_items')
+  assert(a?.body.p_method === 'single' && a.body.p_assignments.length === 1, `feil kall: ${JSON.stringify(a?.body)}`)
+}, { fixtures: settledFx(), rpc: { assign_items: { body: { assigned: 1, skipped: [] } } }, ...DEMO })
 
 await check('Fordelingen: samlet tildeling som hoppes over, eller feiler, sies tydelig', async page => {
   await page.goto(`${BASE}/estate/${EST}/fordeling`)
