@@ -6,12 +6,14 @@ import { hasAiConsent, giveAiConsent } from '../lib/aiConsent'
 import { aiErrorMessage, requestItemEstimate, valuationRecord } from '../lib/itemAi'
 import { PRICE_TYPES, emptyRecord, familyReferences, marketQuery, priceTypeLabel, searchLinks, withReference, withoutReference } from '../lib/marketRefs'
 import { AiConsent } from './AiDialogs'
+import { appraiseText, formatRange, preciousMetal, suggestText, valueAdvice } from '../lib/valueAdvice'
+import { withCorrections } from '../lib/aiCorrections'
+import MetalQuestion from './MetalQuestion'
 
 const small = { fontSize: '0.8125rem', color: '#5C4530', lineHeight: 1.6, margin: 0 }
 const btn = { padding: '10px 14px', minHeight: '44px', borderRadius: '8px', fontSize: '0.8125rem', fontFamily: 'Karla, sans-serif', cursor: 'pointer', background: 'none', border: '1px solid #D9CFC0', color: '#5C4530' }
 const input = { width: '100%', boxSizing: 'border-box', padding: '10px 12px', border: '1px solid #9A8B78', borderRadius: '8px', background: '#fff', fontSize: '0.9375rem', fontFamily: 'Karla, sans-serif', color: '#3A2F26', minHeight: '44px' }
 const label = { display: 'grid', gap: '4px', fontSize: '0.8125rem', fontWeight: 600, color: '#3A2F26' }
-const confidenceText = c => ({ high: L('høy', 'high'), medium: L('middels', 'medium'), low: L('lav', 'low') }[c] || '')
 const dateText = d => (d ? new Date(`${d}T12:00:00`).toLocaleDateString(locale(), { day: 'numeric', month: 'short', year: 'numeric' }) : '')
 
 // «Sammenlign med markedet» på gjenstandssiden: søkelenker brukeren kan åpne selv, familiens egne
@@ -62,6 +64,15 @@ export default function MarketCompare({ item, userId, canEdit, onChanged, onToas
     onChanged()
   }
 
+  // Kan være sølv eller gull: svaret lagres som familiens rettelse av materialet (som «Rett opplysningene»)
+  const metal = preciousMetal(item.ai_analysis)
+  const answerMetal = async text => {
+    const { error } = await saveAnalysis(rec => withCorrections(rec, { material: text }, userId) || rec)
+    if (error) { onToast(L('Kunne ikke lagre. Prøv igjen.', 'Could not save. Please try again.'), 'error'); return }
+    setEstimate(null)
+    onChanged()
+  }
+
   const runEstimate = async (consented = hasAiConsent()) => {
     if (!consented) { setAskConsent(true); return }
     setBusy(true)
@@ -76,7 +87,7 @@ export default function MarketCompare({ item, userId, canEdit, onChanged, onToas
   const applyEstimate = async () => {
     const d = estimate
     setBusy(true)
-    const { error } = await saveAnalysis(rec => ({ ...rec, valuation: valuationRecord(d) }), {
+    const { error } = await saveAnalysis(rec => ({ ...rec, valuation: valuationRecord(d, rec) }), {
       estimated_value: d.estimate.likely, estimate_reasoning: (d.explanation || d.reasoning || '').slice(0, 1000) || null, estimate_confidence: d.confidence,
     })
     setBusy(false)
@@ -90,6 +101,9 @@ export default function MarketCompare({ item, userId, canEdit, onChanged, onToas
   // Priser familien selv har lagt inn, presenteres aldri som uavhengig bekreftede salgspriser
   const familyReported = isMarket && (estimate?.uncertainty?.reasons?.includes('family_reported') || (estimate?.references || []).some(r => r.used && !r.verified))
   const e = estimate?.status === 'ok' ? estimate.estimate : null
+  // Uten markedsdata er AI-anslaget en gjetning: for usikre kategorier og høye beløp vises ikke noe tall (valueAdvice)
+  const advice = e ? valueAdvice(estimate, item.ai_analysis) : 'none'
+  const appraise = advice === 'instead' ? appraiseText(estimate, item.ai_analysis) : null
 
   return (
     <details style={{ marginBottom: '24px', background: '#FBF9F5', border: '1px solid #E8DFD0', borderRadius: '10px', padding: '0 14px' }}>
@@ -98,9 +112,15 @@ export default function MarketCompare({ item, userId, canEdit, onChanged, onToas
       </summary>
       <div style={{ paddingBottom: '14px', display: 'grid', gap: '12px', fontFamily: 'Karla, sans-serif' }}>
         <p style={small}>
-          {L('Valgfritt. Har dere funnet priser på tilsvarende gjenstander, kan dere legge dem inn her. Med tre eller flere av samme slag bygger verdianslaget på dem.',
-            'Optional. If you have found prices for similar items, you can add them here. With three or more of the same kind, the value estimate is based on them.')}
+          {L('Den sikreste veien til en verdi: søk opp tilsvarende gjenstander som faktisk er solgt, og legg inn tre eller flere. Da bygger verdien på det dere har funnet, ikke på en AI-gjetning.',
+            'The most reliable way to a value: look up similar items that have actually sold, and add three or more. The value is then based on what you found, not on an AI guess.')}
         </p>
+        {refs.length > 0 && refs.length < 3 && (
+          <p style={{ ...small, color: '#3A5A30', fontWeight: 600 }}>
+            {L(`${refs.length} av 3 lagt inn. Legg inn ${3 - refs.length} til, så bygger verdien på deres egne funn.`,
+              `${refs.length} of 3 added. Add ${3 - refs.length} more and the value is based on what you found.`)}
+          </p>
+        )}
 
         {links.length > 0 && (
           <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
@@ -128,6 +148,10 @@ export default function MarketCompare({ item, userId, canEdit, onChanged, onToas
           </ul>
         )}
 
+        {canEdit && metal && !metal.answered && <MetalQuestion metal={metal} idPrefix="market-metal" onAnswer={answerMetal} disabled={busy} />}
+        {canEdit && !adding && !estimate && (
+          <p style={small}>{L('AI-anslaget blir sikrere når materiale, stempel, merke og modell er lagt inn under «Rett opplysningene».', 'The AI estimate is more reliable when material, hallmark, brand and model have been added under «Correct the details».')}</p>
+        )}
         {canEdit && (adding ? (
           <form onSubmit={addReference} style={{ display: 'grid', gap: '10px', background: '#fff', border: '1px solid #E8DFD0', borderRadius: '8px', padding: '12px' }}>
             <label htmlFor="ref-title" style={label}>{L('Hva er det?', 'What is it?')}
@@ -155,8 +179,10 @@ export default function MarketCompare({ item, userId, canEdit, onChanged, onToas
           </form>
         ) : (
           <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-            <button onClick={() => setAdding(true)} style={btn}>{L('Legg til en sammenligning', 'Add a comparison')}</button>
-            <button onClick={() => runEstimate()} disabled={busy} style={{ ...btn, color: '#3A2F26', fontWeight: 600 }}>{busy && !estimate ? L('Anslår…', 'Estimating…') : L('Anslå verdi', 'Estimate value')}</button>
+            <button onClick={() => setAdding(true)} style={{ ...btn, background: '#5F6E52', color: '#fff', border: 'none', fontWeight: 600 }}>{L('Legg til en sammenligning', 'Add a comparison')}</button>
+            <button onClick={() => runEstimate()} disabled={busy} style={btn}>
+              {busy && !estimate ? L('Anslår…', 'Estimating…') : refs.length >= 3 ? L('Anslå verdi ut fra sammenligningene', 'Estimate value from the comparisons') : L('Anslå verdi med AI (grovt)', 'Estimate value with AI (rough)')}
+            </button>
           </div>
         ))}
 
@@ -168,22 +194,33 @@ export default function MarketCompare({ item, userId, canEdit, onChanged, onToas
             {estimate.missing?.length > 0 && <> {L('Dette kan hjelpe', 'This could help')}: {estimate.missing.join('; ')}.</>}
           </p>
         )}
-        {e && (
+        {appraise && (
+          <div role="status" style={{ background: '#fff', border: '2px solid #A97C3F', borderRadius: '10px', padding: '12px 14px', display: 'grid', gap: '8px' }}>
+            <div style={{ fontFamily: "'Fraunces', serif", fontSize: '1.125rem', color: '#3A2F26' }}>{appraise.title}</div>
+            <p style={small}>{appraise.body}</p>
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+              {canEdit && !adding && <button onClick={() => { setEstimate(null); setAdding(true) }} style={{ ...btn, background: '#5F6E52', color: '#fff', border: 'none' }}>{L('Legg inn en solgt pris', 'Add a sold price')}</button>}
+              <button onClick={() => setEstimate(null)} style={btn}>{L('Lukk', 'Close')}</button>
+            </div>
+          </div>
+        )}
+        {e && !appraise && (
           <div role="status" style={{ background: '#DCE3D2', border: '1px solid #B8C8A8', borderRadius: '10px', padding: '12px 14px', display: 'grid', gap: '6px' }}>
             <div style={{ fontSize: '0.75rem', color: '#3A5A30', fontWeight: 600 }}>
               {!isMarket ? L('Veiledende AI-anslag, ikke en dokumentert markedsverdi', 'Indicative AI estimate, not a documented market value')
                 : familyReported ? L('Anslag ut fra priser familien har oppgitt (ikke bekreftet av en kilde)', 'Estimate from prices reported by the family (not confirmed by a source)')
                   : L('Anslag ut fra sammenligningene', 'Estimate from the comparisons')}
             </div>
-            <div style={{ fontFamily: "'Fraunces', serif", fontSize: '1.375rem', color: '#3A2F26' }}>{formatNOK(e.likely)}</div>
+            {/* Spennet er hovedtallet: ett tall alene gir et inntrykk av presisjon anslaget ikke har */}
+            <div style={{ fontFamily: "'Fraunces', serif", fontSize: '1.375rem', color: '#3A2F26' }}>{formatRange(e.low, e.high)}</div>
             <div style={{ ...small, color: '#3A5A30' }}>
               {estimate.range_kind === 'hits'
-                ? L(`Spenn i ${estimate.stats?.n_used} treff: ${formatNOK(e.low)}–${formatNOK(e.high)}`, `Range in ${estimate.stats?.n_used} hits: ${formatNOK(e.low)}–${formatNOK(e.high)}`)
+                ? L(`Spenn i ${estimate.stats?.n_used} treff`, `Range in ${estimate.stats?.n_used} hits`)
                 : estimate.range_kind === 'p25_p75'
-                  ? L(`Halvparten av treffene: ${formatNOK(e.low)}–${formatNOK(e.high)}`, `Half of the hits: ${formatNOK(e.low)}–${formatNOK(e.high)}`)
-                  : L(`Mellom ${formatNOK(e.low)} og ${formatNOK(e.high)}`, `Between ${formatNOK(e.low)} and ${formatNOK(e.high)}`)}
-              {' · '}{L('sikkerhet', 'confidence')}: {confidenceText(estimate.confidence)}
+                  ? L('Halvparten av treffene ligger her', 'Half of the hits are in this range')
+                  : L('Sannsynlig spenn', 'Likely range')}
             </div>
+            {advice === 'suggest' && <p style={{ ...small, fontWeight: 600 }}>{suggestText(estimate, item.ai_analysis)}</p>}
             {(estimate.explanation || estimate.reasoning) && <p style={small}>{estimate.explanation || estimate.reasoning}</p>}
             <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
               <button onClick={applyEstimate} disabled={busy} style={{ ...btn, background: '#5F6E52', color: '#fff', border: 'none' }}>{L(`Bruk ${formatNOK(e.likely)} som verdi`, `Use ${formatNOK(e.likely)} as the value`)}</button>

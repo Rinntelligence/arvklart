@@ -8,6 +8,9 @@ import { formatNOK } from '../lib/format'
 import { L, isEn } from '../lib/lang'
 import { categoryLabel } from '../lib/categories'
 import { aiErrorMessage, analyzeItemPhotos, callEdgeFunction, valuationRecord } from '../lib/itemAi'
+import { appraiseText, formatRange, preciousMetal, suggestText, valueAdvice } from '../lib/valueAdvice'
+import { withCorrections } from '../lib/aiCorrections'
+import MetalQuestion from '../components/MetalQuestion'
 import { aiAnalysisRecord, aiSuggestion, applyAiSuggestion } from '../lib/itemAiHelpers'
 import { CONDITION_OPTIONS, multipleItemsText } from '../lib/analysisView'
 import AnalysisDetails from '../components/AnalysisDetails'
@@ -151,13 +154,23 @@ export default function AddItemPage({ session, profile, onToast, isDemo }) {
         likely_nok: d.summary?.likely_nok ?? d.likely_nok,
         reasoning: d.market?.reasoning ?? d.reasoning,
         confidence: d.market?.confidence ?? d.confidence,
-        valuation: valuationRecord(d),
+        valuation: valuationRecord(d, analysis),
       })
     } catch (e) {
       handleAiError(e, L('Verdiestimering feilet', 'Value estimate failed'))
     } finally {
       setEstimating(false)
     }
+  }
+
+  // Uten markedsdata er AI-anslaget en gjetning: for usikre kategorier og høye beløp vises ikke noe tall (valueAdvice)
+  const advice = aiEstimate ? valueAdvice(aiEstimate.valuation, analysis) : 'none'
+  const appraise = advice === 'instead' ? appraiseText(aiEstimate.valuation, analysis) : null
+  // Kan være sølv eller gull: svaret lagres som familiens rettelse av materialet og gjør et tidligere anslag utdatert
+  const metal = preciousMetal(analysis)
+  const answerMetal = text => {
+    const next = withCorrections(analysis, { material: text }, session.user.id)
+    if (next) { setAnalysis(next); setAiEstimate(null); setEstimateMissing(null) }
   }
 
   const save = async () => {
@@ -167,6 +180,8 @@ export default function AddItemPage({ session, profile, onToast, isDemo }) {
     const aiRecord = aiAnalysisRecord({ analysis, aiFilled, title, description, categoryId, condition })
     // AI-ens anslag lagres for seg (veiledende), adskilt fra verdien
     if (aiRecord && aiEstimate?.valuation) aiRecord.valuation = aiEstimate.valuation
+    // «Få det vurdert»: beløpet ble ikke vist, så det lagres heller ikke som verdi (og kan ikke bli fordelingsverdi)
+    const useEstimate = aiEstimate && !appraise
     try {
       const { data: newItem, error } = await supabase.from('items').insert({
         estate_id: id,
@@ -178,16 +193,16 @@ export default function AddItemPage({ session, profile, onToast, isDemo }) {
         added_by_name: profile?.display_name || '',
         status: 'active',
         image_url: null,
-        estimated_value: aiEstimate?.likely_nok || null,
-        estimate_reasoning: aiEstimate?.reasoning || null,
-        estimate_confidence: aiEstimate?.confidence || null,
+        estimated_value: useEstimate ? aiEstimate.likely_nok || null : null,
+        estimate_reasoning: useEstimate ? aiEstimate.reasoning || null : null,
+        estimate_confidence: useEstimate ? aiEstimate.confidence || null : null,
         purchase_price: purchasePrice ? parseFloat(purchasePrice) : null,
         purchase_year: purchaseYear ? parseInt(purchaseYear) : null,
         // AI-vurderingen og hva brukeren gjorde med forslagene; bare når AI-en har analysert gjenstanden
         ...(aiRecord ? { ai_analysis: aiRecord } : {}),
-        value_agree_count: myEstimateVote === 'agree' ? 1 : 0,
-        value_disagree_count: myEstimateVote === 'disagree' ? 1 : 0,
-        value_voter_ids: myEstimateVote ? [session.user.id] : [],
+        value_agree_count: useEstimate && myEstimateVote === 'agree' ? 1 : 0,
+        value_disagree_count: useEstimate && myEstimateVote === 'disagree' ? 1 : 0,
+        value_voter_ids: useEstimate && myEstimateVote ? [session.user.id] : [],
       }).select().single()
 
       if (error) throw error
@@ -428,6 +443,12 @@ export default function AddItemPage({ session, profile, onToast, isDemo }) {
         </div>
 
         {/* Verdiestimat-knapp */}
+        {metal && !metal.answered && <MetalQuestion metal={metal} idPrefix="additem-metal" onAnswer={answerMetal} />}
+        {title.trim() && !consentFor && !aiEstimate && (
+          <p style={{ fontSize: '0.8125rem', color: '#75604B', lineHeight: 1.5, margin: 0 }}>
+            {L('Anslaget blir sikrere når materiale, stempel, merke og modell står i beskrivelsen.', 'The estimate is more reliable when material, hallmark, brand and model are in the description.')}
+          </p>
+        )}
         {consentFor === 'estimate' && <AiConsent onCancel={() => setConsentFor(null)} onAccept={() => { giveAiConsent(); setAiConsented(true); setConsentFor(null); getValueEstimate() }} />}
 
         {title.trim() && !consentFor && (
@@ -448,23 +469,25 @@ export default function AddItemPage({ session, profile, onToast, isDemo }) {
         )}
 
         {/* Verdiestimat-resultat */}
-        {aiEstimate && (
+        {appraise && (
+          <div role="status" style={{ background: '#fff', border: '2px solid #A97C3F', borderRadius: '12px', padding: '20px' }}>
+            <div style={{ fontFamily: "'Fraunces', serif", fontSize: '1.125rem', color: '#3A2F26', marginBottom: '8px' }}>{appraise.title}</div>
+            <p style={{ fontSize: '0.875rem', color: '#5C4530', lineHeight: 1.6, margin: '0 0 8px' }}>{appraise.body}</p>
+            <p style={{ fontSize: '0.8125rem', color: '#75604B', lineHeight: 1.5, margin: 0 }}>
+              {L('Verdien står tom (ukjent) når du lagrer. Etterpå kan dere legge inn solgte priser under «Sammenlign med markedet» på gjenstandssiden, så bygger verdien på dem.',
+                'The value is left empty (unknown) when you save. Afterwards you can add sold prices under «Compare with the market» on the item page, and the value is based on them.')}
+            </p>
+          </div>
+        )}
+        {aiEstimate && !appraise && (
           <div style={{ background: '#DCE3D2', border: '1px solid #B8C8A8', borderRadius: '12px', padding: '20px' }}>
-            <div style={{ fontSize: '0.8125rem', color: '#3A5A30', fontWeight: '500', marginBottom: '12px' }}>{L('Veiledende AI-anslag (NOK)', 'Indicative AI estimate (NOK)')}</div>
-            <div style={{ display: 'flex', gap: '16px', marginBottom: '12px', flexWrap: 'wrap' }}>
-              <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: '0.6875rem', color: '#75604B', marginBottom: '2px' }}>{L('Lavt', 'Low')}</div>
-                <div style={{ fontSize: '1.125rem', color: '#3A2F26', fontFamily: 'Fraunces, serif' }}>{formatNOK(aiEstimate.low_nok)}</div>
-              </div>
-              <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: '0.6875rem', color: '#75604B', marginBottom: '2px' }}>{L('Mest sannsynlig', 'Most likely')}</div>
-                <div style={{ fontSize: '1.375rem', color: '#3A5A30', fontFamily: 'Fraunces, serif', fontWeight: '500' }}>{formatNOK(aiEstimate.likely_nok)}</div>
-              </div>
-              <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: '0.6875rem', color: '#75604B', marginBottom: '2px' }}>{L('Høyt', 'High')}</div>
-                <div style={{ fontSize: '1.125rem', color: '#3A2F26', fontFamily: 'Fraunces, serif' }}>{formatNOK(aiEstimate.high_nok)}</div>
-              </div>
+            <div style={{ fontSize: '0.8125rem', color: '#3A5A30', fontWeight: '500', marginBottom: '8px' }}>{L('Veiledende AI-anslag (NOK)', 'Indicative AI estimate (NOK)')}</div>
+            {/* Spennet er hovedtallet: ett tall alene gir et inntrykk av presisjon anslaget ikke har */}
+            <div style={{ fontSize: '1.375rem', color: '#3A2F26', fontFamily: 'Fraunces, serif', marginBottom: '4px' }}>{formatRange(aiEstimate.low_nok, aiEstimate.high_nok) || formatNOK(aiEstimate.likely_nok)}</div>
+            <div style={{ fontSize: '0.8125rem', color: '#3A5A30', marginBottom: '12px' }}>
+              {L('Sannsynlig spenn', 'Likely range')}{aiEstimate.likely_nok ? L(` · lagres som ${formatNOK(aiEstimate.likely_nok)}`, ` · saved as ${formatNOK(aiEstimate.likely_nok)}`) : ''}
             </div>
+            {advice === 'suggest' && <p style={{ fontSize: '0.8125rem', color: '#3A2F26', fontWeight: 600, lineHeight: '1.5', margin: '0 0 8px' }}>{suggestText(aiEstimate.valuation, analysis)}</p>}
             {aiEstimate.reasoning && <p style={{ fontSize: '0.75rem', color: '#5C4530', lineHeight: '1.5', marginBottom: '8px' }}>{aiEstimate.reasoning}</p>}
 
             {/* Voting */}

@@ -13,6 +13,7 @@ import MarketCompare from '../components/MarketCompare'
 import ItemHistory from '../components/ItemHistory'
 import AgreedValue from '../components/AgreedValue'
 import { withCorrections } from '../lib/aiCorrections'
+import { formatRange } from '../lib/valueAdvice'
 import { assignItems, unassignItem } from '../lib/assignments'
 import { recipientsOf, recipientOf, isUnconfirmedAssignment } from '../lib/recipients'
 import { pendingMembersFor } from '../lib/estateProgress'
@@ -270,12 +271,16 @@ export default function ItemDetailPage({ session, profile, onToast, isDemo }) {
           const hasVoted = voterIds.includes(session.user.id)
           const totalVotes = (item.value_agree_count || 0) + (item.value_disagree_count || 0)
           const suggestions = item.value_suggestions || []
+          // Står AI-ens anslag fortsatt som verdien, vises spennet: ett tall alene ser mer presist ut enn det er
+          const range = item.ai_analysis?.valuation?.estimate
+          const showRange = range && Number(range.likely) === parseNOK(item.estimated_value) && formatRange(range.low, range.high)
           return (
             <div style={{ background:'#DCE3D2', border:'1px solid #B8C8A8', borderRadius:'10px', padding:'14px', marginBottom:'12px' }}>
               <div style={{ fontSize:'0.75rem', color:'#3A5A30', fontWeight:'500', marginBottom:'4px' }}>{L('Verdiestimat (veiledende)', 'Value estimate (indicative)')}</div>
-              <div style={{ fontSize:'1.25rem', color:'#3A2F26', fontFamily:'Fraunces, serif', marginBottom:'8px' }}>
-                {formatNOK(item.estimated_value)}
+              <div style={{ fontSize:'1.25rem', color:'#3A2F26', fontFamily:'Fraunces, serif', marginBottom: showRange ? '2px' : '8px' }}>
+                {showRange || formatNOK(item.estimated_value)}
               </div>
+              {showRange && <div style={{ fontSize:'0.75rem', color:'#3A5A30', marginBottom:'8px' }}>{L(`Sannsynlig spenn · lagret som ${formatNOK(item.estimated_value)}`, `Likely range · saved as ${formatNOK(item.estimated_value)}`)}</div>}
               {item.estimate_reasoning && (
                 <p style={{ fontSize:'0.75rem', color:'#5C4530', lineHeight:'1.5', marginBottom:'8px', marginTop:'-2px' }}>
                   {item.estimate_reasoning}

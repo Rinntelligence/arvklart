@@ -2,6 +2,7 @@
 import { supabase } from './supabase'
 import { downscaleImage, fileToBase64 } from './images'
 import { isEn, L } from './lang'
+import { valueAdvice } from './valueAdvice'
 
 export { addCapturedPhotos, estimateApplies, matchCategory, mergeSelectedPhotos, removePhotoAt, restoreRemoved, runPool, splitDraft } from './itemAiHelpers.js'
 
@@ -59,10 +60,12 @@ export async function analyzeItemPhotos(files, { categories = [], estimate = fal
 // Det som lagres som anslaget (ai_analysis.valuation), adskilt fra verdien i feltet. Null for eldre svar.
 // v3: method sier om det bygger på markedet (market_sold / market_asking) eller er et AI-anslag (model).
 // Sammenligningene lagres uten annet annonseinnhold enn tittel, pris, dato og lenke.
-export const valuationRecord = d => (d?.v ? {
+export const valuationRecord = (d, record = null) => (d?.v ? {
   v: d.v, method: d.method ?? 'model', price_type: d.price_type, range_kind: d.range_kind ?? null, market_area: d.market_area, currency: d.currency,
   estimate: d.estimate, confidence: d.confidence, uncertainty: d.uncertainty, basis: d.basis, model: d.model,
   stats: d.stats ?? null, explanation: d.explanation ?? null, queries: d.queries ?? [],
+  // 'instead': beløpet ble ikke vist, og familien ble rådet til å få gjenstanden vurdert (src/lib/valueAdvice.js)
+  advice: valueAdvice(d, record),
   references: (d.references || []).slice(0, 10).map(r => ({ provider: r.provider, url: r.url, title: r.title, price: r.price, currency: r.currency, price_type: r.price_type, date: r.date, verified: r.verified, used: r.used, flags: r.flags })),
   at: new Date().toISOString(),
 } : null)
@@ -90,7 +93,7 @@ export async function requestValueEstimate({ title, description = '', category =
       likely: num(s.likely_nok), low: num(s.low_nok), high: num(s.high_nok),
       reasoning: d.market?.reasoning ?? d.reasoning ?? null,
       confidence: d.market?.confidence ?? d.confidence ?? null,
-      valuation: valuationRecord(d),
+      valuation: valuationRecord(d, analysis),
     },
     insufficient: null,
     quota: res?.quota,
