@@ -210,7 +210,9 @@ await check('Demo på mobil: rollen, gitarbildet, tekstene, begrunnelsene, «Vil
   await page.evaluate(() => { for (const k of Object.keys(localStorage)) if (k.startsWith('sb-')) localStorage.removeItem(k) })
   await openDemo(page)
   await page.getByText(/Du har 10 gjenstander du ikke har tatt stilling til/).first().waitFor({ timeout: 15000 })
-  assert(await page.getByText('Grønn 3-seters sofa', { exact: true }).count() > 0, 'sofaen mangler etter nullstilling')
+  // Gjenstandene står i gjenstandslisten, ikke på oversikten
+  await page.goto(`${BASE}/estate/${DEMO_EST}/gjenstander`)
+  await page.getByText('Grønn 3-seters sofa', { exact: true }).first().waitFor({ timeout: 20000 })
 })
 
 // ── Statistikk mot den ekte GTM-containeren (GTM-KQWKCWBC) og GA4-taggen ──────────────────────────────────────

@@ -1,494 +1,157 @@
-import { useEffect, useRef, useState } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
-import { getEstate, getItems, getCategories, supabase } from '../lib/supabase'
-import { buildRemainingSteps, getUndecided, getStatusBreakdown, isContested } from '../lib/estateProgress'
-import { loadStatusExtras } from '../lib/decisions'
-import { formatNOK } from '../lib/format'
-import { removeImages, itemImageUrls } from '../lib/images'
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
-import { dispositionLabel } from '../lib/disposition'
+import { useState } from 'react'
+import { Link, useParams } from 'react-router-dom'
+import { useEstateData } from '../hooks/useEstateData'
+import { buildRemainingSteps } from '../lib/estateProgress'
+import { overviewCounts, recommendation, overviewGroups } from '../lib/estateOverview'
+import { darkCss } from '../lib/estateThemeCss'
 import { L, locale } from '../lib/lang'
-import { categoryLabel } from '../lib/categories'
-import { Modal } from '../components/UI'
-import ReasonEditor from '../components/ReasonEditor'
-import StoredImage from '../components/StoredImage'
 import { APP_HOME } from '../lib/routes'
 
-const PALETTE = ['#5F6E52','#8B9A7D','#A97C3F','#7A8B6E','#9C8267','#6E8B87']
-
-export default function EstatePage({ session, profile, onToast, isDemo }) {
+// Oversikten i et bo. Den svarer bare på «hva vil du gjøre?»:
+//  1. Hvor langt boet har kommet (én linje).
+//  2. «Anbefalt nå»: det viktigste for denne brukeren akkurat nå, med én knapp.
+//  3. Fire nedtrekksgrupper (Gjenstander, Fordeling, Arvinger, Praktisk) med lenker videre til egne sider.
+// Gjenstandene med bilder, søk, filter og analyse ligger på /estate/:id/gjenstander (EstateItemsPage).
+// Hva som vises for administrator, arving og demo, bestemmes i src/lib/estateOverview.js.
+export default function EstatePage({ session, isDemo }) {
   const { id } = useParams()
-  const navigate = useNavigate()
-  const [estate, setEstate] = useState(null)
-  const [items, setItems] = useState([])
-  const [categories, setCategories] = useState([])
-  const [myRole, setMyRole] = useState('member')
-  const [tab, setTab] = useState('items')
-  const [filterCat, setFilterCat] = useState('all')
-  const [query, setQuery] = useState('')
-  const tabsRef = useRef(null) // faneraden; «Se mine ønsker» flytter hit
-  const [filterStatus, setFilterStatus] = useState('all')
-  const [loading, setLoading] = useState(true)
-  const [confirmItem, setConfirmItem] = useState(null)
-  const [statusExtras, setStatusExtras] = useState(null)
-  const [deleting, setDeleting] = useState(false)
+  const userId = session.user.id
+  const { loading, estate, items, myRole, extras, proposal } = useEstateData(id, userId, { withProgress: true })
+  const [openGroups, setOpenGroups] = useOpenGroups(id)
 
-  useEffect(() => {
-    const onScroll = () => sessionStorage.setItem('estate_scroll_' + id, window.scrollY)
-    window.addEventListener('scroll', onScroll)
-    return () => window.removeEventListener('scroll', onScroll)
-  }, [id])
+  if (loading) return <Message>{L('Laster…', 'Loading…')}</Message>
+  if (!estate) return <Message>{L('Fant ikke boet. Det kan være slettet, eller du er ikke medlem.', 'Estate not found. It may have been deleted, or you are not a member.')}</Message>
 
-  useEffect(() => {
-    if (!loading) {
-      const saved = sessionStorage.getItem('estate_scroll_' + id)
-      if (saved) {
-        setTimeout(() => {
-          window.scrollTo({ top: parseInt(saved), behavior: 'instant' })
-          sessionStorage.removeItem('estate_scroll_' + id)
-        }, 50)
-      }
-    }
-  }, [loading])
-
-  const load = async () => {
-    const [{ data: est }, { data: its }, { data: cats }, { data: mem }] = await Promise.all([
-      getEstate(id),
-      getItems(id),
-      getCategories(id),
-      supabase.from('estate_members').select('role').eq('estate_id', id).eq('user_id', session.user.id).single(),
-    ])
-    setEstate(est)
-    setItems(its || [])
-    setCategories(cats || [])
-    setMyRole(mem?.role || 'member')
-    setLoading(false)
-    setStatusExtras(await loadStatusExtras(id))
-  }
-
-  useEffect(() => {
-    load()
-    const channel = supabase.channel(`estate-${id}`)
-      .on('postgres_changes', { event:'*', schema:'public', table:'items', filter:`estate_id=eq.${id}` }, load)
-      .on('postgres_changes', { event:'*', schema:'public', table:'interests' }, load)
-      .on('postgres_changes', { event:'*', schema:'public', table:'item_passes' }, load)
-      .subscribe()
-    return () => supabase.removeChannel(channel)
-  }, [id])
-
-  if (loading) return <div style={{ padding:'80px', textAlign:'center', color:'#75604B', fontFamily:'Karla, sans-serif' }}>{L('Laster…', 'Loading…')}</div>
-  if (!estate) return <div style={{ padding:'60px', textAlign:'center', color:'#75604B', fontFamily:'Karla, sans-serif' }}>{L('Fant ikke boet. Det kan være slettet, eller du er ikke medlem.', 'Estate not found. It may have been deleted, or you are not a member.')}</div>
-
-  const myItems = items.filter(i => i.interests?.some(x => x.user_id === session.user.id))
-  const otherItems = items.filter(i => !i.interests?.some(x => x.user_id === session.user.id))
-
-  const getFiltered = () => {
-    if (filterStatus === 'mine') return items.filter(i => i.interests?.some(x => x.user_id === session.user.id))
-    if (filterStatus === 'contested') return items.filter(isContested)
-    if (filterStatus === 'wanted') return items.filter(i => i.interests?.length > 0)
-    if (filterStatus === 'unwanted') return items.filter(i => i.status !== 'assigned' && !i.interests?.length)
-    if (filterStatus === 'assigned') return items.filter(i => i.status === 'assigned')
-    return items
-  }
-
-  // Kategori og søk (navn, beskrivelse, kategori) brukes på alle lister
-  const q = query.trim().toLocaleLowerCase('nb')
-  const matches = (i) => (filterCat === 'all' || i.category_id === filterCat) && (!q ||
-    [i.title, i.description, i.categories?.label, i.categories && categoryLabel(i.categories.label)]
-      .some(t => t && String(t).toLocaleLowerCase('nb').includes(q)))
-  const filtered = getFiltered().filter(matches)
-
-  const myCount = myItems.length
-  const myContested = myItems.filter(isContested).length
-  const contested = items.filter(isContested).length
-  const unwanted = items.filter(i => i.status !== 'assigned' && !i.interests?.length).length
-  const assigned = items.filter(i => i.status === 'assigned').length
-  const undecided = statusExtras ? getUndecided(items, statusExtras.members, statusExtras.passes, statusExtras.heirs) : []
-  const undecidedCount = undecided.length
-  const remainingSteps = statusExtras ? buildRemainingSteps({ estateId: id, userId: session.user.id, items, ...statusExtras }).length : null
-
-  const handleDelete = (item, e) => {
-    e.stopPropagation()
-    setConfirmItem(item)
-  }
-
-  const confirmDelete = async () => {
-    if (!confirmItem || deleting) return
-    setDeleting(true)
-    const { data, error } = await supabase.from('items').delete().eq('id', confirmItem.id).select('id')
-    setDeleting(false)
-    if (error || !data?.length) { onToast(L('Kunne ikke slette gjenstanden. Bare admin og den som la den inn kan slette den.', 'Could not delete the item. Only an admin and the person who added it can delete it.'), 'error'); return }
-    await removeImages(itemImageUrls(confirmItem))
-    onToast(L('Gjenstand slettet', 'Item deleted'))
-    setConfirmItem(null)
-    load()
-  }
-
-  const byCat = categories.map(c => ({
-    name: `${c.emoji} ${categoryLabel(c.label)}`,
-    count: items.filter(i => i.category_id === c.id).length,
-  })).filter(x => x.count > 0).sort((a,b) => b.count - a.count)
-
-  const pieData = [
-    { name: L('Tildelt', 'Assigned'), value: assigned },
-    { name: L('Ettertraktet', 'Contested'), value: contested },
-    { name: L('Ønsket', 'Wanted'), value: items.filter(i => i.status !== 'assigned' && i.interests?.length === 1).length },
-    { name: L('Ingen vil ha', 'Unwanted'), value: unwanted },
-  ].filter(d => d.value > 0)
-
-  const breakdown = getStatusBreakdown(items)
-  const myUndecided = undecided.find(u => u.member.user_id === session.user.id)?.items.length || 0
-  const memberCount = statusExtras?.members.length
-  const openTaskCount = statusExtras ? statusExtras.tasks.filter(t => !t.completed).length : 0
-
-  const statusTabs = [
-    { key:'all', label:L('Alle', 'All'), count:items.length },
-    { key:'mine', label:L('Mine', 'Mine'), count:myCount },
-    { key:'contested', label:L('Ettertraktede', 'Contested'), count:contested },
-    { key:'wanted', label:L('Noen vil ha', 'Wanted'), count:items.filter(i => i.interests?.length > 0).length },
-    { key:'unwanted', label:L('Ingen vil ha', 'Unwanted'), count:unwanted },
-    { key:'assigned', label:L('Tildelt', 'Assigned'), count:assigned },
-  ]
-
-  const statusBar = [
-    { label:L('Tildelt', 'Assigned'), value:breakdown.assigned, color:'#5F6E52' },
-    { label:L('Ettertraktet', 'Contested'), value:breakdown.contested, color:'#75604B' },
-    { label:L('Én vil ha', 'One wants it'), value:breakdown.single, color:'#5F6E52' },
-    { label:L('Ingen vil ha', 'No one wants it'), value:breakdown.none, color:'#E8DFD0' },
-  ]
-
-  const btn = { padding:'9px 16px', background:'#fff', border:'1px solid #D9CFC0', borderRadius:'8px', cursor:'pointer', color:'#5C4530', fontSize:'0.875rem', fontFamily:'Karla, sans-serif' }
-  const btnPrimary = { ...btn, background:'#3A2F26', border:'1px solid #3A2F26', color:'#FBF9F5' }
-  const sectionLabel = { fontSize:'0.8125rem', fontWeight:'500', marginBottom:'10px', textTransform:'uppercase', letterSpacing:'0.5px' }
-  // «Se mine ønsker»: vis listen med bare dine ønsker, og flytt dit (ellers skjer endringen utenfor skjermen)
-  // «Snakk sammen først»: gjenstandene flere ønsker, med begrunnelsene på hver gjenstand
-  const showContested = () => {
-    setTab('items'); setFilterStatus('contested'); setQuery('')
-    requestAnimationFrame(() => {
-      tabsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-      tabsRef.current?.querySelector('[data-tab="contested"]')?.focus({ preventScroll: true })
-    })
-  }
-
-  const showMine = () => {
-    setTab('items'); setFilterStatus('mine'); setQuery('')
-    requestAnimationFrame(() => {
-      tabsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-      tabsRef.current?.querySelector('[data-tab="mine"]')?.focus({ preventScroll: true })
-    })
-  }
-  const openItem = item => { sessionStorage.setItem('estate_scroll_' + id, window.scrollY); navigate(`/estate/${id}/item/${item.id}`) }
+  const isAdmin = myRole === 'admin'
+  const counts = overviewCounts({ items, userId, extras })
+  const steps = extras ? buildRemainingSteps({ estateId: id, userId, items, ...extras, proposal }) : null
+  const next = recommendation({ estateId: id, estate, counts, steps, isAdmin, isDemo })
+  const groups = overviewGroups({ estateId: id, counts, steps, isAdmin, isDemo })
+  const progress = counts.total ? Math.round(counts.assigned / counts.total * 100) : 0
 
   return (
-    <div style={{ maxWidth:'960px', margin:'0 auto', padding:'24px 16px 64px', fontFamily:'Karla, sans-serif' }}>
-      <style>{`@media (max-width: 600px) { .item-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 10px !important; } }`}</style>
-      {/* Header */}
-      <button onClick={() => navigate(APP_HOME)} style={{ background:'none', border:'none', color:'#75604B', cursor:'pointer', fontSize:'0.8125rem', padding:'0 0 8px', fontFamily:'Karla, sans-serif' }}>{L('← Alle bo', '← All estates')}</button>
-      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-end', marginBottom:'20px', flexWrap:'wrap', gap:'12px' }}>
-        <div>
-          <h1 style={{ fontFamily:'Fraunces, serif', fontSize:'1.625rem', fontWeight:'400', color:'#3A2F26', marginBottom:'2px' }}>{estate.name}</h1>
-          {estate.description && <p style={{ color:'#75604B', fontSize:'0.875rem' }}>{estate.description}</p>}
-          <p style={{ color:'#75604B', fontSize:'0.875rem' }}>
-            {memberCount ? `${memberCount} ${memberCount === 1 ? L('medlem', 'member') : L('medlemmer', 'members')} · ` : ''}{items.length} {items.length === 1 ? L('gjenstand', 'item') : L('gjenstander', 'items')}
-          </p>
-        </div>
-        <div style={{ display:'flex', gap:'8px', flexWrap:'wrap' }}>
-          {myRole === 'admin' && !isDemo && <button onClick={() => navigate(`/estate/${id}/admin`)} style={btn}>{L('Administrer', 'Manage')}</button>}
-          <button onClick={() => navigate(`/estate/${id}/swipe`)} style={btn}>{L('Sveip', 'Swipe')}</button>
-          {isDemo
-            ? <button onClick={() => navigate(`/estate/${id}/add`)} style={btnPrimary}>{L('Prøv AI-verdivurdering', 'Try AI valuation')}</button>
-            : <>
-                <button onClick={() => navigate(`/estate/${id}/add`)} style={btn}>{L('Én gjenstand', 'One item')}</button>
-                <button onClick={() => navigate(`/estate/${id}/add-many`)} style={myRole === 'admin' ? btnPrimary : btn}>{L('+ Legg til gjenstander', '+ Add items')}</button>
-              </>}
-        </div>
-      </div>
-
-      {estate.status === 'closed' && (
-        <div style={{ background:'#E8DFD0', border:'1px solid #D9CFC0', borderRadius:'10px', padding:'12px 16px', marginBottom:'16px', fontSize:'0.8125rem', color:'#5C4530', lineHeight:1.5 }}>
-          {L('Boet er avsluttet', 'This estate is closed')}
-          {estate.closed_at && ` (${new Date(estate.closed_at).toLocaleDateString(locale(), { day:'numeric', month:'long', year:'numeric' })})`}.{' '}
-          {L('Det oppbevares med bilder og dokumenter til det slettes. Det finnes ingen automatisk sletting; administratoren kan be Arvklart slette boet.', 'It is kept with its photos and documents until it is deleted. There is no automatic deletion; the administrator can ask Arvklart to delete the estate.')}
-        </div>
-      )}
-
-      {/* Arvingens oversikt: det som venter på deg, og dine ønsker, øverst */}
-      {myRole !== 'admin' && items.length > 0 && (
-        <section aria-labelledby="my-overview-title" style={{ background:'#DCE3D2', borderRadius:'12px', padding:'20px', marginBottom:'20px' }}>
-          <h2 id="my-overview-title" style={{ fontFamily:'Fraunces, serif', fontSize:'1.25rem', fontWeight:'400', color:'#3A2F26', marginBottom:'14px' }}>{L('Dine valg', 'Your choices')}</h2>
-          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(min(100%, 15rem), 1fr))', gap:'12px' }}>
-            <div style={{ background:'#fff', borderRadius:'10px', padding:'16px', display:'flex', flexDirection:'column', gap:'10px', justifyContent:'space-between' }}>
-              <div>
-                <div aria-hidden={myUndecided === 0} style={{ fontFamily:'Fraunces, serif', fontSize:'2rem', color: myUndecided === 0 ? '#5F6E52' : '#3A2F26', lineHeight:1.1 }}>{myUndecided === 0 ? '✓' : myUndecided}</div>
-                <div style={{ fontSize:'0.9375rem', color:'#3A2F26' }}>{myUndecided === 0 ? L('Du har svart på alle gjenstandene', 'You have answered all the items') : L(`${myUndecided === 1 ? 'gjenstand venter' : 'gjenstander venter'} på svaret ditt`, `${myUndecided === 1 ? 'item is' : 'items are'} waiting for your answer`)}</div>
-              </div>
-              {myUndecided > 0
-                ? <button onClick={() => navigate(`/estate/${id}/swipe`)} style={{ ...btnPrimary, background:'#5F6E52', border:'1px solid #5F6E52', minHeight:'44px' }}>{L('Gå gjennom nå', 'Review now')}</button>
-                : remainingSteps > 0 && <button onClick={() => navigate(`/estate/${id}/status`)} style={{ ...btn, minHeight:'44px' }}>{L('Se hva som gjenstår', 'See what remains')}</button>}
-            </div>
-            <div style={{ background:'#fff', borderRadius:'10px', padding:'16px', display:'flex', flexDirection:'column', gap:'10px', justifyContent:'space-between' }}>
-              <div>
-                <div style={{ fontFamily:'Fraunces, serif', fontSize:'2rem', color:'#3A2F26', lineHeight:1.1 }}>{myCount}</div>
-                <div style={{ fontSize:'0.9375rem', color:'#3A2F26' }}>{myCount === 0 ? L('Du har ikke ønsket noe ennå', 'You have not wished for anything yet') : L(`${myCount === 1 ? 'gjenstand' : 'gjenstander'} du ønsker`, `${myCount === 1 ? 'item' : 'items'} you want`)}</div>
-              </div>
-              {myCount > 0 && <button onClick={showMine} style={{ ...btn, minHeight:'44px' }}>{L('Se mine ønsker', 'See my wishes')}</button>}
-              {myContested > 0 && (
-                <button onClick={showContested} style={{ ...btn, minHeight:'44px' }}>
-                  {L(`${myContested} ønskes også av andre – snakk sammen`, `${myContested} also wanted by others – talk first`)}
-                </button>
-              )}
-            </div>
-          </div>
-        </section>
-      )}
-
-      {/* Status for boet */}
-      {items.length > 0 && (
-        <div style={{ background:'#fff', border:'1px solid #D9CFC0', borderRadius:'10px', padding:'20px', marginBottom:'16px' }}>
-          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'baseline', marginBottom:'10px', gap:'12px', flexWrap:'wrap' }}>
-            <span style={{ fontSize:'0.9375rem', fontWeight:'600', color:'#3A2F26' }}>{L('Status for boet', 'Estate status')}</span>
-            <span style={{ fontSize:'0.875rem', color:'#75604B' }}>{L(`${assigned} av ${items.length} fordelt`, `${assigned} of ${items.length} distributed`)}</span>
-          </div>
-          <div style={{ display:'flex', height:'10px', borderRadius:'5px', overflow:'hidden', background:'#E8DFD0' }}>
-            {statusBar.map(s => s.value > 0 && <span key={s.label} style={{ width:`${s.value / items.length * 100}%`, background:s.color }} />)}
-          </div>
-          <div style={{ display:'flex', flexWrap:'wrap', gap:'6px 20px', marginTop:'12px', fontSize:'0.8125rem', color:'#5C4530' }}>
-            {statusBar.map(s => (
-              <span key={s.label} style={{ display:'flex', alignItems:'center', gap:'6px' }}>
-                <i style={{ width:'10px', height:'10px', borderRadius:'2px', background:s.color, border: s.color === '#E8DFD0' ? '1px solid #D9CFC0' : 'none' }} />
-                {s.label} {s.value}
-              </span>
-            ))}
-          </div>
-          {assigned > 0 && (
-            <button onClick={() => navigate(`/estate/${id}/fordeling`)} style={{ marginTop:'10px', background:'none', border:'none', padding:0, minHeight:'44px', color:'#5F6E52', textDecoration:'underline', cursor:'pointer', fontSize:'0.875rem', fontFamily:'Karla, sans-serif' }}>
-              {L('Se fordelingen per arving', 'See the distribution per heir')}
-            </button>
-          )}
-        </div>
-      )}
-
-      {/* Neste steg for admin (arvinger får sin egen oversikt øverst) */}
-      {myRole !== 'admin' ? null : myUndecided > 0 ? (
-        <div style={{ background:'#DCE3D2', borderRadius:'10px', padding:'16px 20px', marginBottom:'28px', display:'flex', justifyContent:'space-between', alignItems:'center', gap:'16px', flexWrap:'wrap' }}>
-          <div>
-            <div style={{ fontSize:'0.9375rem', fontWeight:'600', color:'#3A2F26', marginBottom:'2px' }}>
-              {L(
-                `Du har ${myUndecided} ${myUndecided === 1 ? 'gjenstand' : 'gjenstander'} du ikke har tatt stilling til`,
-                `You have ${myUndecided} ${myUndecided === 1 ? 'item' : 'items'} you have not decided on`,
-              )}
-            </div>
-            <div style={{ fontSize:'0.875rem', color:'#5C4530' }}>{L('Si ja eller nei takk til hver av dem, så kan fordelingen starte.', 'Say yes or no thanks to each of them so the distribution can start.')}</div>
-          </div>
-          <button onClick={() => navigate(`/estate/${id}/swipe`)} style={{ ...btnPrimary, background:'#5F6E52', border:'1px solid #5F6E52' }}>{L('Gå gjennom nå', 'Review now')}</button>
-        </div>
-      ) : remainingSteps > 0 ? (
-        <div style={{ background:'#DCE3D2', borderRadius:'10px', padding:'16px 20px', marginBottom:'28px', display:'flex', justifyContent:'space-between', alignItems:'center', gap:'16px', flexWrap:'wrap' }}>
-          <div>
-            <div style={{ fontSize:'0.9375rem', fontWeight:'600', color:'#3A2F26', marginBottom:'2px' }}>{L('Du har tatt stilling til alle gjenstandene', 'You have decided on all the items')}</div>
-            <div style={{ fontSize:'0.875rem', color:'#5C4530' }}>{L(`${remainingSteps} steg gjenstår før boet er ferdig.`, `${remainingSteps} ${remainingSteps === 1 ? 'step remains' : 'steps remain'} before the estate is finished.`)}</div>
-          </div>
-          <button onClick={() => navigate(`/estate/${id}/status`)} style={{ ...btnPrimary, background:'#5F6E52', border:'1px solid #5F6E52' }}>{L('Se hva som gjenstår', 'See what remains')}</button>
-        </div>
-      ) : <div style={{ marginBottom:'12px' }} />}
-
-      {/* Snarveier */}
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(min(100%, 10rem), 1fr))', gap:'8px', marginBottom:'32px' }}>
-        {[
-          { path:`/estate/${id}/guide`, label:L('Veiviser', 'Guide'), desc:L('For arveprosessen', 'For the inheritance process') },
-          { path:`/estate/${id}/heirs`, label:L('Arvinger', 'Heirs'), desc:L('Fordelingskalkulator', 'Distribution calculator'), adminOnly: true },
-          undecidedCount > 0
-            ? { path:`/estate/${id}/conflicts`, label:L('Løsningsmetoder', 'Resolution methods'), desc:L(`Venter på ${undecidedCount} ${undecidedCount === 1 ? 'arving' : 'arvinger'}`, `Waiting for ${undecidedCount} ${undecidedCount === 1 ? 'heir' : 'heirs'}`) }
-            : contested > 0
-            ? { path:`/estate/${id}/conflicts`, label:L('Løsningsmetoder', 'Resolution methods'), desc:L(`${contested} ettertraktede`, `${contested} contested`), highlight: true }
-            : { path:`/estate/${id}/conflicts`, label:L('Løsningsmetoder', 'Resolution methods'), desc:L('Ingen ettertraktede ennå', 'None contested yet') },
-          { path:`/estate/${id}/status`, label:L('Hva gjenstår', 'What remains'), desc: remainingSteps === null ? L('Oversikt over boet', 'Estate overview') : remainingSteps === 0 ? L('Alt er klart', 'All done') : L(`${remainingSteps} steg gjenstår`, `${remainingSteps} ${remainingSteps === 1 ? 'step' : 'steps'} left`) },
-          // Dokumentarkivet er ikke tilgjengelig i demoen (ruten er sperret for demokontoen)
-          { path:`/estate/${id}/documents`, label:L('Dokumenter', 'Documents'), desc:L('Testament, skjøter og verdivurderinger', 'Wills, deeds and valuations'), notInDemo: true },
-          { path:`/estate/${id}/tasks`, label:L('Sjekkliste', 'Checklist'), desc: openTaskCount ? L(`${openTaskCount} ${openTaskCount === 1 ? 'oppgave' : 'oppgaver'} gjenstår`, `${openTaskCount} ${openTaskCount === 1 ? 'task' : 'tasks'} left`) : L('Praktiske oppgaver etter dødsfallet', 'Practical tasks after the death') },
-        ].filter(mod => (myRole === 'admin' || !mod.adminOnly) && !(isDemo && mod.notInDemo)).map(mod => (
-          <button key={mod.path} onClick={() => navigate(mod.path)} style={{
-            padding:'12px 14px', background:'#fff', border:`1px solid ${mod.highlight ? '#8B9A7D' : '#D9CFC0'}`,
-            borderRadius:'8px', cursor:'pointer', textAlign:'left', fontFamily:'Karla, sans-serif',
-          }}>
-            <div style={{ fontSize:'0.875rem', color:'#3A2F26', marginBottom:'2px' }}>{mod.label}</div>
-            <div style={{ fontSize:'0.75rem', color: mod.highlight ? '#5F6E52' : '#75604B', fontWeight: mod.highlight ? '600' : '400' }}>{mod.desc}</div>
-          </button>
-        ))}
-      </div>
-
-      {/* Faner: statusfilter + analyse */}
-      <div ref={tabsRef} style={{ display:'flex', gap:'2px', borderBottom:'1px solid #D9CFC0', marginBottom:'16px', overflowX:'auto', scrollMarginTop:'16px' }}>
-        {[...statusTabs, { key:'analytics', label:L('Analyse', 'Analytics') }].map(t => {
-          const active = t.key === 'analytics' ? tab === 'analytics' : tab === 'items' && filterStatus === t.key
-          return (
-            <button key={t.key} data-tab={t.key} aria-pressed={active} onClick={() => {
-              if (t.key === 'analytics') { setTab('analytics'); return }
-              setTab('items'); setFilterStatus(t.key)
-            }} style={{
-              padding:'10px 12px', border:'none', background:'none', cursor:'pointer', whiteSpace:'nowrap',
-              fontSize:'0.875rem', fontFamily:'Karla, sans-serif',
-              color: active ? '#3A2F26' : '#75604B',
-              borderBottom: active ? '2px solid #3A2F26' : '2px solid transparent', marginBottom:'-1px',
-              marginLeft: t.key === 'analytics' ? 'auto' : 0,
-            }}>
-              {t.label}
-              {t.count !== undefined && <span style={{ fontSize:'0.75rem', background:'#E8DFD0', color:'#5C4530', borderRadius:'10px', padding:'1px 7px', marginLeft:'6px' }}>{t.count}</span>}
-            </button>
-          )
-        })}
-      </div>
-
-      {tab === 'analytics' ? (
-        <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(280px, 1fr))', gap:'20px' }}>
-          <div style={{ background:'#fff', border:'1px solid #D9CFC0', borderRadius:'12px', padding:'24px' }}>
-            <h3 style={{ fontFamily:'Fraunces, serif', fontSize:'1rem', fontWeight:'400', color:'#3A2F26', marginBottom:'20px' }}>{L('Gjenstander per kategori', 'Items per category')}</h3>
-            <ResponsiveContainer width="100%" height={200}>
-              <BarChart data={byCat} margin={{ bottom:40, left:-20 }}>
-                <XAxis dataKey="name" tick={{ fontSize:10, fill:'#75604B' }} angle={-35} textAnchor="end" interval={0} />
-                <YAxis tick={{ fontSize:10, fill:'#75604B' }} allowDecimals={false} />
-                <Tooltip />
-                <Bar dataKey="count" fill="#5F6E52" radius={[4,4,0,0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-          <div style={{ background:'#fff', border:'1px solid #D9CFC0', borderRadius:'12px', padding:'24px' }}>
-            <h3 style={{ fontFamily:'Fraunces, serif', fontSize:'1rem', fontWeight:'400', color:'#3A2F26', marginBottom:'20px' }}>Status</h3>
-            <ResponsiveContainer width="100%" height={200}>
-              <PieChart>
-                <Pie data={pieData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={70} label={({ percent }) => `${(percent*100).toFixed(0)}%`} labelLine={false}>
-                  {pieData.map((_,i) => <Cell key={i} fill={PALETTE[i%PALETTE.length]} />)}
-                </Pie>
-                <Tooltip />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-      ) : (
-        <>
-          {items.length > 0 && (
-            <div role="search" style={{ display:'flex', gap:'10px', flexWrap:'wrap', marginBottom:'20px' }}>
-              <input type="search" value={query} onChange={e => setQuery(e.target.value)} aria-label={L('Søk i boet', 'Search the estate')}
-                placeholder={L('Søk etter gjenstand…', 'Search for an item…')}
-                style={{ flex:'1 1 220px', minHeight:'44px', padding:'9px 12px', border:'1px solid #9A8B78', borderRadius:'8px', fontSize:'0.9375rem', background:'#fff', color:'#3A2F26', fontFamily:'Karla, sans-serif' }} />
-              {categories.length > 0 && <select value={filterCat} onChange={e => setFilterCat(e.target.value)} aria-label={L('Vis kategori', 'Show category')}
-                style={{ minWidth:'200px', minHeight:'44px', padding:'9px 12px', border:'1px solid #9A8B78', borderRadius:'8px', fontSize:'0.875rem', background:'#fff', color:'#3A2F26', fontFamily:'Karla, sans-serif' }}>
-                <option value="all">{L('Alle kategorier', 'All categories')}</option>
-                {categories.map(c => <option key={c.id} value={c.id}>{c.emoji} {categoryLabel(c.label)}</option>)}
-              </select>}
-            </div>
-          )}
-
-          {filterStatus === 'all' && myItems.length > 0 && (
-            <div style={{ marginBottom:'24px' }}>
-              <div style={{ ...sectionLabel, color:'#5F6E52' }}>{L('Mine interesser', 'My interests')} ({myItems.length})</div>
-              <div className="item-grid" style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(200px, 1fr))', gap:'12px', marginBottom:'20px' }}>
-                {myItems.filter(matches).map(item => (
-                  <ItemCard key={item.id} item={item} userId={session.user.id} myRole={myRole} isDemo={isDemo}
-                    onClick={() => openItem(item)} onDelete={e => handleDelete(item, e)} showReason onToast={onToast} onReasonSaved={load} />
-                ))}
-              </div>
-              {otherItems.filter(matches).length > 0 && (
-                <div style={{ ...sectionLabel, color:'#75604B' }}>{L('Andre gjenstander', 'Other items')}</div>
-              )}
-            </div>
-          )}
-
-          {filtered.length === 0 ? (
-            <div style={{ textAlign:'center', padding:'80px 20px', color:'#75604B' }}>
-              <p role="status" style={{ marginBottom:'20px' }}>{items.length === 0 ? L('Ingen gjenstander ennå.', 'No items yet.') : q ? L(`Ingen gjenstander passer «${query.trim()}».`, `No items match «${query.trim()}».`) : L('Ingen gjenstander i dette utvalget.', 'No items in this selection.')}</p>
-              {q && <button onClick={() => setQuery('')} style={{ ...btn, marginBottom:'12px' }}>{L('Tøm søket', 'Clear the search')}</button>}
-              {!isDemo && items.length === 0 && <button onClick={() => navigate(`/estate/${id}/add-many`)} style={{ ...btnPrimary, padding:'11px 24px' }}>
-                {L('Legg til første gjenstand', 'Add the first item')}
-              </button>}
-            </div>
-          ) : (
-            <div className="item-grid" style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(200px, 1fr))', gap:'12px' }}>
-              {(filterStatus === 'all' ? otherItems : filtered).filter(matches).map(item => (
-                <ItemCard key={item.id} item={item} userId={session.user.id} myRole={myRole} isDemo={isDemo}
-                  onClick={() => openItem(item)} onDelete={e => handleDelete(item, e)}
-                  showReason={filterStatus === 'mine'} onToast={onToast} onReasonSaved={load} />
-              ))}
-            </div>
-          )}
-        </>
-      )}
-
-      {confirmItem && (
-        <Modal onClose={() => setConfirmItem(null)} labelledBy="delete-item-title" maxWidth={380}>
-            <h3 id="delete-item-title" style={{ fontFamily:'Fraunces, serif', fontSize:'1.125rem', fontWeight:'400', color:'#3A2F26', marginBottom:'8px' }}>{L('Slett gjenstand', 'Delete item')}</h3>
-            <p style={{ fontSize:'0.875rem', color:'#5C4530', marginBottom:'6px' }}>«{confirmItem.title}»</p>
-            <p style={{ fontSize:'0.8125rem', color:'#75604B', marginBottom:'24px' }}>{L('Kan ikke angres.', 'This cannot be undone.')}</p>
-            <div style={{ display:'flex', gap:'10px' }}>
-              <button onClick={() => setConfirmItem(null)} style={{ flex:1, padding:'11px', background:'none', border:'1px solid #D9CFC0', borderRadius:'8px', cursor:'pointer', color:'#5C4530', fontSize:'0.875rem', fontFamily:'Karla, sans-serif' }}>{L('Avbryt', 'Cancel')}</button>
-              <button onClick={confirmDelete} disabled={deleting} style={{ flex:1, padding:'11px', background:'#8B3A3A', color:'#fff', border:'none', borderRadius:'8px', cursor:'pointer', fontSize:'0.875rem', fontFamily:'Karla, sans-serif' }}>{deleting ? L('Sletter…', 'Deleting…') : L('Slett', 'Delete')}</button>
-            </div>
-        </Modal>
-      )}
-    </div>
-  )
-}
-
-// Navn på de som ønsker gjenstanden, med «deg» for innlogget bruker
-const interestNames = (interests, userId) => {
-  const me = L('deg', 'you'), and = L('og', 'and')
-  const names = interests.map(x => x.user_id === userId ? me : (x.profiles?.display_name || L('Ukjent', 'Unknown')))
-  const sorted = [...names.filter(n => n !== me), ...names.filter(n => n === me)]
-  if (sorted.length <= 3) return sorted.length > 1 ? `${sorted.slice(0, -1).join(', ')} ${and} ${sorted.at(-1)}` : sorted[0] || ''
-  return L(`${sorted.slice(0, 2).join(', ')} og ${sorted.length - 2} til`, `${sorted.slice(0, 2).join(', ')} and ${sorted.length - 2} more`)
-}
-
-function ItemCard({ item, userId, onClick, onDelete, myRole, isDemo, showReason = false, onToast, onReasonSaved }) {
-  const cat = item.categories || { emoji:'📦', label:L('Annet', 'Other') }
-  const mine = item.interests?.find(x => x.user_id === userId)
-  const myInterest = !!mine
-  const count = item.interests?.length || 0
-  const isAssigned = item.status === 'assigned'
-  // Den som la inn gjenstanden kan slette den bare før den er tildelt (håndheves også i databasen)
-  const canDelete = !isDemo && (myRole === 'admin' || (item.added_by === userId && !item.assigned_to && item.status !== 'assigned'))
-  const names = interestNames(item.interests || [], userId)
-
-  return (
-    <div onClick={onClick} style={{
-      background:'#fff', borderRadius:'10px', overflow:'hidden', cursor:'pointer',
-      border: myInterest ? '2px solid #3A2F26' : isAssigned ? '1.5px solid #8B9A7D' : '1px solid #D9CFC0',
-      transition:'transform 0.15s, box-shadow 0.15s', position:'relative',
-    }}
-    onMouseEnter={e => { e.currentTarget.style.transform='translateY(-2px)'; e.currentTarget.style.boxShadow='0 8px 28px rgba(0,0,0,0.09)' }}
-    onMouseLeave={e => { e.currentTarget.style.transform='none'; e.currentTarget.style.boxShadow='none' }}>
-
-      {canDelete && (
-        <button onClick={onDelete} aria-label={L(`Slett «${item.title}»`, `Delete «${item.title}»`)} style={{
-          position:'absolute', top:'8px', left:'8px', zIndex:10,
-          background:'#8B3A3A', color:'#fff', border:'none',
-          borderRadius:'8px', padding:'6px 12px', minHeight:'36px', cursor:'pointer',
-          fontSize:'0.8125rem', fontFamily:'Karla, sans-serif',
-        }}>{L('Slett', 'Delete')}</button>
-      )}
-
-      <div style={{ height:'130px', background:'#E8DFD0', overflow:'hidden', position:'relative' }}>
-        {item.image_url
-          ? <StoredImage src={item.image_url} alt={item.title} style={{ width:'100%', height:'100%', objectFit:'contain' }} />
-          : <span style={{ position:'absolute', left:'10px', bottom:'8px', fontSize:'0.6875rem', color:'#75604B' }}>{cat.emoji} {categoryLabel(cat.label)}</span>}
-        {count > 1 && !isAssigned && <span style={{ position:'absolute', top:'8px', right:'8px', background:'#5F6E52', color:'#fff', fontSize:'0.6875rem', padding:'2px 8px', borderRadius:'10px' }}>{L(`${count} vil ha`, `${count} want it`)}</span>}
-        {isAssigned && <span style={{ position:'absolute', top:'8px', right:'8px', background:'#5F6E52', color:'#fff', fontSize:'0.6875rem', padding:'2px 8px', borderRadius:'10px' }}>{L('Tildelt', 'Assigned')}</span>}
-        {!isAssigned && item.disposition && <span style={{ position:'absolute', top:'8px', right:'8px', background:'#FBF9F5', color:'#3A2F26', border:'1px solid #D9CFC0', fontSize:'0.6875rem', padding:'2px 8px', borderRadius:'10px' }}>{dispositionLabel(item.disposition)}</span>}
-      </div>
-
-      <div style={{ padding:'10px 12px 12px' }}>
-        <button onClick={e => { e.stopPropagation(); onClick() }} style={{ display:'block', width:'100%', textAlign:'left', background:'none', border:'none', padding:0, cursor:'pointer', fontFamily:'Karla, sans-serif', fontSize:'0.875rem', fontWeight:'500', color:'#3A2F26', marginBottom:'2px', lineHeight:'1.3' }}>{item.title}</button>
-        {item.estimated_value != null && item.estimated_value !== '' && <div style={{ fontSize:'0.75rem', color:'#75604B' }}>{L('ca.', 'approx.')} {formatNOK(item.estimated_value)}</div>}
-        <div style={{ marginTop:'8px', fontSize:'0.75rem', color: count ? '#5C4530' : '#75604B', fontStyle: count ? 'normal' : 'italic' }}>
-          {count === 0 ? L('Ingen ennå', 'No one yet') : names === L('deg', 'you') ? L('Bare deg', 'Only you') : names.charAt(0).toUpperCase() + names.slice(1)}
-        </div>
-        {/* «Mine ønsker»: egen begrunnelse kan legges til, endres eller fjernes uten å åpne gjenstanden */}
-        {showReason && mine && (
-          <div style={{ marginTop:'8px', paddingTop:'6px', borderTop:'1px solid #E8DFD0', cursor:'auto' }}>
-            <ReasonEditor key={item.id} itemId={item.id} itemTitle={item.title} userId={userId} savedReason={mine.reason || null}
-              compact onToast={onToast} onSaved={onReasonSaved} />
+    <div className="bo-mork">
+      <style>{darkCss}</style>
+      <div className="bo-side">
+        {/* Demoen har bare ett bo, og kan ikke administreres (notForDemo i App.jsx) */}
+        {!isDemo && (
+          <div className="bo-topplinje">
+            <Link to={APP_HOME} className="bo-lenke">{L('← Alle bo', '← All estates')}</Link>
+            {isAdmin && <Link to={`/estate/${id}/admin`} className="bo-lenke">{L('Administrer boet', 'Manage the estate')}</Link>}
           </div>
         )}
+
+        <header className="bo-hode">
+          <h1>{estate.name}</h1>
+          {estate.description && <p className="bo-dempet">{estate.description}</p>}
+          <p className="bo-status">
+            {counts.total > 0 && <span className="bo-spor" aria-hidden="true"><span style={{ width: `${progress}%` }} /></span>}
+            <span>
+              {counts.total > 0
+                ? L(`${counts.assigned} av ${counts.total} gjenstander fordelt`, `${counts.assigned} of ${counts.total} items distributed`)
+                : L('Ingen gjenstander ennå', 'No items yet')}
+              {counts.members !== null && ` · ${counts.members} ${counts.members === 1 ? L('medlem', 'member') : L('medlemmer', 'members')}`}
+            </span>
+          </p>
+        </header>
+
+        {estate.status === 'closed' && (
+          <p className="bo-melding">
+            {L('Boet er avsluttet', 'This estate is closed')}
+            {estate.closed_at && ` (${new Date(estate.closed_at).toLocaleDateString(locale(), { day: 'numeric', month: 'long', year: 'numeric' })})`}.{' '}
+            {L('Det oppbevares med bilder og dokumenter til det slettes. Det finnes ingen automatisk sletting; administratoren kan be Arvklart slette boet.', 'It is kept with its photos and documents until it is deleted. There is no automatic deletion; the administrator can ask Arvklart to delete the estate.')}
+          </p>
+        )}
+
+        {next && (
+          <section className="bo-anbefalt" aria-labelledby="anbefalt-tittel">
+            <div className="tekst">
+              <span className="bo-etikett">{L('Anbefalt nå', 'Recommended now')}</span>
+              <h2 id="anbefalt-tittel">{next.title}</h2>
+              {next.text && <p>{next.text}</p>}
+            </div>
+            <Link to={next.path} className="bo-knapp messing">{next.action} →</Link>
+          </section>
+        )}
+
+        <section aria-labelledby="valg-tittel">
+          <h2 id="valg-tittel" className="bo-seksjonstittel">{L('Hva vil du gjøre?', 'What do you want to do?')}</h2>
+          <div className="bo-grupper">
+            {groups.map(group => (
+              <details key={group.key} className="bo-gruppe" open={!!openGroups[group.key]}
+                onToggle={e => setOpenGroups(group.key, e.currentTarget.open)}>
+                <summary>
+                  <span className="bo-ikon" aria-hidden="true">{ICONS[group.key]}</span>
+                  <span>
+                    <span className="tittel">{group.title}</span>
+                    <span className="beskrivelse">{group.desc}</span>
+                  </span>
+                  <span className="bo-hint">{group.hint}</span>
+                  <Chevron />
+                </summary>
+                <ul className="bo-valg">
+                  {group.links.map(link => (
+                    <li key={link.key}>
+                      <Link to={link.path}>
+                        <span>
+                          <span className="navn">{link.title}</span>
+                          <span className="forklaring">{link.desc}</span>
+                        </span>
+                        <Count link={link} />
+                        <span className="til" aria-hidden="true">→</span>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </details>
+            ))}
+          </div>
+        </section>
       </div>
     </div>
   )
+}
+
+// Tallet til høyre på en lenke: uthevet når noe venter på deg, ellers nøytralt
+function Count({ link }) {
+  if (link.badge > 0) return <span className="bo-tall venter">{link.badge}</span>
+  if (link.countLabel) return <span className="bo-tall noytral">{link.countLabel}</span>
+  if (link.count !== undefined && link.count !== null) return <span className="bo-tall noytral">{link.count}</span>
+  return <span />
+}
+
+// Hvilke grupper som er åpne, husket i fanen per bo. «Gjenstander» er åpen første gang.
+function useOpenGroups(estateId) {
+  const key = `bo_grupper_${estateId}`
+  const [open, setOpen] = useState(() => {
+    try { return JSON.parse(sessionStorage.getItem(key)) || { gjenstander: true } } catch { return { gjenstander: true } }
+  })
+  const set = (group, isOpen) => setOpen(prev => {
+    if (!!prev[group] === isOpen) return prev
+    const next = { ...prev, [group]: isOpen }
+    try { sessionStorage.setItem(key, JSON.stringify(next)) } catch { /* privat modus: huskes ikke */ }
+    return next
+  })
+  return [open, set]
+}
+
+function Message({ children }) {
+  return (
+    <div className="bo-mork">
+      <style>{darkCss}</style>
+      <p role="status" className="bo-dempet" style={{ padding: '80px 16px', textAlign: 'center' }}>{children}</p>
+    </div>
+  )
+}
+
+function Chevron() {
+  return <svg className="bo-pil" viewBox="0 0 12 12" aria-hidden="true"><path d="M2 4l4 4 4-4" fill="none" stroke="currentColor" strokeWidth="1.6" /></svg>
+}
+
+const icon = path => <svg viewBox="0 0 24 24" fill="none" stroke="#F2EEE6" strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round">{path}</svg>
+const ICONS = {
+  gjenstander: icon(<><path d="M3.5 8L12 3.5 20.5 8v8L12 20.5 3.5 16z" /><path d="M3.5 8L12 12.5 20.5 8M12 12.5v8" /></>),
+  fordeling: icon(<><path d="M12 3v18M5 7h14" /><path d="M5 7l-3 7a3 3 0 006 0zM19 7l-3 7a3 3 0 006 0z" /></>),
+  arvinger: icon(<><circle cx="9" cy="8" r="3.2" /><path d="M3 19.5c.6-3.3 3-5 6-5s5.4 1.7 6 5" /><circle cx="17" cy="9" r="2.4" /><path d="M16.5 14.6c2.4.2 4 1.7 4.5 4.4" /></>),
+  praktisk: icon(<><rect x="5" y="4.5" width="14" height="16" rx="2" /><path d="M9 4.5V3h6v1.5M8.5 10h7M8.5 13.5h7M8.5 17h4" /></>),
 }

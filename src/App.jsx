@@ -23,9 +23,10 @@ import { L } from './lib/lang'
 import RouteMeta from './seo/RouteMeta'
 import { APP_HOME, HOME, LANDING_STATE } from './lib/routes'
 import AnalyticsConsent from './components/AnalyticsConsent'
+import { C as DARK, isDarkEstatePath } from './lib/estateTheme'
 // Den innloggede appen lastes ved behov; offentlige sider over er i hovedfilen (forhåndsrendres og hydreres)
 import {
-  ProfileSetupPage, EstatesPage, EstatePage, ItemDetailPage, AddItemPage, AddItemsPage, SwipePage, EditItemPage, AdminPage,
+  ProfileSetupPage, EstatesPage, EstatePage, EstateItemsPage, ItemDetailPage, AddItemPage, AddItemsPage, SwipePage, EditItemPage, AdminPage,
   FounderPage, TasksPage, DocumentVaultPage, HeirsPage, GoodwillPage, ConflictPage, UnwantedPage, DistributionPage, StatusPage,
   preloadAppPages,
 } from './appPages'
@@ -188,8 +189,9 @@ export default function App({ prerendered = false }) {
 
   return (
     <PlanProvider session={session}>
-      {/* app-shell: på /veiviser står veiviseren under appen i siden, og høyden følger da innholdet (veiviserHost.js) */}
-      <div className="app-shell" style={{ minHeight: '100vh', background: '#FBF9F5' }}>
+      {/* app-shell: på /veiviser står veiviseren under appen i siden, og høyden følger da innholdet (veiviserHost.js).
+          Oversikten i boet og gjenstandslisten er mørke (estateTheme.js); da er hele siden mørk under innholdet. */}
+      <div className="app-shell" style={{ minHeight: '100vh', background: isDarkEstatePath(pathname) ? DARK.natt : '#FBF9F5' }}>
         <RouteMeta />
         <VeiviserHostGuard />
         {/* Innlogget: aldri statistikk; lastet fra en offentlig side, lastes siden på nytt uten */}
@@ -224,6 +226,7 @@ export default function App({ prerendered = false }) {
             else navigate(APP_HOME)
           }} onToast={showToast} />)} />
           <Route path="/estate/:id" element={<EstatePage {...p} />} />
+          <Route path="/estate/:id/gjenstander" element={<EstateItemsPage {...p} />} />
           <Route path="/estate/:id/item/:itemId" element={<ItemDetailPage {...p} />} />
           <Route path="/estate/:id/swipe" element={<SwipePage {...p} />} />
           <Route path="/estate/:id/item/:itemId/edit" element={notForDemo(<EditItemPage {...p} />)} />

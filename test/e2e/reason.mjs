@@ -161,13 +161,13 @@ await check('Gjenstand: Esc lukker feltet uten å miste teksten', async page => 
 
 await check('Mine ønsker: begrunnelse kan legges til fra kortet uten å åpne gjenstanden', async page => {
   const db = await interestsTable(page, withMyInterest(null))
-  await page.goto(`${BASE}/estate/${EST}`)
-  await page.locator('[data-tab="mine"]').click()
+  await page.goto(`${BASE}/estate/${EST}/gjenstander`)
+  await page.getByRole('combobox', { name: 'Vis' }).selectOption('mine')
   await page.getByRole('button', { name: '+ Si hvorfor' }).click()
   await page.getByLabel('Hvorfor vil du ha «Gyngestol»? (valgfritt)').fill('Til hytta')
   await page.getByRole('button', { name: 'Lagre' }).click()
   await page.getByText('Din begrunnelse:').waitFor()
-  assert(page.url().endsWith(`/estate/${EST}`), 'kortet åpnet gjenstanden')
+  assert(page.url().endsWith(`/estate/${EST}/gjenstander?vis=mine`), 'kortet åpnet gjenstanden')
   assert(db.patches.length === 1 && db.patches[0].reason === 'Til hytta', 'begrunnelsen ble ikke lagret')
 })
 

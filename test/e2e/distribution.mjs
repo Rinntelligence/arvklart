@@ -131,10 +131,14 @@ await check('F2 Løsningsmetoder for arving: begrunnelsene side om side, bare eg
   assert(!v.length, v.join('; '))
 }, { fixtures: asMember(withReasons) })
 
-await check('F2 «Dine valg» viser hvor mange av mine ønsker andre også har', async page => {
+await check('F2 «Anbefalt nå» viser hvor mange av mine ønsker andre også har, og leder til dem', async page => {
   await page.goto(`${BASE}/estate/${EST}`)
-  await page.getByRole('button', { name: '2 ønskes også av andre – snakk sammen' }).click()
-  await page.waitForFunction(() => document.activeElement?.dataset?.tab === 'contested', null, { timeout: 5000 })
+  await page.getByRole('heading', { name: '2 av ønskene dine ønskes også av andre' }).waitFor()
+  await page.getByRole('link', { name: 'Se gjenstandene →' }).click()
+  await page.waitForURL(`**/estate/${EST}/gjenstander?vis=ettertraktede`)
+  assert(await page.getByRole('combobox', { name: 'Vis' }).inputValue() === 'ettertraktede', '«Ettertraktede» er ikke valgt')
+  await page.getByRole('link', { name: /^Gyngestol/ }).waitFor()
+  await page.getByRole('link', { name: /^Maleri/ }).waitFor()
 }, { fixtures: asMember(withReasons) })
 
 // ── F3: fordelingsverdi adskilt fra AI-anslaget, og bekreftede arveandeler ─────

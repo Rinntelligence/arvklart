@@ -617,7 +617,7 @@ export default function AddItemsPage({ session, profile, onToast, isDemo }) {
                 {L('Inviter arvingene', 'Invite the heirs')}
               </button>
             )}
-            <button onClick={() => navigate(`/estate/${id}`)} style={{ ...bigBtn, background: myRole === 'admin' ? '#fff' : '#3A2F26', color: myRole === 'admin' ? '#3A2F26' : '#FBF9F5', border: myRole === 'admin' ? `1px solid ${FIELD_BORDER}` : 'none' }}>
+            <button onClick={() => navigate(`/estate/${id}/gjenstander`)} style={{ ...bigBtn, background: myRole === 'admin' ? '#fff' : '#3A2F26', color: myRole === 'admin' ? '#3A2F26' : '#FBF9F5', border: myRole === 'admin' ? `1px solid ${FIELD_BORDER}` : 'none' }}>
               {L('Se gjenstandene', 'See the items')}
             </button>
             <button onClick={() => { setDone(null); openCamera() }} style={{ ...bigBtn, background: '#fff', color: '#3A2F26', border: `1px solid ${FIELD_BORDER}` }}>

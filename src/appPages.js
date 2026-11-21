@@ -6,6 +6,7 @@ import { lazyPage } from './lib/lazyPage'
 export const ProfileSetupPage = lazyPage(() => import('./pages/ProfileSetupPage'))
 export const EstatesPage = lazyPage(() => import('./pages/EstatesPage'))
 export const EstatePage = lazyPage(() => import('./pages/EstatePage'))
+export const EstateItemsPage = lazyPage(() => import('./pages/EstateItemsPage'))
 export const ItemDetailPage = lazyPage(() => import('./pages/ItemDetailPage'))
 export const AddItemPage = lazyPage(() => import('./pages/AddItemPage'))
 export const AddItemsPage = lazyPage(() => import('./pages/AddItemsPage'))
@@ -22,7 +23,7 @@ export const UnwantedPage = lazyPage(() => import('./pages/UnwantedPage'))
 export const DistributionPage = lazyPage(() => import('./pages/DistributionPage'))
 export const StatusPage = lazyPage(() => import('./pages/StatusPage'))
 
-const ALL = [ProfileSetupPage, EstatesPage, EstatePage, ItemDetailPage, AddItemPage, AddItemsPage, SwipePage, EditItemPage,
+const ALL = [ProfileSetupPage, EstatesPage, EstatePage, EstateItemsPage, ItemDetailPage, AddItemPage, AddItemsPage, SwipePage, EditItemPage,
   AdminPage, FounderPage, TasksPage, DocumentVaultPage, HeirsPage, GoodwillPage, ConflictPage, UnwantedPage, DistributionPage, StatusPage]
 
 // Etter innlogging hentes resten av appen i bakgrunnen når nettleseren er ledig, så navigering ikke venter på nett.

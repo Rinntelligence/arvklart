@@ -96,7 +96,7 @@ await check('Slett, arving: egen gjenstand kan slettes før tildeling, ikke ette
   await page.getByRole('heading', { name: 'Klokke' }).first().waitFor()
   await page.waitForTimeout(500)
   assert(await page.getByRole('button', { name: 'Slett gjenstand…' }).count() === 0, 'kan slette egen gjenstand etter tildeling')
-  await page.goto(`${BASE}/estate/${EST}`)
+  await page.goto(`${BASE}/estate/${EST}/gjenstander`)
   await page.getByRole('button', { name: 'Slett «Lampe»' }).waitFor()
   assert(await page.getByRole('button', { name: 'Slett «Klokke»' }).count() === 0, 'kortet viser «Slett» på tildelt gjenstand')
   assert(await page.getByRole('button', { name: 'Slett «Gyngestol»' }).count() === 0, 'kortet viser «Slett» på andres gjenstand')

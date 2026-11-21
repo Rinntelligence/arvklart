@@ -71,7 +71,7 @@ await check('Vanlig bruker: «Logg ut» logger ut overalt som før (scope=global
 
 // ── Brukerreisen i demoen på mobil, med eksempelsvarene fra nullstillingen ─────────────────────────────────────
 // Tekstene hentes fra den siste migreringen med reset_demo_estate(), så testen viser det besøkende faktisk ser:
-// hvem man er (Mona, administrator), oversikten over boet, en gjenstand som alle tre ønsker etter at den besøkende har
+// hvem man er (Mona, administrator), oversikten over boet og gjenstandslisten, en gjenstand som alle tre ønsker etter at den besøkende har
 // sagt «Vil ha» (Kari og Lars med begrunnelser side om side), og «Snakk sammen først».
 const MIG = readFileSync(new URL('../../supabase/migrations/20261109210000_demo_content_fixes.sql', import.meta.url), 'utf8')
 const wish = (item, who) => MIG.match(new RegExp(`\\('${item}-[0-9a-f-]+'::uuid, '${who}'\\s*,\\s+'([^']+)'\\)`))[1]
@@ -99,13 +99,17 @@ const demoFixtures = {
 }
 const noSideScroll = page => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)
 
-await check('Mobil (390×664): oversikt over boet, gjenstanden alle ønsker med begrunnelsene, og «Snakk sammen først»', async page => {
+await check('Mobil (390×664): oversikt over boet, gjenstandslisten, gjenstanden alle ønsker med begrunnelsene, og «Snakk sammen først»', async page => {
   await page.goto(`${BASE}/estate/${EST}`)
   await page.getByText(BANNER).waitFor()
   await page.getByText(/Du er Mona, en av tre arvinger og administrator; Kari og Lars har allerede svart\./).waitFor()
   await page.getByRole('heading', { name: 'Fam. Hansen sitt bo' }).first().waitFor()
-  for (const t of ['Bestemors gyngestol', 'Grønn 3-seters sofa', 'Middagsservise']) assert(await page.getByText(t).count() > 0, `oversikten viser ikke ${t}`)
+  await page.getByRole('heading', { name: /^Du har \d+ gjenstander? du ikke har tatt stilling til$/ }).waitFor()
   assert(await noSideScroll(page), 'oversikten kan rulles sidelengs på mobil')
+
+  await page.goto(`${BASE}/estate/${EST}/gjenstander`)
+  for (const t of ['Bestemors gyngestol', 'Grønn 3-seters sofa', 'Middagsservise']) await page.getByText(t, { exact: true }).first().waitFor()
+  assert(await noSideScroll(page), 'gjenstandslisten kan rulles sidelengs på mobil')
 
   await page.goto(`${BASE}/estate/${EST}/item/f4`)
   await page.getByText(/^Flere ønsker denne \(3\)$/).waitFor()

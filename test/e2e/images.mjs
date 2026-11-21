@@ -26,10 +26,11 @@ async function signing(page) {
 
 const srcs = page => page.locator('img').evaluateAll(els => els.map(e => e.getAttribute('src')))
 
-await check('Oversikten: bildet på kortet vises med signert URL, ikke den offentlige', async page => {
+await check('Gjenstandslisten: bildet på kortet vises med signert URL, ikke den offentlige', async page => {
   const asked = await signing(page)
-  await page.goto(`${BASE}/estate/${EST}`)
-  await page.locator(`img[alt="Gyngestol"]`).first().waitFor()
+  await page.goto(`${BASE}/estate/${EST}/gjenstander`)
+  // Bildet på kortet har tom alt-tekst: navnet står rett under, i samme lenke
+  await page.locator('.bo-kort img').first().waitFor()
   const all = await srcs(page)
   assert(all.some(s => s.includes('/object/sign/item-images/') && s.includes('token=')), `ingen signert URL: ${all.join(', ')}`)
   assert(!all.some(s => s.includes('/object/public/item-images/')), 'en offentlig bilde-URL vises fortsatt')

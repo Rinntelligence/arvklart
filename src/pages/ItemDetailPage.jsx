@@ -47,6 +47,11 @@ export default function ItemDetailPage({ session, profile, onToast, isDemo }) {
   const [withdrawn, setWithdrawn] = useState(null) // { reason } etter «Trekk ønsket mitt», til angring
   const commentsEndRef = useRef(null)
   const location = useLocation()
+  // «← Tilbake» går til gjenstandslisten med samme utvalg som før (EstateItemsPage sender det med i state.back).
+  // Åpnet fra et annet sted (lenke, ny fane) går den til hele listen.
+  const backTo = typeof location.state?.back === 'string' && location.state.back.startsWith(`/estate/${id}/`)
+    ? location.state.back
+    : `/estate/${id}/gjenstander`
   // Lenken «Kommenter» (…#kommentarer) ruller ned til kommentarfeltet når siden er lastet
   useEffect(() => {
     if (!loading && location.hash === '#kommentarer') document.getElementById('kommentarer')?.scrollIntoView({ block: 'start' })
@@ -207,14 +212,14 @@ export default function ItemDetailPage({ session, profile, onToast, isDemo }) {
     if (error || !data?.length) { onToast(L('Kunne ikke slette gjenstanden. Bare admin og den som la den inn kan slette den.', 'Could not delete the item. Only an admin and the person who added it can delete it.'), 'error'); return }
     await removeImages(allImages)
     onToast(L('Gjenstand slettet', 'Item deleted'))
-    navigate(`/estate/${id}`)
+    navigate(backTo)
   }
 
   return (
     <div style={{ maxWidth:'700px', margin:'0 auto', padding:'28px 16px', fontFamily:'Karla, sans-serif' }}>
 
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'4px' }}>
-        <button onClick={() => navigate(`/estate/${id}`)} style={{ background:'none', border:'none', color:'#75604B', cursor:'pointer', fontSize:'0.8125rem', padding:'0 0 20px', fontFamily:'Karla, sans-serif' }}>
+        <button onClick={() => navigate(backTo)} style={{ background:'none', border:'none', color:'#75604B', cursor:'pointer', fontSize:'0.8125rem', padding:'0 0 20px', fontFamily:'Karla, sans-serif' }}>
           {L('← Tilbake', '← Back')}
         </button>
         {canEdit && <button onClick={() => navigate(`/estate/${id}/item/${itemId}/edit`)} style={{ background:'none', border:'1px solid #D9CFC0', borderRadius:'8px', color:'#5C4530', cursor:'pointer', fontSize:'0.8125rem', padding:'6px 14px', fontFamily:'Karla, sans-serif', marginBottom:'16px' }}>

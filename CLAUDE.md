@@ -63,6 +63,8 @@ og `tc()` i `TopBar.jsx` velger lys eller mørk tekst etter lysheten i fargen.
 
 Tilgjengelighet (WCAG 2.2 AA): ikke bruk `outline:'none'`; fokus vises med `:focus-visible` i `index.html` (mørke flater setter lys ring selv). Hvit tekst bare på `#5F6E52` eller mørkere, ikke på `#8B9A7D`.
 
+**Unntak: bo-sidene er mørke.** Oversikten i boet (`/estate/:id`) og gjenstandslisten (`/estate/:id/gjenstander`) bruker den mørke paletten (Natt `#1F221E` som bakgrunn, Lin `#F2EEE6` tekst, Lin dempet `#B9B4A8`, Mose `#9DAA8C` aksent og fokusring, Granskog `#2F4A43`, Jord `#3A3129`, Messing lys `#C79A6B` høyst én gang per skjerm, Rust lys `#E08A7A` for sletting). Fargene står i `src/lib/estateTheme.js` (liten, brukes av `App.jsx`) og CSS-en i `src/lib/estateThemeCss.js` (klasser med prefiks `bo-`, avgrenset til `.bo-mork`; hover, `<details>` og mobiloppsett krever CSS). Sidene løypene leder til (sveip, fordeling, gjenstandssiden osv.) er fortsatt lyse.
+
 ## Typografi
 - `fontFamily: 'Karla, sans-serif'` — brødtekst og UI
 - `fontFamily: "'Fraunces', serif"` — overskrifter/display
@@ -150,7 +152,8 @@ Hent verdiene fra Supabase Dashboard → Project Settings → API.
 | `/om-oss` | AboutPage | Teamet bak Arvklart (forhåndsrendret) |
 | `/kontakt` | ContactPage | Kontakt, e-post med ferdig emne (forhåndsrendret; ingen skjema) |
 | `/app` | EstatesPage | Liste over brukerens bo (inngangen til appen) |
-| `/estate/:id` | EstatePage | Bo-oversikt |
+| `/estate/:id` | EstatePage | Bo-oversikten: hvor langt boet har kommet, «Anbefalt nå» (én handling) og fire nedtrekksgrupper (Gjenstander, Fordeling, Arvinger, Praktisk) med lenker til egne sider. Hva administrator, arving og demo ser, og hva som anbefales, står i `src/lib/estateOverview.js` (testet i `test/estate/overview.test.js`). Demoen viser ikke sidene som er sperret for den (`notForDemo`), og kan prøve AI, men ikke lagre |
+| `/estate/:id/gjenstander` | EstateItemsPage | Alle gjenstandene med store bilder. Søk, «Vis» (alle, mine ønsker, ettertraktede, noen vil ha, ingen vil ha, tildelt) og kategori står i adressen (`?vis=…&kategori=…&sok=…`, `src/lib/itemFilters.js`), og «Analyse» (`?visning=analyse`) viser fordelingen per kategori og status. Gjenstandssiden går tilbake hit med samme utvalg (`state.back`) |
 | `/estate/:id/add` | AddItemPage | Legg til gjenstand (inkl. AI-analyse) |
 | `/estate/:id/add-many` | AddItemsPage | Legg til opptil 20 gjenstander: kamera i appen (ett bilde = én gjenstand, «Flere bilder av denne» for flere), kamerarull/filer/dra-og-slipp, AI analyserer alle (ett kall per gjenstand, høyst fire samtidig). Analysen låser bare kortene den gjelder, og etter første «Analyser med AI» analyseres nye bilder av seg selv. AI lagrer aldri selv: brukeren ser over kortene og trykker «Godkjenn og lagre alle» |
 | `/estate/:id/swipe` | SwipePage | Ta stilling til gjenstander (vil ha / nei takk) |

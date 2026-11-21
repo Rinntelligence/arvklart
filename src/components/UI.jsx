@@ -30,7 +30,8 @@ export function Card({ children, style = {} }) {
 // Dialog med riktig semantikk: role="dialog", Esc lukker, Tab blir i dialogen, og fokus går tilbake
 // til knappen som åpnet den. Første knapp får fokus (i bekreftelser er det «Avbryt»).
 // labelledBy: id på overskriften i dialogen.
-export function Modal({ onClose, labelledBy, maxWidth = 400, overlay = 'rgba(0,0,0,0.5)', zIndex = 200, children }) {
+// panelStyle: egne farger på panelet, f.eks. mørkt på bo-sidene (estateTheme.js)
+export function Modal({ onClose, labelledBy, maxWidth = 400, overlay = 'rgba(0,0,0,0.5)', zIndex = 200, panelStyle, children }) {
   const panelRef = useRef(null)
   const closeRef = useRef(onClose)
   closeRef.current = onClose
@@ -58,7 +59,7 @@ export function Modal({ onClose, labelledBy, maxWidth = 400, overlay = 'rgba(0,0
   return (
     <div onClick={() => closeRef.current?.()} style={{ position:'fixed', inset:0, background:overlay, display:'flex', alignItems:'center', justifyContent:'center', zIndex, padding:'20px' }}>
       <div ref={panelRef} role="dialog" aria-modal="true" aria-labelledby={labelledBy} tabIndex={-1} onClick={e => e.stopPropagation()}
-        style={{ background:'#fff', borderRadius:'14px', padding:'28px', maxWidth:`${maxWidth}px`, width:'100%', fontFamily:'Karla, sans-serif', maxHeight:'calc(100vh - 40px)', overflowY:'auto' }}>
+        style={{ background:'#fff', borderRadius:'14px', padding:'28px', maxWidth:`${maxWidth}px`, width:'100%', fontFamily:'Karla, sans-serif', maxHeight:'calc(100vh - 40px)', overflowY:'auto', ...panelStyle }}>
         {children}
       </div>
     </div>

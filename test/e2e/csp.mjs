@@ -111,12 +111,20 @@ await check('Engelsk veiviser (?lang=en): språkskriptet kjører før siden vise
   await none(get)
 }, { loggedIn: false })
 
-await check('Bo-oversikten: signerte bilder og sanntid blokkeres ikke', async page => {
+await check('Bo-oversikten: sanntid og den mørke siden (stilblokk) blokkeres ikke', async page => {
+  const get = await violations(page)
+  await page.goto(`${BASE}/estate/${EST}`)
+  await page.getByRole('heading', { name: 'Hva vil du gjøre?' }).waitFor()
+  await page.waitForTimeout(500) // sanntidskanalen (wss://) åpnes
+  await none(get)
+}, withImages)
+
+await check('Gjenstandslisten: signerte bilder, pilene i nedtrekkslistene (data-URI) og sanntid blokkeres ikke', async page => {
   const get = await violations(page)
   await signedImages(page)
-  await page.goto(`${BASE}/estate/${EST}`)
-  await page.locator('img[alt="Gyngestol"]').first().waitFor()
-  await page.waitForFunction(() => [...document.images].some(i => i.alt === 'Gyngestol' && i.complete && i.naturalWidth > 0))
+  await page.goto(`${BASE}/estate/${EST}/gjenstander`)
+  await page.locator('.bo-kort img').first().waitFor()
+  await page.waitForFunction(() => [...document.querySelectorAll('.bo-kort img')].some(i => i.complete && i.naturalWidth > 0))
   await page.waitForTimeout(500) // sanntidskanalen (wss://) åpnes
   await none(get)
 }, withImages)

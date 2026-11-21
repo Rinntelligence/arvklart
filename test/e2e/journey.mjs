@@ -14,23 +14,47 @@ await check('Nytt bo åpnes direkte etter opprettelse', async page => {
   await page.waitForURL(`**/estate/${EST}`)
 })
 
-await check('«+ Legg til gjenstander» går til «Legg til flere»', async page => {
+await check('«Legg til gjenstander» går til «Legg til flere», både fra oversikten og fra gjenstandslisten', async page => {
   await page.goto(`${BASE}/estate/${EST}`)
-  await page.getByRole('button', { name: '+ Legg til gjenstander' }).click()
+  // «Gjenstander» er åpen første gang oversikten vises
+  await page.getByRole('link', { name: /^Legg til gjenstander/ }).click()
+  await page.waitForURL(`**/estate/${EST}/add-many`)
+  await page.goto(`${BASE}/estate/${EST}/gjenstander`)
+  await page.getByRole('link', { name: '+ Legg til gjenstander' }).click()
   await page.waitForURL(`**/estate/${EST}/add-many`)
 })
 
 await check('Søk i boet finner gjenstanden, og sier fra når ingenting passer', async page => {
-  await page.goto(`${BASE}/estate/${EST}`)
+  await page.goto(`${BASE}/estate/${EST}/gjenstander`)
+  const card = page.getByRole('link', { name: /^Gyngestol/ })
   const search = page.getByRole('searchbox', { name: 'Søk i boet' })
   await search.fill('gyng')
-  await page.getByRole('button', { name: 'Gyngestol', exact: true }).waitFor()
+  await card.waitFor()
   await search.fill('eik')
-  await page.getByRole('button', { name: 'Gyngestol', exact: true }).waitFor()
+  await card.waitFor()
   await search.fill('piano')
   await page.getByText('Ingen gjenstander passer «piano».').waitFor()
+  assert(page.url().includes('sok=piano'), 'søket står ikke i adressen')
   await page.getByRole('button', { name: 'Tøm søket' }).click()
-  await page.getByRole('button', { name: 'Gyngestol', exact: true }).waitFor()
+  await card.waitFor()
+})
+
+await check('Gjenstandslisten: kortet åpner gjenstanden, og «Tilbake» går til samme utvalg', async page => {
+  await page.goto(`${BASE}/estate/${EST}/gjenstander?vis=ingen-vil-ha`)
+  await page.getByRole('heading', { name: 'Ingen vil ha', level: 1 }).waitFor()
+  await page.getByRole('link', { name: /^Gyngestol/ }).click()
+  await page.waitForURL(`**/estate/${EST}/item/${ITEM}`)
+  await page.getByRole('button', { name: '← Tilbake' }).click()
+  await page.waitForURL(`**/estate/${EST}/gjenstander?vis=ingen-vil-ha`)
+  assert(await page.getByRole('combobox', { name: 'Vis' }).inputValue() === 'ingen-vil-ha', '«Vis» er ikke «Ingen vil ha»')
+})
+
+await check('Gjenstandslisten: «Analyse» viser fordelingen per kategori og status', async page => {
+  await page.goto(`${BASE}/estate/${EST}/gjenstander`)
+  await page.getByRole('button', { name: 'Analyse' }).click()
+  await page.getByRole('heading', { name: 'Gjenstander per kategori' }).waitFor()
+  await page.getByText('Ingen vil ha 1').waitFor()
+  assert(page.url().includes('visning=analyse'), 'visningen står ikke i adressen')
 })
 
 await check('Sveip: «Nei takk» kan angres uten tidsfrist', async (page, calls) => {
@@ -58,7 +82,7 @@ await check('Arvinger: fjerning krever bekreftelse', async (page, calls) => {
 })
 
 await check('Verdi på kortet er merket som anslag («ca.»)', async page => {
-  await page.goto(`${BASE}/estate/${EST}`)
+  await page.goto(`${BASE}/estate/${EST}/gjenstander`)
   await page.getByText(/^ca\. kr\s?1\s?500$|^ca\. 1\s?500\s?kr$/).first().waitFor()
 })
 
@@ -144,13 +168,18 @@ await check('Invitasjon som ikke stemmer: viser innlogget e-post, kopier, prøv 
 
 await check('Arving: ser egne ønsker ett trykk unna, ikke admin-verktøyene', async page => {
   await page.goto(`${BASE}/estate/${EST}`)
-  await page.getByRole('heading', { name: 'Dine valg' }).waitFor()
-  await page.getByText('gjenstander du ønsker').waitFor()
-  await page.getByRole('button', { name: 'Se mine ønsker' }).click()
-  await page.waitForFunction(() => document.activeElement?.dataset.tab === 'mine')
-  assert(await page.locator('[data-tab="mine"]').getAttribute('aria-pressed') === 'true', '«Mine» er ikke valgt')
-  assert(await page.getByRole('button', { name: /Arvinger\s*Fordelingskalkulator/ }).count() === 0, 'arvingen ser fordelingskalkulatoren')
-  assert(await page.getByRole('button', { name: 'Administrer' }).count() === 0, 'arvingen ser «Administrer»')
+  // Begge ønskene deles med Kari: «Anbefalt nå» ber om å snakke sammen
+  await page.getByRole('heading', { name: '2 av ønskene dine ønskes også av andre' }).waitFor()
+  await page.getByRole('link', { name: /^Mine ønsker.*2$/ }).click()
+  await page.waitForURL(`**/estate/${EST}/gjenstander?vis=mine`)
+  await page.getByRole('heading', { name: 'Mine ønsker', level: 1 }).waitFor()
+  assert(await page.getByRole('combobox', { name: 'Vis' }).inputValue() === 'mine', '«Mine ønsker» er ikke valgt')
+  await page.goto(`${BASE}/estate/${EST}`)
+  await page.getByText('Arvinger', { exact: true }).click()
+  await page.getByRole('link', { name: /^Arvingene/ }).waitFor()
+  assert(await page.getByRole('link', { name: /fordelingskalkulator/i }).count() === 0, 'arvingen ser fordelingskalkulatoren')
+  assert(await page.getByRole('link', { name: 'Administrer boet' }).count() === 0, 'arvingen ser «Administrer boet»')
+  assert(await page.getByRole('link', { name: /^Inviter arvinger/ }).count() === 0, 'arvingen ser «Inviter arvinger»')
 }, { fixtures: { ...contested, estate_members: [
   { estate_id: EST, user_id: UID, role: 'member', joined_at: now, profiles: FIXTURES.profiles[0] },
   { estate_id: EST, user_id: U2, role: 'admin', joined_at: now, profiles: kari },
@@ -214,20 +243,41 @@ await check('Slett konto: feil gir en fast melding, ikke råtekst fra serveren',
   assert(await page.getByText(/foreign key|secret_stuff/).count() === 0, 'råtekst fra serveren vises')
 })
 
-await check('Bo-siden har snarvei til dokumentarkivet og sjekklisten', async page => {
+await check('Oversikten: «Praktisk» leder til dokumentarkivet og sjekklisten', async page => {
   await page.goto(`${BASE}/estate/${EST}`)
-  await page.getByRole('button', { name: /^Dokumenter/ }).click()
+  await page.getByText('Praktisk', { exact: true }).click()
+  await page.getByRole('link', { name: /^Dokumenter/ }).click()
   await page.waitForURL(`**/estate/${EST}/documents`)
   await page.goto(`${BASE}/estate/${EST}`)
-  await page.getByRole('button', { name: /^Sjekkliste/ }).click()
+  // Gruppen huskes som åpen i fanen
+  await page.getByRole('link', { name: /^Sjekkliste/ }).click()
   await page.waitForURL(`**/estate/${EST}/tasks`)
 })
 
-await check('Demoen viser ikke snarveien til dokumentarkivet', async page => {
+await check('Oversikten for administrator: «Administrer boet», «Inviter arvinger» og fordelingskalkulatoren', async page => {
+  await page.goto(`${BASE}/estate/${EST}`)
+  await page.getByRole('link', { name: 'Administrer boet' }).waitFor()
+  await page.getByText('Arvinger', { exact: true }).click()
+  await page.getByRole('link', { name: /^Arvinger og fordelingskalkulator/ }).waitFor()
+  await page.getByRole('link', { name: /^Inviter arvinger/ }).click()
+  await page.waitForURL(`**/estate/${EST}/admin`)
+})
+
+await check('Demoen viser bare det demokontoen kan bruke', async page => {
   await page.goto(`${BASE}/estate/${EST}`)
   await page.getByText(/Du ser på en/).waitFor() // demobanneret: økten er en demoøkt
-  await page.getByRole('button', { name: /^Sjekkliste/ }).waitFor()
-  assert(await page.getByRole('button', { name: /^Dokumenter/ }).count() === 0, 'demoen viser «Dokumenter»')
+  await page.getByRole('link', { name: /^Prøv AI-verdivurdering/ }).waitFor()
+  await page.getByText('Praktisk', { exact: true }).click()
+  await page.getByRole('link', { name: /^Sjekkliste/ }).waitFor()
+  await page.getByText('Arvinger', { exact: true }).click()
+  await page.getByRole('link', { name: /^Arvinger og fordelingskalkulator/ }).waitFor()
+  for (const name of [/^Dokumenter/, /^Oppgaver og bidrag/, /^Inviter arvinger/, /^Legg til gjenstander/, /^Legg til én gjenstand/, 'Administrer boet', '← Alle bo']) {
+    assert(await page.getByRole('link', { name }).count() === 0, `demoen viser ${name}`)
+  }
+  await page.goto(`${BASE}/estate/${EST}/gjenstander`)
+  await page.getByRole('link', { name: /^Gyngestol/ }).waitFor()
+  assert(await page.getByRole('button', { name: 'Slett «Gyngestol»' }).count() === 0, 'demoen kan slette gjenstander')
+  await page.getByRole('link', { name: 'Prøv AI-verdivurdering' }).waitFor()
 }, { ...DEMO })
 
 await check('Innloggingen lover ikke kunder eller partnere som ikke finnes', async page => {

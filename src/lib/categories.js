@@ -1,6 +1,6 @@
 // Visningsnavn for kategorier. Kategoriene lagres med norsk navn (CLAUDE.md); standardkategoriene vises på
 // engelsk når grensesnittet er engelsk. Egne kategorier vises slik brukeren skrev dem.
-import { L } from './lang'
+import { L } from './lang.js'
 
 const EN = {
   'Møbler': 'Furniture',

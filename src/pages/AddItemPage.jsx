@@ -211,7 +211,7 @@ export default function AddItemPage({ session, profile, onToast, isDemo }) {
 
       if (failedImages > 0) onToast(L(`Gjenstanden er lagt til, men ${failedImages} ${failedImages === 1 ? 'bilde' : 'bilder'} kunne ikke lastes opp. Prøv igjen fra «Rediger».`, `The item was added, but ${failedImages} ${failedImages === 1 ? 'photo' : 'photos'} could not be uploaded. Try again from «Edit».`), 'error')
       else onToast(L('Gjenstand lagt til! ✓', 'Item added! ✓'))
-      navigate(`/estate/${id}`)
+      navigate(`/estate/${id}/gjenstander`) // den nye gjenstanden står øverst i listen
     } catch (e) {
       onToast(L('Feil: ', 'Error: ') + e.message, 'error')
     } finally {
